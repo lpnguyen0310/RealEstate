@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
+import Header from './layouts/Header'
 import Footer from './layouts/Footer.jsx'
 
 function App() {
@@ -10,7 +9,7 @@ function App() {
   return (
     <>
       <p className='font-black'>
-        Hello world ok
+        Hello world
       </p>
       <Footer />
     </>
