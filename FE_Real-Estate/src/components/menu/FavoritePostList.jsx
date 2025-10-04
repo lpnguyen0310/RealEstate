@@ -1,0 +1,94 @@
+import React from "react";
+import { Dropdown, Tooltip, Badge } from "antd";
+import { HeartOutlined } from "@ant-design/icons";
+
+export default function FavoritePostList({
+  savedPosts = [],
+  width = 340,
+  iconSize = 25,
+}) {
+  return (
+    <Dropdown
+      trigger={["click"]}
+      placement="bottom"
+      arrow={{ pointAtCenter: true }}
+      getPopupContainer={() => document.body}
+      align={{ offset: [0, 10] }}
+      overlayClassName="bds-saved-dropdown"
+      zIndex={120}
+      dropdownRender={() => (
+        <div
+          className="bg-white rounded-2xl shadow-xl overflow-hidden"
+          style={{ width }}
+        >
+          <div className="animate-fade-up">
+            {/* Header */}
+            <div className="text-center font-semibold text-[15px] text-gray-800 py-3 border-b border-gray-100">
+              Tin đăng đã lưu
+            </div>
+
+            {/* List */}
+            <div className="max-h-[300px] overflow-auto">
+              {savedPosts.length === 0 ? (
+                <div className="px-4 py-6 text-center text-gray-500 text-[14px]">
+                  Chưa có tin nào được lưu.
+                </div>
+              ) : (
+                savedPosts.map((p) => (
+                  <a
+                    key={p.id}
+                    href={p.href || "#"}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition no-underline"
+                  >
+                    <img
+                      src={p.thumb}
+                      alt="thumb"
+                      className="w-[70px] h-[50px] object-cover rounded-md border"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[14px] text-gray-800 font-medium truncate">
+                        {p.title}
+                      </div>
+                      <div className="text-[12px] text-gray-500">{p.savedAgo}</div>
+                    </div>
+                  </a>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-100 text-center py-2">
+              <a
+                href="/tin-da-luu"
+                className="text-[#d6402c] text-[14px] font-medium hover:underline"
+              >
+                Xem tất cả →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    >
+      <span className="inline-block align-middle">
+        <Tooltip
+          title="Danh sách tin đã lưu"
+          placement="bottom"
+          color="#000"
+          overlayInnerStyle={{ fontSize: 13, fontWeight: 600, padding: "6px 10px" }}
+          arrow={{ pointAtCenter: true }}
+          overlayClassName="bds-tooltip"
+          mouseEnterDelay={0.06}
+          mouseLeaveDelay={0.12}
+          zIndex={100}
+        >
+          <Badge count={savedPosts.length} size="small" offset={[-2, 6]}>
+            <HeartOutlined
+              className="cursor-pointer text-gray-800 hover:text-[#d6402c]"
+              style={{ fontSize: iconSize }}
+            />
+          </Badge>
+        </Tooltip>
+      </span>
+    </Dropdown>
+  );
+}

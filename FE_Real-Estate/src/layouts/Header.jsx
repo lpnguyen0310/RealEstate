@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Flex, Badge, Dropdown, Button } from "antd";
-import { HeartOutlined, BellOutlined } from "@ant-design/icons";
+import { Flex, Badge, Dropdown, Button, Tooltip } from "antd";
+import { BellOutlined } from "@ant-design/icons";
 import { NAVS } from "@/data/header_submenu";
 import UserDropDownHeader from "@/components/menu/UserDropDownHeader";
 import LoginModal from "../pages/Login/LoginModal";
 import RegisterModal from "../pages/Signup/RegisterModal";
+import { SAVED_POSTS } from "@/data/SavedPost";
+import FavoritePostList from "@/components/menu/FavoritePostList";
 
 export default function Header() {
     const [hoverKey, setHoverKey] = useState(null);
@@ -55,7 +57,7 @@ export default function Header() {
     return (
         <>
             <header className="sticky top-0 z-50 mx-auto bg-white border-b border-gray-200 w-full px-4 py-2">
-                <Flex align="center" justify="space-between" className="mx-auto w-full h-[72px] px-4 max-w-[1440px]">
+                <Flex align="center" justify="space-between" className="mx-auto w-full h-[72px] px-4">
                     <Flex align="center" gap={32}>
                         {/* Logo */}
                         <a href="/" className="flex items-center h-full cursor-pointer px-4 py-3">
@@ -114,7 +116,8 @@ export default function Header() {
                         gap={0}
                         justify="space-evenly"
                     >
-                        <HeartOutlined className="text-[25px] text-gray-800 cursor-pointer hover:text-[#d6402c]" />
+                        {/* Favorite Post List */}
+                        <FavoritePostList savedPosts={SAVED_POSTS} />
                         <Badge count={2} size="small" offset={[-2, 6]}>
                             <BellOutlined className="text-[25px] text-gray-800 cursor-pointer hover:text-[#d6402c]" />
                         </Badge>
