@@ -1,20 +1,15 @@
-import { useState } from 'react'
-import './App.css'
-import Header from './layouts/Header'
-import Footer from './layouts/Footer.jsx'
+import Header from "./layouts/Header";
+import Footer from "./layouts/Footer";
+import AppRoutes from "./routes/appRoutes";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+export default function App() {
   return (
     <>
       <Header />
-      <p className='font-black'>
-        Hello world
-      </p>
+      <main className="min-h-screen">
+        <AppRoutes />
+      </main>
       <Footer />
     </>
-  )
+  );
 }
-
-export default App
