@@ -8,6 +8,7 @@ function App() {
 
   return (
     <>
+      <Header />
       <p className='font-black'>
         Hello world
       </p>
