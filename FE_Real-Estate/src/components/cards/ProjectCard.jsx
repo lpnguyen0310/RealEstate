@@ -17,14 +17,29 @@ export default function ProjectCard({ project }) {
         {/* gradient đáy */}
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         {/* text */}
+        {/* text */}
         <div className="absolute left-5 right-5 bottom-5 text-white">
-          <h3 className="text-[18px] md:text-[20px] lg:text-[22px] font-extrabold leading-snug group-hover:underline">
-            {project.name}
-          </h3>
-          <p className="mt-2 text-white/90 text-[14px] md:text-[15px] line-clamp-2">
-            {project.address}
-          </p>
+          <div className="flex flex-col gap-1">
+            {/* Title box: cố định chiều cao (≈ 2 dòng), ẩn phần tràn */}
+            <div className="overflow-hidden h-[48px] md:h-[52px] lg:h-[56px]">
+              <h3
+                className="text-[18px] md:text-[20px] lg:text-[22px] font-extrabold leading-tight group-hover:underline"
+                title={project.name}         // tooltip để xem full
+              >
+                {project.name}
+              </h3>
+            </div>
+
+            {/* Address: 1 dòng, cắt đuôi bằng ellipsis */}
+            <p
+              className="text-white/90 text-[14px] md:text-[15px] leading-snug truncate"
+              title={project.address}       
+            >
+              {project.address}
+            </p>
+          </div>
         </div>
+
       </div>
     </a>
   );

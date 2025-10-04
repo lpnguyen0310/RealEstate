@@ -17,8 +17,14 @@ import {
 } from "@ant-design/icons";
 import FeatureTools from "../../components/button/FeatureTools";
 import FeaturedList from "../../components/cards/FeaturedList";
-import ExploreAmenities from "../../components/sections/ExploreAmenities";
 import FeaturedProjects from "../../components/sections/FeaturedProjects";
+import FirstTimeBuyerGuide from "../../components/sections/FirstTimeBuyerGuide";
+import BannerCta from "../../components/sections/BannerCta";
+import bannerPlanning from "../../assets/home-section4-image-bg.png";
+import bannerResearch from "../../assets/home-section6-image-bg.png";
+import bannerPosting from "../../assets/home-section7-image-bg.png";
+import bannerContact from "../../assets/home-section8-image-bg.png";
+import FilterModal from "../../components/filters/FilterModal";
 
 const trending = [
     "mua nhà phố bình tân dưới 7 tỷ",
@@ -34,6 +40,14 @@ export default function Home() {
     const [mode, setMode] = useState("buy"); // 'buy' | 'rent'
     const [query, setQuery] = useState("");
     const [type, setType] = useState(null);
+    const [showFilter, setShowFilter] = useState(false);
+    const [filters, setFilters] = useState(null);
+
+    const handleApplyFilters = (payload) => {
+        setFilters(payload);
+        // TODO: gọi API với filters
+        // console.log("Applied filters:", payload);
+    };
 
     const handleSearch = () => {
         // TODO: nối API tìm kiếm
@@ -115,22 +129,14 @@ export default function Home() {
                         {/* Hàng controls: Chọn BĐS + Input + Tìm kiếm */}
                         <div className="px-6 pb-5 pt-4">
                             <div className="flex flex-col lg:flex-row gap-3">
-                                <Dropdown menu={typeMenu} trigger={["click"]}>
-                                    <Button
-                                        size="large"
-                                        icon={<FilterOutlined />}
-                                        className="lg:w-[220px] w-full h-[44px] !rounded-xl !border-none !bg-[#f1f5ff] hover:!bg-[#e8efff] text-[#17306b] font-semibold shadow-sm"
-                                    >
-                                        {type
-                                            ? {
-                                                "can-ho": "Căn hộ",
-                                                "nha-pho": "Nhà phố",
-                                                "biet-thu": "Biệt thự",
-                                                "dat-nen": "Đất nền",
-                                            }[type]
-                                            : "Chọn BĐS"}
-                                    </Button>
-                                </Dropdown>
+                                <Button
+                                    size="large"
+                                    icon={<FilterOutlined />}
+                                    className="lg:w-[180px] w-full h-[44px] !rounded-xl !border-none !bg-[#f1f5ff] hover:!bg-[#e8efff] text-[#17306b] font-semibold shadow-sm"
+                                    onClick={() => setShowFilter(true)}
+                                >
+                                    Bộ lọc
+                                </Button>
 
                                 <Input
                                     size="large"
@@ -177,10 +183,78 @@ export default function Home() {
                 <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
                     <FeatureTools />
                     <FeaturedList />
-                    <ExploreAmenities />
+                    <BannerCta
+                        title="Tra cứu quy hoạch"
+                        description={
+                            <>
+                                Kiểm tra quy hoạch online theo: số tờ, số thửa, tọa độ… với độ chính
+                                xác cao và dữ liệu mới nhất.
+                            </>
+                        }
+                        buttonLabel="Khám phá ngay"
+                        href="/tra-cuu-quy-hoach"
+                        bg={bannerPlanning}    // hoặc "/assets/home-section4-image-bg.png"
+                        side="right"
+                        tone="light"
+                        minH={300}
+                    />
                     <FeaturedProjects />
+                    <FirstTimeBuyerGuide />
+                    <BannerCta
+                        title="Tra cứu kế hoạch"
+                        description={
+                            <>
+                                Kiểm tra quy hoạch online theo: số tờ, số thửa, toạ độ... với độ chính xác cao và dữ liệu mới nhất
+                            </>
+                        }
+                        buttonLabel="Khám phá ngay"
+                        href="/dang-tin"
+                        bg={bannerResearch}     // hoặc "/assets/home-section5-image-bg.png"
+                        side="left"
+                        tone="dark"
+                        minH={320}
+                    />
+                    <BannerCta
+                        title="Đăng tin chuyên nghiệp
+"
+                        description={
+                            <>
+                                Muốn tìm khách hàng chất lượng? Khám phá giải pháp đăng tin toàn diện tại Radanhadat.vn với cực nhiều ưu đãi trong giai đoạn ra mắt nền tảng
+
+                            </>
+                        }
+                        buttonLabel="Đăng tin ngay"
+                        href="/dang-tin"
+                        bg={bannerPosting}     // hoặc "/assets/home-section5-image-bg.png"
+                        side="right"
+                        tone="dark"
+                        minH={320}
+                    />
+                    <BannerCta
+                        title="“Làm” nội thất đẹp mê say"
+                        description={
+                            <>
+                                Giảm ngay 5% khi làm nội thất cùng dg home
+
+                            </>
+                        }
+                        buttonLabel="Khám phá ngay"
+                        href="/dang-tin"
+                        bg={bannerContact}     // hoặc "/assets/home-section5-image-bg.png"
+                        side="left"
+                        tone="dark"
+                        minH={320}
+                    />
+
+
                 </div>
             </section>
+            <FilterModal
+                open={showFilter}
+                onClose={() => setShowFilter(false)}
+                onApply={handleApplyFilters}
+                initial={filters}
+            />
         </div>
     );
 }
