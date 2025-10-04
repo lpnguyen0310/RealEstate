@@ -1,6 +1,5 @@
-#root {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 1rem;
-  text-align: center;
+:root {
+  --header-backgrond-color: #fff;
+  --primary-color: #00b14f;
+  --header-button-dark: #161f29;
 }
