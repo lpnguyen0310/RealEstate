@@ -1,6 +1,7 @@
 import { useRef, useCallback } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay } from "swiper/modules";
+import { Link } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
 import PropertyCard from "./PropertyCard";
@@ -49,7 +50,9 @@ export default function FeaturedList() {
         >
           {FEATURED_PROPERTIES.map((p) => (
             <SwiperSlide key={p.id}>
-              <PropertyCard item={p} />
+              <Link to={`/real-estate/${p.id}`} className="block group">
+                <PropertyCard item={p} />
+              </Link>
             </SwiperSlide>
           ))}
         </Swiper>
