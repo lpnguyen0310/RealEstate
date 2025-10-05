@@ -7,6 +7,12 @@ import {
   EnvironmentOutlined,
 } from "@ant-design/icons";
 
+function stopLink(e) {
+  // chặn mọi hành vi điều hướng của Link bao quanh
+  e.preventDefault();
+  e.stopPropagation();
+}
+
 export default function PropertyCard({ item }) {
   return (
     <div className="rounded-[20px] border border-gray-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
@@ -27,6 +33,11 @@ export default function PropertyCard({ item }) {
             className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow flex items-center justify-center"
             aria-label="Chia sẻ"
             title="Chia sẻ"
+            onMouseDown={stopLink}   // chặn sớm để tránh focus kích hoạt Link
+            onClick={(e) => {
+              stopLink(e);
+              // TODO: logic chia sẻ của bạn
+            }}
           >
             <ShareAltOutlined />
           </button>
@@ -35,7 +46,12 @@ export default function PropertyCard({ item }) {
             className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow flex items-center justify-center"
             aria-label="Yêu thích"
             title="Yêu thích"
-          >
+            onMouseDown={stopLink}
+            onClick={(e) => {
+              stopLink(e);
+              // TODO: toggle like / gọi API
+            }}
+           > 
             <HeartOutlined />
           </button>
         </div>
