@@ -3,18 +3,256 @@
 export const FEATURED_PROPERTIES = [
   {
     id: 1,
+    images: [
+      "/src/assets/section3-image1.jpg",
+      "/src/assets/section3-image2.jpg",
+      "/src/assets/section3-image3.jpg",
+      "/src/assets/section3-image4.jpg",
+    ],
     image: "/src/assets/section3-image1.jpg",
-    title: "bán nhà cạnh sân bay 5x15 (75m2) 3 tầng 6,999 tỷ hẻm oto",
-    price: "6.9 tỷ",
+    title:
+      "NHÀ BÁN HẺM XE HƠI TRÁNH NHAU - 2 TẦNG KIÊN CỐ - 4M x 10M - GIÁ HƠN 3 TỶ XÍU.",
+    price: "3.6 tỷ",
+    pricePerM2: "~90 triệu/m²",
+    postedAt: "2 ngày trước",
+    photos: 4,
+    addressShort: "Bình Tân, TP.HCM",
+    addressFull:
+      "Phường Bình Hưng Hoà B, Quận Bình Tân, Thành phố Hồ Chí Minh",
+    area: 40,
+    bed: 2,
+    bath: 2,
+    description:
+      "Đường số 6, Bình Hưng Hoà B – Kết cấu: 1 trệt 1 lầu, 2PN 2WC, xe hơi tránh nhau.",
+    agent: {
+      name: "Phạm Văn Tuấn",
+      role: "Môi giới",
+      avatar: "",
+      phone: "0971 509 123",
+      zaloUrl: "https://zalo.me/ptuan",
+    },
+  },
+
+  {
+    id: 2,
+    image: "/src/assets/section3-image2.jpg",
+    title: "Nhà mới ở ngay 5x15, 1 trệt 2 lầu, tặng full nội thất",
+    price: "69 tỷ",
     pricePerM2: "~92 triệu/m²",
     postedAt: "1 ngày trước",
     photos: 4,
-    addressShort: "Phường Tân Sơn, Thành phố Hồ Chí Minh",
+    addressShort: "Tân Bình, TP.HCM",
     addressFull: "Phường 15, Quận Tân Bình, Thành phố Hồ Chí Minh",
-    area: 75, bed: 2, bath: 2,
+    area: 75,
+    bed: 4,
+    bath: 3,
+    description:
+      "Khu an ninh, gần sân bay Tân Sơn Nhất. Nội thất gỗ tự nhiên, vào ở ngay.",
+    agent: {
+      name: "Nguyễn Thị Mai",
+      role: "Cộng tác viên",
+      phone: "0903 456 789",
+      zaloUrl: "https://zalo.me/mainguyen",
+    },
   },
-  // ... các item 2..10 (y như bạn đã đưa)
+
+  {
+    id: 3,
+    image: "/src/assets/section3-image3.jpg",
+    title: "Căn hộ Q7 Riverside 56m², view sông thoáng mát",
+    price: "2.1 tỷ",
+    pricePerM2: "~37 triệu/m²",
+    postedAt: "Hôm nay",
+    photos: 6,
+    addressShort: "Quận 7, TP.HCM",
+    addressFull: "Phường Phú Thuận, Quận 7, Thành phố Hồ Chí Minh",
+    area: 56,
+    bed: 2,
+    bath: 1,
+    description: "Block B, tầng trung, sổ hồng sẵn, vay bank được 70%.",
+    agent: {
+      name: "Lê Quốc Huy",
+      role: "Môi giới",
+      phone: "0912 888 222",
+      zaloUrl: "https://zalo.me/lequochuy",
+    },
+  },
+
+  {
+    id: 4,
+    images: [
+      "/src/assets/section3-image4.jpg",
+      "/src/assets/section3-image1.jpg",
+      "/src/assets/section3-image2.jpg",
+    ],
+    image: "/src/assets/section3-image4.jpg",
+    title: "Đất thổ cư 5x20, sổ riêng, xây tự do, sát chợ",
+    price: "1.25 tỷ",
+    pricePerM2: "~12.5 triệu/m²",
+    postedAt: "3 ngày trước",
+    photos: 3,
+    addressShort: "Hóc Môn, TP.HCM",
+    addressFull: "Xã Xuân Thới Thượng, Huyện Hóc Môn, TP.HCM",
+    area: 100,
+    bed: 0,
+    bath: 0,
+    description: "Đường trước đất 6m, dân cư hiện hữu, công chứng trong ngày.",
+    agent: {
+      name: "Trần Ngọc Dũng",
+      role: "Môi giới",
+      phone: "0933 777 101",
+      zaloUrl: "https://zalo.me/tndung",
+    },
+  },
+
+  {
+    id: 5,
+    image: "/src/assets/section3-image5.jpg",
+    title: "Nhà phố Cityland Gò Vấp, 1 trệt 3 lầu, gara ô tô",
+    price: "19 tỷ",
+    pricePerM2: "~152 triệu/m²",
+    postedAt: "Tuần trước",
+    photos: 8,
+    addressShort: "Gò Vấp, TP.HCM",
+    addressFull: "KDC Cityland, Phường 5, Quận Gò Vấp, TP.HCM",
+    area: 125,
+    bed: 5,
+    bath: 5,
+    description:
+      "Nhà đẹp, thiết kế hiện đại, khu compound an ninh, kinh doanh tốt.",
+    agent: {
+      name: "Võ Minh Khôi",
+      role: "Môi giới",
+      phone: "0902 333 444",
+      zaloUrl: "https://zalo.me/vmkhoi",
+    },
+  },
+
+  {
+    id: 6,
+    image: "/src/assets/section3-image1.jpg",
+    title: "Chung cư Bình Thạnh 48m², nội thất cơ bản, giá mềm",
+    price: "950 triệu",
+    pricePerM2: "~19.8 triệu/m²",
+    postedAt: "5 ngày trước",
+    photos: 3,
+    addressShort: "Bình Thạnh, TP.HCM",
+    addressFull: "Phường 26, Quận Bình Thạnh, TP.HCM",
+    area: 48,
+    bed: 1,
+    bath: 1,
+    // không có description để test ẩn dòng mô tả
+    agent: {
+      name: "Đinh Hải Yến",
+      role: "Cộng tác viên",
+      // không có phone để test ẩn nút Gọi
+      zaloUrl: "https://zalo.me/dhyen",
+    },
+  },
+
+  {
+    id: 7,
+    images: [
+      "/src/assets/section3-image2.jpg",
+      "/src/assets/section3-image3.jpg",
+      "/src/assets/section3-image4.jpg",
+      "/src/assets/section3-image5.jpg",
+    ],
+    image: "/src/assets/section3-image2.jpg",
+    title: "Nhà góc 2 mặt tiền, 6x14, thiết kế lệch tầng, thoáng sáng",
+    price: "6.9 tỷ",
+    pricePerM2: "~82 triệu/m²",
+    postedAt: "Hôm qua",
+    photos: 9,
+    addressShort: "Tân Phú, TP.HCM",
+    addressFull: "Phường Sơn Kỳ, Quận Tân Phú, TP.HCM",
+    area: 84,
+    bed: 4,
+    bath: 3,
+    description:
+      "Hẻm 6m thông, gần AEON Tân Phú, khu dân trí cao, sổ nở hậu tài lộc.",
+    agent: {
+      name: "Phan Gia Bảo",
+      role: "Môi giới",
+      phone: "0979 111 222",
+      zaloUrl: "https://zalo.me/pgbao",
+    },
+  },
+
+  {
+    id: 8,
+    image: "/src/assets/section3-image3.jpg",
+    title: "Studio 28m² full nội thất, gần ĐH Tôn Đức Thắng",
+    price: "1.15 tỷ",
+    pricePerM2: "~41 triệu/m²",
+    postedAt: "4 ngày trước",
+    photos: 2,
+    addressShort: "Quận 7, TP.HCM",
+    addressFull: "Phường Tân Phong, Quận 7, TP.HCM",
+    area: 28,
+    bed: 1,
+    bath: 1,
+    description: "Thích hợp đầu tư cho thuê, tỷ suất 8–10%/năm.",
+    agent: {
+      name: "Ngô Nhật Anh",
+      role: "Môi giới",
+      phone: "0911 222 333",
+      zaloUrl: "https://zalo.me/ngonhatanh",
+    },
+  },
+
+  {
+    id: 9,
+    images: [
+      "/src/assets/section3-image4.jpg",
+      "/src/assets/section3-image1.jpg",
+    ],
+    image: "/src/assets/section3-image4.jpg",
+    title: "Biệt thự mini 8x20, sân vườn trước sau, hồ cá KOI",
+    price: "39 tỷ",
+    pricePerM2: "~244 triệu/m²",
+    postedAt: "2 tuần trước",
+    photos: 10,
+    addressShort: "Thủ Đức, TP.HCM",
+    addressFull: "Phường Linh Tây, TP Thủ Đức, TP.HCM",
+    area: 160,
+    bed: 6,
+    bath: 6,
+    description:
+      "Khu VIP, hàng xóm thân thiện, nội thất nhập khẩu, gara 2 ô tô.",
+    agent: {
+      name: "Lương Hoài Phong",
+      role: "Môi giới",
+      phone: "0908 000 666",
+      zaloUrl: "https://zalo.me/lhphong",
+    },
+  },
+
+  {
+    id: 10,
+    image: "/src/assets/section3-image5.jpg",
+    title: "Nhà 3 tấm 4x12, gần trường học, chợ, công viên",
+    price: "3.25 tỷ",
+    pricePerM2: "~67 triệu/m²",
+    postedAt: "6 ngày trước",
+    photos: 5,
+    addressShort: "Bình Chánh, TP.HCM",
+    addressFull: "Xã Vĩnh Lộc A, Huyện Bình Chánh, TP.HCM",
+    area: 48,
+    bed: 3,
+    bath: 2,
+    // không có agent.avatar để test ký tự đầu tên
+    description:
+      "Nhà mới, sơn sửa cuối 2024, tặng bếp + máy lạnh, công chứng ngay.",
+    agent: {
+      name: "Hoàng Mỹ Linh",
+      role: "Môi giới",
+      phone: "0934 567 890",
+      zaloUrl: "https://zalo.me/hmlinh",
+    },
+  },
 ];
+
 
 // ==== CHI TIẾT THEO ID (tuỳ từng bài có thể khác nhau) ====
 // Bạn chỉ cần khai 1 số trường đổi theo từng bài; phần còn thiếu sẽ fallback.
