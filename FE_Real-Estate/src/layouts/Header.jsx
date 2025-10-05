@@ -98,7 +98,7 @@ export default function Header() {
                                         <a
                                             key={nav.key}
                                             href={`/${nav.key}`}
-                                            className="inline-block"
+                                            className="inline-block no-underline !text-gray-800 hover:text-gray-900 visited:text-gray-800"
                                             onMouseEnter={() => setHoverKey(nav.label)}
                                         >
                                             {btn}

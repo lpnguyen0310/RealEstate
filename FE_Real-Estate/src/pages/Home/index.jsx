@@ -137,7 +137,6 @@ export default function Home() {
                                 >
                                     Bộ lọc
                                 </Button>
-
                                 <Input
                                     size="large"
                                     value={query}
@@ -146,7 +145,6 @@ export default function Home() {
                                     className="flex-1 h-[44px] !rounded-xl"
                                     onPressEnter={handleSearch}
                                 />
-
                                 <Button
                                     type="primary"
                                     size="large"
@@ -193,7 +191,7 @@ export default function Home() {
                         }
                         buttonLabel="Khám phá ngay"
                         href="/tra-cuu-quy-hoach"
-                        bg={bannerPlanning}    // hoặc "/assets/home-section4-image-bg.png"
+                        bg={bannerPlanning}
                         side="right"
                         tone="light"
                         minH={300}
@@ -209,18 +207,15 @@ export default function Home() {
                         }
                         buttonLabel="Khám phá ngay"
                         href="/dang-tin"
-                        bg={bannerResearch}     // hoặc "/assets/home-section5-image-bg.png"
+                        bg={bannerResearch}
                         side="left"
                         tone="dark"
                         minH={320}
                     />
                     <BannerCta
-                        title="Đăng tin chuyên nghiệp
-"
+                        title="Đăng tin chuyên nghiệp"
                         description={
-                            <>
-                                Muốn tìm khách hàng chất lượng? Khám phá giải pháp đăng tin toàn diện tại Radanhadat.vn với cực nhiều ưu đãi trong giai đoạn ra mắt nền tảng
-
+                            <> Muốn tìm khách hàng chất lượng? Khám phá giải pháp đăng tin toàn diện tại Radanhadat.vn với cực nhiều ưu đãi trong giai đoạn ra mắt nền tảng
                             </>
                         }
                         buttonLabel="Đăng tin ngay"
@@ -235,18 +230,15 @@ export default function Home() {
                         description={
                             <>
                                 Giảm ngay 5% khi làm nội thất cùng dg home
-
                             </>
                         }
                         buttonLabel="Khám phá ngay"
                         href="/dang-tin"
-                        bg={bannerContact}     // hoặc "/assets/home-section5-image-bg.png"
+                        bg={bannerContact}
                         side="left"
                         tone="dark"
                         minH={320}
                     />
-
-
                 </div>
             </section>
             <FilterModal

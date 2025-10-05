@@ -1,84 +1,26 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useLayoutEffect } from "react";
+import { Modal, Button } from "antd";
+import FilterChipBar from "./FilterChipBar";
+import FilterPanel from "./FilterPanel";
+
 import {
-    Modal,
-    Checkbox,
-    Radio,
-    InputNumber,
-    Space,
-    Button,
-    Row,
-    Col,
-} from "antd";
-import { RightOutlined } from "@ant-design/icons";
+    FILTER_TABS as CHIP_TABS,
+    TYPE_OPTIONS_LEFT, TYPE_OPTIONS_RIGHT,
+    PRICE_RADIOS, AREA_RADIOS,
+    BED_OPTIONS, BATH_OPTIONS,
+    DIRECTION_OPTIONS, POSITION_OPTIONS,
+} from "@/data/FilterModalData";
 
-const TYPE_OPTIONS_LEFT = [
-    "Nhà ngõ, hẻm",
-    "Nhà biệt thự",
-    "Nhà liền kề",
-    "Officetel",
-    "Căn hộ duplex",
-    "Đất thổ cư",
-    "Đất nông nghiệp",
-    "Nhà xưởng/Kho bãi",
-];
-const TYPE_OPTIONS_RIGHT = [
-    "Nhà mặt tiền",
-    "Căn hộ chung cư",
-    "Căn hộ studio",
-    "Căn hộ dịch vụ",
-    "Penthouse",
-    "Đất nền dự án",
-    "Mặt bằng kinh doanh",
-    "Biệt thự/Shophouse/Nhà phố thương mại",
-];
+/* ===== constants ===== */
+const CONTENT_W = 736;
 
-const PRICE_RADIOS = [
-    { label: "Dưới 500 triệu", value: "0-0.5" },
-    { label: "800 triệu - 1 tỷ", value: "0.8-1" },
-    { label: "2 - 3 tỷ", value: "2-3" },
-    { label: "5 - 7 tỷ", value: "5-7" },
-    { label: "10 - 20 tỷ", value: "10-20" },
-    { label: "30 - 40 tỷ", value: "30-40" },
-    { label: "Trên 60 tỷ", value: "60+" },
-    { label: "500 - 800 triệu", value: "0.5-0.8" },
-    { label: "1 - 2 tỷ", value: "1-2" },
-    { label: "3 - 5 tỷ", value: "3-5" },
-    { label: "7 - 10 tỷ", value: "7-10" },
-    { label: "20 - 30 tỷ", value: "20-30" },
-    { label: "40 - 60 tỷ", value: "40-60" },
-    { label: "Giá thoả thuận", value: "thoa-thuan" },
-];
-
-const AREA_RADIOS = [
-    "Dưới 30 m²",
-    "30 - 50 m²",
-    "50 - 80 m²",
-    "80 - 100 m²",
-    "100 - 150 m²",
-    "150 - 200 m²",
-    "200 - 250 m²",
-    "250 - 300 m²",
-    "300 - 500 m²",
-    "Trên 500 m²",
-];
-
-const BED_OPTIONS = [
-    "1 phòng ngủ",
-    "2 phòng ngủ",
-    "3 phòng ngủ",
-    "4 phòng ngủ",
-    "5 phòng ngủ",
-    "6+ phòng ngủ",
-];
-const BATH_OPTIONS = [
-    "1 phòng tắm",
-    "2 phòng tắm",
-    "3 phòng tắm",
-    "4+ phòng tắm",
-];
+/* helpers */
+const splitTwo = (arr) => {
+    const mid = Math.ceil(arr.length / 2);
+    return [arr.slice(0, mid), arr.slice(mid)];
+};
 
 export default function FilterModal({ open, onClose, onApply, initial }) {
-    // ---- state filters
     const [types, setTypes] = useState(initial?.types || []);
     const [pricePreset, setPricePreset] = useState(initial?.pricePreset);
     const [priceFrom, setPriceFrom] = useState(initial?.priceFrom ?? null);
@@ -90,24 +32,145 @@ export default function FilterModal({ open, onClose, onApply, initial }) {
 
     const [beds, setBeds] = useState(initial?.beds || []);
     const [baths, setBaths] = useState(initial?.baths || []);
-
-    // ---- tab state (chip tabs)
+    const [directions, setDirections] = useState(initial?.directions || []);
+    const [positions, setPositions] = useState(initial?.positions || []);
     const [activeKey, setActiveKey] = useState("types");
+    const wrapperRef = useRef(null);
     const tabsRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+    const [uiReady, setUiReady] = useState(false);
+    const predictedLeftRef = useRef(null);
 
-    const canReset = useMemo(
-        () =>
-            types.length ||
-            pricePreset ||
-            priceFrom != null ||
-            priceTo != null ||
-            areaPreset ||
-            areaFrom != null ||
-            areaTo != null ||
-            beds.length ||
-            baths.length,
-        [types, pricePreset, priceFrom, priceTo, areaPreset, areaFrom, areaTo, beds, baths]
-    );
+    useLayoutEffect(() => {
+        if (open) {
+            setUiReady(false);
+            predictedLeftRef.current = null;
+        }
+    }, [open]);
+
+    const recalc = () => {
+        const el = tabsRef.current;
+        if (!el) return;
+
+        const scrollWidth = Math.round(el.scrollWidth);
+        const clientWidth = Math.round(el.clientWidth);
+        const maxLeft = scrollWidth - clientWidth;
+
+        const rawLeft = el.scrollLeft;
+        const predicted = predictedLeftRef.current;
+        const left = predicted != null ? predicted : rawLeft;
+
+        const EPS = 1;
+        const overflow = scrollWidth > clientWidth;
+        setCanScrollLeft(overflow && left > EPS);
+        setCanScrollRight(overflow && left < maxLeft - EPS);
+    };
+
+    const getBounds = () => {
+        const el = tabsRef.current;
+        if (!el) return { maxLeft: 0, left: 0 };
+        return {
+            maxLeft: Math.round(el.scrollWidth - el.clientWidth),
+            left: el.scrollLeft,
+        };
+    };
+
+    const smoothScrollTo = (target) => {
+        const el = tabsRef.current;
+        if (!el) return;
+
+        const { maxLeft } = getBounds();
+        const goal = Math.max(0, Math.min(target, maxLeft));
+
+        predictedLeftRef.current = goal;
+        setCanScrollLeft(goal > 0);
+        setCanScrollRight(goal < maxLeft);
+
+        el.scrollTo({ left: goal, behavior: "smooth" });
+
+        let raf = 0;
+        const tick = () => {
+            recalc();
+            const done = Math.abs(el.scrollLeft - goal) < 1;
+            if (!done) {
+                raf = requestAnimationFrame(tick);
+            } else {
+                cancelAnimationFrame(raf);
+                predictedLeftRef.current = null;
+                recalc();
+            }
+        };
+        raf = requestAnimationFrame(tick);
+    };
+
+    const robustKick = () => {
+        const el = tabsRef.current;
+        if (!el) return;
+
+        el.querySelectorAll(".chip-btn").forEach((btn) => (btn.style.flex = "0 0 auto"));
+        el.scrollLeft = 0;
+
+        requestAnimationFrame(() => {
+            recalc();
+            setUiReady(true);
+        });
+
+        setTimeout(recalc, 120);
+        setTimeout(recalc, 260);
+
+        if (document?.fonts?.ready) {
+            document.fonts.ready
+                .then(() => {
+                    requestAnimationFrame(recalc);
+                    setTimeout(recalc, 60);
+                })
+                .catch(() => { });
+        }
+    };
+
+    useLayoutEffect(() => {
+        if (!open) return;
+        const el = tabsRef.current;
+        if (!el) return;
+
+        const onScroll = () => recalc();
+        el.addEventListener("scroll", onScroll, { passive: true });
+
+        const roTrack = new ResizeObserver(recalc);
+        const roWrap = new ResizeObserver(recalc);
+        roTrack.observe(el);
+        if (wrapperRef.current) roWrap.observe(wrapperRef.current);
+
+        const mo = new MutationObserver(() => requestAnimationFrame(recalc));
+        mo.observe(el, { childList: true, subtree: true, characterData: true, attributes: true });
+
+        const onResize = () => requestAnimationFrame(recalc);
+        window.addEventListener("resize", onResize);
+
+        requestAnimationFrame(recalc);
+
+        return () => {
+            el.removeEventListener("scroll", onScroll);
+            roTrack.disconnect();
+            roWrap.disconnect();
+            mo.disconnect();
+            window.removeEventListener("resize", onResize);
+        };
+    }, [open]);
+
+    const canReset =
+        types.length ||
+        pricePreset ||
+        priceFrom != null ||
+        priceTo != null ||
+        areaPreset ||
+        areaFrom != null ||
+        areaTo != null ||
+        beds.length ||
+        baths.length ||
+        directions.length ||
+        positions.length;
 
     const handleReset = () => {
         setTypes([]);
@@ -119,6 +182,9 @@ export default function FilterModal({ open, onClose, onApply, initial }) {
         setAreaTo(null);
         setBeds([]);
         setBaths([]);
+        setDirections([]);
+        setPositions([]);
+        robustKick();
     };
 
     const handleApply = () => {
@@ -132,282 +198,129 @@ export default function FilterModal({ open, onClose, onApply, initial }) {
             areaTo,
             beds,
             baths,
+            directions,
+            positions,
         });
         onClose?.();
     };
 
-    // ---- chip items
-    const CHIP_TABS = [
-        { key: "types", label: "Loại BĐS" },
-        { key: "price", label: "Khoảng giá" },
-        { key: "area", label: "Diện tích" },
-        { key: "beds", label: "Số phòng ngủ" },
-        { key: "baths", label: "Số phòng tắm" },
-    ];
+    const showLeft = uiReady && canScrollLeft;
+    const showRight = uiReady && canScrollRight;
 
-    const scrollChips = () => {
-        if (!tabsRef.current) return;
-        tabsRef.current.scrollBy({ left: 180, behavior: "smooth" });
+    useMemo(() => splitTwo(AREA_RADIOS), []);
+    useMemo(() => splitTwo(BED_OPTIONS), []);
+    useMemo(() => splitTwo(BATH_OPTIONS), []);
+    useMemo(() => splitTwo(DIRECTION_OPTIONS), []);
+    useMemo(() => splitTwo(POSITION_OPTIONS), []);
+    const dirtyMap = {
+        types: types.length > 0,
+        price: !!(pricePreset || priceFrom != null || priceTo != null),
+        area: !!(areaPreset || areaFrom != null || areaTo != null),
+        beds: beds.length > 0,
+        baths: baths.length > 0,
+        dir: directions.length > 0,
+        pos: positions.length > 0,
     };
-
-    // ---- fixed sizing
-    const BODY_W = 736; // content width (not including padding)
-    const BODY_H = 560; // content height
-    const PAD = 16;     // body padding
-    const MODAL_W = BODY_W + PAD * 2; // = 768
-
     return (
-        <Modal
-            open={open}
-            onCancel={onClose}
-            title="Bộ lọc"
-            width={MODAL_W}
-            centered
-            destroyOnClose
-            maskClosable={false}
-            bodyStyle={{
-                height: BODY_H,   // 560
-                padding: PAD,     // 16
-                overflow: "auto", // body cuộn, header/footer đứng yên
-            }}
-            footer={
-                <Space>
-                    <Button onClick={handleReset} disabled={!canReset}>
-                        Đặt lại
-                    </Button>
-                    <Button type="primary" onClick={handleApply}>
-                        Áp dụng
-                    </Button>
-                </Space>
-            }
-        >
-            {/* ===== CHIP BAR ===== */}
-            <div style={{ position: "relative", marginBottom: 16 }}>
-                <div
-                    ref={tabsRef}
-                    style={{
-                        display: "flex",
-                        gap: 12,
-                        overflowX: "auto",
-                        paddingRight: 40,
-                        scrollBehavior: "smooth",
-                    }}
-                >
-                    {CHIP_TABS.map((t) => {
-                        const active = activeKey === t.key;
-                        return (
-                            <button
-                                key={t.key}
-                                onClick={() => setActiveKey(t.key)}
-                                style={{
-                                    padding: "0 20px",
-                                    height: 40,
-                                    borderRadius: 999,
-                                    border: "1px solid",
-                                    borderColor: active ? "#1f4fbf" : "#d1d5db",
-                                    color: active ? "#fff" : "#374151",
-                                    background: active ? "#1f4fbf" : "#fff",
-                                    fontWeight: 600,
-                                    whiteSpace: "nowrap",
-                                    boxShadow: active ? "0 1px 4px rgba(0,0,0,.12)" : "none",
-                                }}
-                            >
-                                {t.label}
-                            </button>
-                        );
-                    })}
-                </div>
+        <>
+            <style>{`
+        .ant-modal .ant-modal-header { border-bottom: 1px solid #e5e7eb; }
+        .ant-modal .ant-modal-footer { border-top: 1px solid #e5e7eb; padding-top: 14px; }
 
-                {/* right chevron */}
-                <button
-                    type="button"
-                    onClick={scrollChips}
-                    title="Next"
-                    style={{
-                        position: "absolute",
-                        right: 0,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        width: 36,
-                        height: 36,
-                        borderRadius: "999px",
-                        background: "#fff",
-                        border: "1px solid #e5e7eb",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: "0 1px 4px rgba(0,0,0,.08)",
-                    }}
-                >
-                    <RightOutlined />
-                </button>
-            </div>
+        .chip-btn {
+          border-radius: 999px;
+          height: 40px;
+          font-weight: 600;
+          white-space: nowrap;
+          flex: 0 0 auto;
+        }
 
-            {/* ===== PANES ===== */}
-            {activeKey === "types" && (
-                <div style={{ minHeight: 360, overflowX: "hidden" }}>
-                    <Row gutter={24}>
-                        <Col xs={24} md={12}>
-                            <Checkbox.Group
-                                value={types}
-                                onChange={setTypes}
-                                style={{ width: "100%" }}
-                            >
-                                <Space direction="vertical">
-                                    {TYPE_OPTIONS_LEFT.map((x) => (
-                                        <Checkbox key={x} value={x}>
-                                            {x}
-                                        </Checkbox>
-                                    ))}
-                                </Space>
-                            </Checkbox.Group>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Checkbox.Group
-                                value={types}
-                                onChange={setTypes}
-                                style={{ width: "100%" }}
-                            >
-                                <Space direction="vertical">
-                                    {TYPE_OPTIONS_RIGHT.map((x) => (
-                                        <Checkbox key={x} value={x}>
-                                            {x}
-                                        </Checkbox>
-                                    ))}
-                                </Space>
-                            </Checkbox.Group>
-                        </Col>
-                    </Row>
-                </div>
-            )}
+        .option-col .ant-checkbox-wrapper,
+        .option-col .ant-radio-wrapper { line-height: 24px; }
 
-            {activeKey === "price" && (
-                <div style={{ minHeight: 360, overflowX: "hidden" }}>
-                    <Row gutter={16}>
-                        <Col xs={24} md={10}>
-                            <div style={{ marginBottom: 8, color: "#6b7280" }}>Từ</div>
-                            <InputNumber
-                                min={0}
-                                style={{ width: "100%" }}
-                                addonAfter="tỷ"
-                                value={priceFrom}
-                                onChange={setPriceFrom}
-                            />
-                        </Col>
-                        <Col xs={24} md={10}>
-                            <div style={{ marginBottom: 8, color: "#6b7280" }}>Đến</div>
-                            <InputNumber
-                                min={0}
-                                style={{ width: "100%" }}
-                                addonAfter="tỷ"
-                                value={priceTo}
-                                onChange={setPriceTo}
-                            />
-                        </Col>
-                    </Row>
+        .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
 
-                    <Row gutter={24} style={{ marginTop: 16 }}>
-                        <Col xs={24} md={12}>
-                            <Radio.Group
-                                onChange={(e) => setPricePreset(e.target.value)}
-                                value={pricePreset}
-                            >
-                                <Space direction="vertical">
-                                    {PRICE_RADIOS.slice(0, 7).map((x) => (
-                                        <Radio key={x.value} value={x.value}>
-                                            {x.label}
-                                        </Radio>
-                                    ))}
-                                </Space>
-                            </Radio.Group>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Radio.Group
-                                onChange={(e) => setPricePreset(e.target.value)}
-                                value={pricePreset}
-                            >
-                                <Space direction="vertical">
-                                    {PRICE_RADIOS.slice(7).map((x) => (
-                                        <Radio key={x.value} value={x.value}>
-                                            {x.label}
-                                        </Radio>
-                                    ))}
-                                </Space>
-                            </Radio.Group>
-                        </Col>
-                    </Row>
-                </div>
-            )}
+        .chip-track {
+          scrollbar-gutter: stable both-edges;
+          scroll-padding-inline: 24px;
+          overflow-y: hidden;
+        }
+      `}</style>
 
-            {activeKey === "area" && (
-                <div style={{ minHeight: 360 }}>
-                    <Row gutter={16}>
-                        <Col xs={24} md={10}>
-                            <div style={{ marginBottom: 8, color: "#6b7280" }}>Từ</div>
-                            <InputNumber
-                                min={0}
-                                style={{ width: "100%" }}
-                                addonAfter="m²"
-                                value={areaFrom}
-                                onChange={setAreaFrom}
-                            />
-                        </Col>
-                        <Col xs={24} md={10}>
-                            <div style={{ marginBottom: 8, color: "#6b7280" }}>Đến</div>
-                            <InputNumber
-                                min={0}
-                                style={{ width: "100%" }}
-                                addonAfter="m²"
-                                value={areaTo}
-                                onChange={setAreaTo}
-                            />
-                        </Col>
-                    </Row>
-
-                    <div style={{ marginTop: 16 }}>
-                        <Radio.Group
-                            onChange={(e) => setAreaPreset(e.target.value)}
-                            value={areaPreset}
-                        >
-                            <Space direction="vertical">
-                                {AREA_RADIOS.map((label) => (
-                                    <Radio key={label} value={label}>
-                                        {label}
-                                    </Radio>
-                                ))}
-                            </Space>
-                        </Radio.Group>
+            <Modal
+                open={open}
+                onCancel={onClose}
+                title="Bộ lọc"
+                centered
+                maskClosable={false}
+                width={CONTENT_W}
+                destroyOnClose
+                bodyStyle={{ display: "flex", flexDirection: "column", gap: 12 }}
+                afterOpenChange={(opened) => {
+                    if (opened) robustKick();
+                }}
+                footer={
+                    <div style={{ textAlign: "right" }}>
+                        <Button onClick={handleReset} disabled={!canReset}>
+                            Đặt lại
+                        </Button>
+                        <Button type="primary" onClick={handleApply} style={{ marginLeft: 8 }}>
+                            Áp dụng
+                        </Button>
                     </div>
-                </div>
-            )}
+                }
+            >
+                {/* ==== CHIP BAR ==== */}
+                <FilterChipBar
+                    CHIP_TABS={CHIP_TABS}
+                    activeKey={activeKey}
+                    setActiveKey={setActiveKey}
+                    canScrollLeft={showLeft}
+                    canScrollRight={showRight}
+                    smoothScrollTo={smoothScrollTo}
+                    getBounds={getBounds}
+                    wrapperRef={wrapperRef}
+                    tabsRef={tabsRef}
+                    recalc={recalc}
+                    dirtyMap={dirtyMap}
+                />
 
-            {activeKey === "beds" && (
-                <div style={{ minHeight: 360 }}>
-                    <Checkbox.Group value={beds} onChange={setBeds}>
-                        <Space direction="vertical">
-                            {BED_OPTIONS.map((x) => (
-                                <Checkbox key={x} value={x}>
-                                    {x}
-                                </Checkbox>
-                            ))}
-                        </Space>
-                    </Checkbox.Group>
-                </div>
-            )}
-
-            {activeKey === "baths" && (
-                <div style={{ minHeight: 360 }}>
-                    <Checkbox.Group value={baths} onChange={setBaths}>
-                        <Space direction="vertical">
-                            {BATH_OPTIONS.map((x) => (
-                                <Checkbox key={x} value={x}>
-                                    {x}
-                                </Checkbox>
-                            ))}
-                        </Space>
-                    </Checkbox.Group>
-                </div>
-            )}
-        </Modal>
+                {/* ==== PANELS ==== */}
+                <FilterPanel
+                    activeKey={activeKey}
+                    types={types}
+                    setTypes={setTypes}
+                    pricePreset={pricePreset}
+                    setPricePreset={setPricePreset}
+                    priceFrom={priceFrom}
+                    setPriceFrom={setPriceFrom}
+                    priceTo={priceTo}
+                    setPriceTo={setPriceTo}
+                    areaPreset={areaPreset}
+                    setAreaPreset={setAreaPreset}
+                    areaFrom={areaFrom}
+                    setAreaFrom={setAreaFrom}
+                    areaTo={areaTo}
+                    setAreaTo={setAreaTo}
+                    beds={beds}
+                    setBeds={setBeds}
+                    baths={baths}
+                    setBaths={setBaths}
+                    directions={directions}
+                    setDirections={setDirections}
+                    positions={positions}
+                    setPositions={setPositions}
+                    TYPE_OPTIONS_LEFT={TYPE_OPTIONS_LEFT}
+                    TYPE_OPTIONS_RIGHT={TYPE_OPTIONS_RIGHT}
+                    PRICE_RADIOS={PRICE_RADIOS}
+                    AREA_RADIOS={AREA_RADIOS}
+                    BED_OPTIONS={BED_OPTIONS}
+                    BATH_OPTIONS={BATH_OPTIONS}
+                    DIRECTION_OPTIONS={DIRECTION_OPTIONS}
+                    POSITION_OPTIONS={POSITION_OPTIONS}
+                />
+            </Modal>
+        </>
     );
 }

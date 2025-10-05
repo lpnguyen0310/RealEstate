@@ -152,10 +152,10 @@ export default function InfoRealEstate() {
 
   return (
     <div className="min-h-screen w-full bg-white">
-      <div className="mx-auto max-w-[1200px] px-4 lg:px-6 py-6">
+      <div className="mx-auto max-w-[1440px] px-4 lg:px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* LEFT: Gallery */}
-          <div className="lg:col-span-8">
+          <div className="lg:col-span-9">
             <div className="w-full rounded-xl border border-gray-200 overflow-hidden">
               {/* Gallery ẩn cho ViewerJS */}
               <div className="hidden" ref={hiddenGalleryRef}>
@@ -206,7 +206,7 @@ export default function InfoRealEstate() {
                   onSlideChange={(s) => setActiveIndex(s.activeIndex)}
                   thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
                   spaceBetween={10}
-                  className="h-[46vh] min-h-[320px] lg:h-[56vh]"
+                  className="w-full h-[46vh] min-h-[320px] lg:h-[56vh]"
                 >
                   {images.map((src, idx) => (
                     <SwiperSlide key={idx}>
@@ -263,7 +263,7 @@ export default function InfoRealEstate() {
           </div>
 
           {/* RIGHT: Agent/Contact card + list */}
-          <div className="lg:col-span-4">
+          <div className="lg:col-span-3">
             <div className="sticky top-4">
               <div className="rounded-xl border border-gray-200 p-4 shadow-sm">
                 <div className="flex items-center gap-3">
