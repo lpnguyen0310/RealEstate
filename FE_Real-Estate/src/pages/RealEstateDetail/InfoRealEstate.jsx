@@ -259,7 +259,7 @@ export default function InfoRealEstate() {
 
           {/* RIGHT: Agent/Contact card + list */}
           <div className="lg:col-span-3">
-            <div className="sticky top-4">
+            <div className="sticky top-[88px] lg:top-[96px] z-10">
               <div className="rounded-xl border border-gray-200 p-4 shadow-sm">
                 <div className="flex items-center gap-3">
                   <img src={agent.avatar} alt="avatar" className="h-12 w-12 rounded-full object-cover" />

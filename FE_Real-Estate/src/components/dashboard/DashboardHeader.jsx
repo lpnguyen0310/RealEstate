@@ -50,7 +50,7 @@ export default function DashboardHeader({
   return (
     <header className="flex items-center justify-between bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-3 mb-6">
       <div className="flex items-center h-[42px]">
-        <h1 className="text-[22px] font-semibold text-[#3D3D4E] leading-none">{title}</h1>
+        <h1 className="text-[22px] font-semibold text-[#3D3D4E] leading-none !mb-[0px]">{title}</h1>
       </div>
 
       <div className="flex items-center gap-6">

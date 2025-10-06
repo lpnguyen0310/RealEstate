@@ -203,7 +203,7 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
                                 <Divider plain>Hoặc</Divider>
 
                                 <div className="space-y-3">
-                                    <Button size="large" className="w-full h-[44px]" icon={<AppleFilled />}>
+                                    <Button size="large" className="w-full h-[44px] !mb-[8px]" icon={<AppleFilled />}>
                                         Đăng nhập với Apple
                                     </Button>
                                     <Button size="large" className="w-full h-[44px]" icon={<GoogleOutlined />}>
