@@ -1,5 +1,5 @@
 export const USER_MENU_ITEMS = [
-  { icon: "🏠", text: "Tổng quan", badge: "Mới" },
+  { icon: "🏠", text: "Tổng quan", href: "/dashboard", badge: "Mới" },
   { icon: "📝", text: "Quản lý tin đăng" },
   { icon: "🎯", text: "Gói hội viên", badge2: "Tiết kiệm đến -39%" },
   { icon: "👥", text: "Quản lý khách hàng" },
