@@ -1,4 +1,3 @@
-// src/layouts/DashboardLayout.jsx
 import { Outlet, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import Sidebar from "@/components/Dashboard/Sidebar";
@@ -13,23 +12,36 @@ export default function DashboardLayout() {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    // nếu có token thật thì clear ở đây
-    nav("/", { replace: true }); // ← quay về trang chủ
+    nav("/", { replace: true });
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F7F8FC]">
-      <Sidebar pinned={pinned} setPinned={setPinned} hovered={hovered} setHovered={setHovered} />
+    // 🔒 khung cao = viewport + không cho trang ngoài scroll
+    <div className="flex h-svh overflow-hidden bg-[#F7F8FC]">
+      {/* Sidebar sticky (sẽ stick theo viewport) */}
+      <Sidebar
+        pinned={pinned}
+        setPinned={setPinned}
+        hovered={hovered}
+        setHovered={setHovered}
+      />
 
-      <div className="flex-1 p-6">
-        <DashboardHeader
-          title="Tổng quan"
-          user={user}
-          notifyCount={31}
-          onLogout={handleLogout} // ← truyền hàm thật
-        />
+      {/* Cột phải: header sticky + content scroll */}
+      <div className="flex-1 flex flex-col">
+        {/* Header sticky ở đỉnh vùng scroll bên phải */}
+        <div className="sticky top-0 z-30 bg-[#F7F8FC] px-6 pt-6">
+          <DashboardHeader
+            title="Tổng quan"
+            user={user}
+            notifyCount={31}
+            onLogout={handleLogout}
+          />
+        </div>
 
-        <Outlet /> {/* hiển thị nội dung trang con */}
+        {/* Chỉ phần này được scroll dọc */}
+        <main className="flex-1 overflow-y-auto px-6 pb-6">
+          <Outlet />
+        </main>
       </div>
     </div>
   );
