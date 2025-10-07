@@ -1,33 +1,34 @@
+// src/routes/AppRoutes.jsx
 import { Routes, Route } from "react-router-dom";
 import PublicLayout from "@/layouts/PublicLayout";
 import DashboardLayout from "@/layouts/DashboardLayout";
 
-import { publicRoutes } from "./publicRoutes";   // Home, Login, Register...
-import { adminRoutes } from "./adminRoutes";     // superadmin (nếu có)
+import { publicRoutes } from "./publicRoutes";
+import { adminRoutes } from "./adminRoutes";
 import DashboardOverview from "@/pages/UserDashboard/DashboardOverview";
-
+import PostManagerPage from "@/pages/UserDashboard/PostManagerPage"; 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Nhóm PUBLIC: có Header + Footer */}
+      {/* PUBLIC */}
       <Route element={<PublicLayout />}>
         {publicRoutes.map(({ path, element }) => (
           <Route key={path} path={path} element={element} />
         ))}
       </Route>
 
-      {/* Nhóm DASHBOARD: KHÔNG có Header + Footer */}
+      {/* DASHBOARD */}
       <Route path="/dashboard" element={<DashboardLayout />}>
         <Route index element={<DashboardOverview />} />
-        {/* sau này thêm các trang con ở đây */}
+        <Route path="posts" element={<PostManagerPage />} /> 
       </Route>
 
-      {/* Admin (tuỳ bạn có layout riêng hay không) */}
+      {/* ADMIN */}
       {adminRoutes.map(({ path, element }) => (
         <Route key={path} path={path} element={element} />
       ))}
 
-      <Route path="*" element={<div style={{padding:24}}>404 Not Found</div>} />
+      <Route path="*" element={<div style={{ padding: 24 }}>404 Not Found</div>} />
     </Routes>
   );
 }
