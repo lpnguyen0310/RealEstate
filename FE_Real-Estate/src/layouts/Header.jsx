@@ -7,11 +7,13 @@ import LoginModal from "../pages/Login/LoginModal";
 import RegisterModal from "../pages/Signup/RegisterModal";
 import { SAVED_POSTS } from "@/data/SavedPost";
 import FavoritePostList from "@/components/menu/FavoritePostList";
+import { useNavigate } from "react-router-dom";
 
 export default function Header() {
     const [hoverKey, setHoverKey] = useState(null);
     const [loginOpen, setLoginOpen] = useState(false);
     const [registerOpen, setRegisterOpen] = useState(false);
+    const nav = useNavigate();
 
     // ===== User state (persist qua localStorage) =====
     const [user, setUser] = useState(() => {
@@ -29,7 +31,8 @@ export default function Header() {
 
     const handleLogout = () => {
         setUser(null);
-        // nếu có token thật thì xoá token/clear cookie ở đây
+        localStorage.removeItem("user");
+        nav("/", { replace: true }); // ← quay về trang chủ
     };
 
     // ===== helper render submenu =====

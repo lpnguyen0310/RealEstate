@@ -1,17 +1,24 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import Sidebar from "@/components/Dashboard/Sidebar";
 import DashboardHeader from "@/components/Dashboard/DashboardHeader";
 
 export default function DashboardLayout() {
-  // ghim và hover để điều khiển thu gọn
-  const [pinned, setPinned] = useState(false);   // mặc định KHÔNG ghim → thu gọn
+  const nav = useNavigate();
+  const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  const user = { fullName: "Nguyễn Lê", initial: "N" };
+  const user = { fullName: "Nguyễn Lê", email: "phuocnguyenlea04@gmail.com", initial: "N" };
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    nav("/", { replace: true });
+  };
 
   return (
-    <div className="flex min-h-screen bg-[#F7F8FC]">
+    // 🔒 khung cao = viewport + không cho trang ngoài scroll
+    <div className="flex h-svh overflow-hidden bg-[#F7F8FC]">
+      {/* Sidebar sticky (sẽ stick theo viewport) */}
       <Sidebar
         pinned={pinned}
         setPinned={setPinned}
@@ -19,13 +26,22 @@ export default function DashboardLayout() {
         setHovered={setHovered}
       />
 
-      {/* CONTENT */}
-      <div className="flex-1">
-        {/* CONTAINER GIỮA TRANG */}
-        <div className="w-full max-w-[1440px] mx-auto px-4 md:px-6 py-6">
-          <DashboardHeader title="Tổng quan" user={user} notifyCount={31} />
-          <Outlet />
+      {/* Cột phải: header sticky + content scroll */}
+      <div className="flex-1 flex flex-col">
+        {/* Header sticky ở đỉnh vùng scroll bên phải */}
+        <div className="sticky top-0 z-30 bg-[#F7F8FC] px-6 pt-6">
+          <DashboardHeader
+            title="Tổng quan"
+            user={user}
+            notifyCount={31}
+            onLogout={handleLogout}
+          />
         </div>
+
+        {/* Chỉ phần này được scroll dọc */}
+        <main className="flex-1 overflow-y-auto px-6 pb-6">
+          <Outlet />
+        </main>
       </div>
     </div>
   );

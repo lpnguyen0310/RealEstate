@@ -17,6 +17,7 @@ export default function Sidebar({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={`
+                sticky top-0 h-svh   
         relative shrink-0 border-r border-gray-100 bg-white
         transition-all duration-300 ease-out overflow-hidden
         ${collapsed ? "w-[84px]" : "w-[264px]"}
