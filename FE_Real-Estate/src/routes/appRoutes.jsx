@@ -7,6 +7,9 @@ import { publicRoutes } from "./publicRoutes";
 import { adminRoutes } from "./adminRoutes";
 import DashboardOverview from "@/pages/UserDashboard/DashboardOverview";
 import PostManagerPage from "@/pages/UserDashboard/PostManagerPage"; 
+import AccountManagement from "@/pages/Account/AccountManagement";
+
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -21,6 +24,7 @@ export default function AppRoutes() {
       <Route path="/dashboard" element={<DashboardLayout />}>
         <Route index element={<DashboardOverview />} />
         <Route path="posts" element={<PostManagerPage />} /> 
+        <Route path="account" element={<AccountManagement />} /> 
       </Route>
 
       {/* ADMIN */}
