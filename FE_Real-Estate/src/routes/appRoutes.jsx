@@ -5,6 +5,8 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { publicRoutes } from "./publicRoutes";   // Home, Login, Register...
 import { adminRoutes } from "./adminRoutes";     // superadmin (nếu có)
 import DashboardOverview from "@/pages/UserDashboard/DashboardOverview";
+import AccountManagement from "@/pages/Account/AccountManagement";
+
 
 export default function AppRoutes() {
   return (
@@ -19,7 +21,7 @@ export default function AppRoutes() {
       {/* Nhóm DASHBOARD: KHÔNG có Header + Footer */}
       <Route path="/dashboard" element={<DashboardLayout />}>
         <Route index element={<DashboardOverview />} />
-        {/* sau này thêm các trang con ở đây */}
+        <Route path="account" element={<AccountManagement />} /> 
       </Route>
 
       {/* Admin (tuỳ bạn có layout riêng hay không) */}
