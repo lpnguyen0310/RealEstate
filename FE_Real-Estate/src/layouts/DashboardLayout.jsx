@@ -16,7 +16,7 @@ export default function DashboardLayout() {
   };
 
   return (
-    // 🔒 khung cao = viewport + không cho trang ngoài scroll
+    // khung cao = viewport + không cho trang ngoài scroll
     <div className="flex h-svh overflow-hidden bg-[#F7F8FC]">
       {/* Sidebar sticky (sẽ stick theo viewport) */}
       <Sidebar
