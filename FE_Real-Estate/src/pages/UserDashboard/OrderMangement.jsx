@@ -1,15 +1,15 @@
+// src/pages/Dashboard/OrderManagement.jsx
 import { useState, useMemo, useCallback } from "react";
 import { Stack } from "@mui/material";
 import dayjs from "dayjs";
-import { TxSearchBar, TxStatusTabs, TransactionTable } from "../../components/dashboard/historytransaction";
+import {
+    OrderSearchBar as TxSearchBar,
+    OrderListTable as OrderTable,
+    OrderStatusTabs as TxStatusTabs,
+    OrderDetailModal
+} from "@/components/dashboard/ordermanagement";
 import { exportTransactionsXLSX } from "@/utils/exportXlsx";
-
-
-const transactions = [
-    { code: "251009V629585", status: "Đang xử lý", createdAt: "09/10/2025 10:31", amount: "25 nghìn", createdBy: "Nguyên Lê" },
-    { code: "251009V777777", status: "Thành công", createdAt: "09/10/2025 08:12", amount: "150 nghìn", createdBy: "Nguyên Lê" },
-    { code: "251009V999999", status: "Đã hủy", createdAt: "08/10/2025 09:00", amount: "50 nghìn", createdBy: "Nguyên Lê" },
-];
+import { ORDERS } from "@/data/Dashboard/OrderManagementData"; // 👈
 
 const normalize = (s = "") =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -20,9 +20,7 @@ const parseRowDate = (s) => {
     return dayjs(s, "DD/MM/YYYY", true);
 };
 
-
-
-export default function TransactionsMangement() {
+export default function OrderManagement() {
     const [orderCode, setOrderCode] = useState("");
     const [date, setDate] = useState(null);
     const [tabKey, setTabKey] = useState("all");
@@ -30,17 +28,18 @@ export default function TransactionsMangement() {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
 
-    const counts = useMemo(() => {
-        const all = transactions.length;
-        const success = transactions.filter((t) => t.status === "Thành công").length;
-        const processing = transactions.filter((t) => t.status === "Đang xử lý").length;
-        const canceled = transactions.filter((t) => t.status === "Đã hủy").length;
-        return { all, success, processing, canceled };
-    }, []);
+    // đếm badge theo source ORDERS
+    const counts = useMemo(() => ({
+        all: ORDERS.length,
+        success: ORDERS.filter((t) => t.status === "Thành công").length,
+        processing: ORDERS.filter((t) => t.status === "Đang xử lý").length,
+        canceled: ORDERS.filter((t) => t.status === "Đã hủy").length,
+    }), []);
 
+    // lọc theo tab + mã + ngày
     const filteredData = useMemo(() => {
         const q = normalize(orderCode);
-        return transactions
+        return ORDERS
             .filter((t) => {
                 if (tabKey === "all") return true;
                 if (tabKey === "success") return t.status === "Thành công";
@@ -58,11 +57,21 @@ export default function TransactionsMangement() {
 
     const handleSearch = useCallback(() => setPage(1), []);
     const handleExport = () => {
-        exportTransactionsXLSX(transactions, "giao_dich.xlsx");
+        // export theo kết quả lọc hoặc toàn bộ tuỳ bạn
+        exportTransactionsXLSX(filteredData, "giao_dich.xlsx");
     };
+
+    // chi tiết đơn hàng
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [openModal, setOpenModal] = useState(false);
+
+    const handleRowClick = (order) => {
+        setSelectedOrder(order);
+        setOpenModal(true);
+    };
+
     return (
         <Stack spacing={2.5}>
-            {/* Search bar tách riêng */}
             <TxSearchBar
                 orderCode={orderCode}
                 onOrderCodeChange={setOrderCode}
@@ -78,13 +87,20 @@ export default function TransactionsMangement() {
                 counts={counts}
             />
 
-            <TransactionTable
+            <OrderTable
                 data={filteredData}
                 page={page}
                 pageSize={pageSize}
                 totalItems={filteredData.length}
                 onPageChange={setPage}
                 onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                onRowClick={handleRowClick}
+            />
+
+            <OrderDetailModal
+                open={openModal}
+                onClose={() => setOpenModal(false)}
+                order={selectedOrder}
             />
         </Stack>
     );
