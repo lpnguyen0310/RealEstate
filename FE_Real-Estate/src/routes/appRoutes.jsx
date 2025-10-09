@@ -7,9 +7,8 @@ import { publicRoutes } from "./publicRoutes";
 import { adminRoutes } from "./adminRoutes";
 import DashboardOverview from "@/pages/UserDashboard/DashboardOverview";
 import PostManagerPage from "@/pages/UserDashboard/PostManagerPage"; 
-import AccountManagement from "@/pages/Account/AccountManagement";
-import PurchagePostPage from "../pages/UserDashboard/PurchagePostPage";
-import TransactionsMangement from "@/pages/UserDashboard/TransactionsMangement";
+import AccountManagement from "@/pages/UserDashboard/AccountManagement";
+import PricingPage from "@/pages/UserDashboard/PricingPage";
 
 export default function AppRoutes() {
   return (
@@ -26,6 +25,7 @@ export default function AppRoutes() {
         <Route index element={<DashboardOverview />} />
         <Route path="posts" element={<PostManagerPage />} /> 
         <Route path="account" element={<AccountManagement />} /> 
+        <Route path="pricing" element={<PricingPage />} /> 
         <Route path="purchase" element={<PurchagePostPage />} />
         <Route path="transactions" element={<TransactionsMangement />} />
       </Route>

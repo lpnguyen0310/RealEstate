@@ -1,5 +1,6 @@
 import { Select, Pagination } from "antd";
 import PostCard from "./PostCard";
+import "../../../../public/css/post_list.css";
 
 export default function PostList({
     items = [],
