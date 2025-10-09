@@ -25,31 +25,40 @@ export default function Sidebar({
             style={{ minHeight: "100vh" }}
         >
             {/* logo + nút ghim */}
-            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-50">
-                <img
-                    src={logo}
-                    alt="radanhadat.vn"
-                    className={`${collapsed ? "h-7" : "h-8"} transition-all`}
-                    onError={(e) => (e.currentTarget.style.display = "none")}
-                />
-
-                {/* nút ghim */}
-                <button
-                    onClick={() => setPinned((v) => !v)}
-                    className="grid h-7 w-7 place-items-center rounded-full border border-gray-200 bg-white shadow hover:bg-gray-50 transition"
-                    title={pinned ? "Bỏ ghim thanh bên" : "Ghim thanh bên"}
+            <div
+                className={`border-b border-gray-50 ${collapsed ? "px-0 py-3" : "px-4 py-4"}`}
+            >
+                <div
+                    className={`flex items-center ${collapsed ? "justify-center" : "justify-between"
+                        }`}
                 >
-                    {pinned ? (
-                        <PushpinFilled className="text-[#1D3B67]" />
-                    ) : (
-                        <PushpinOutlined className="text-gray-500" />
+                    <img
+                        src={logo}
+                        alt="radanhadat.vn"
+                        className={`${collapsed ? "h-7" : "h-8"} transition-all`}
+                        onError={(e) => (e.currentTarget.style.display = "none")}
+                    />
+
+                    {/* NÚT GHIM: chỉ hiện khi không collapsed để khỏi chen vào layout */}
+                    {!collapsed && (
+                        <button
+                            onClick={() => setPinned((v) => !v)}
+                            className="grid h-7 w-7 place-items-center rounded-full border border-gray-200 bg-white shadow hover:bg-gray-50 transition"
+                            title={pinned ? "Bỏ ghim thanh bên" : "Ghim thanh bên"}
+                        >
+                            {pinned ? (
+                                <PushpinFilled className="text-[#1D3B67]" />
+                            ) : (
+                                <PushpinOutlined className="text-gray-500" />
+                            )}
+                        </button>
                     )}
-                </button>
+                </div>
             </div>
 
 
             {/* menu */}
-            <nav className="px-3">
+            <nav className="px-4">
                 {MENUS.map((m) => {
                     const Item = (
                         <NavLink
