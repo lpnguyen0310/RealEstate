@@ -1,4 +1,4 @@
-package com.backend.be_realestate.modals.dto;
+package com.backend.be_realestate.modals.response;
 
 import lombok.Data;
 
