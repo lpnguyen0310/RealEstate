@@ -6,8 +6,9 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { publicRoutes } from "./publicRoutes";
 import { adminRoutes } from "./adminRoutes";
 import DashboardOverview from "@/pages/UserDashboard/DashboardOverview";
-import PostManagerPage from "@/pages/UserDashboard/PostManagerPage"; import AccountManagement from "@/pages/Account/AccountManagement";
-
+import PostManagerPage from "@/pages/UserDashboard/PostManagerPage"; 
+import AccountManagement from "@/pages/UserDashboard/AccountManagement";
+import PricingPage from "@/pages/UserDashboard/PricingPage";
 
 export default function AppRoutes() {
   return (
@@ -24,6 +25,7 @@ export default function AppRoutes() {
         <Route index element={<DashboardOverview />} />
         <Route path="account" element={<AccountManagement />} /> 
         <Route path="posts" element={<PostManagerPage />} /> 
+        <Route path="pricing" element={<PricingPage />} /> 
       </Route>
 
       {/* ADMIN */}
