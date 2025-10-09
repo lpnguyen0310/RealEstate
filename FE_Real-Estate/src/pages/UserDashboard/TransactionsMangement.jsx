@@ -1,10 +1,9 @@
 import { useState, useMemo, useCallback } from "react";
 import { Stack } from "@mui/material";
 import dayjs from "dayjs";
-import customParseFormat from "dayjs/plugin/customParseFormat";
 import { TxSearchBar, TxStatusTabs, TransactionTable } from "../../components/dashboard/historytransaction";
+import { exportTransactionsXLSX } from "@/utils/exportXlsx";
 
-dayjs.extend(customParseFormat);
 
 const transactions = [
     { code: "251009V629585", status: "Đang xử lý", createdAt: "09/10/2025 10:31", amount: "25 nghìn", createdBy: "Nguyên Lê" },
@@ -20,6 +19,8 @@ const parseRowDate = (s) => {
     if (d1.isValid()) return d1;
     return dayjs(s, "DD/MM/YYYY", true);
 };
+
+
 
 export default function TransactionsMangement() {
     const [orderCode, setOrderCode] = useState("");
@@ -56,8 +57,9 @@ export default function TransactionsMangement() {
     }, [tabKey, orderCode, date]);
 
     const handleSearch = useCallback(() => setPage(1), []);
-    const handleExport = () => console.log("EXPORT EXCEL");
-
+    const handleExport = () => {
+        exportTransactionsXLSX(transactions, "giao_dich.xlsx");
+    };
     return (
         <Stack spacing={2.5}>
             {/* Search bar tách riêng */}

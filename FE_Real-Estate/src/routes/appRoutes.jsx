@@ -9,7 +9,8 @@ import DashboardOverview from "@/pages/UserDashboard/DashboardOverview";
 import PostManagerPage from "@/pages/UserDashboard/PostManagerPage"; 
 import AccountManagement from "@/pages/UserDashboard/AccountManagement";
 import PricingPage from "@/pages/UserDashboard/PricingPage";
-
+import PurchagePostPage from "@/pages/UserDashboard/PurchagePostPage";
+import TransactionsMangement from "@/pages/UserDashboard/TransactionsMangement";
 export default function AppRoutes() {
   return (
     <Routes>
