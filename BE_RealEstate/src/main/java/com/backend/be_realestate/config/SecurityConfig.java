@@ -1,5 +1,6 @@
-package com.backend.be_realestate.security;
+package com.backend.be_realestate.config;
 
+import com.backend.be_realestate.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

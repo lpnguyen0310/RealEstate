@@ -10,22 +10,23 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Optional;
 
 @Configuration
-@EnableJpaAuditing(auditorAwareRef="auditorProvider")
+@EnableJpaAuditing(auditorAwareRef = "auditorProvider")
 public class JpaAuditingConfig {
+
     @Bean
     AuditorAware<String> auditorProvider() {
         return new AuditorAwareImpl();
     }
 
-    public class AuditorAwareImpl implements AuditorAware<String> {
-
+    // Nên để static để tránh giữ reference tới outer class
+    public static class AuditorAwareImpl implements AuditorAware<String> {
         @Override
         public Optional<String> getCurrentAuditor() {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return null;
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated()) {
+                return Optional.empty();           // ✅ thay vì return null
             }
-            return Optional.of(authentication.getName());
+            return Optional.ofNullable(auth.getName());
         }
     }
 }
