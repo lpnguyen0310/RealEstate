@@ -3,6 +3,7 @@ package com.backend.be_realestate.service.impl;
 import com.backend.be_realestate.converter.UserConverter;
 import com.backend.be_realestate.entity.UserEntity;
 import com.backend.be_realestate.modals.dto.UserDTO;
+import com.backend.be_realestate.modals.request.CreatePasswordRequest;
 import com.backend.be_realestate.modals.request.RegisterComplete;
 import com.backend.be_realestate.modals.response.StartOtpResponse;
 import com.backend.be_realestate.modals.response.VerifyOtpResponse;
@@ -129,35 +130,38 @@ public class RegisterServiceInMemoryImpl implements RegisterService {
     }
 
     @Override
-    @Deprecated
-    public Long complete(RegisterComplete req) {
-        var userDto = completeAndReturnUser(req);
-        return userDto.getId();
-    }
+    public UserDTO setPasswordAndCreateUser(CreatePasswordRequest req) {
+        if (!req.getPassword().equals(req.getConfirmPassword())) {
+            throw new IllegalArgumentException("Xác nhận mật khẩu không trùng khớp");
+        }
 
-    @Override
-    public UserDTO completeAndReturnUser(RegisterComplete req) {
         TicketRecord ticket = ticketCache.getIfPresent(req.getTicket());
         if (ticket == null) throw new IllegalArgumentException("Ticket không hợp lệ.");
         if (ticket.isUsed() || Instant.now().isAfter(ticket.getExpiresAt()))
             throw new IllegalStateException("Ticket đã dùng hoặc hết hạn.");
 
+        // Chặn email trùng
         userRepo.findByEmail(ticket.getEmail()).ifPresent(u -> {
             throw new IllegalStateException("Email đã tồn tại.");
         });
 
         UserEntity user = UserEntity.builder()
                 .email(ticket.getEmail())
-                .phone(req.getPhone())
-                .firstName(req.getFirstName())
-                .lastName(req.getLastName())
-                .isActive(true)
                 .passwordHash(encoder.encode(req.getPassword()))
+                .firstName("Nguyễn Văn")
+                .lastName("A")
+                .phone(null)
+                .avatar(null)
+                .isActive(true)
                 .build();
 
         user = userRepo.save(user);
+
+        // đánh dấu ticket đã dùng + dọn
         ticket.setUsed(true);
         ticketCache.put(req.getTicket(), ticket);
+
         return userConverter.convertToDto(user);
     }
+
 }
