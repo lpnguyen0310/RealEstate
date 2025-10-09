@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { Tooltip } from "antd";
 import { MENUS } from "@/data/SideBar/menuDataSideBar";
-import { PushpinOutlined, PushpinFilled } from "@ant-design/icons"; 
+import { PushpinOutlined, PushpinFilled } from "@ant-design/icons";
 import logo from "@/assets/featuretool4.png";
 
 export default function Sidebar({
@@ -56,7 +56,11 @@ export default function Sidebar({
                             key={m.to}
                             to={m.to}
                             end
-                            className={({ isActive }) =>`group flex items-center gap-3 mb-2 rounded-2xl px-3 py-2.5 text-[#4B4B5A] hover:bg-[#F4F6FA] transition${isActive ? "text-white bg-gradient-to-r from-[#274067] to-[#375A8B] shadow-[0_8px_20px_rgba(23,42,87,0.25)]" : ""}`
+                            className={({ isActive }) =>
+                                `group flex items-center gap-3 mb-2 rounded-2xl px-3 py-2.5 text-[#4B4B5A] hover:bg-[#F4F6FA] transition ${isActive
+                                    ? "text-white bg-gradient-to-r from-[#274067] to-[#375A8B] shadow-[0_8px_20px_rgba(23,42,87,0.25)]"
+                                    : ""
+                                }`
                             }
                         >
                             <span className="grid h-6 w-6 place-items-center text-[18px]">{m.icon}</span>
@@ -95,7 +99,7 @@ export default function Sidebar({
                         <img src="/zalo.png" alt="Zalo" className="h-8 w-8 rounded-full" />
                         {!collapsed && <span className="text-sm text-gray-600">Chat với chúng tôi</span>}
                     </div>
-                 
+
                 </div>
             </div>
         </aside>

@@ -6,13 +6,14 @@ import { useMemo } from "react";
 
 const HOVER_BG = "#dbe7ff";
 
-export default function TransactionTable({
+export default function OrderTable({
     data = [],
     page = 1,
     pageSize = 20,
     totalItems = 0,
     onPageChange,
     onPageSizeChange,
+    onRowClick,
 }) {
     const { start, end, totalPages } = useMemo(() => {
         const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -74,6 +75,7 @@ export default function TransactionTable({
                                             "& td": { transition: "background-color 140ms ease" },
                                             "&:hover td": { backgroundColor: HOVER_BG },
                                         }}
+                                        onClick={() => onRowClick?.(row)}
                                     >
                                         <TableCell sx={styles.bodyCell}>{row.code}</TableCell>
                                         <TableCell sx={styles.bodyCell}>
