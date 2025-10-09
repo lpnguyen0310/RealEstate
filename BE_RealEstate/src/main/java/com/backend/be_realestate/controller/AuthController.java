@@ -36,23 +36,24 @@ public class AuthController {
     @PostMapping("/request-otp")
     public ResponseEntity<ApiResponse<StartOtpResponse>> requestOtp(
             @Valid @RequestBody RegisterRequestOtp req) {
-
-        StartOtpResponse res = registerService.startByEmail(req.getEmail());
-        return ResponseEntity.ok(ApiResponse.success(res));
+        return ResponseEntity.ok(ApiResponse.success(
+                registerService.startByEmail(req.getEmail())));
     }
 
+    // B2: verify -> trả ticket
     @PostMapping("/verify")
     public ResponseEntity<ApiResponse<VerifyOtpResponse>> verify(
             @Valid @RequestBody RegisterVerifyOtp req) {
-        VerifyOtpResponse res = registerService.verifyEmailOtp(req.getEmail(), req.getOtp());
-        return ResponseEntity.ok(ApiResponse.success(res));
+        return ResponseEntity.ok(ApiResponse.success(
+                registerService.verifyEmailOtp(req.getEmail(), req.getOtp())));
     }
 
-    @PostMapping("/complete")
-    public ResponseEntity<ApiResponse<RegisterCompleteResponse>> complete(
-            @Valid @RequestBody RegisterComplete req) {
-        UserDTO dto = registerService.completeAndReturnUser(req);
-        RegisterCompleteResponse body = new RegisterCompleteResponse("Đăng ký thành công", dto);
-        return ResponseEntity.ok(ApiResponse.success(body));
+    // B3: set password -> tạo user
+    @PostMapping("/set-password")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> setPassword(
+            @Valid @RequestBody CreatePasswordRequest req) {
+        UserDTO dto = registerService.setPasswordAndCreateUser(req);
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("message", "Đăng ký thành công", "user", dto)));
     }
 }
