@@ -31,6 +31,9 @@ export const FEATURED_PROPERTIES = [
       phone: "0971 509 123",
       zaloUrl: "https://zalo.me/ptuan",
     },
+    // Thêm type & category
+    type: "sell",
+    category: "nha-rieng",
   },
 
   {
@@ -54,6 +57,8 @@ export const FEATURED_PROPERTIES = [
       phone: "0903 456 789",
       zaloUrl: "https://zalo.me/mainguyen",
     },
+    type: "sell",
+    category: "nha-mat-pho",
   },
 
   {
@@ -76,6 +81,8 @@ export const FEATURED_PROPERTIES = [
       phone: "0912 888 222",
       zaloUrl: "https://zalo.me/lequochuy",
     },
+    type: "rent",
+    category: "can-ho-chung-cu",
   },
 
   {
@@ -103,6 +110,8 @@ export const FEATURED_PROPERTIES = [
       phone: "0933 777 101",
       zaloUrl: "https://zalo.me/tndung",
     },
+    type: "sell",
+    category: "dat-nen-du-an",
   },
 
   {
@@ -126,6 +135,8 @@ export const FEATURED_PROPERTIES = [
       phone: "0902 333 444",
       zaloUrl: "https://zalo.me/vmkhoi",
     },
+    type: "sell",
+    category: "shophouse",
   },
 
   {
@@ -141,13 +152,13 @@ export const FEATURED_PROPERTIES = [
     area: 48,
     bed: 1,
     bath: 1,
-    // không có description để test ẩn dòng mô tả
     agent: {
       name: "Đinh Hải Yến",
       role: "Cộng tác viên",
-      // không có phone để test ẩn nút Gọi
       zaloUrl: "https://zalo.me/dhyen",
     },
+    type: "sell",
+    category: "can-ho-chung-cu",
   },
 
   {
@@ -177,6 +188,8 @@ export const FEATURED_PROPERTIES = [
       phone: "0979 111 222",
       zaloUrl: "https://zalo.me/pgbao",
     },
+    type: "sell",
+    category: "biet-thu-lien-ke",
   },
 
   {
@@ -199,6 +212,8 @@ export const FEATURED_PROPERTIES = [
       phone: "0911 222 333",
       zaloUrl: "https://zalo.me/ngonhatanh",
     },
+    type: "rent",
+    category: "studio",
   },
 
   {
@@ -226,6 +241,8 @@ export const FEATURED_PROPERTIES = [
       phone: "0908 000 666",
       zaloUrl: "https://zalo.me/lhphong",
     },
+    type: "sell",
+    category: "biet-thu-liền-kề",
   },
 
   {
@@ -241,7 +258,6 @@ export const FEATURED_PROPERTIES = [
     area: 48,
     bed: 3,
     bath: 2,
-    // không có agent.avatar để test ký tự đầu tên
     description:
       "Nhà mới, sơn sửa cuối 2024, tặng bếp + máy lạnh, công chứng ngay.",
     agent: {
@@ -250,8 +266,11 @@ export const FEATURED_PROPERTIES = [
       phone: "0934 567 890",
       zaloUrl: "https://zalo.me/hmlinh",
     },
+    type: "sell",
+    category: "nha-rieng",
   },
 ];
+
 
 
 // ==== CHI TIẾT THEO ID (tuỳ từng bài có thể khác nhau) ====
