@@ -9,7 +9,7 @@ import DashboardOverview from "@/pages/UserDashboard/DashboardOverview";
 import PostManagerPage from "@/pages/UserDashboard/PostManagerPage"; 
 import AccountManagement from "@/pages/Account/AccountManagement";
 import PurchagePostPage from "../pages/UserDashboard/PurchagePostPage";
-
+import TransactionsMangement from "@/pages/UserDashboard/TransactionsMangement";
 
 export default function AppRoutes() {
   return (
@@ -27,6 +27,7 @@ export default function AppRoutes() {
         <Route path="posts" element={<PostManagerPage />} /> 
         <Route path="account" element={<AccountManagement />} /> 
         <Route path="purchase" element={<PurchagePostPage />} />
+        <Route path="transactions" element={<TransactionsMangement />} />
       </Route>
 
       {/* ADMIN */}

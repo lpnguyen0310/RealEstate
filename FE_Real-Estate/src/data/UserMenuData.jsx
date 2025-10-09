@@ -1,6 +1,8 @@
+import { href } from "react-router-dom";
+
 export const USER_MENU_ITEMS = [
   { icon: "🏠", text: "Tổng quan", href: "/dashboard", badge: "Mới" },
-  { icon: "📝", text: "Quản lý tin đăng" },
+  { icon: "📝", text: "Quản lý tin đăng" ,href:"/posts"},
   { icon: "🎯", text: "Gói hội viên", badge2: "Tiết kiệm đến -39%" },
   { icon: "👥", text: "Quản lý khách hàng" },
   { icon: "💼", text: "Quản lý tin tài trợ" },
