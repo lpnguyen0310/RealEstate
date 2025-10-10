@@ -43,6 +43,9 @@ public class UserEntity extends BaseEntity {
     @Column(name="last_name", length=100)
     private String lastName;
 
+    @Column(name="zalo_url", length = 100)
+    private String zalo_url;
+
     @ManyToMany
     @JoinTable(
             name="user_roles",

@@ -22,6 +22,9 @@ import OrderManagement from "@/pages/UserDashboard/OrderMangement";
 import TransactionManagement from "@/pages/UserDashboard/TransactionManagement";
 import DashboardNotFound from "@/pages/UserDashboard/DashboardNotFound";
 
+import QRGeneratorPage from "@/pages/UserDashboard/Tools/QRGeneratorPage";
+
+
 export default function AppRoutes() {
   return (
     <Routes>
