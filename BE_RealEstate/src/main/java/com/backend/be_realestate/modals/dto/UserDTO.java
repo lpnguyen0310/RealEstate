@@ -14,4 +14,6 @@ public class UserDTO {
     private Boolean isActive;
     private String avatar;
     private List<String> roles;
+    private AuthProviderDTO authProvider;
+
 }

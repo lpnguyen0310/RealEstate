@@ -16,14 +16,8 @@ export default function Sidebar({
         <aside
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
-            className={`
-                sticky top-0 h-svh   
-        relative shrink-0 border-r border-gray-100 bg-white
-        transition-all duration-300 ease-out overflow-hidden
-        ${collapsed ? "w-[84px]" : "w-[264px]"}
-      `}
-            style={{ minHeight: "100vh" }}
-        >
+            className={`sticky top-0 h-svh relative shrink-0 border-r border-gray-100 bg-white transition-all duration-300 ease-out overflow-hidden ${collapsed ? "w-[84px]" : "w-[264px]"}`}
+            style={{ minHeight: "100vh" }}>
             {/* logo + nút ghim */}
             <div
                 className={`border-b border-gray-50 ${collapsed ? "px-0 py-3" : "px-4 py-4"}`}
@@ -38,8 +32,6 @@ export default function Sidebar({
                         className={`${collapsed ? "h-7" : "h-8"} transition-all`}
                         onError={(e) => (e.currentTarget.style.display = "none")}
                     />
-
-                    {/* NÚT GHIM: chỉ hiện khi không collapsed để khỏi chen vào layout */}
                     {!collapsed && (
                         <button
                             onClick={() => setPinned((v) => !v)}
@@ -55,9 +47,6 @@ export default function Sidebar({
                     )}
                 </div>
             </div>
-
-
-            {/* menu */}
             <nav className="px-4">
                 {MENUS.map((m) => {
                     const Item = (
@@ -100,10 +89,7 @@ export default function Sidebar({
             <div className="absolute bottom-4 left-0 right-0">
                 <div className="px-3">
                     <div
-                        className={`
-              flex items-center gap-3 rounded-2xl border border-gray-100 shadow-sm
-              ${collapsed ? "justify-center p-2" : "px-3 py-2"}
-            `}
+                        className={`flex items-center gap-3 rounded-2xl border border-gray-100 shadow-sm ${collapsed ? "justify-center p-2" : "px-3 py-2"}`}
                     >
                         <img src="/zalo.png" alt="Zalo" className="h-8 w-8 rounded-full" />
                         {!collapsed && <span className="text-sm text-gray-600">Chat với chúng tôi</span>}

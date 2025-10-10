@@ -19,6 +19,7 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserDTO>> me(Authentication auth) {
         UserDTO dto = userService.getCurrentUser(auth);
-        return ResponseEntity.ok(ApiResponse.success(dto)); // dto có thể null nếu chưa đăng nhập
+        return ResponseEntity.ok(ApiResponse.success(dto));
     }
+
 }

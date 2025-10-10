@@ -1,11 +1,6 @@
 import React, { useMemo, useState } from "react";
 import Chart from "react-apexcharts";
 
-/**
- * Props:
- *  data: [{ label: "10/09", sell: 2, rent: 1 }, ...]
- *  defaultMode: "day" | "week" | "month"
- */
 export default function PostsChartApex({ data = [], defaultMode = "day" }) {
     const [mode, setMode] = useState(defaultMode);
     const [showSell, setShowSell] = useState(true);
