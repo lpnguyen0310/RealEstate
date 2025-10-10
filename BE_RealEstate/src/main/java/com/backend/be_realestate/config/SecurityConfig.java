@@ -1,6 +1,7 @@
 package com.backend.be_realestate.config;
 
 import com.backend.be_realestate.security.JwtAuthFilter;
+import com.backend.be_realestate.security.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,28 +22,33 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtFilter;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler; // <-- add
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                .cors(cors -> {})
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(reg -> reg
-                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/auth/**","/oauth2/**","/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                // bật oauth2 login
+                .oauth2Login(o -> o
+                        .loginPage("/oauth2/authorization/google")
+                        .successHandler(oAuth2LoginSuccessHandler)
+                )
+                // filter JWT cho các request còn lại
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
-        // (Tuỳ chọn) bật CORS nếu FE khác origin:
-        // http.cors(Customizer.withDefaults());
-
+        // http.cors(Customizer.withDefaults()); // nếu FE khác origin
         return http.build();
     }
 
     @Bean
     public AuthenticationManager authenticationManager(
             UserDetailsService uds, PasswordEncoder encoder) {
-
         var provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(uds);
         provider.setPasswordEncoder(encoder);

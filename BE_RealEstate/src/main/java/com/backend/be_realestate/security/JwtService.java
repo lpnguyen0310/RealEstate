@@ -46,7 +46,9 @@ public class JwtService {
     public boolean isValid(String token){
         try { parse(token); return true; } catch (JwtException | IllegalArgumentException e){ return false; }
     }
-
+    public long refreshExpMs() {
+        return refreshExpMs;
+    }
     public Jws<Claims> parse(String token){
         return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
     }

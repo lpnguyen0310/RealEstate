@@ -1,4 +1,3 @@
-// RegisterModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Form, Input, Button, Divider, message } from "antd";
 import { AppleFilled, GoogleOutlined, PhoneOutlined, ArrowLeftOutlined } from "@ant-design/icons";
@@ -70,7 +69,6 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
 
             if (res.ok) {
                 setTempUserId(res.tempUserId);
-                // 👉 chuyển qua bước đặt mật khẩu
                 setStep("setPwd");
             } else {
                 message.error("Mã OTP không đúng, vui lòng thử lại");
