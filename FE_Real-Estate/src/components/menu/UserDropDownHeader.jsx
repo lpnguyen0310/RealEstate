@@ -1,10 +1,11 @@
 import { Flex, Avatar, Dropdown } from "antd";
 import { DownOutlined } from "@ant-design/icons";
 import { USER_MENU_ITEMS } from "@/data/UserMenuData";
+import { useNavigate } from "react-router-dom";
 
 export default function UserDropDownHeader({ user, onLoginClick, onRegisterClick, onLogout }) {
     const isLoggedIn = !!user;
-
+    const nav = useNavigate();
     // helper: nếu có fn thì preventDefault; không có thì cứ đi link tĩnh
     const clickOrHref = (fn, href) =>
         fn
@@ -55,7 +56,11 @@ export default function UserDropDownHeader({ user, onLoginClick, onRegisterClick
                         {USER_MENU_ITEMS.map((item) => (
                             <a
                                 key={item.text}
-                                href={item.href || "#"}
+                                href={item.to || "#"}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    if (item.to) nav(item.to);      // ✅ dùng react-router, không reload
+                                }}
                                 className="flex items-center justify-between px-4 py-2.5 rounded-lg hover:bg-gray-50 text-[14px] font-medium no-underline !text-gray-800 hover:!text-[#d6402c]"
                             >
                                 <div className="flex items-center gap-2">
@@ -89,7 +94,11 @@ export default function UserDropDownHeader({ user, onLoginClick, onRegisterClick
                 <Avatar size={45} src={user?.avatarUrl} className="bg-[#fdece7] text-[#d6402c] font-semibold">
                     {!user?.avatarUrl && initial}
                 </Avatar>
-                <span className="font-medium text-gray-800">{user?.fullName || "Người dùng"}</span>
+                <span>
+                    {user
+                        ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email
+                        : "Người dùng"}
+                </span>
                 <DownOutlined className="text-[10px]" />
             </Flex>
         </Dropdown>

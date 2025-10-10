@@ -19,6 +19,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "antd": "^5.27.4",
     "apexcharts": "^5.3.5",
+    "axios": "^1.12.2",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.18",
     "google-map-react": "^2.2.5",

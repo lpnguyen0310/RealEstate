@@ -23,10 +23,10 @@ export default function LoginPage() {
 
   return (
     <LoginModal
-      open={open}
-      onClose={handleClose}
-      onRegisterClick={handleGoRegister}
-      onSuccess={handleSuccess}
+      open
+      onClose={() => navigate(-1)}
+      onRegisterClick={() => navigate("/register")}
+      onSuccess={() => navigate(from, { replace: true })}
     />
   );
 }
