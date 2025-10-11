@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api from "@/api/axios";
 import { setAccessToken, clearAccessToken, getAccessToken } from "@/utils/auth";
+import { extractErrorMessage } from "@/utils/httpError";
 
 const AuthCtx = createContext(null);
 export const useAuth = () => useContext(AuthCtx);
@@ -45,12 +46,16 @@ export default function AuthProvider({ children }) {
     }, []);
 
     const login = async ({ username, password }) => {
-        const res = await api.post("/auth/login", { identifier: username, password });
-        const access = res?.data?.data?.access || res?.data?.data?.accessToken;
-        if (!access) throw new Error("No access token");
-        setAccessToken(access);
-        const me = await api.get("user/me").catch(() => ({ data: null }));
-        setUser(me?.data?.data ?? me?.data ?? null);
+        try {
+            const res = await api.post("/auth/login", { identifier: username, password });
+            const access = res?.data?.data?.access || res?.data?.data?.accessToken;
+            if (!access) throw new Error("No access token");
+            setAccessToken(access);
+            const me = await api.get("user/me").catch(() => ({ data: null }));
+            setUser(me?.data?.data ?? me?.data ?? null);
+        } catch (err) {
+            throw new Error(extractErrorMessage(err));
+        }
     };
 
     const logout = async () => {

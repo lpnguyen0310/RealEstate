@@ -1,26 +1,54 @@
+// src/pages/Login/LoginModal.jsx
 import { useEffect, useState } from "react";
 import { Modal, Form, message } from "antd";
+
 import LoginForm from "@/components/auth/forms/LoginForm";
 import ForgotForm from "@/components/auth/forms/ForgotForm";
 import OtpZaloForm from "@/components/auth/forms/OtpZaloForm";
 import ResetPasswordForm from "@/components/auth/forms/ResetPasswordForm";
 import ForgotSuccessPanel from "@/components/auth/panels/ForgotSuccessPanel";
+import LoggingInPanel from "@/components/auth/panels/LoggingInPanel";
+
 import useCountdown from "@/utils/useCountdown";
 import { isPhone, isEmail, maskPhone } from "@/utils/validators";
-import { useAuth } from "@/contexts/AuthContext";  
+import { useAuth } from "@/contexts/AuthContext";
 
-export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }) {
-  const { login } = useAuth(); // <-- từ context
+export default function LoginModal({
+  open,
+  onClose,
+  onRegisterClick,
+  onSuccess,
+  onBeginLogging, // ✅ mới
+}) {
+  const { login } = useAuth();
+
   const [form] = Form.useForm();
   const [forgotForm] = Form.useForm();
   const [otpForm] = Form.useForm();
   const [resetForm] = Form.useForm();
 
+  // login | forgot | otp_zalo | reset | forgot_success | logging_in
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
+  const [forceClosed, setForceClosed] = useState(false); // ✅ ép đóng nội bộ
+
   const [sentTo, setSentTo] = useState("");
   const [maskInfo, setMaskInfo] = useState("");
+
   const { value: resendIn, restart: restartCountdown } = useCountdown(60);
+
+  // Reset khi mở modal
+  useEffect(() => {
+    if (open) {
+      setMode("login");
+      setLoading(false);
+      setForceClosed(false);
+      form.resetFields();
+      forgotForm.resetFields();
+      otpForm.resetFields();
+      resetForm.resetFields();
+    }
+  }, [open]);
 
   // ===== ĐĂNG NHẬP =====
   const onFinishLogin = async (values) => {
@@ -30,12 +58,20 @@ export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }
         username: values.username,
         password: values.password,
       });
+
+      // Không đóng ngay → chuyển qua panel "Đang đăng nhập"
+      setMode("logging_in");
+      onBeginLogging?.(); // ✅ báo Header bật Skeleton
       message.success("Đăng nhập thành công!");
-      onSuccess?.();
-      onClose?.();
     } catch (err) {
-      console.error(err);
-      message.error("Sai tài khoản hoặc mật khẩu, vui lòng thử lại!");
+      const msg = err?.message || "";
+      if (msg.includes("chưa được đăng ký")) {
+        form.setFields([{ name: "username", errors: [msg] }]);
+      } else if (msg.includes("mật khẩu không đúng")) {
+        form.setFields([{ name: "password", errors: [msg] }]);
+      } else {
+        message.error(msg || "Đăng nhập thất bại, vui lòng thử lại!");
+      }
     } finally {
       setLoading(false);
     }
@@ -45,7 +81,8 @@ export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }
   const onFinishForgot = async ({ account }) => {
     try {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 600)); // giả lập
+      // TODO: gọi API thật
+      await new Promise((r) => setTimeout(r, 600));
       setSentTo(account);
 
       if (isPhone(account)) {
@@ -64,10 +101,11 @@ export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }
     }
   };
 
-  // ===== OTP =====
+  // ===== OTP (Zalo) =====
   const resendOtp = async () => {
     try {
       setLoading(true);
+      // TODO: gọi API resend OTP
       await new Promise((r) => setTimeout(r, 500));
       restartCountdown(60);
       message.success("Đã gửi lại OTP qua Zalo.");
@@ -81,6 +119,7 @@ export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }
   const onVerifyOtp = async ({ otp }) => {
     try {
       setLoading(true);
+      // TODO: gọi API verify OTP
       await new Promise((r) => setTimeout(r, 600));
       message.success("Xác thực OTP thành công.");
       setMode("reset");
@@ -95,6 +134,7 @@ export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }
   const onFinishReset = async ({ newPassword }) => {
     try {
       setLoading(true);
+      // TODO: API đổi mật khẩu
       await new Promise((r) => setTimeout(r, 700));
       message.success("Đổi mật khẩu thành công, vui lòng đăng nhập lại.");
       setMode("login");
@@ -107,20 +147,32 @@ export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }
     }
   };
 
+  // Panel "Đang đăng nhập" xong → đóng chắc chắn & báo ra ngoài
+  const handleLoggingDone = () => {
+    setForceClosed(true); // ✅ ép đóng modal (dù cha quên setOpen(false))
+    onSuccess?.();
+    onClose?.();
+  };
+
+  const isBlockingClose = mode === "logging_in";
+  // GHIM mở modal khi đang logging_in, và KHÔNG mở nếu đã bị ép đóng
+  const shouldOpen = (open || isBlockingClose) && !forceClosed;
+
   return (
     <Modal
-      open={open}
-      onCancel={onClose}
+      open={shouldOpen}
+      onCancel={isBlockingClose ? undefined : onClose}
       footer={null}
       centered
       width={800}
       destroyOnClose
-      maskClosable
+      maskClosable={!isBlockingClose}
+      closable={!isBlockingClose}
       bodyStyle={{ height: 700, padding: 0, overflow: "hidden" }}
       modalRender={(node) => <div className="animate-fade-up">{node}</div>}
     >
       <div className="flex flex-row h-full w-full">
-        {/* Bên trái: hình minh họa */}
+        {/* Bên trái: minh họa */}
         <div className="w-[40%] h-full bg-[#ffe9e6] flex flex-col justify-center items-center rounded-l-[8px]">
           <img
             src="/assets/login-illustration.png"
@@ -133,7 +185,7 @@ export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }
           </p>
         </div>
 
-        {/* Bên phải: các form con */}
+        {/* Bên phải: form/panel */}
         <div className="flex flex-col justify-center w-[60%] h-full px-8">
           {mode === "login" && (
             <LoginForm
@@ -181,6 +233,8 @@ export default function LoginModal({ open, onClose, onRegisterClick, onSuccess }
               onBackToLogin={() => setMode("login")}
             />
           )}
+
+          {mode === "logging_in" && <LoggingInPanel onDone={handleLoggingDone} />}
         </div>
       </div>
     </Modal>

@@ -1,5 +1,5 @@
 // src/components/layout/Header.jsx
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Flex, Badge, Dropdown, Button, message } from "antd";
 import { BellOutlined } from "@ant-design/icons";
 import { NAVS } from "@/data/header_submenu";
@@ -9,24 +9,22 @@ import RegisterModal from "@/pages/Signup/RegisterModal";
 import { SAVED_POSTS } from "@/data/SavedPost";
 import FavoritePostList from "@/components/menu/FavoritePostList";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext"; 
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Header() {
   const nav = useNavigate();
-  const { user, logout } = useAuth(); 
+  const { user, logout } = useAuth();
+
   const [hoverKey, setHoverKey] = useState(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
 
-  // Khi user đã đăng nhập thành công ở nơi khác, tự đóng modal
-  useEffect(() => {
-    if (user && loginOpen) setLoginOpen(false);
-    if (user && registerOpen) setRegisterOpen(false);
-  }, [user, loginOpen, registerOpen]);
+  // ✅ cờ UI để hiện Skeleton trong user dropdown khi đang logging
+  const [authUiLoading, setAuthUiLoading] = useState(false);
 
   const handleLogout = async () => {
     try {
-      await logout(); // sẽ gọi BE /auth/logout trong AuthContext (nếu bạn đã implement)
+      await logout();
       message.success("Đã đăng xuất.");
       nav("/", { replace: true });
     } catch {
@@ -34,7 +32,6 @@ export default function Header() {
     }
   };
 
-  // Helper render submenu
   const renderSubmenu = (items = [], parentKey) => (
     <div className="bds-submenu bg-white shadow-xl rounded-2xl p-2 w-[340px]">
       {items.map((it) => (
@@ -122,7 +119,8 @@ export default function Header() {
             </Badge>
 
             <UserDropDownHeader
-              user={user} // ✅ nhận từ context
+              user={user}
+              loadingUser={authUiLoading}          
               onLoginClick={() => setLoginOpen(true)}
               onRegisterClick={() => setRegisterOpen(true)}
               onLogout={handleLogout}
@@ -144,16 +142,20 @@ export default function Header() {
       {/* Modals */}
       <LoginModal
         open={loginOpen}
-        onClose={() => setLoginOpen(false)}
+        onClose={() => {
+          setLoginOpen(false);
+          setAuthUiLoading(false);           // phòng khi đóng giữa chừng
+        }}
         onRegisterClick={() => {
           setLoginOpen(false);
           setRegisterOpen(true);
+          setAuthUiLoading(false);           // phòng khi chuyển modal
         }}
-        // Sau khi login thành công, AuthContext đã set user → chỉ đóng modal hoặc điều hướng nhẹ
+        onBeginLogging={() => setAuthUiLoading(true)} // bật Skeleton từ lúc vào panel
         onSuccess={() => {
+          setAuthUiLoading(false);           // tắt Skeleton khi panel xong
           setLoginOpen(false);
-          // điều hướng nếu muốn:
-          // nav("/dashboard", { replace: true });
+          // nav("/dashboard", { replace: true }); // nếu muốn điều hướng
         }}
       />
 
@@ -162,8 +164,7 @@ export default function Header() {
         onClose={() => setRegisterOpen(false)}
         onSuccess={() => {
           setRegisterOpen(false);
-          // Có thể auto mở login nếu muốn
-          // setLoginOpen(true);
+          // setLoginOpen(true); // nếu muốn auto mở login
         }}
       />
     </>
