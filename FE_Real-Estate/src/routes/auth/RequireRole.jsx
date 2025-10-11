@@ -1,13 +1,15 @@
-import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useSelector } from "react-redux";
 
-export default function RequireRole({ roles = [] }) {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
+export default function RequireAuth() {
+  const user = useSelector((s) => s.auth.user);
+  const status = useSelector((s) => s.auth.status);
+  const loc = useLocation();
 
-  const has = Array.isArray(user.roles)
-    ? user.roles.some(r => roles.includes(r))
-    : roles.includes(user.role);
+  const hasToken = !!sessionStorage.getItem("access_token");
+  if (status === "loading" && hasToken) {
+    return <div style={{ padding: 24 }}>Đang tải phiên đăng nhập…</div>;
+  }
 
-  return has ? <Outlet /> : <Navigate to="/403" replace />;
+  return user ? <Outlet /> : <Navigate to="/login" replace state={{ from: loc.pathname }} />;
 }

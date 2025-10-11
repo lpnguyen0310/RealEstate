@@ -8,12 +8,11 @@ export default function UserDropDownHeader({
     onLoginClick,
     onRegisterClick,
     onLogout,
-    loadingUser = false, 
+    loadingUser = false, // bật/tắt Skeleton cho avatar + tên
 }) {
     const isLoggedIn = !!user;
     const nav = useNavigate();
 
-    // helper: nếu có fn thì preventDefault; không có thì cứ đi link tĩnh
     const clickOrHref = (fn, href) =>
         fn
             ? { onClick: (e) => { e.preventDefault(); fn(); }, href: href || "#" }
@@ -39,6 +38,7 @@ export default function UserDropDownHeader({
         );
     }
 
+    // ======= ĐÃ LOGIN =======
     const initial = user?.fullName?.charAt(0)?.toUpperCase()
         || user?.firstName?.charAt(0)?.toUpperCase()
         || user?.email?.charAt(0)?.toUpperCase()
@@ -68,7 +68,7 @@ export default function UserDropDownHeader({
                                 href={item.to || "#"}
                                 onClick={(e) => {
                                     e.preventDefault();
-                                    if (item.to) nav(item.to); // dùng react-router, không reload
+                                    if (item.to) nav(item.to);
                                 }}
                                 className="flex items-center justify-between px-4 py-2.5 rounded-lg hover:bg-gray-50 text-[14px] font-medium no-underline !text-gray-800 hover:!text-[#d6402c]"
                             >

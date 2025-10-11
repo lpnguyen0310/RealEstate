@@ -1,10 +1,11 @@
+// src/routes/AppRoutes.jsx
 import { Routes, Route } from "react-router-dom";
 
 // Layouts
 import PublicLayout from "@/layouts/PublicLayout";
 import DashboardLayout from "@/layouts/DashboardLayout";
 
-// Route guards (đã chuyển vào folder auth)
+// Route guards
 import RequireAuth from "@/routes/auth/RequireAuth";
 import RequireRole from "@/routes/auth/RequireRole";
 
@@ -22,18 +23,19 @@ import OrderManagement from "@/pages/UserDashboard/OrderMangement";
 import TransactionManagement from "@/pages/UserDashboard/TransactionManagement";
 import DashboardNotFound from "@/pages/UserDashboard/DashboardNotFound";
 
-import QRGeneratorPage from "@/pages/UserDashboard/Tools/QRGeneratorPage";
-
+// (import QRGeneratorPage nếu dùng, hiện chưa gắn vào route)
 
 export default function AppRoutes() {
   return (
     <Routes>
-        <Route element={<PublicLayout />}>
+      {/* PUBLIC */}
+      <Route element={<PublicLayout />}>
         {publicRoutes.map(({ path, element }) => (
           <Route key={path} path={path} element={element} />
         ))}
       </Route>
 
+      {/* USER DASHBOARD (YÊU CẦU LOGIN) */}
       <Route element={<RequireAuth />}>
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<DashboardOverview />} />
@@ -47,12 +49,14 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      <Route element={<RequireRole role="ADMIN" />}>
+      {/* ADMIN (YÊU CẦU ROLE) */}
+      <Route element={<RequireRole roles={['ADMIN']} />}>
         {adminRoutes.map(({ path, element }) => (
           <Route key={path} path={path} element={element} />
         ))}
       </Route>
 
+      {/* 404 */}
       <Route path="*" element={<div style={{ padding: 24 }}>404 Not Found</div>} />
     </Routes>
   );

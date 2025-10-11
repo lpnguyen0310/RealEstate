@@ -1,11 +1,8 @@
 // src/api/axios.js
 import axios from "axios";
-import { getAccessToken, setAccessToken, clearAccessToken, logout } from "@/utils/auth";
+import { getAccessToken, setAccessToken, clearAccessToken /*, logout*/ } from "@/utils/auth";
 
-const api = axios.create({
-  baseURL: "/api",
-  withCredentials: true,
-});
+const api = axios.create({ baseURL: "/api", withCredentials: true });
 
 api.interceptors.request.use((cfg) => {
   const t = getAccessToken();
@@ -14,6 +11,10 @@ api.interceptors.request.use((cfg) => {
 });
 
 let refreshing = null;
+
+
+let onUnauthorized = null;
+export function setOnUnauthorized(fn) { onUnauthorized = fn; }
 
 api.interceptors.response.use(
   (r) => r,
@@ -40,7 +41,8 @@ api.interceptors.response.use(
         refreshing = null;
         clearAccessToken();
         try { await api.post("/auth/logout"); } catch { }
-        logout();
+        // logout(); // ❌ bỏ hẳn nếu nó phụ thuộc Context
+        if (onUnauthorized) onUnauthorized(); // ✅ báo cho Redux
       }
     }
     return Promise.reject(err);

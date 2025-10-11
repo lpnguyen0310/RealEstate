@@ -1,30 +1,36 @@
 // src/components/layout/Header.jsx
 import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Flex, Badge, Dropdown, Button, message } from "antd";
 import { BellOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+
 import { NAVS } from "@/data/header_submenu";
+import { SAVED_POSTS } from "@/data/SavedPost";
+
 import UserDropDownHeader from "@/components/menu/UserDropDownHeader";
+import FavoritePostList from "@/components/menu/FavoritePostList";
 import LoginModal from "@/pages/Login/LoginModal";
 import RegisterModal from "@/pages/Signup/RegisterModal";
-import { SAVED_POSTS } from "@/data/SavedPost";
-import FavoritePostList from "@/components/menu/FavoritePostList";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+
+import { logoutThunk } from "@/store/authSlice";
 
 export default function Header() {
   const nav = useNavigate();
-  const { user, logout } = useAuth();
+  const dispatch = useDispatch();
 
+  const { user, status } = useSelector((s) => s.auth);
+  const loadingAuth = status === "loading"; // đang hydrate/getProfile/login
+
+  // UI state
   const [hoverKey, setHoverKey] = useState(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
-
-  // ✅ cờ UI để hiện Skeleton trong user dropdown khi đang logging
-  const [authUiLoading, setAuthUiLoading] = useState(false);
+  const [authUiLoading, setAuthUiLoading] = useState(false); // Skeleton khi panel "Đang đăng nhập"
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await dispatch(logoutThunk()).unwrap();
       message.success("Đã đăng xuất.");
       nav("/", { replace: true });
     } catch {
@@ -72,7 +78,10 @@ export default function Header() {
 
             {/* NAV */}
             <div id="nav-anchor" className="hidden lg:flex relative">
-              <div className="flex items-center h-full gap-8" onMouseLeave={() => setHoverKey(null)}>
+              <div
+                className="flex items-center h-full gap-8"
+                onMouseLeave={() => setHoverKey(null)}
+              >
                 {NAVS.map((navItem) => {
                   const isActive = hoverKey === navItem.label;
                   return (
@@ -120,7 +129,8 @@ export default function Header() {
 
             <UserDropDownHeader
               user={user}
-              loadingUser={authUiLoading}          
+              // ✅ Skeleton khi đang hydrate/getProfile/login hoặc đang show panel logging_in
+              loadingUser={loadingAuth || authUiLoading}
               onLoginClick={() => setLoginOpen(true)}
               onRegisterClick={() => setRegisterOpen(true)}
               onLogout={handleLogout}
@@ -132,6 +142,8 @@ export default function Header() {
                 if (user) nav("/dashboard/posts");
                 else setLoginOpen(true);
               }}
+              // (tuỳ) khoá nút trong lúc auth đang loading
+              disabled={loadingAuth}
             >
               <span className="text-[18px]">Đăng tin</span>
             </Button>
@@ -144,18 +156,17 @@ export default function Header() {
         open={loginOpen}
         onClose={() => {
           setLoginOpen(false);
-          setAuthUiLoading(false);           // phòng khi đóng giữa chừng
+          setAuthUiLoading(false);
         }}
         onRegisterClick={() => {
           setLoginOpen(false);
           setRegisterOpen(true);
-          setAuthUiLoading(false);           // phòng khi chuyển modal
+          setAuthUiLoading(false);
         }}
-        onBeginLogging={() => setAuthUiLoading(true)} // bật Skeleton từ lúc vào panel
+        onBeginLogging={() => setAuthUiLoading(true)} // bật Skeleton khi panel "Đang đăng nhập" chạy
         onSuccess={() => {
-          setAuthUiLoading(false);           // tắt Skeleton khi panel xong
+          setAuthUiLoading(false); // tắt Skeleton khi panel xong
           setLoginOpen(false);
-          // nav("/dashboard", { replace: true }); // nếu muốn điều hướng
         }}
       />
 
@@ -164,7 +175,7 @@ export default function Header() {
         onClose={() => setRegisterOpen(false)}
         onSuccess={() => {
           setRegisterOpen(false);
-          // setLoginOpen(true); // nếu muốn auto mở login
+          // setLoginOpen(true);
         }}
       />
     </>

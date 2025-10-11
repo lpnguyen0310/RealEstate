@@ -1,6 +1,7 @@
-// src/pages/Login/LoginModal.jsx
 import { useEffect, useState } from "react";
 import { Modal, Form, message } from "antd";
+import { useDispatch } from "react-redux";
+import { loginThunk } from "@/store/authSlice";
 
 import LoginForm from "@/components/auth/forms/LoginForm";
 import ForgotForm from "@/components/auth/forms/ForgotForm";
@@ -11,16 +12,15 @@ import LoggingInPanel from "@/components/auth/panels/LoggingInPanel";
 
 import useCountdown from "@/utils/useCountdown";
 import { isPhone, isEmail, maskPhone } from "@/utils/validators";
-import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginModal({
   open,
   onClose,
   onRegisterClick,
   onSuccess,
-  onBeginLogging, // ✅ mới
+  onBeginLogging, // bật Skeleton ở Header
 }) {
-  const { login } = useAuth();
+  const dispatch = useDispatch();
 
   const [form] = Form.useForm();
   const [forgotForm] = Form.useForm();
@@ -30,14 +30,13 @@ export default function LoginModal({
   // login | forgot | otp_zalo | reset | forgot_success | logging_in
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
-  const [forceClosed, setForceClosed] = useState(false); // ✅ ép đóng nội bộ
+  const [forceClosed, setForceClosed] = useState(false);
 
   const [sentTo, setSentTo] = useState("");
   const [maskInfo, setMaskInfo] = useState("");
 
   const { value: resendIn, restart: restartCountdown } = useCountdown(60);
 
-  // Reset khi mở modal
   useEffect(() => {
     if (open) {
       setMode("login");
@@ -50,21 +49,21 @@ export default function LoginModal({
     }
   }, [open]);
 
-  // ===== ĐĂNG NHẬP =====
+  // ===== ĐĂNG NHẬP (Redux) =====
   const onFinishLogin = async (values) => {
     try {
       setLoading(true);
-      await login({
+      await dispatch(loginThunk({
         username: values.username,
         password: values.password,
-      });
+      })).unwrap();
 
-      // Không đóng ngay → chuyển qua panel "Đang đăng nhập"
+      // Không đóng ngay → panel “Đang đăng nhập”
       setMode("logging_in");
-      onBeginLogging?.(); // ✅ báo Header bật Skeleton
+      onBeginLogging?.();
       message.success("Đăng nhập thành công!");
-    } catch (err) {
-      const msg = err?.message || "";
+    } catch (errMsg) {
+      const msg = errMsg || "";
       if (msg.includes("chưa được đăng ký")) {
         form.setFields([{ name: "username", errors: [msg] }]);
       } else if (msg.includes("mật khẩu không đúng")) {
@@ -81,10 +80,8 @@ export default function LoginModal({
   const onFinishForgot = async ({ account }) => {
     try {
       setLoading(true);
-      // TODO: gọi API thật
-      await new Promise((r) => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 600)); // giả lập
       setSentTo(account);
-
       if (isPhone(account)) {
         setMaskInfo(maskPhone(account));
         setMode("otp_zalo");
@@ -105,7 +102,6 @@ export default function LoginModal({
   const resendOtp = async () => {
     try {
       setLoading(true);
-      // TODO: gọi API resend OTP
       await new Promise((r) => setTimeout(r, 500));
       restartCountdown(60);
       message.success("Đã gửi lại OTP qua Zalo.");
@@ -119,7 +115,6 @@ export default function LoginModal({
   const onVerifyOtp = async ({ otp }) => {
     try {
       setLoading(true);
-      // TODO: gọi API verify OTP
       await new Promise((r) => setTimeout(r, 600));
       message.success("Xác thực OTP thành công.");
       setMode("reset");
@@ -134,7 +129,6 @@ export default function LoginModal({
   const onFinishReset = async ({ newPassword }) => {
     try {
       setLoading(true);
-      // TODO: API đổi mật khẩu
       await new Promise((r) => setTimeout(r, 700));
       message.success("Đổi mật khẩu thành công, vui lòng đăng nhập lại.");
       setMode("login");
@@ -147,15 +141,14 @@ export default function LoginModal({
     }
   };
 
-  // Panel "Đang đăng nhập" xong → đóng chắc chắn & báo ra ngoài
+  // Panel “Đang đăng nhập” hoàn tất → ép đóng chắc chắn + báo ra ngoài
   const handleLoggingDone = () => {
-    setForceClosed(true); // ✅ ép đóng modal (dù cha quên setOpen(false))
-    onSuccess?.();
+    setForceClosed(true);     // ép đóng nội bộ
+    onSuccess?.();            // báo cho Header tắt Skeleton + đóng modal
     onClose?.();
   };
 
   const isBlockingClose = mode === "logging_in";
-  // GHIM mở modal khi đang logging_in, và KHÔNG mở nếu đã bị ép đóng
   const shouldOpen = (open || isBlockingClose) && !forceClosed;
 
   return (
@@ -172,7 +165,7 @@ export default function LoginModal({
       modalRender={(node) => <div className="animate-fade-up">{node}</div>}
     >
       <div className="flex flex-row h-full w-full">
-        {/* Bên trái: minh họa */}
+        {/* Bên trái */}
         <div className="w-[40%] h-full bg-[#ffe9e6] flex flex-col justify-center items-center rounded-l-[8px]">
           <img
             src="/assets/login-illustration.png"
@@ -185,7 +178,7 @@ export default function LoginModal({
           </p>
         </div>
 
-        {/* Bên phải: form/panel */}
+        {/* Bên phải */}
         <div className="flex flex-col justify-center w-[60%] h-full px-8">
           {mode === "login" && (
             <LoginForm
