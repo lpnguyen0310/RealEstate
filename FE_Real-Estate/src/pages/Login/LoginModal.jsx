@@ -5,13 +5,12 @@ import { loginThunk } from "@/store/authSlice";
 
 import LoginForm from "@/components/auth/forms/LoginForm";
 import ForgotForm from "@/components/auth/forms/ForgotForm";
-import OtpZaloForm from "@/components/auth/forms/OtpZaloForm";
+import OtpZaloForm from "@/components/auth/forms/OtpZaloForm"; // dùng chung cho cả Zalo & email
 import ResetPasswordForm from "@/components/auth/forms/ResetPasswordForm";
-import ForgotSuccessPanel from "@/components/auth/panels/ForgotSuccessPanel";
 import LoggingInPanel from "@/components/auth/panels/LoggingInPanel";
 
 import useCountdown from "@/utils/useCountdown";
-import { isPhone, isEmail, maskPhone } from "@/utils/validators";
+import { isPhone, isEmail, maskPhone, maskEmail } from "@/utils/validators"; // nhớ export maskEmail
 
 export default function LoginModal({
   open,
@@ -27,13 +26,14 @@ export default function LoginModal({
   const [otpForm] = Form.useForm();
   const [resetForm] = Form.useForm();
 
-  // login | forgot | otp_zalo | reset | forgot_success | logging_in
+  // login | forgot | otp_zalo | reset | logging_in
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
   const [forceClosed, setForceClosed] = useState(false);
 
   const [sentTo, setSentTo] = useState("");
   const [maskInfo, setMaskInfo] = useState("");
+  const [channel, setChannel] = useState("zalo"); // 'zalo' | 'email'
 
   const { value: resendIn, restart: restartCountdown } = useCountdown(60);
 
@@ -42,6 +42,10 @@ export default function LoginModal({
       setMode("login");
       setLoading(false);
       setForceClosed(false);
+      setSentTo("");
+      setMaskInfo("");
+      setChannel("zalo");
+
       form.resetFields();
       forgotForm.resetFields();
       otpForm.resetFields();
@@ -53,10 +57,12 @@ export default function LoginModal({
   const onFinishLogin = async (values) => {
     try {
       setLoading(true);
-      await dispatch(loginThunk({
-        username: values.username,
-        password: values.password,
-      })).unwrap();
+      await dispatch(
+        loginThunk({
+          username: values.username,
+          password: values.password,
+        })
+      ).unwrap();
 
       // Không đóng ngay → panel “Đang đăng nhập”
       setMode("logging_in");
@@ -76,21 +82,41 @@ export default function LoginModal({
     }
   };
 
-  // ===== QUÊN MẬT KHẨU =====
+  // ===== QUÊN MẬT KHẨU (email & phone đều đi OTP) =====
   const onFinishForgot = async ({ account }) => {
     try {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 600)); // giả lập
       setSentTo(account);
+
       if (isPhone(account)) {
+        // Gửi OTP qua Zalo/SMS
+        // TODO: await api.sendOtpPhone(account)
+        setChannel("zalo");
         setMaskInfo(maskPhone(account));
         setMode("otp_zalo");
         restartCountdown(60);
         otpForm.resetFields();
-      } else if (isEmail(account)) {
-        setMode("forgot_success");
-        message.success("Đã gửi hướng dẫn khôi phục qua email!");
+        // giả lập
+        await new Promise((r) => setTimeout(r, 500));
+        message.success("Đã gửi OTP qua Zalo.");
+        return;
       }
+
+      if (isEmail(account)) {
+        // Gửi OTP qua email
+        // TODO: await api.sendOtpEmail(account)
+        setChannel("email");
+        setMaskInfo(maskEmail(account));
+        setMode("otp_zalo");
+        restartCountdown(60);
+        otpForm.resetFields();
+        // giả lập
+        await new Promise((r) => setTimeout(r, 500));
+        message.success("Đã gửi OTP qua email.");
+        return;
+      }
+
+      message.error("Vui lòng nhập email hoặc số điện thoại hợp lệ.");
     } catch {
       message.error("Gửi yêu cầu thất bại, thử lại sau.");
     } finally {
@@ -98,13 +124,21 @@ export default function LoginModal({
     }
   };
 
-  // ===== OTP (Zalo) =====
+  // ===== OTP (Zalo / Email) =====
   const resendOtp = async () => {
     try {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 500));
+      // TODO:
+      // if (channel === 'zalo') await api.resendOtpPhone(sentTo)
+      // else await api.resendOtpEmail(sentTo)
+      await new Promise((r) => setTimeout(r, 500)); // giả lập
+
       restartCountdown(60);
-      message.success("Đã gửi lại OTP qua Zalo.");
+      message.success(
+        channel === "zalo"
+          ? "Đã gửi lại OTP qua Zalo."
+          : "Đã gửi lại OTP qua email."
+      );
     } catch {
       message.error("Không gửi lại được OTP.");
     } finally {
@@ -115,7 +149,8 @@ export default function LoginModal({
   const onVerifyOtp = async ({ otp }) => {
     try {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
+      // TODO: await api.verifyOtp({ account: sentTo, channel, otp })
+      await new Promise((r) => setTimeout(r, 600)); // giả lập
       message.success("Xác thực OTP thành công.");
       setMode("reset");
     } catch {
@@ -129,7 +164,8 @@ export default function LoginModal({
   const onFinishReset = async ({ newPassword }) => {
     try {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 700));
+      // TODO: await api.resetPassword({ account: sentTo, newPassword })
+      await new Promise((r) => setTimeout(r, 700)); // giả lập
       message.success("Đổi mật khẩu thành công, vui lòng đăng nhập lại.");
       setMode("login");
       resetForm.resetFields();
@@ -143,8 +179,8 @@ export default function LoginModal({
 
   // Panel “Đang đăng nhập” hoàn tất → ép đóng chắc chắn + báo ra ngoài
   const handleLoggingDone = () => {
-    setForceClosed(true);     // ép đóng nội bộ
-    onSuccess?.();            // báo cho Header tắt Skeleton + đóng modal
+    setForceClosed(true); // ép đóng nội bộ
+    onSuccess?.(); // báo cho Header tắt Skeleton + đóng modal
     onClose?.();
   };
 
@@ -174,7 +210,9 @@ export default function LoginModal({
             onError={(e) => (e.currentTarget.style.display = "none")}
           />
           <p className="mt-6 text-[#c23a2a] text-[16px] font-semibold text-center leading-snug">
-            Tìm nhà đất<br />Batdongsan.com.vn dẫn lối
+            Tìm nhà đất
+            <br />
+            Batdongsan.com.vn dẫn lối
           </p>
         </div>
 
@@ -209,6 +247,7 @@ export default function LoginModal({
               onBack={() => setMode("forgot")}
               onVerify={onVerifyOtp}
               loading={loading}
+              channel="email"
             />
           )}
 
@@ -220,14 +259,9 @@ export default function LoginModal({
             />
           )}
 
-          {mode === "forgot_success" && (
-            <ForgotSuccessPanel
-              sentTo={sentTo}
-              onBackToLogin={() => setMode("login")}
-            />
+          {mode === "logging_in" && (
+            <LoggingInPanel onDone={handleLoggingDone} />
           )}
-
-          {mode === "logging_in" && <LoggingInPanel onDone={handleLoggingDone} />}
         </div>
       </div>
     </Modal>
