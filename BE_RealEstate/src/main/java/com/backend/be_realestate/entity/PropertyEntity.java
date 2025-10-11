@@ -65,8 +65,11 @@ public class PropertyEntity {
     @Column(name = "legal_status", length = 100)
     private String legalStatus;
 
-    @Column(name = "direction", length = 50)
+    @Column(name = "direction", length = 255)
     private String direction;
+
+    @Column(name = "description", length = 255)
+    private String description;
 
     @Column(name = "frontage_m")
     private Float frontageM;

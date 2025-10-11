@@ -5,6 +5,7 @@ import com.backend.be_realestate.security.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -32,6 +33,7 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers("/api/auth/**","/oauth2/**","/login/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/properties", "/api/properties/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // bật oauth2 login
