@@ -406,7 +406,7 @@ export default function InfoRealEstate() {
           <div className="mt-10">
             <h2 className="text-xl font-semibold text-gray-900">Đặc điểm bất động sản</h2>
 
-            <div className="mt-4" style={{ width: "100%", maxWidth: features.maxWidth }}>
+            <div className="mt-4" style={{ width: "100%", maxWidth: "50%" }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10">
                 <div className="divide-y">
                   {features.left.map(({ label, value }) => (

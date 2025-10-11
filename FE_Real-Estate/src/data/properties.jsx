@@ -325,7 +325,6 @@ export const PROPERTY_DETAILS = {
         { label: "Đường vào", value: "Ô tô tránh" },
         { label: "Pháp lý", value: "Sổ hồng" },
       ],
-      maxWidth: "50%",
     },
     map: { lat: 10.813, lng: 106.662, zoom: 16 },
     mapMeta: [
