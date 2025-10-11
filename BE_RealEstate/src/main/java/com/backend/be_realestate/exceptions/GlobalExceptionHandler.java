@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+    public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<?>> handleBadCredentials(BadCredentialsException ex) {
@@ -30,13 +30,35 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(403, "Bạn không có quyền truy cập", null));
     }
 
-    @ExceptionHandler({JwtException.class, IllegalArgumentException.class})
-    public ResponseEntity<ApiResponse<?>> handleJwt(RuntimeException ex) {
+
+    @ExceptionHandler(JwtException.class)
+    public ResponseEntity<ApiResponse<?>> handleJwt(JwtException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.fail(401, "Token không hợp lệ hoặc đã hết hạn", null));
     }
 
-    // Nhận message từ ResponseStatusException (dùng cho “Email chưa được đăng ký”)
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<?>> handleIllegalArg(IllegalArgumentException ex) {
+        // dùng 409 cho các case “đã tồn tại” hoặc 400 cho input sai — tuỳ nội dung message
+        String msg = ex.getMessage();
+        HttpStatus status = msg != null && (msg.contains("tồn tại") || msg.contains("được sử dụng"))
+                ? HttpStatus.CONFLICT  // 409
+                : HttpStatus.BAD_REQUEST; // 400
+        return ResponseEntity.status(status)
+                .body(ApiResponse.fail(status.value(), msg, null));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<?>> handleIllegalState(IllegalStateException ex) {
+        // dùng 429 cho rate limit / cooldown
+        String msg = ex.getMessage();
+        HttpStatus status = (msg != null && (msg.contains("quá số lần") || msg.contains("đợi")))
+                ? HttpStatus.TOO_MANY_REQUESTS  // 429
+                : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status)
+                .body(ApiResponse.fail(status.value(), msg, null));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<?>> handleRSE(ResponseStatusException ex) {
         int code = ex.getStatusCode().value();
@@ -48,17 +70,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<?>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errs = new HashMap<>();
-        for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
-            errs.put(fe.getField(), fe.getDefaultMessage());
-        }
+        ex.getBindingResult().getFieldErrors().forEach(fe -> errs.put(fe.getField(), fe.getDefaultMessage()));
+        String first = ex.getBindingResult().getAllErrors().stream()
+                .findFirst().map(err -> err.getDefaultMessage()).orElse("Dữ liệu không hợp lệ");
         return ResponseEntity.badRequest()
-                .body(ApiResponse.fail(400, "Dữ liệu không hợp lệ", errs));
+                .body(ApiResponse.fail(400, first, errs));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleOthers(Exception ex) {
+        ex.printStackTrace(); // log
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.fail(500, "Lỗi hệ thống", null));
     }
 }
-

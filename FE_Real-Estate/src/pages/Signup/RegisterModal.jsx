@@ -1,41 +1,60 @@
+// src/pages/Signup/RegisterModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Form, Input, Button, Divider, message } from "antd";
-import { AppleFilled, GoogleOutlined, PhoneOutlined, ArrowLeftOutlined } from "@ant-design/icons";
-import ResetPasswordForm from "@/components/auth/forms/ResetPasswordForm";
+import { AppleFilled, GoogleOutlined, ArrowLeftOutlined, CheckCircleTwoTone } from "@ant-design/icons";
+import { useDispatch, useSelector } from "react-redux";
 
-const VN_PHONE_REGEX = /^(0|(\+?84))([3|5|7|8|9])([0-9]{8})$/;
+import ResetPasswordForm from "@/components/auth/forms/ResetPasswordForm";
+import {
+    requestOtpThunk,
+    verifyOtpThunk,
+    setPasswordThunk,
+} from "@/store/registerSlice";
+
 const OTP_LEN = 6;
 const RESEND_SECONDS = 60;
 
-export default function RegisterModal({ open, onClose, onSuccess }) {
+export default function RegisterModal({ open, onClose, onSuccess, onBackToLogin }) {
+    const dispatch = useDispatch();
+    const { email: storeEmail, ticket } = useSelector((s) => s.register || {});
+
     const [form] = Form.useForm();
     const [pwdForm] = Form.useForm();
 
-    // 'phone' | 'otp' | 'setPwd'
-    const [step, setStep] = useState("phone");
+    // steps: 'email' | 'otp' | 'setPwd' | 'done'
+    const [step, setStep] = useState("email");
 
-    const [phone, setPhone] = useState("");
+    const [email, setEmail] = useState("");
     const [otp, setOtp] = useState(Array(OTP_LEN).fill(""));
     const [seconds, setSeconds] = useState(RESEND_SECONDS);
+
+    // Loading flags
+    const [sendingOtp, setSendingOtp] = useState(false);
+    const [resending, setResending] = useState(false);
     const [verifying, setVerifying] = useState(false);
     const [settingPwd, setSettingPwd] = useState(false);
 
-    // server nên trả tạm userId hoặc token sau verify để đặt mật khẩu
-    const [tempUserId, setTempUserId] = useState(null);
+    // Lỗi OTP hiển thị dưới dãy ô
+    const [otpError, setOtpError] = useState("");
 
     const inputsRef = useRef([]);
 
+    // Reset khi mở modal
     useEffect(() => {
         if (open) {
-            setStep("phone");
-            setPhone("");
+            setStep("email");
+            setEmail("");
             setOtp(Array(OTP_LEN).fill(""));
             setSeconds(RESEND_SECONDS);
-            setTempUserId(null);
+            setOtpError("");
+            setSendingOtp(false);
+            setResending(false);
+            setVerifying(false);
+            setSettingPwd(false);
             form.resetFields();
             pwdForm.resetFields();
         }
-    }, [open, form, pwdForm]);
+    }, [open, form, pwdForm, dispatch]);
 
     useEffect(() => {
         if (step !== "otp") return;
@@ -47,34 +66,50 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
     const otpValue = useMemo(() => otp.join(""), [otp]);
     const canVerify = otpValue.length === OTP_LEN && /^\d{6}$/.test(otpValue);
 
-    const handlePhoneSubmit = async (values) => {
-        const raw = String(values.phone || "").replace(/\s+/g, "");
-        setPhone(raw);
-
-        // TODO: await api.sendOtp({ phone: raw });
-        setStep("otp");
-        setOtp(Array(OTP_LEN).fill(""));
-        setSeconds(RESEND_SECONDS);
-        setTimeout(() => inputsRef.current?.[0]?.focus(), 0);
+    // ===== STEP 1: gửi OTP =====
+    const handleEmailSubmit = async (values) => {
+        const em = (values?.email || "").trim();
+        if (!em || sendingOtp) return;
+        setSendingOtp(true);
+        try {
+            await dispatch(requestOtpThunk(em)).unwrap();
+            setEmail(em);
+            setStep("otp");
+            setOtp(Array(OTP_LEN).fill(""));
+            setSeconds(RESEND_SECONDS);
+            setOtpError("");
+            setTimeout(() => inputsRef.current?.[0]?.focus(), 0);
+            message.success("Đã gửi mã OTP đến email của bạn.");
+        } catch (err) {
+            const msg = err?.message || "Gửi OTP thất bại";
+            if (err?.code === 409 || /được sử dụng|đã tồn tại/i.test(msg)) {
+                form.setFields([{ name: "email", errors: [msg] }]);
+            } else if (err?.fieldErrors?.email) {
+                form.setFields([{ name: "email", errors: [err.fieldErrors.email] }]);
+            } else {
+                message.error(msg);
+            }
+        } finally {
+            setSendingOtp(false);
+        }
     };
 
+    // ===== STEP 2: xác minh OTP =====
     const handleVerify = async () => {
         if (!canVerify || verifying) return;
         setVerifying(true);
+        setOtpError("");
         try {
-            // TODO: gọi verify thật
-            // const res = await api.verifyOtp({ phone, otp: otpValue });
-            // ví dụ BE trả { ok: true, tempUserId: 'tmp_123' }
-            const res = { ok: true, tempUserId: "tmp_" + Date.now() };
-
-            if (res.ok) {
-                setTempUserId(res.tempUserId);
-                setStep("setPwd");
-            } else {
-                message.error("Mã OTP không đúng, vui lòng thử lại");
-                setOtp(Array(OTP_LEN).fill(""));
-                inputsRef.current?.[0]?.focus();
-            }
+            await dispatch(
+                verifyOtpThunk({ email: email || storeEmail, otp: otpValue })
+            ).unwrap();
+            setStep("setPwd");
+            message.success("Xác minh OTP thành công.");
+        } catch (err) {
+            const msg = err?.message || "OTP không đúng hoặc đã hết hạn.";
+            setOtpError(msg); // hiển thị ngay dưới dãy OTP
+            setOtp(Array(OTP_LEN).fill(""));
+            inputsRef.current?.[0]?.focus();
         } finally {
             setVerifying(false);
         }
@@ -85,6 +120,7 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
         const next = [...otp];
         next[idx] = v;
         setOtp(next);
+        if (otpError) setOtpError("");
         if (v && idx < OTP_LEN - 1) inputsRef.current?.[idx + 1]?.focus();
     };
 
@@ -100,6 +136,7 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
                 next[idx] = "";
                 setOtp(next);
             }
+            if (otpError) setOtpError("");
             e.preventDefault();
         }
         if (e.key === "ArrowLeft" && idx > 0) {
@@ -117,43 +154,84 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
         const text = (e.clipboardData.getData("text") || "").replace(/\D/g, "");
         if (text.length === OTP_LEN) {
             setOtp(text.split(""));
+            if (otpError) setOtpError("");
             setTimeout(() => handleVerify(), 0);
             e.preventDefault();
         }
     };
 
     const handleResend = async () => {
-        // TODO: await api.resendOtp({ phone });
-        setOtp(Array(OTP_LEN).fill(""));
-        setSeconds(RESEND_SECONDS);
-        inputsRef.current?.[0]?.focus();
+        if (resending) return;
+        setResending(true);
+        try {
+            const em = email || storeEmail;
+            await dispatch(requestOtpThunk(em)).unwrap();
+            setOtp(Array(OTP_LEN).fill(""));
+            setSeconds(RESEND_SECONDS);
+            setOtpError("");
+            inputsRef.current?.[0]?.focus();
+            message.success("Đã gửi lại mã OTP.");
+        } catch (err) {
+            const msg = err?.message || "Gửi lại OTP thất bại";
+            setOtpError(msg);
+        } finally {
+            setResending(false);
+        }
     };
 
-    const handleSubmitNewPwd = async (values) => {
-        if (!tempUserId) return;
+    // ===== STEP 3: đặt mật khẩu =====
+    const handleSubmitNewPwd = async ({ newPassword, confirmPassword }) => {
+        if (!ticket) {
+            message.error("Thiếu ticket xác minh. Vui lòng xác minh lại OTP.");
+            setStep("otp");
+            return;
+        }
         setSettingPwd(true);
         try {
-            // ⚠️ Nếu bạn muốn "verify xong -> tạo user mặc định luôn"
-            // thì BE có thể đã tạo user sau verify rồi
-            // và đây chỉ là "set password" cho user đó.
-            // Ví dụ:
-            // await api.setPassword({ tempUserId, password: values.newPassword });
-
-            // Demo: tạo hồ sơ mặc định nếu cần
-            const profile = {
-                id: "u_" + Date.now(),
-                fullName: "Nguyễn Văn A",
-                phone,
-                avatarUrl: "",
-            };
-
-            onSuccess?.(profile);
-            onClose?.();
-            message.success("Tạo mật khẩu thành công!");
+            const em = email || storeEmail;
+            await dispatch(
+                setPasswordThunk({ email: em, ticket, password: newPassword, confirmPassword })
+            ).unwrap();
+            setStep("done");
+            onSuccess?.();
+        } catch (err) {
+            const msg = err?.message || "Tạo mật khẩu thất bại";
+            if (err?.fieldErrors?.password) {
+                pwdForm.setFields([{ name: "newPassword", errors: [err.fieldErrors.password] }]);
+            }
+            if (err?.fieldErrors?.confirmPassword) {
+                pwdForm.setFields([{ name: "confirmPassword", errors: [err.fieldErrors.confirmPassword] }]);
+            }
+            if (!err?.fieldErrors) message.error(msg);
         } finally {
             setSettingPwd(false);
         }
     };
+
+    // ===== STEP 4: done panel =====
+    const SuccessPanel = () => (
+        <div className="w-full text-center animate-fade-in">
+            <div className="flex flex-col items-center justify-center mt-4">
+                <CheckCircleTwoTone twoToneColor="#52c41a" style={{ fontSize: 64 }} />
+                <h2 className="text-gray-900 font-bold text-[22px] mt-3">Tài khoản đã được đăng ký</h2>
+                <p className="text-gray-600 mt-2">
+                    Bạn có thể đăng nhập bằng email vừa đăng ký và mật khẩu mới tạo.
+                </p>
+                <Button
+                    type="primary"
+                    size="large"
+                    className="mt-6 !bg-[#d6402c] hover:!bg-[#c13628] h-[44px] px-6 font-semibold"
+                    onClick={() => {
+                        // đóng modal & mở login nếu parent có xử lý
+                        if (onBackToLogin) onBackToLogin();
+                        else onClose?.();
+                    }}
+                >
+                    Quay lại trang đăng nhập
+                </Button>
+            </div>
+        </div>
+    );
 
     return (
         <Modal
@@ -183,45 +261,45 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
 
                 {/* RIGHT */}
                 <div className="flex flex-col justify-center w-[60%] h-full px-8">
-                    {step === "phone" && (
+                    {step === "email" && (
                         <>
                             <h3 className="text-gray-900 font-semibold text-[14px]">Xin chào bạn</h3>
                             <h2 className="text-gray-900 font-bold text-[22px] mb-5">Đăng ký tài khoản mới</h2>
 
-                            <Form form={form} layout="vertical" onFinish={handlePhoneSubmit} requiredMark={false}>
+                            <Form form={form} layout="vertical" onFinish={handleEmailSubmit} requiredMark={false}>
                                 <Form.Item
-                                    name="phone"
+                                    name="email"
                                     rules={[
-                                        { required: true, message: "Vui lòng nhập số điện thoại" },
-                                        {
-                                            validator: (_, v) =>
-                                                !v || VN_PHONE_REGEX.test(String(v).replace(/\s+/g, "")) ? Promise.resolve()
-                                                    : Promise.reject("Số điện thoại không hợp lệ"),
-                                        },
+                                        { required: true, message: "Vui lòng nhập email" },
+                                        { type: "email", message: "Email không hợp lệ" },
                                     ]}
                                 >
                                     <Input
                                         size="large"
-                                        placeholder="Nhập số điện thoại"
-                                        prefix={<PhoneOutlined />}
-                                        inputMode="tel"
-                                        maxLength={15}
-                                        onChange={(e) => setPhone(e.target.value)}
+                                        placeholder="Nhập email"
+                                        inputMode="email"
+                                        disabled={sendingOtp}
                                     />
                                 </Form.Item>
 
-                                <Button type="primary" htmlType="submit" size="large"
-                                    className="!bg-[#f07e7a] hover:!bg-[#ea6a66] w-full h-[44px] font-semibold">
+                                <Button
+                                    type="primary"
+                                    htmlType="submit"
+                                    size="large"
+                                    loading={sendingOtp}
+                                    disabled={sendingOtp}
+                                    className="!bg-[#f07e7a] hover:!bg-[#ea6a66] w-full h-[44px] font-semibold"
+                                >
                                     Tiếp tục
                                 </Button>
 
                                 <Divider plain>Hoặc</Divider>
 
                                 <div className="space-y-3">
-                                    <Button size="large" className="w-full h-[44px] !mb-[8px]" icon={<AppleFilled />}>
+                                    <Button size="large" className="w-full h-[44px] !mb-[8px]" icon={<AppleFilled />} disabled={sendingOtp}>
                                         Đăng nhập với Apple
                                     </Button>
-                                    <Button size="large" className="w-full h-[44px]" icon={<GoogleOutlined />}>
+                                    <Button size="large" className="w-full h-[44px]" icon={<GoogleOutlined />} disabled={sendingOtp}>
                                         Đăng nhập với Google
                                     </Button>
                                 </div>
@@ -241,7 +319,11 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
                             <div className="flex items-center gap-2 mb-4">
                                 <button
                                     className="flex items-center gap-2 text-gray-500 hover:text-gray-700"
-                                    onClick={() => setStep("phone")}
+                                    onClick={() => {
+                                        if (verifying || resending) return;
+                                        setStep("email");
+                                        setOtpError("");
+                                    }}
                                 >
                                     <ArrowLeftOutlined />
                                     <span>Quay lại</span>
@@ -250,39 +332,57 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
 
                             <h2 className="text-gray-900 font-bold text-[22px]">Nhập mã xác minh</h2>
                             <p className="text-[14px] text-gray-600 mt-1">
-                                Chúng tôi đã gửi mã xác minh gồm 6 chữ số tới số điện thoại{" "}
-                                <strong>{phone}</strong> qua tài khoản Zalo hoặc SMS
+                                Chúng tôi đã gửi mã xác minh gồm 6 chữ số tới email{" "}
+                                <strong>{email || storeEmail}</strong>
                             </p>
 
-                            <div className="mt-5 flex gap-2" onPaste={handlePaste}>
-                                {Array.from({ length: OTP_LEN }).map((_, i) => (
-                                    <Input
-                                        key={i}
-                                        ref={(el) => (inputsRef.current[i] = el?.input)}
-                                        size="large"
-                                        maxLength={1}
-                                        value={otp[i]}
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        className="!w-12 !h-12 text-center text-[18px]"
-                                        onChange={(e) => handleChangeDigit(i, e.target.value)}
-                                        onKeyDown={(e) => handleKeyDown(i, e)}
-                                    />
-                                ))}
-                            </div>
+                            <Form layout="vertical">
+                                <Form.Item
+                                    validateStatus={otpError ? "error" : ""}
+                                    help={otpError || ""}
+                                    className="!mb-0"
+                                    label={null}
+                                >
+                                    <div className="mt-5 flex gap-2" onPaste={handlePaste}>
+                                        {Array.from({ length: OTP_LEN }).map((_, i) => (
+                                            <Input
+                                                key={i}
+                                                ref={(el) => (inputsRef.current[i] = el?.input)}
+                                                size="large"
+                                                maxLength={1}
+                                                value={otp[i]}
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                status={otpError ? "error" : ""}
+                                                disabled={verifying}
+                                                className={`!w-12 !h-12 text-center text-[18px] ${otpError ? "border-red-500" : ""}`}
+                                                onChange={(e) => handleChangeDigit(i, e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(i, e)}
+                                            />
+                                        ))}
+                                    </div>
+                                </Form.Item>
+                            </Form>
 
                             <div className="text-[12px] text-gray-500 mt-2">
                                 Mã có hiệu lực trong 5 phút.{" "}
                                 {seconds > 0 ? (
-                                    <span>Gửi lại mã sau{" "}
+                                    <span>
+                                        Gửi lại mã sau{" "}
                                         <span className="text-[#d6402c] font-semibold">
                                             0{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
                                         </span>
                                     </span>
                                 ) : (
-                                    <button onClick={handleResend} className="text-[#d6402c] font-semibold underline">
+                                    <Button
+                                        type="link"
+                                        onClick={handleResend}
+                                        loading={resending}
+                                        disabled={verifying || resending}
+                                        className="!p-0 !h-auto text-[#d6402c] font-semibold underline"
+                                    >
                                         Gửi lại mã
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
 
@@ -290,7 +390,7 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
                                 type="primary"
                                 size="large"
                                 loading={verifying}
-                                disabled={!canVerify}
+                                disabled={!canVerify || verifying}
                                 onClick={handleVerify}
                                 className={`mt-6 w-full h-[44px] font-semibold ${canVerify ? "!bg-[#d6402c] hover:!bg-[#c13628]" : "!bg-[#f5bdbb] cursor-not-allowed"
                                     }`}
@@ -307,6 +407,8 @@ export default function RegisterModal({ open, onClose, onSuccess }) {
                             onSubmit={handleSubmitNewPwd}
                         />
                     )}
+
+                    {step === "done" && <SuccessPanel />}
                 </div>
             </div>
         </Modal>
