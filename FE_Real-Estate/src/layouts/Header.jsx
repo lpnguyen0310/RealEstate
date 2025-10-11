@@ -1,41 +1,43 @@
-import { useEffect, useState } from "react";
-import { Flex, Badge, Dropdown, Button } from "antd";
+// src/components/layout/Header.jsx
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Flex, Badge, Dropdown, Button, message } from "antd";
 import { BellOutlined } from "@ant-design/icons";
-import { NAVS } from "@/data/header_submenu";
-import UserDropDownHeader from "@/components/menu/UserDropDownHeader";
-import LoginModal from "../pages/Login/LoginModal";
-import RegisterModal from "../pages/Signup/RegisterModal";
-import { SAVED_POSTS } from "@/data/SavedPost";
-import FavoritePostList from "@/components/menu/FavoritePostList";
 import { useNavigate } from "react-router-dom";
 
+import { NAVS } from "@/data/header_submenu";
+import { SAVED_POSTS } from "@/data/SavedPost";
+
+import UserDropDownHeader from "@/components/menu/UserDropDownHeader";
+import FavoritePostList from "@/components/menu/FavoritePostList";
+import LoginModal from "@/pages/Login/LoginModal";
+import RegisterModal from "@/pages/Signup/RegisterModal";
+
+import { logoutThunk } from "@/store/authSlice";
+
 export default function Header() {
+  const nav = useNavigate();
+  const dispatch = useDispatch();
+
+  const { user, status } = useSelector((s) => s.auth);
+  const loadingAuth = status === "loading"; // đang hydrate/getProfile/login
+
+  // UI state
   const [hoverKey, setHoverKey] = useState(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
-  const nav = useNavigate();
+  const [authUiLoading, setAuthUiLoading] = useState(false); // Skeleton khi panel "Đang đăng nhập"
 
-  // ===== User state (persist qua localStorage) =====
-  const [user, setUser] = useState(() => {
+  const handleLogout = async () => {
     try {
-      return JSON.parse(localStorage.getItem("user")) || null;
+      await dispatch(logoutThunk()).unwrap();
+      message.success("Đã đăng xuất.");
+      nav("/", { replace: true });
     } catch {
-      return null;
+      message.error("Đăng xuất thất bại.");
     }
-  });
-
-  useEffect(() => {
-    if (user) localStorage.setItem("user", JSON.stringify(user));
-    else localStorage.removeItem("user");
-  }, [user]);
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-    nav("/", { replace: true });
   };
 
-  // ===== helper render submenu =====
   const renderSubmenu = (items = [], parentKey) => (
     <div className="bds-submenu bg-white shadow-xl rounded-2xl p-2 w-[340px]">
       {items.map((it) => (
@@ -48,8 +50,7 @@ export default function Header() {
           }}
           className="flex items-center justify-between px-4 py-2.5 rounded-lg text-[14px] font-medium
                      hover:bg-gray-50 no-underline
-                     !text-gray-800 hover:!text-[#d6402c] visited:!text-gray-800 focus:!text-[#d6402c]"
-        >
+                     !text-gray-800 hover:!text-[#d6402c] visited:!text-gray-800 focus:!text-[#d6402c]">
           <span>{it.text}</span>
           {it.badge && (
             <span className="ml-3 text-[12px] px-1.5 py-0.5 rounded bg-[#fdece7] text-[#d6402c] border border-[#f7c7be]">
@@ -77,7 +78,10 @@ export default function Header() {
 
             {/* NAV */}
             <div id="nav-anchor" className="hidden lg:flex relative">
-              <div className="flex items-center h-full gap-8" onMouseLeave={() => setHoverKey(null)}>
+              <div
+                className="flex items-center h-full gap-8"
+                onMouseLeave={() => setHoverKey(null)}
+              >
                 {NAVS.map((navItem) => {
                   const isActive = hoverKey === navItem.label;
                   return (
@@ -89,18 +93,13 @@ export default function Header() {
                       getPopupContainer={(node) => node?.parentElement || document.body}
                       dropdownRender={() => renderSubmenu(navItem.items || [], navItem.key)}
                       arrow={{ pointAtCenter: false }}
-                      onOpenChange={(open) =>
-                        setHoverKey(open ? navItem.label : null)
-                      }
+                      onOpenChange={(open) => setHoverKey(open ? navItem.label : null)}
                     >
                       <button
                         key={navItem.key}
                         onMouseEnter={() => setHoverKey(navItem.label)}
                         onFocus={() => setHoverKey(navItem.label)}
-                        onClick={() => {
-                          // Khi click menu chính cũng chuyển search
-                          nav(`/search?type=${navItem.key}`);
-                        }}
+                        onClick={() => nav(`/search?type=${navItem.key}`)}
                         className={`relative text-[16px] font-medium text-gray-800 hover:text-gray-900 transition
                           after:absolute after:left-0 after:right-0 after:-bottom-[6px]
                           after:h-[2px] after:bg-[#d6402c] after:transition-transform after:origin-left
@@ -130,12 +129,22 @@ export default function Header() {
 
             <UserDropDownHeader
               user={user}
+              // ✅ Skeleton khi đang hydrate/getProfile/login hoặc đang show panel logging_in
+              loadingUser={loadingAuth || authUiLoading}
               onLoginClick={() => setLoginOpen(true)}
               onRegisterClick={() => setRegisterOpen(true)}
               onLogout={handleLogout}
             />
 
-            <Button className="!h-12 !px-6 !rounded-lg border-gray-200 hover:!border-gray-300 hover:!bg-gray-50 font-medium text-[#d6402c] bg-[#fff1ef]">
+            <Button
+              className="!h-12 !px-6 !rounded-lg border-gray-200 hover:!border-gray-300 hover:!bg-gray-50 font-medium text-[#d6402c] bg-[#fff1ef]"
+              onClick={() => {
+                if (user) nav("/dashboard/posts");
+                else setLoginOpen(true);
+              }}
+              // (tuỳ) khoá nút trong lúc auth đang loading
+              disabled={loadingAuth}
+            >
               <span className="text-[18px]">Đăng tin</span>
             </Button>
           </Flex>
@@ -145,13 +154,18 @@ export default function Header() {
       {/* Modals */}
       <LoginModal
         open={loginOpen}
-        onClose={() => setLoginOpen(false)}
+        onClose={() => {
+          setLoginOpen(false);
+          setAuthUiLoading(false);
+        }}
         onRegisterClick={() => {
           setLoginOpen(false);
           setRegisterOpen(true);
+          setAuthUiLoading(false);
         }}
-        onSuccess={(profile) => {
-          setUser(profile);
+        onBeginLogging={() => setAuthUiLoading(true)} // bật Skeleton khi panel "Đang đăng nhập" chạy
+        onSuccess={() => {
+          setAuthUiLoading(false); // tắt Skeleton khi panel xong
           setLoginOpen(false);
         }}
       />
@@ -159,9 +173,9 @@ export default function Header() {
       <RegisterModal
         open={registerOpen}
         onClose={() => setRegisterOpen(false)}
-        onSuccess={(profile) => {
-          setUser(profile);
+        onSuccess={() => {
           setRegisterOpen(false);
+          // setLoginOpen(true);
         }}
       />
     </>

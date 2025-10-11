@@ -1,21 +1,28 @@
-import { Flex, Avatar, Dropdown } from "antd";
+import { Flex, Avatar, Dropdown, Skeleton } from "antd";
 import { DownOutlined } from "@ant-design/icons";
 import { USER_MENU_ITEMS } from "@/data/UserMenuData";
+import { useNavigate } from "react-router-dom";
 
-export default function UserDropDownHeader({ user, onLoginClick, onRegisterClick, onLogout }) {
+export default function UserDropDownHeader({
+    user,
+    onLoginClick,
+    onRegisterClick,
+    onLogout,
+    loadingUser = false, // bật/tắt Skeleton cho avatar + tên
+}) {
     const isLoggedIn = !!user;
+    const nav = useNavigate();
 
-    // helper: nếu có fn thì preventDefault; không có thì cứ đi link tĩnh
     const clickOrHref = (fn, href) =>
         fn
             ? { onClick: (e) => { e.preventDefault(); fn(); }, href: href || "#" }
             : { href };
 
-    // ======= CHƯA LOGIN =======
     if (!isLoggedIn) {
         return (
             <Flex align="center" gap={12} className="px-2 py-1.5">
-                <a {...clickOrHref(onLoginClick, "/dang-nhap")}
+                <a
+                    {...clickOrHref(onLoginClick, "/dang-nhap")}
                     className="text-[16px] font-medium !text-gray-800 hover:!text-[#d6402c] transition-colors duration-150"
                 >
                     Đăng nhập
@@ -32,7 +39,10 @@ export default function UserDropDownHeader({ user, onLoginClick, onRegisterClick
     }
 
     // ======= ĐÃ LOGIN =======
-    const initial = user?.fullName?.charAt(0)?.toUpperCase() || "U";
+    const initial = user?.fullName?.charAt(0)?.toUpperCase()
+        || user?.firstName?.charAt(0)?.toUpperCase()
+        || user?.email?.charAt(0)?.toUpperCase()
+        || "U";
 
     return (
         <Dropdown
@@ -55,7 +65,11 @@ export default function UserDropDownHeader({ user, onLoginClick, onRegisterClick
                         {USER_MENU_ITEMS.map((item) => (
                             <a
                                 key={item.text}
-                                href={item.href || "#"}
+                                href={item.to || "#"}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    if (item.to) nav(item.to);
+                                }}
                                 className="flex items-center justify-between px-4 py-2.5 rounded-lg hover:bg-gray-50 text-[14px] font-medium no-underline !text-gray-800 hover:!text-[#d6402c]"
                             >
                                 <div className="flex items-center gap-2">
@@ -85,12 +99,32 @@ export default function UserDropDownHeader({ user, onLoginClick, onRegisterClick
                 </div>
             )}
         >
-            <Flex align="center" gap={8} className="cursor-pointer px-2 py-1.5 rounded-lg hover:bg-gray-50">
-                <Avatar size={45} src={user?.avatarUrl} className="bg-[#fdece7] text-[#d6402c] font-semibold">
-                    {!user?.avatarUrl && initial}
-                </Avatar>
-                <span className="font-medium text-gray-800">{user?.fullName || "Người dùng"}</span>
-                <DownOutlined className="text-[10px]" />
+            <Flex
+                align="center"
+                gap={8}
+                className="cursor-pointer px-2 py-1.5 rounded-lg hover:bg-gray-50"
+            >
+                {loadingUser ? (
+                    <>
+                        <Skeleton.Avatar active size={45} shape="circle" />
+                        <Skeleton.Input active style={{ width: 140, height: 18 }} />
+                        <DownOutlined className="text-[10px]" />
+                    </>
+                ) : (
+                    <>
+                        <Avatar
+                            size={45}
+                            src={user?.avatarUrl}
+                            className="bg-[#fdece7] text-[#d6402c] font-semibold"
+                        >
+                            {!user?.avatarUrl && initial}
+                        </Avatar>
+                        <span>
+                            {`${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || user?.email}
+                        </span>
+                        <DownOutlined className="text-[10px]" />
+                    </>
+                )}
             </Flex>
         </Dropdown>
     );
