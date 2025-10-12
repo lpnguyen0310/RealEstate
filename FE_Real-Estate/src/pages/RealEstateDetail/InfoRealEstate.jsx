@@ -523,14 +523,13 @@ export default function InfoRealEstate() {
 
                         {(() => {
                             // 1. DÁN API KEY HỢP LỆ CỦA BẠN VÀO ĐÂY
-                            const YOUR_GOOGLE_MAPS_API_KEY = "AIzaSy...KEY_CUA_BAN"; 
+                            const YOUR_GOOGLE_MAPS_API_KEY = "AIzaSyBe_KXmcNfAbQyuxkEv43tusbIuXHLzEyE"; 
 
-                            // 2. URL được cập nhật theo chuẩn của Google Maps Embed API
-                            // Chúng ta sử dụng tham số 'q' để ghim vị trí theo tọa độ
-                            const mapsEmbed = `https://www.google.com/maps/embed/v1/view?key=${YOUR_GOOGLE_MAPS_API_KEY}&q=${map.lat},${map.lng}&zoom=${map.zoom}`;
+                            // 2. URL ĐÃ SỬA LẠI CHO ĐÚNG CHUẨN CỦA GOOGLE MAPS EMBED API
+                            const mapsEmbed = `https://www.google.com/maps/embed/v1/place?key=${YOUR_GOOGLE_MAPS_API_KEY}&q=${map.lat},${map.lng}&zoom=${map.zoom}`;
                             
-                            // Link để người dùng xem trên trang Google Maps lớn hơn
-                            const mapsLink = `http://googleusercontent.com/maps.google.com/7?q=${map.lat},${map.lng}&z=${map.zoom}`;
+                            // Link để người dùng xem trên trang Google Maps lớn hơn (cũng đã sửa lại)
+                            const mapsLink = `https://www.google.com/maps?q=${map.lat},${map.lng}&z=${map.zoom}`;
 
                             return (
                                 <div className="mt-3 relative rounded-xl overflow-hidden border border-gray-200">

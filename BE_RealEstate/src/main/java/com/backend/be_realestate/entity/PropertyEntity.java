@@ -117,4 +117,10 @@ public class PropertyEntity {
 
     @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<PriceHistoryEntity> priceHistories;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "plan_id") // Trường này trong DB có thể null
+    private ServicePlanEntity servicePlan;
+
+
 }
