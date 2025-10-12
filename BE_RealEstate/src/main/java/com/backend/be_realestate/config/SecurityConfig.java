@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers("/api/auth/**","/oauth2/**","/login/oauth2/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/properties", "/api/properties/**").permitAll()
+                        .requestMatchers("/api/maps/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // bật oauth2 login

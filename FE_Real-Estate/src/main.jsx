@@ -16,6 +16,7 @@ import "swiper/css/navigation";
 import "swiper/css/free-mode";
 import "swiper/css/thumbs";
 import "viewerjs/dist/viewer.css";
+import "leaflet/dist/leaflet.css";
 
 setOnUnauthorized(() => {
   store.dispatch(clearAuth());

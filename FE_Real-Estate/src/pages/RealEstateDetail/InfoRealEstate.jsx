@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { Button, Tag, message } from "antd";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode, Thumbs } from "swiper/modules";
+import NearbyAmenities from "../../components/filters/PostFilter/NearbyAmenities";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/free-mode";
@@ -18,7 +19,7 @@ import {
     DEFAULT_MAP,
     DEFAULT_MAP_META,
     DEFAULT_AGENT,
-} from "@/data/properties"; 
+} from "@/data/properties";
 
 import axios from "axios";
 
@@ -26,52 +27,52 @@ import SimilarNews from "../../components/cards/SimilarNews";
 
 /* ================= SVG ICONS (Giữ nguyên) ================= */
 const ChatIcon = (p) => (
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" {...p}>
-    <path d="M2 4a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2H8l-4 4v-4H4a2 2 0 01-2-2V4z" />
-  </svg>
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" {...p}>
+        <path d="M2 4a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2H8l-4 4v-4H4a2 2 0 01-2-2V4z" />
+    </svg>
 );
 const PhoneIcon = (p) => (
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" {...p}>
-    <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.11.37 2.31.57 3.58.57a1 1 0 011 1V21a1 1 0 01-1 1C10.85 22 2 13.15 2 2a1 1 0 011-1h3.5a1 1 0 011 1c0 1.27.2 2.47.57 3.58a1 1 0 01-.24 1.01l-2.2 2.2z" />
-  </svg>
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" {...p}>
+        <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.11.37 2.31.57 3.58.57a1 1 0 011 1V21a1 1 0 01-1 1C10.85 22 2 13.15 2 2a1 1 0 011-1h3.5a1 1 0 011 1c0 1.27.2 2.47.57 3.58a1 1 0 01-.24 1.01l-2.2 2.2z" />
+    </svg>
 );
 const ChevronLeft = (p) => (
-  <svg viewBox="0 0 24 24" width="1.3em" height="1.3em" fill="currentColor" {...p}>
-    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-  </svg>
+    <svg viewBox="0 0 24 24" width="1.3em" height="1.3em" fill="currentColor" {...p}>
+        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+    </svg>
 );
 const ChevronRight = (p) => (
-  <svg viewBox="0 0 24 24" width="1.3em" height="1.3em" fill="currentColor" {...p}>
-    <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
-  </svg>
+    <svg viewBox="0 0 24 24" width="1.3em" height="1.3em" fill="currentColor" {...p}>
+        <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
+    </svg>
 );
 const ShareIcon = (p) => (
-  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...p}>
-    <path d="M18 16a3 3 0 00-2.24 1.02L8.91 13.7a3.06 3.06 0 000-3.4l6.85-3.33A3 3 0 1015 5a3 3 0 00.09.72L8.24 9.05a3 3 0 100 5.9l6.85 3.33A3 3 0 1018 16z" />
-  </svg>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...p}>
+        <path d="M18 16a3 3 0 00-2.24 1.02L8.91 13.7a3.06 3.06 0 000-3.4l6.85-3.33A3 3 0 1015 5a3 3 0 00.09.72L8.24 9.05a3 3 0 100 5.9l6.85 3.33A3 3 0 1018 16z" />
+    </svg>
 );
 const HeartIcon = ({ filled, ...p }) => (
-  <svg viewBox="0 0 24 24" width="18" height="18" {...p}>
-    <path
-      d="M12.1 21.35l-1.1-1.02C5.14 14.88 2 12.05 2 8.5 2 6 4 4 6.5 4c1.54 0 3.04.74 3.96 1.9A5.28 5.28 0 0114.5 4C17 4 19 6 19 8.5c0 3.55-3.14 6.38-8.9 11.83l-1.1 1.02z"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="1.8"
-    />
-  </svg>
+    <svg viewBox="0 0 24 24" width="18" height="18" {...p}>
+        <path
+            d="M12.1 21.35l-1.1-1.02C5.14 14.88 2 12.05 2 8.5 2 6 4 4 6.5 4c1.54 0 3.04.74 3.96 1.9A5.28 5.28 0 0114.5 4C17 4 19 6 19 8.5c0 3.55-3.14 6.38-8.9 11.83l-1.1 1.02z"
+            fill={filled ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="1.8"
+        />
+    </svg>
 );
 const ExpandIcon = (p) => (
-  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...p}>
-    <path d="M4 4h7v2H6v5H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z" />
-  </svg>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...p}>
+        <path d="M4 4h7v2H6v5H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z" />
+    </svg>
 );
 const IconBtn = ({ children, ...rest }) => (
-  <button
-    className="h-9 w-9 rounded-full bg-white/90 text-gray-800 shadow hover:bg-white grid place-items-center"
-    {...rest}
-  >
-    {children}
-  </button>
+    <button
+        className="h-9 w-9 rounded-full bg-white/90 text-gray-800 shadow hover:bg-white grid place-items-center"
+        {...rest}
+    >
+        {children}
+    </button>
 );
 
 /* =================================== COMPONENT =================================== */
@@ -91,7 +92,7 @@ export default function InfoRealEstate() {
     const [thumbsSwiper, setThumbsSwiper] = useState(null);
     const [liked, setLiked] = useState(false);
     const [showPhone, setShowPhone] = useState(false);
-    
+
     // Refs
     const hiddenGalleryRef = useRef(null);
     const viewerRef = useRef(null);
@@ -102,58 +103,58 @@ export default function InfoRealEstate() {
     // ==========================================================
     // TẤT CẢ USEEFFECT NẰM TIẾP THEO
     // ==========================================================
-  useEffect(() => {
-    if (!id) {
-        setLoading(false);
-        setError(new Error("Không tìm thấy ID của bất động sản."));
-        return;
-    }
-
-    const fetchPropertyDetail = async () => {
-        try {
-            setLoading(true);
-            const response = await axios.get(`http://localhost:8080/api/properties/${id}`);
-            const apiData = response.data;
-
-            // --- LOGIC KẾT HỢP DỮ LIỆU VỚI FALLBACK TỪ properties.js ---
-            const mergedData = {
-                // Đối với các object, dùng spread syntax để kết hợp
-                // Giá trị từ apiData sẽ ghi đè lên giá trị từ default nếu nó tồn tại
-                postInfo: {
-                    ...DEFAULT_POST_INFO,
-                    ...apiData.postInfo,
-                    stats: { ...DEFAULT_POST_INFO.stats, ...apiData.postInfo?.stats },
-                    growthNotice: { ...DEFAULT_POST_INFO.growthNotice, ...apiData.postInfo?.growthNotice },
-                },
-                description: {
-                    ...DEFAULT_DESCRIPTION,
-                    ...apiData.description,
-                    // Ghi đè lại các trường là MẢNG để đảm bảo chúng không bao giờ null
-                    // Nếu apiData.description.bullets tồn tại, dùng nó. Nếu không, dùng mảng rỗng từ default.
-                    bullets: apiData.description?.bullets || DEFAULT_DESCRIPTION.bullets,
-                    nearby: apiData.description?.nearby || DEFAULT_DESCRIPTION.nearby,
-                },
-                features: { ...DEFAULT_FEATURES, ...apiData.features },
-                map: { ...DEFAULT_MAP, ...apiData.map },
-                agent: { ...DEFAULT_AGENT, ...apiData.agent },
-
-                // Đối với các mảng, kiểm tra nếu mảng từ API có dữ liệu thì dùng, nếu không thì dùng default
-                gallery: apiData.gallery?.length ? apiData.gallery : DEFAULT_GALLERY_IMAGES,
-                mapMeta: apiData.mapMeta?.length ? apiData.mapMeta : DEFAULT_MAP_META,
-            };
-            
-            setProperty(mergedData);
-
-        } catch (err) {
-            setError(err);
-            message.error("Không thể tải dữ liệu chi tiết.");
-        } finally {
+    useEffect(() => {
+        if (!id) {
             setLoading(false);
+            setError(new Error("Không tìm thấy ID của bất động sản."));
+            return;
         }
-    };
 
-    fetchPropertyDetail();
-}, [id]);
+        const fetchPropertyDetail = async () => {
+            try {
+                setLoading(true);
+                const response = await axios.get(`http://localhost:8080/api/properties/${id}`);
+                const apiData = response.data;
+
+                // --- LOGIC KẾT HỢP DỮ LIỆU VỚI FALLBACK TỪ properties.js ---
+                const mergedData = {
+                    // Đối với các object, dùng spread syntax để kết hợp
+                    // Giá trị từ apiData sẽ ghi đè lên giá trị từ default nếu nó tồn tại
+                    postInfo: {
+                        ...DEFAULT_POST_INFO,
+                        ...apiData.postInfo,
+                        stats: { ...DEFAULT_POST_INFO.stats, ...apiData.postInfo?.stats },
+                        growthNotice: { ...DEFAULT_POST_INFO.growthNotice, ...apiData.postInfo?.growthNotice },
+                    },
+                    description: {
+                        ...DEFAULT_DESCRIPTION,
+                        ...apiData.description,
+                        // Ghi đè lại các trường là MẢNG để đảm bảo chúng không bao giờ null
+                        // Nếu apiData.description.bullets tồn tại, dùng nó. Nếu không, dùng mảng rỗng từ default.
+                        bullets: apiData.description?.bullets || DEFAULT_DESCRIPTION.bullets,
+                        nearby: apiData.description?.nearby || DEFAULT_DESCRIPTION.nearby,
+                    },
+                    features: { ...DEFAULT_FEATURES, ...apiData.features },
+                    map: { ...DEFAULT_MAP, ...apiData.map },
+                    agent: { ...DEFAULT_AGENT, ...apiData.agent },
+
+                    // Đối với các mảng, kiểm tra nếu mảng từ API có dữ liệu thì dùng, nếu không thì dùng default
+                    gallery: apiData.gallery?.length ? apiData.gallery : DEFAULT_GALLERY_IMAGES,
+                    mapMeta: apiData.mapMeta?.length ? apiData.mapMeta : DEFAULT_MAP_META,
+                };
+
+                setProperty(mergedData);
+
+            } catch (err) {
+                setError(err);
+                message.error("Không thể tải dữ liệu chi tiết.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPropertyDetail();
+    }, [id]);
 
 
     useEffect(() => {
@@ -211,7 +212,7 @@ export default function InfoRealEstate() {
     // LOGIC VÀ JSX CÒN LẠI
     // ==========================================================
     const { gallery, postInfo, description, features, map, mapMeta, agent } = property;
-    
+
     const openViewerAt = (i) => viewerRef.current?.view(i ?? activeIndex);
 
     const onShare = async () => {
@@ -226,7 +227,7 @@ export default function InfoRealEstate() {
             message.warning("Không thể chia sẻ lúc này");
         }
     };
-    
+
     const onLike = () => {
         setLiked((v) => !v);
         message.success(!liked ? "Đã thêm vào yêu thích" : "Đã bỏ khỏi yêu thích");
@@ -402,17 +403,17 @@ export default function InfoRealEstate() {
                     {/* Hàng action nhỏ (share / save / report) */}
                     <div className="mt-3 flex items-center gap-3 text-gray-500">
                         <button className="hover:text-gray-700 inline-flex items-center gap-1">
-                            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M18 16a3 3 0 00-2.24 1.02L8.91 13.7a3.06 3.06 0 000-3.4l6.85-3.33A3 3 0 1015 5a3 3 0 00.09.72L8.24 9.05a3 3 0 100 5.9l6.85 3.33A3 3 0 1018 16z"/></svg>
+                            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M18 16a3 3 0 00-2.24 1.02L8.91 13.7a3.06 3.06 0 000-3.4l6.85-3.33A3 3 0 1015 5a3 3 0 00.09.72L8.24 9.05a3 3 0 100 5.9l6.85 3.33A3 3 0 1018 16z" /></svg>
                             Chia sẻ
                         </button>
                         <button className="hover:text-gray-700 inline-flex items-center gap-1">
                             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                                <path d="M12.1 21.35l-1.1-1.02C5.14 14.88 2 12.05 2 8.5 2 6 4 4 6.5 4c1.54 0 3.04.74 3.96 1.9A5.28 5.28 0 0114.5 4C17 4 19 6 19 8.5c0 3.55-3.14 6.38-8.9 11.83l-1.1 1.02z"/>
+                                <path d="M12.1 21.35l-1.1-1.02C5.14 14.88 2 12.05 2 8.5 2 6 4 4 6.5 4c1.54 0 3.04.74 3.96 1.9A5.28 5.28 0 0114.5 4C17 4 19 6 19 8.5c0 3.55-3.14 6.38-8.9 11.83l-1.1 1.02z" />
                             </svg>
                             Lưu tin
                         </button>
                         <button className="hover:text-gray-700 inline-flex items-center gap-1">
-                            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M13 3l-1 2H6v12h6l1 2h5V3h-5z"/></svg>
+                            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M13 3l-1 2H6v12h6l1 2h5V3h-5z" /></svg>
                             Báo cáo
                         </button>
                     </div>
@@ -516,47 +517,18 @@ export default function InfoRealEstate() {
                         </div>
                     </div>
 
-                    {/* ===== Xem trên bản đồ ===== */}
                     {/* ===== Xem trên bản đồ (Đã sửa) ===== */}
                     <div className="mt-10">
-                        <h2 className="text-xl font-semibold text-gray-900">Xem trên bản đồ</h2>
-
-                        {(() => {
-                            // 1. DÁN API KEY HỢP LỆ CỦA BẠN VÀO ĐÂY
-                            const YOUR_GOOGLE_MAPS_API_KEY = "AIzaSy...KEY_CUA_BAN"; 
-
-                            // 2. URL được cập nhật theo chuẩn của Google Maps Embed API
-                            // Chúng ta sử dụng tham số 'q' để ghim vị trí theo tọa độ
-                            const mapsEmbed = `https://www.google.com/maps/embed/v1/view?key=${YOUR_GOOGLE_MAPS_API_KEY}&q=${map.lat},${map.lng}&zoom=${map.zoom}`;
-                            
-                            // Link để người dùng xem trên trang Google Maps lớn hơn
-                            const mapsLink = `http://googleusercontent.com/maps.google.com/7?q=${map.lat},${map.lng}&z=${map.zoom}`;
-
-                            return (
-                                <div className="mt-3 relative rounded-xl overflow-hidden border border-gray-200">
-                                    {/* Phần overlay hiển thị tọa độ không thay đổi */}
-                                    <div className="absolute left-3 top-3 z-10 rounded-md bg-white/95 px-3 py-2 shadow">
-                                        <div className="text-sm font-semibold text-gray-900">
-                                            {map.lat.toFixed(4)}°N {map.lng.toFixed(4)}°E
-                                        </div>
-                                        <a href={mapsLink} target="_blank" rel="noreferrer" className="text-xs text-sky-600 hover:underline">
-                                            Xem bản đồ lớn hơn
-                                        </a>
-                                    </div>
-                                    <div className="aspect-[16/9] w-full">
-                                        <iframe 
-                                            src={mapsEmbed} 
-                                            title="Bản đồ vị trí" 
-                                            loading="lazy" 
-                                            className="h-full w-full border-0" // Thêm border-0 để đảm bảo không có viền iframe
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-                        {/* Meta dưới bản đồ (không thay đổi) */}
-                        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <h2 className="text-xl font-semibold text-gray-900">Khám phá tiện ích</h2>
+                        <NearbyAmenities
+                            center={{
+                                // Lấy từ dữ liệu của bạn; fallback nếu thiếu
+                                lat: map?.lat ?? 10.792,
+                                lng: map?.lng ?? 106.680,
+                            }}
+                            address={postInfo?.address}
+                        />
+=                        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                             {mapMeta.map(({ label, value }) => (
                                 <div key={label} className="rounded-lg border border-gray-200 p-4">
                                     <div className="text-gray-500 text-sm">{label}</div>
