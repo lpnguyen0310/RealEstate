@@ -103,12 +103,9 @@ public class PropertyMapper {
                 .collect(Collectors.toList()));
 
         dto.setPostInfo(buildPostInfo(entity));
-        dto.setDescription(buildDescription(entity.getDescriptionJson()));
         dto.setFeatures(buildFeatures(entity));
 
         MapDTO mapDTO = new MapDTO();
-        mapDTO.setLat(entity.getLatitude());
-        mapDTO.setLng(entity.getLongitude());
         dto.setMap(mapDTO);
 
         dto.setMapMeta(buildMapMeta(entity));
@@ -144,9 +141,7 @@ public class PropertyMapper {
             stats.setPricePerM2(String.format("~%s triệu/m²", formatPrice(entity.getPricePerM2().longValue() / 1_000_000)));
         }
         stats.setAreaText(entity.getArea() + " m²");
-        if (entity.getFrontageM() != null) {
-            stats.setFrontageText("Mặt tiền " + entity.getFrontageM() + " m");
-        }
+
         postInfo.setStats(stats);
 
         // TODO: Logic tính toán tăng trưởng giá thực tế từ bảng PriceHistoryEntity
@@ -178,8 +173,6 @@ public class PropertyMapper {
                 new FeatureItemDTO("Hướng nhà", entity.getDirection())
         ));
         features.setRight(List.of(
-                new FeatureItemDTO("Mặt tiền", entity.getFrontageM() != null ? entity.getFrontageM() + " m" : "N/A"),
-                new FeatureItemDTO("Đường vào", entity.getEntryWidthM() != null ? entity.getEntryWidthM() + " m" : "N/A"),
                 new FeatureItemDTO("Pháp lý", entity.getLegalStatus())
         ));
         return features;

@@ -44,7 +44,7 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
 
     return (
         <Drawer
-             className="post-create-drawer"
+            className="post-create"
             open={open}
             onClose={onClose}
             width={720}
@@ -53,7 +53,7 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
             closable={false}
             destroyOnClose
             footer={footer}
-            bodyStyle={{ display: "flex", flexDirection: "column", height: "100%", padding: 0, backgroundColor: "#E9EEF8",  }}
+            bodyStyle={{ display: "flex", flexDirection: "column", height: "100%", padding: 0, backgroundColor: "#E9EEF8", }}
             maskStyle={{ backgroundColor: "rgba(15,23,42,.35)", backdropFilter: "blur(2px)" }}
         >
             {/* Header */}

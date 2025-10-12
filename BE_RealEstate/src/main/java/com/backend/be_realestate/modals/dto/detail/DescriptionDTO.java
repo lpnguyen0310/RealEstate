@@ -12,5 +12,4 @@ public class DescriptionDTO {
     private List<String> nearby;
     private String priceLine;
     private String suggest;
-
 }

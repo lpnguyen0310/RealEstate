@@ -59,4 +59,7 @@ public class UserEntity extends BaseEntity {
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private AuthProviderEntity authProvider;
+
+
+
 }
