@@ -3,9 +3,9 @@ import { Tag, Pagination } from "antd";
 import { useSearchParams } from "react-router-dom";
 import SearchFilters from "../Search/SearchFilters";
 import SearchList from "../Search/SearchList";
-import { FEATURED_PROPERTIES } from "../../data/properties";
+import axios from "axios";
 
-// ===== Helpers =====
+// ===== Helpers (Không thay đổi) =====
 const parsePriceToTrieu = (label) => {
   if (!label) return null;
   const txt = String(label).toLowerCase().replace(/\s/g, "");
@@ -55,13 +55,41 @@ const extractInt = (label) => {
 
 export default function SearchResultsPage() {
   const [searchParams] = useSearchParams();
-  const type = searchParams.get("type"); // e.g. "sell", "rent", ...
-  const category = searchParams.get("category"); // e.g. "can-ho-chung-cu", etc.
+  const type = searchParams.get("type");
+  const category = searchParams.get("category");
 
-  // Chuẩn hoá dữ liệu
+  // ==================== THAY ĐỔI BẮT ĐẦU TỪ ĐÂY ====================
+
+  // 1. Khai báo state để lưu dữ liệu từ API
+  const [allProperties, setAllProperties] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // 2. Dùng useEffect để gọi API
+  useEffect(() => {
+    const fetchAllProperties = async () => {
+      try {
+        // Dùng axios để gọi API
+        const response = await axios.get('http://localhost:8080/api/properties');
+        
+        // Dữ liệu từ API sẽ nằm trong `response.data`
+        // Axios đã tự động parse JSON cho bạn
+        setAllProperties(response.data); 
+      } catch (err) {
+        // Nếu API trả về lỗi (như 404, 500), axios sẽ tự động nhảy vào đây
+        setError(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllProperties();
+  }, []); // [] đảm bảo chỉ gọi 1 lần
+
+  // 3. Chuẩn hoá dữ liệu từ state `allProperties` thay vì mock data
   const baseItems = useMemo(
     () =>
-      (FEATURED_PROPERTIES || []).map((x) => {
+      (allProperties || []).map((x) => {
         const images = Array.isArray(x.images) && x.images.length
           ? x.images.slice(0, 4)
           : Array.from(
@@ -86,13 +114,14 @@ export default function SearchResultsPage() {
           images,
           photosCount: images.length,
           tags: x.tags || [],
-          // Nếu source dữ liệu của bạn có type & category, trả vào đây
           type: x.type,
           category: x.category,
         };
       }),
-    []
+    [allProperties] // Phụ thuộc vào `allProperties`
   );
+
+  // ==================== THAY ĐỔI KẾT THÚC TẠI ĐÂY ====================
 
   const [keyword, setKeyword] = useState("");
   const [sort, setSort] = useState("relevance");
@@ -103,7 +132,6 @@ export default function SearchResultsPage() {
   const filteredAll = useMemo(() => {
     let arr = baseItems;
 
-    // Helper clean để chuẩn hóa chuỗi category / p.category
     const clean = (s) => {
       if (!s) return "";
       let t = decodeURIComponent(s);
@@ -113,12 +141,9 @@ export default function SearchResultsPage() {
       return t;
     };
 
-    // Lọc theo type nếu có
     if (type) {
       arr = arr.filter((p) => p.type === type);
     }
-
-    // Lọc theo category nếu có
     if (category) {
       const cat = clean(category);
       arr = arr.filter((p) => {
@@ -126,24 +151,18 @@ export default function SearchResultsPage() {
         return pcat === cat;
       });
     }
-
-    // Lọc theo từ khóa
     if (keyword) {
       arr = arr.filter((it) => matchKeyword(it, keyword));
     }
-
-    // Lọc theo các filter bổ sung nếu có
     if (filters) {
       const minTrieu = vndToTrieu(filters.priceFrom);
       const maxTrieu = vndToTrieu(filters.priceTo);
       if (minTrieu != null) arr = arr.filter((p) => (p.priceTrieu ?? 0) >= minTrieu);
       if (maxTrieu != null) arr = arr.filter((p) => (p.priceTrieu ?? 0) <= maxTrieu);
-
       if (filters.areaFrom != null)
         arr = arr.filter((p) => (p.area ?? 0) >= filters.areaFrom);
       if (filters.areaTo != null)
         arr = arr.filter((p) => (p.area ?? 0) <= filters.areaTo);
-
       if (Array.isArray(filters.beds) && filters.beds.length) {
         const maxBeds = Math.max(
           ...filters.beds.map(extractInt).filter((x) => x != null)
@@ -151,7 +170,6 @@ export default function SearchResultsPage() {
         if (Number.isFinite(maxBeds))
           arr = arr.filter((p) => (p.bed ?? 0) >= maxBeds);
       }
-
       if (Array.isArray(filters.baths) && filters.baths.length) {
         const maxBaths = Math.max(
           ...filters.baths.map(extractInt).filter((x) => x != null)
@@ -160,13 +178,9 @@ export default function SearchResultsPage() {
           arr = arr.filter((p) => (p.bath ?? 0) >= maxBaths);
       }
     }
-
-    // Sort cuối cùng
     return sortItems(arr, sort);
   }, [baseItems, type, category, keyword, sort, filters]);
 
-
-  // Khi các điều kiện đổi (keyword, sort, filters, type, category) → đưa trang về 1
   useEffect(() => {
     setPage(1);
   }, [keyword, sort, filters, type, category]);
@@ -182,6 +196,15 @@ export default function SearchResultsPage() {
     setPage(1);
   };
 
+  // 4. Xử lý giao diện cho Loading và Error
+  if (loading) {
+    return <div className="text-center py-20">Đang tải dữ liệu...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-20 text-red-600">Lỗi: {error.message}. Vui lòng kiểm tra lại kết nối API.</div>;
+  }
+  
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6">
       <SearchFilters
