@@ -3,6 +3,7 @@ import Home from "@/pages/Home";
 import InfoRealEstate from "@/pages/RealEstateDetail/InfoRealEstate";
 import LoginPage from "../pages/Login";         
 import SearchResultsPage from "../pages/Search/SearchResultsBody";
+import OAuth2Callback from "../pages/Login/OAuth2Callback";
 
 export const publicRoutes = [
     { path: "/", element: <Home /> },
@@ -10,4 +11,5 @@ export const publicRoutes = [
     { path: "/login", element: <LoginPage /> },
     { path: "/register", element: <RegisterModal /> },
     { path: "/search", element: <SearchResultsPage  /> },
+    { path: "/oauth2/callback", element: <OAuth2Callback /> },
 ];

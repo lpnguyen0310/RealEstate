@@ -22,7 +22,6 @@ import PurchagePostPage from "@/pages/UserDashboard/PurchagePostPage";
 import OrderManagement from "@/pages/UserDashboard/OrderMangement";
 import TransactionManagement from "@/pages/UserDashboard/TransactionManagement";
 import DashboardNotFound from "@/pages/UserDashboard/DashboardNotFound";
-
 // (import QRGeneratorPage nếu dùng, hiện chưa gắn vào route)
 
 export default function AppRoutes() {
