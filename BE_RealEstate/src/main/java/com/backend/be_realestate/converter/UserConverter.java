@@ -23,11 +23,11 @@ public class UserConverter {
             dto.setRoles(entity.getRoles().stream().map(r -> r.getCode()).toList());
         }
         dto.setAuthProvider(authProviderConverter.toDto(entity.getAuthProvider()));
-
         return dto;
     }
 
     public UserEntity convertToEntity(UserDTO dto) {
         return modelMapper.map(dto, UserEntity.class);
     }
+
 }

@@ -1,3 +1,16 @@
 .ant-pagination .ant-pagination-item-active {
-  border-color: transparent !important; /* hoặc màu bạn muốn */
+  border-color: transparent !important;
+  /* hoặc màu bạn muốn */
+}
+
+.post-create-drawer .ant-drawer-content-wrapper {
+  top: 24px !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  left: auto !important;
+  width: 760px !important;
+  border-radius: 20px !important;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25) !important;
+  background: transparent !important;
 }

@@ -129,7 +129,6 @@ export default function Header() {
 
             <UserDropDownHeader
               user={user}
-              // ✅ Skeleton khi đang hydrate/getProfile/login hoặc đang show panel logging_in
               loadingUser={loadingAuth || authUiLoading}
               onLoginClick={() => setLoginOpen(true)}
               onRegisterClick={() => setRegisterOpen(true)}
@@ -142,7 +141,6 @@ export default function Header() {
                 if (user) nav("/dashboard/posts");
                 else setLoginOpen(true);
               }}
-              // (tuỳ) khoá nút trong lúc auth đang loading
               disabled={loadingAuth}
             >
               <span className="text-[18px]">Đăng tin</span>
@@ -173,9 +171,9 @@ export default function Header() {
       <RegisterModal
         open={registerOpen}
         onClose={() => setRegisterOpen(false)}
-        onSuccess={() => {
+        onBackToLogin={() => {
           setRegisterOpen(false);
-          // setLoginOpen(true);
+          setLoginOpen(true);
         }}
       />
     </>

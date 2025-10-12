@@ -1,12 +1,14 @@
 package com.backend.be_realestate.service.impl;
 
 import com.backend.be_realestate.converter.UserConverter;
+import com.backend.be_realestate.entity.RoleEntity;
 import com.backend.be_realestate.entity.UserEntity;
 import com.backend.be_realestate.modals.dto.UserDTO;
 import com.backend.be_realestate.modals.request.CreatePasswordRequest;
 import com.backend.be_realestate.modals.request.RegisterComplete;
 import com.backend.be_realestate.modals.response.StartOtpResponse;
 import com.backend.be_realestate.modals.response.VerifyOtpResponse;
+import com.backend.be_realestate.repository.RoleRepository;
 import com.backend.be_realestate.repository.UserRepository;
 import com.backend.be_realestate.security.register.OtpRecord;
 import com.backend.be_realestate.security.register.TicketRecord;
@@ -22,6 +24,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -41,7 +44,7 @@ public class RegisterServiceInMemoryImpl implements RegisterService {
     private final UserRepository userRepo;
     private final PasswordEncoder encoder;
     private final UserConverter userConverter;
-
+    private final RoleRepository roleRepo;
     private final SecureRandom random = new SecureRandom();
 
     private String genOtp() {
@@ -139,25 +142,26 @@ public class RegisterServiceInMemoryImpl implements RegisterService {
         if (ticket == null) throw new IllegalArgumentException("Ticket không hợp lệ.");
         if (ticket.isUsed() || Instant.now().isAfter(ticket.getExpiresAt()))
             throw new IllegalStateException("Ticket đã dùng hoặc hết hạn.");
-
         // Chặn email trùng
         userRepo.findByEmail(ticket.getEmail()).ifPresent(u -> {
             throw new IllegalStateException("Email đã tồn tại.");
         });
-
+        RoleEntity userRole = roleRepo.findByCode("USER")
+                .orElseThrow(() -> new IllegalStateException("Không tìm thấy role USER"));
         UserEntity user = UserEntity.builder()
                 .email(ticket.getEmail())
                 .passwordHash(encoder.encode(req.getPassword()))
                 .firstName("Nguyễn Văn")
                 .lastName("A")
-                .phone(null)
+                .phone("090000000")
                 .avatar(null)
                 .isActive(true)
+                .roles(List.of(userRole))
                 .build();
 
         user = userRepo.save(user);
 
-        // đánh dấu ticket đã dùng + dọn
+        // Đánh dấu ticket đã dùng
         ticket.setUsed(true);
         ticketCache.put(req.getTicket(), ticket);
 

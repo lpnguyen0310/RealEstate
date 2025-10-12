@@ -5,18 +5,18 @@ import {
   EyeInvisibleOutlined,
   EyeTwoTone,
 } from "@ant-design/icons";
+import authApi from "@/api/register";
 
 export default function LoginForm({
   form,
   onFinish,
   onForgot,
   onRegisterClick,
+  loading = false, // nhận từ LoginModal
 }) {
   return (
     <>
-      <h3 className="text-gray-900 font-semibold text-[14px]">
-        Xin chào bạn
-      </h3>
+      <h3 className="text-gray-900 font-semibold text-[14px]">Xin chào bạn</h3>
       <h2 className="text-gray-900 font-bold text-[22px] mb-5">
         Đăng nhập để tiếp tục
       </h2>
@@ -27,7 +27,7 @@ export default function LoginForm({
           name="username"
           rules={[{ required: true, message: "Vui lòng nhập SĐT hoặc email" }]}
         >
-          <Input size="large" placeholder="SĐT hoặc email" />
+          <Input size="large" placeholder="SĐT hoặc email" disabled={loading} />
         </Form.Item>
 
         <Form.Item
@@ -39,18 +39,20 @@ export default function LoginForm({
             size="large"
             placeholder="Mật khẩu"
             iconRender={(v) => (v ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+            disabled={loading}
           />
         </Form.Item>
 
         <div className="flex items-center justify-between mb-3">
           <Form.Item name="remember" valuePropName="checked" noStyle>
-            <Checkbox>Nhớ tài khoản</Checkbox>
+            <Checkbox disabled={loading}>Nhớ tài khoản</Checkbox>
           </Form.Item>
 
           <button
             type="button"
             onClick={onForgot}
             className="text-[#d6402c] text-[14px]"
+            disabled={loading}
           >
             Quên mật khẩu?
           </button>
@@ -61,6 +63,8 @@ export default function LoginForm({
           htmlType="submit"
           size="large"
           className="!bg-[#d6402c] hover:!bg-[#c13628] w-full h-[44px] font-semibold"
+          loading={loading}
+          disabled={loading}
         >
           Đăng nhập
         </Button>
@@ -72,13 +76,19 @@ export default function LoginForm({
             size="large"
             className="w-full h-[44px] !mb-[8px]"
             icon={<AppleFilled />}
+            type="button"
+            disabled={loading}
           >
             Đăng nhập với Apple
           </Button>
+
           <Button
             size="large"
             className="w-full h-[44px]"
             icon={<GoogleOutlined />}
+            type="button"
+            onClick={() => authApi.loginWithGoogle()}
+            disabled={loading}
           >
             Đăng nhập với Google
           </Button>
@@ -86,14 +96,9 @@ export default function LoginForm({
 
         <p className="text-[12px] text-gray-500 mt-4">
           Bằng việc tiếp tục, bạn đồng ý với{" "}
-          <a href="/dieu-khoan" className="text-[#d6402c]">
-            Điều khoản sử dụng
-          </a>{" "}
+          <a href="/dieu-khoan" className="text-[#d6402c]">Điều khoản sử dụng</a>{" "}
           và{" "}
-          <a href="/bao-mat" className="text-[#d6402c]">
-            Chính sách bảo mật
-          </a>
-          .
+          <a href="/bao-mat" className="text-[#d6402c]">Chính sách bảo mật</a>.
         </p>
 
         <p className="text-[14px] mt-4">
@@ -102,6 +107,7 @@ export default function LoginForm({
             type="button"
             onClick={onRegisterClick}
             className="text-[#d6402c] font-semibold underline hover:text-[#c13628]"
+            disabled={loading}
           >
             Đăng ký tại đây
           </button>
