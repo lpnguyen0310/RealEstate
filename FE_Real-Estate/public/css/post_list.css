@@ -1,3 +1,26 @@
 .ant-pagination .ant-pagination-item-active {
-  border-color: transparent !important; /* hoặc màu bạn muốn */
+  border-color: transparent !important;
+  /* hoặc màu bạn muốn */
 }
+
+/* === Layout tổng thể Drawer === */
+.post-create-drawer .ant-drawer-content-wrapper {
+  position: fixed;
+  inset: 24px 24px 24px auto;
+  width: 760px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+  background: transparent;
+}
+
+
+/* Mobile: tự co lại */
+@media (max-width: 1024px) {
+  .post-create-drawer .ant-drawer-content-wrapper {
+    inset: 8px;
+    width: calc(100% - 16px);
+  }
+}
+
+

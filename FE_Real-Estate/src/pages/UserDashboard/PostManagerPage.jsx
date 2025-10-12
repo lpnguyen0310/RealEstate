@@ -5,7 +5,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination as SwiperPagination, Autoplay } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/pagination";
-import PostList from "@/components/dashboard/postmanagement/PostList";
+import { useOutletContext } from "react-router-dom"; // +++
 
 const SLIDES = [
     "https://images.unsplash.com/photo-1501183638710-841dd1904471?q=80&w=1400",
@@ -14,9 +14,8 @@ const SLIDES = [
 ];
 
 import { useNavigate } from "react-router-dom";
-import PostFilters from "../../components/dashboard/postmanagement/PostFiltersBar";
-import PostStatusTabs from "../../components/dashboard/postmanagement/PostStatusTabs";
-import { MOCK_POSTS } from "@/data/PostManagementData/mockPost"; // đúng với file bạn vừa update
+import { PostFilters, PostStatusTabs, PostCreateDrawer, PostList } from "../../components/dashboard/postmanagement";
+import { MOCK_POSTS } from "@/data/PostManagementData/mockPost";
 
 // map statusTag (VN) -> key của tab
 const tagToKey = (tag) => {
@@ -34,10 +33,11 @@ const tagToKey = (tag) => {
 
 export default function PostManagerPage() {
     const navigate = useNavigate();
-
+    const { user } = useOutletContext() || {};
     const [status, setStatus] = useState("active");
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
+    const [openCreate, setOpenCreate] = useState(false);
 
     // danh sách sau khi lọc theo form ===
     const [filteredPosts, setFilteredPosts] = useState(MOCK_POSTS);
@@ -154,7 +154,7 @@ export default function PostManagerPage() {
             {/* FILTERS BAR */}
             <PostFilters
                 onSearch={handleSearch}
-                onCreate={() => navigate("/dashboard/posts/new")}
+                onCreate={() => setOpenCreate(true)}
             />
 
             {/* STATUS TABS */}
@@ -177,6 +177,22 @@ export default function PostManagerPage() {
                     onPageSizeChange={handlePageSizeChange}
                 />
             </div>
+
+            {/* === Drawer Tạo Tin === */}
+            <PostCreateDrawer
+                open={openCreate}
+                onClose={() => setOpenCreate(false)}
+                onSaveDraft={(values) => {
+                    console.log("SAVE DRAFT:", values);
+                    // TODO: gọi API lưu nháp -> đóng hoặc giữ mở tuỳ UX
+                }}
+                onContinue={(values) => {
+                    console.log("CONTINUE:", values);
+                    // TODO: chuyển bước tiếp theo (upload ảnh, vị trí bản đồ, tiện ích, ...),
+                    // hoặc navigate(`/dashboard/posts/new?prefill=${...}`)
+                }}
+                user={user}
+            />
         </div>
     );
 }
