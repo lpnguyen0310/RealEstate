@@ -1,4 +1,22 @@
+import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchUserInventory } from '@/store/inventorySlice';
+
 export default function UserHeader({ user }) {
+  const dispatch = useDispatch();
+  const { items: inventory, loading } = useSelector((state) => state.inventory);
+
+  useEffect(() => {
+    dispatch(fetchUserInventory());
+  }, [dispatch]);
+
+  // Hàm trợ giúp để tìm số lượng của một loại vật phẩm
+  const getQuantity = (itemType) => {
+    if (loading) return '...';
+    const item = inventory.find(i => i.itemType === itemType);
+    return item ? item.quantity : 0;
+  };
+
   return (
     <div className="rounded-2xl border border-[#eef2f8] shadow-[0_8px_24px_rgba(13,47,97,0.06)] bg-white overflow-hidden">
       {/* === Banner (phần màu) === */}
@@ -6,7 +24,7 @@ export default function UserHeader({ user }) {
         {/* Avatar chồng nhẹ lên ranh giới */}
         <div className="absolute left-6 bottom-[-36px]">
           <div className="w-24 h-24 rounded-2xl bg-[#ee3e6b] grid place-items-center text-white text-5xl font-semibold
-                          border-4 border-white shadow-[0_10px_24px_rgba(13,47,97,0.12)]">
+                           border-4 border-white shadow-[0_10px_24px_rgba(13,47,97,0.12)]">
             {user.name?.charAt(0).toUpperCase()}
           </div>
         </div>
@@ -19,10 +37,10 @@ export default function UserHeader({ user }) {
         {/* Badge */}
         <div className="flex items-center gap-2 pb-1">
           <span className="inline-flex items-center rounded-md bg-[#ff7a45] text-white text-[12px] px-2.5 py-0.5 font-medium shadow-sm">
-            0 PREMIUM
+            {getQuantity('PREMIUM')} PREMIUM
           </span>
           <span className="inline-flex items-center rounded-md bg-[#faad14] text-white text-[12px] px-2.5 py-0.5 font-medium shadow-sm">
-            0 VIP
+            {getQuantity('VIP')} VIP
           </span>
         </div>
       </div>
@@ -50,8 +68,8 @@ export default function UserHeader({ user }) {
             {/* Nút nạp tiền */}
             <button
               className="h-9 px-4 rounded-xl bg-gradient-to-r from-[#5db9f0] to-[#b36ad6]
-                   text-white text-[13px] font-medium shadow-sm hover:opacity-90
-                   active:translate-y-[1px] transition"
+                       text-white text-[13px] font-medium shadow-sm hover:opacity-90
+                       active:translate-y-[1px] transition"
             >
               Nạp tiền
             </button>
