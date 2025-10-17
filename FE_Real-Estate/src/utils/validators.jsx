@@ -24,3 +24,72 @@ export const maskEmail = (email) => {
   const parts = domain.split(".");
   return `${mask(user)}@${[mask(parts[0] || ""), ...parts.slice(1)].join(".")}`;
 };
+
+
+const num = (v) => Number(String(v ?? "").replace(/[^\d.]/g, ""));
+const empty = (v) => !String(v ?? "").trim();
+
+export const rules = {
+  title: (v) =>
+    empty(v) ? "Tiêu đề không được để trống"
+      : (v.length < 30 || v.length > 99) ? "Tiêu đề 30–99 ký tự"
+        : null,
+
+  description: (v) =>
+    empty(v) ? "Mô tả không được để trống"
+      : (v.length < 30 || v.length > 5000) ? "Mô tả 30–5000 ký tự"
+        : null,
+
+  propertyType: (v) => empty(v) ? "Loại BĐS không được để trống" : null,
+
+  price: (v) => {
+    if (empty(v)) return "Giá không được để trống";
+    const n = num(v);
+    return !Number.isFinite(n) || n <= 0 ? "Giá phải là số > 0" : null;
+  },
+
+  position: (v) => empty(v) ? "Vị trí bắt buộc phải chọn" : null,
+
+  // landArea: (v) => {
+  //   if (empty(v)) return "Diện tích đất không được để trống";
+  //   const n = num(v);
+  //   return !Number.isFinite(n) || n <= 0 ? "Diện tích đất phải là số > 0" : null;
+  // },
+
+  // provinceId: (v) => empty(v) ? "Tỉnh/Thành phố không được để trống" : null,
+  // districtId: (v) => empty(v) ? "Quận/Huyện không được để trống" : null,
+  // wardId: (v) => empty(v) ? "Phường/Xã không được để trống" : null,
+  // suggestedAddress: (v) => empty(v) ? "Địa chỉ đề xuất không được để trống" : null,
+
+  legalDocument: (v) => empty(v) ? "Giấy tờ pháp lý không được để trống" : null,
+};
+
+export const validateField = (name, value) => rules[name]?.(value) ?? null;
+
+export const validateMany = (data, fields) => {
+  const errs = {};
+  fields.forEach((f) => {
+    const msg = validateField(f, data[f]);
+    if (msg) errs[f] = msg;
+  });
+  return errs;
+};
+
+export const formatVND = (n) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 })
+    .format(Number(n || 0)).replace("₫", "đ");
+
+export const priceText = (val) => {
+  const n = Number(val || 0);
+  if (!n) return "—";
+  const b = n / 1e9;
+  return b >= 1 ? `${(+b.toFixed(1)).toString().replace(/\.0$/, "")} tỷ` : formatVND(n);
+};
+
+export const makeUrl = (item) => {
+  if (!item) return "";
+  if (typeof item === "string") return item;
+  if (item.url) return item.url;
+  if (item.previewUrl) return item.previewUrl;
+  return ""; // File/Blob -> tạo objectURL ở component
+};

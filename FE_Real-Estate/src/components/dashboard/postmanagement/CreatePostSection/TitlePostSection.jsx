@@ -7,7 +7,7 @@ import {
     Divider,
 } from "@mui/material";
 
-export default function TitlePostSection({ formData, onChange }) {
+export default function TitlePostSection({ formData, onChange,errors = {} }) {
     const inputRootSx = {
         borderRadius: "10px",
         height: 40,
@@ -36,6 +36,8 @@ export default function TitlePostSection({ formData, onChange }) {
                         value={formData.title}
                         onChange={(e) => onChange("title", e.target.value)}
                         placeholder="Nhập tiêu đề tin đăng"
+                        error={Boolean(errors.title)}
+                        helperText={errors.title}
                         InputProps={{ sx: inputRootSx }}
                     />
                     <TextField
@@ -47,6 +49,8 @@ export default function TitlePostSection({ formData, onChange }) {
                         value={formData.description}
                         onChange={(e) => onChange("description", e.target.value)}
                         placeholder="Nhập mô tả chi tiết cho tin đăng..."
+                        error={Boolean(errors.description)}
+                        helperText={errors.description}
                         InputProps={{ sx: { ...inputRootSx, height: "auto" } }}
                     />
                 </Box>

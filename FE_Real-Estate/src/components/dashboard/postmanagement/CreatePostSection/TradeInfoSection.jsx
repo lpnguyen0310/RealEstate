@@ -1,4 +1,6 @@
-import {Box,Typography,Card,CardContent,Divider,ToggleButtonGroup,ToggleButton,FormControl,Select,MenuItem,TextField,InputAdornment,
+import {
+    Box, Typography, Card, CardContent, Divider, ToggleButtonGroup, ToggleButton,
+    FormControl, Select, MenuItem, TextField, InputAdornment, FormHelperText,
 } from "@mui/material";
 
 const PROPERTY_TYPES = [
@@ -9,7 +11,7 @@ const PROPERTY_TYPES = [
     { value: "office", label: "Văn phòng" },
 ];
 
-export default function TradeInfoSection({ formData, setFormData }) {
+export default function TradeInfoSection({ formData, onChange, errors }) {
     const inputRootSx = {
         borderRadius: "10px",
         height: 40,
@@ -19,10 +21,7 @@ export default function TradeInfoSection({ formData, setFormData }) {
     };
 
     return (
-        <Card
-            variant="outlined"
-            sx={{ borderRadius: "14px", borderColor: "#e1e5ee", boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }}
-        >
+        <Card variant="outlined" sx={{ borderRadius: "14px", borderColor: "#e1e5ee", boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }}>
             <CardContent sx={{ p: 2.5 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0f223a", fontSize: "18px", mb: 1.5 }}>
                     Thông tin giao dịch
@@ -40,11 +39,8 @@ export default function TradeInfoSection({ formData, setFormData }) {
                         value={formData.tradeType}
                         onChange={(_e, v) => {
                             if (!v) return;
-                            setFormData((p) => ({
-                                ...p,
-                                tradeType: v,
-                                priceType: v === "sell" ? "sellPrice" : "rentPrice",
-                            }));
+                            onChange("tradeType", v);
+                            onChange("priceType", v === "sell" ? "sellPrice" : "rentPrice");
                         }}
                         size="small"
                         sx={{
@@ -71,7 +67,7 @@ export default function TradeInfoSection({ formData, setFormData }) {
                     </ToggleButtonGroup>
                 </Box>
 
-                {/* GRID 2 cột: trái = label/Select; phải = input */}
+                {/* GRID 2 cột */}
                 <Box
                     sx={{
                         display: "grid",
@@ -84,14 +80,16 @@ export default function TradeInfoSection({ formData, setFormData }) {
                     <Typography variant="body2" sx={{ color: "#475569", fontWeight: 500, alignSelf: "center" }}>
                         Loại bất động sản <span style={{ color: "red" }}>*</span>
                     </Typography>
+
                     <FormControl
                         fullWidth
                         size="small"
+                        error={!!errors?.propertyType}
                         sx={{ "& .MuiOutlinedInput-root": inputRootSx, "& .MuiSelect-select": { py: "8px !important" } }}
                     >
                         <Select
                             value={formData.propertyType}
-                            onChange={(e) => setFormData((p) => ({ ...p, propertyType: e.target.value }))}
+                            onChange={(e) => onChange("propertyType", e.target.value)}
                             displayEmpty
                             renderValue={(val) =>
                                 val
@@ -108,9 +106,10 @@ export default function TradeInfoSection({ formData, setFormData }) {
                                 </MenuItem>
                             ))}
                         </Select>
+                        {errors?.propertyType && <FormHelperText>{errors.propertyType}</FormHelperText>}
                     </FormControl>
 
-                    {/* Hàng 2: Select giá (trái) + Input giá (phải, floating label) */}
+                    {/* Hàng 2: Select giá (trái) + Input giá (phải) */}
                     <FormControl
                         size="small"
                         sx={{
@@ -122,7 +121,7 @@ export default function TradeInfoSection({ formData, setFormData }) {
                     >
                         <Select
                             value={formData.priceType}
-                            onChange={(e) => setFormData((p) => ({ ...p, priceType: e.target.value }))}
+                            onChange={(e) => onChange("priceType", e.target.value)}
                         >
                             <MenuItem value="sellPrice">Giá bán</MenuItem>
                             <MenuItem value="rentPrice">Giá thuê</MenuItem>
@@ -131,11 +130,14 @@ export default function TradeInfoSection({ formData, setFormData }) {
 
                     <TextField
                         required
-                        label={formData.priceType === "sellPrice" ? "Giá bán" : "Giá thuê"} // floating label
+                        label={formData.priceType === "sellPrice" ? "Giá bán" : "Giá thuê"}
                         fullWidth
                         size="small"
                         value={formData.price}
-                        onChange={(e) => setFormData((p) => ({ ...p, price: e.target.value }))}
+                        onChange={(e) => {
+                            const onlyDigits = e.target.value.replace(/\D/g, "");
+                            onChange("price", onlyDigits);
+                        }}
                         inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
                         InputProps={{
                             endAdornment: (
@@ -145,6 +147,8 @@ export default function TradeInfoSection({ formData, setFormData }) {
                             ),
                             sx: inputRootSx,
                         }}
+                        error={!!errors?.price}
+                        helperText={errors?.price}
                         sx={{ gridColumn: { xs: "1 / -1", sm: "2 / 3" } }}
                     />
                 </Box>
