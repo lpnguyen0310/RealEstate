@@ -14,6 +14,8 @@ export const MOCK_POSTS = [
         views: 0,
         addressMain: "300, Phường Hồng Hà, Thành phố Hà Nội",
         addressOld: "300, Phố 45, Phường Phúc Tân, Quận Hoàn Kiếm, Thành phố Hà Nội",
+        description: "Căn nhà nằm trong khu vực trung tâm, gần các tiện ích như trường học, chợ và bệnh viện. Thiết kế hiện đại, không gian rộng rãi, phù hợp cho gia đình sinh sống.",
+
         area: 3,
         bed: 1,
         bath: 2,
@@ -41,9 +43,9 @@ export const MOCK_POSTS = [
         addressMain: "300, Phường Hồng Hà, Thành phố Hà Nội",
         addressOld: "300, Phố 45, Phường Phúc Tân, Quận Hoàn Kiếm, Thành phố Hà Nội",
         area: 3,
+        description: "Căn nhà nằm trong khu vực trung tâm, gần các tiện ích như trường học, chợ và bệnh viện. Thiết kế hiện đại, không gian rộng rãi, phù hợp cho gia đình sinh sống.",
         bed: 1,
         bath: 2,
-        floors: 3,
         sizeText: "3m x 3m",
         note: "-",
         code: "HN002",
@@ -51,7 +53,7 @@ export const MOCK_POSTS = [
         price: 3_000_000_000,
         expireDate: "2025-11-15",
     },
-     {
+    {
         id: 3,
         images: [
             "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1400",
@@ -69,7 +71,6 @@ export const MOCK_POSTS = [
         area: 3,
         bed: 1,
         bath: 2,
-        floors: 3,
         sizeText: "3m x 3m",
         note: "-",
         code: "HN003",
@@ -77,7 +78,7 @@ export const MOCK_POSTS = [
         price: 2_000_000,
         expireDate: "2025-11-15",
     },
-     {
+    {
         id: 4,
         images: [
             "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1400",
@@ -92,10 +93,10 @@ export const MOCK_POSTS = [
         views: 0,
         addressMain: "300, Phường Hồng Hà, Thành phố Hà Nội",
         addressOld: "300, Phố 45, Phường Phúc Tân, Quận Hoàn Kiếm, Thành phố Hà Nội",
+        description: "Căn nhà nằm trong khu vực trung tâm, gần các tiện ích như trường học, chợ và bệnh viện. Thiết kế hiện đại, không gian rộng rãi, phù hợp cho gia đình sinh sống.",
         area: 3,
         bed: 1,
         bath: 2,
-        floors: 3,
         sizeText: "3m x 3m",
         note: "-",
         code: "HN004",
@@ -103,7 +104,7 @@ export const MOCK_POSTS = [
         price: 3_000_000_000,
         expireDate: "2025-11-15",
     },
-     {
+    {
         id: 5,
         images: [
             "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1400",
@@ -118,10 +119,10 @@ export const MOCK_POSTS = [
         views: 0,
         addressMain: "300, Phường Hồng Hà, Thành phố Hà Nội",
         addressOld: "300, Phố 45, Phường Phúc Tân, Quận Hoàn Kiếm, Thành phố Hà Nội",
+        description: "Căn nhà nằm trong khu vực trung tâm, gần các tiện ích như trường học, chợ và bệnh viện. Thiết kế hiện đại, không gian rộng rãi, phù hợp cho gia đình sinh sống.",
         area: 3,
         bed: 1,
         bath: 2,
-        floors: 3,
         sizeText: "3m x 3m",
         note: "-",
         code: "HN005",

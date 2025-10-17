@@ -1,93 +1,63 @@
 package com.backend.be_realestate.modals.request;
 
+import com.backend.be_realestate.enums.PriceType;
 import com.backend.be_realestate.enums.PropertyType;
+import com.backend.be_realestate.enums.TradeType;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CreatePropertyRequest {
 
-
-    // Bắt buộc tối thiểu
-    @NotNull
+    @NotBlank @Size(max = 255)
     private String title;
 
-    @NotNull
-    private String description;
-
-    @NotNull
-    private PropertyType propertyType;
-
-    @NotNull
-    private Long categoryId;
-
-    @NotNull
-    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
-    @Positive
+    @NotNull @DecimalMin("0.0")
     private BigDecimal price;
 
-    @NotNull
-    private String address;
+    @NotNull(message = "Diện tích (area) là bắt buộc")
+    private BigDecimal area;
+
+    @DecimalMin("0.0")
+    private BigDecimal landAreaM2;
+
+    @DecimalMin("0.0")
+    private BigDecimal usableAreaM2;
 
     @NotNull
+    private PropertyType propertyType;     // APARTMENT/HOUSE/...
+
+    @NotNull(message = "Loại giao dịch (tradeType) là bắt buộc")
+    @JsonAlias({"trade_type"})             // nếu FE lỡ gửi trade_type
+    private TradeType tradeType;           // SELL / RENT
+
+    @NotNull(message = "priceType là bắt buộc (TOTAL | PER_M2 | NEGOTIABLE)")
+    @JsonAlias({"priceUnit", "price_type"}) // hỗ trợ key khác từ FE
+    private PriceType priceType;           // TOTAL / PER_M2 / NEGOTIABLE
+
+    @Min(0) private Integer bedrooms;
+    @Min(0) private Integer bathrooms;
+    @Min(0) private Integer floors;
+
+    @Size(max = 500) private String displayAddress;
+    @Size(max = 255) private String addressStreet;
+    @Size(max = 100) private String legalStatus;
+    @Size(max = 255) private String direction;
+    @Size(max = 2000) private String description;
+    @Size(max = 100) private String position;
+
     private Long cityId;
-
-    @NotNull
     private Long districtId;
-
-    @NotNull
     private Long wardId;
 
-    @NotNull
-    private String addressStreet; // Duong
+    private Long categoryId;
+    private List<Long> amenityIds;
+    private List<String> imageUrls;
 
-    private Long numberOfStreet; // So nha\
-
-    @NotNull
-    private String direction; // Huong
-
-    @NotNull
-    @Positive
-    private Double area; // Dien tich
-
-    @NotNull
-    @Positive
-    private Double width; // Ngang
-
-    @NotNull
-    @Positive
-    private Double height; // Cao
-
-    @NotNull
-    private String legalStatus; // Phap ly
-
-    @NotNull
-    private Long floors; // So tang
-
-    @NotNull
-    private Long numberOfBathrooms; // So phong tam
-
-    @NotNull
-    private Long numberOfBedrooms; // So phong ngu
-
-    @NotNull
-    private String position; // Mat tien, hem xe hoi...
-
-    @NotNull
-    private List<String> amenities; // Tien ich
-    @NotNull
-    @Size(min =4, message = "At least 4 images are required")
-    private List<String> images; // Hinh anh
-    private List<String> videos; // Video
-
-
-
-
+    @Pattern(regexp = "free|vip|premium")
+    private String listingType;
 }

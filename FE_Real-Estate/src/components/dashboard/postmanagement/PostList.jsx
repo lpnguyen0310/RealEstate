@@ -10,8 +10,6 @@ export default function PostList({
     onPageChange = () => { },
     onPageSizeChange = () => { },
 }) {
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
     return (
         <div className="space-y-4">
             {/* LIST */}
@@ -31,12 +29,17 @@ export default function PostList({
                     <Select
                         value={pageSize}
                         onChange={(v) => onPageSizeChange(v)}
-                        options={[10, 20, 30, 50].map((n) => ({ label: n.toString(), value: n }))}
+                        options={[10, 20, 30, 50].map((n) => ({
+                            label: n.toString(),
+                            value: n,
+                        }))}
                         className="!w-[90px] [&_.ant-select-selector]:!h-10 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selection-item]:!leading-10"
                         popupMatchSelectWidth={false}
                     />
                     <span className="text-gray-500 mt-[8px]">
-                        Hiển thị {total === 0 ? 0 : (page - 1) * pageSize + 1} đến {Math.min(page * pageSize, total)} của {total}
+                        Hiển thị{" "}
+                        {total === 0 ? 0 : (page - 1) * pageSize + 1} đến{" "}
+                        {Math.min(page * pageSize, total)} của {total}
                     </span>
                 </div>
 
@@ -52,7 +55,7 @@ export default function PostList({
                         const baseBtn =
                             "px-5 h-10 inline-flex items-center justify-center rounded-xl transition font-medium " +
                             "focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0";
-                        const grayBtn = "bg-gray-300 text-gray-700 hover:bg-gray-400"; // xám đậm hơn
+                        const grayBtn = "bg-gray-300 text-gray-700 hover:bg-gray-400";
                         const numBtn =
                             "min-w-10 px-3 h-10 rounded-xl border border-gray-200 transition " +
                             "focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0";
@@ -65,9 +68,12 @@ export default function PostList({
                         if (type === "prev") {
                             return (
                                 <button
-                                    className={`${baseBtn} ${grayBtn} ${isPrevDisabled ? "opacity-60 cursor-not-allowed pointer-events-none" : ""}`}
+                                    className={`${baseBtn} ${grayBtn} ${isPrevDisabled
+                                            ? "opacity-60 cursor-not-allowed pointer-events-none"
+                                            : ""
+                                        }`}
                                     tabIndex={-1}
-                                    onMouseDown={(e) => e.preventDefault()} // ngăn browser focus
+                                    onMouseDown={(e) => e.preventDefault()}
                                 >
                                     Trước
                                 </button>
@@ -76,7 +82,10 @@ export default function PostList({
                         if (type === "next") {
                             return (
                                 <button
-                                    className={`${baseBtn} ${grayBtn} ${isNextDisabled ? "opacity-60 cursor-not-allowed pointer-events-none" : ""}`}
+                                    className={`${baseBtn} ${grayBtn} ${isNextDisabled
+                                            ? "opacity-60 cursor-not-allowed pointer-events-none"
+                                            : ""
+                                        }`}
                                     tabIndex={-1}
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
@@ -88,7 +97,10 @@ export default function PostList({
                             const isActive = p === page;
                             return (
                                 <button
-                                    className={`${numBtn} ${isActive ? activeBtn : "bg-white text-gray-700 hover:bg-gray-50"} !focus:outline-none !focus-visible:outline-none !focus:ring-0`}
+                                    className={`${numBtn} ${isActive
+                                            ? activeBtn
+                                            : "bg-white text-gray-700 hover:bg-gray-50"
+                                        } !focus:outline-none !focus-visible:outline-none !focus:ring-0`}
                                     tabIndex={-1}
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
@@ -99,7 +111,6 @@ export default function PostList({
                         return original;
                     }}
                 />
-
             </div>
         </div>
     );

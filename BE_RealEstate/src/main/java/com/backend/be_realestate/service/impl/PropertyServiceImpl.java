@@ -1,46 +1,65 @@
 package com.backend.be_realestate.service.impl;
 
+import com.backend.be_realestate.converter.PropertyConverter;
 import com.backend.be_realestate.converter.PropertyMapper;
-import com.backend.be_realestate.entity.PropertyEntity;
+import com.backend.be_realestate.entity.*;
 import com.backend.be_realestate.exceptions.ResourceNotFoundException;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
+import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
-import com.backend.be_realestate.repository.PropertyRepository;
+import com.backend.be_realestate.modals.request.CreatePropertyRequest;
+import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.IPropertyService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-public class PropertyServiceImpl implements IPropertyService { // implements interface
+@RequiredArgsConstructor
+public class PropertyServiceImpl implements IPropertyService {
 
     private final PropertyRepository propertyRepository;
     private final PropertyMapper propertyMapper;
+    private final PropertyConverter propertyConverter;
+    private final PropertyImage propertyImageRepository;
+    private final AmenityRepository amenityRepository;
+    private final CategoryRepository categoryRepository;
+    private final CityRepository cityRepository;
+    private final DistrictRepository districtRepository;
+    private final WardRepository wardRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    public PropertyServiceImpl(PropertyRepository propertyRepository, PropertyMapper propertyMapper) {
-        this.propertyRepository = propertyRepository;
-        this.propertyMapper = propertyMapper;
-    }
-
-    @Override // Thêm annotation @Override
+    @Override
     public List<PropertyCardDTO> getAllPropertiesForCardView() {
-        var entities = propertyRepository.findAll();
-        return entities.stream()
+        return propertyRepository.findAll().stream()
                 .map(propertyMapper::toPropertyCardDTO)
                 .collect(Collectors.toList());
     }
 
     @Override
     public PropertyDetailDTO getPropertyDetailById(Long id) {
-        // Gọi phương thức đã được tối ưu và sử dụng Exception tùy chỉnh
         PropertyEntity entity = propertyRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
-
-        // Sử dụng mapper để chuyển đổi
         return propertyMapper.toPropertyDetailDTO(entity);
     }
 
+    @Override
+    public Page<PropertyDTO> getPropertiesByUser(Long userId, Pageable pageable) {
+        return propertyRepository.findAllByUser_UserId(userId, pageable)
+                .map(propertyConverter::toDto);
+    }
+
+
+    @Override
+    @Transactional
+    public PropertyDTO create(Long currentUserId, CreatePropertyRequest req, List<MultipartFile> images) {
+        // 1) Load quan hệ bắt buộc
+        return null;
+    }
 }

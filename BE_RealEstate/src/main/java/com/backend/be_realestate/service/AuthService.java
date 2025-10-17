@@ -40,7 +40,11 @@ public class AuthService {
         );
 
         UserDetails user = (UserDetails) auth.getPrincipal();
+        Long userId = userRepo.findByIdentifier(user.getUsername())
+                .map(u -> u.getUserId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Không tìm thấy user"));
         Map<String,Object> claims = Map.of(
+                "uid", userId, //
                 "roles", user.getAuthorities().stream().map(a -> a.getAuthority()).toList()
         );
         String access  = jwt.generateAccess(user.getUsername(), claims);

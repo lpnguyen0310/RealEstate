@@ -2,7 +2,8 @@ import { configureStore } from "@reduxjs/toolkit";
 import auth from "./authSlice";
 import register from "./registerSlice";
 import pricing from "./pricingSlice";
+import property from "./propertySlice";
 
 export const store = configureStore({
-  reducer: { auth, register, pricing }
+  reducer: { auth, register, pricing, property }
 });

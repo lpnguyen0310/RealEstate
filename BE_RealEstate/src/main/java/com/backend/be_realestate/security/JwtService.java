@@ -52,6 +52,17 @@ public class JwtService {
     public Jws<Claims> parse(String token){
         return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
     }
+    public Claims getAllClaims(String token) {
+        return parse(token).getBody();
+    }
+
+    public Long getUserId(String token) {
+        Object v = getAllClaims(token).get("uid");
+        if (v == null) return null;
+        if (v instanceof Long l) return l;
+        if (v instanceof Integer i) return i.longValue();
+        return Long.valueOf(String.valueOf(v));
+    }
 
     public String getSubject(String token){ return parse(token).getBody().getSubject(); }
     public boolean isRefresh(String token){

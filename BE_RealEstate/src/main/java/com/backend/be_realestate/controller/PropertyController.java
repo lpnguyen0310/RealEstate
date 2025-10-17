@@ -2,29 +2,36 @@ package com.backend.be_realestate.controller;
 
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 
+import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
+import com.backend.be_realestate.modals.request.CreatePropertyRequest;
+import com.backend.be_realestate.modals.response.PageResponse;
 import com.backend.be_realestate.service.IPropertyService;
+import com.backend.be_realestate.utils.SecurityUtils;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/properties")
+@RequiredArgsConstructor
 public class PropertyController {
 
     private final IPropertyService propertyService;
+    private final SecurityUtils securityUtils;
 
-    @Autowired
-    public PropertyController(IPropertyService propertyService) {
-        this.propertyService = propertyService;
-    }
-
-    /**
-     * API để lấy danh sách tất cả properties (dạng card rút gọn)
-     * GET: /api/properties
-     */
     @GetMapping
     public ResponseEntity<List<PropertyCardDTO>> getAllProperties() {
         List<PropertyCardDTO> properties = propertyService.getAllPropertiesForCardView();
@@ -35,6 +42,24 @@ public class PropertyController {
     public ResponseEntity<PropertyDetailDTO> getPropertyById(@PathVariable Long id) {
         PropertyDetailDTO propertyDetail = propertyService.getPropertyDetailById(id);
         return ResponseEntity.ok(propertyDetail);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<PageResponse<PropertyDTO>> getMyProperties(
+            Authentication auth,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "postedAt,desc") String sort
+    ) {
+        Long userId = securityUtils.currentUserId(auth);
+        if (userId == null) return ResponseEntity.status(401).build();
+
+        String[] s = sort.split(",");
+        var dir = (s.length>1 && s[1].equalsIgnoreCase("asc")) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        var pageable = PageRequest.of(page, size, Sort.by(dir, s[0]));
+
+        var pageDto = propertyService.getPropertiesByUser(userId, pageable);
+        return ResponseEntity.ok(PageResponse.from(pageDto));
     }
 
 }
