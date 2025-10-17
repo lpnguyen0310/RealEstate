@@ -143,12 +143,6 @@ public class PropertyEntity {
             inverseJoinColumns = @JoinColumn(name = "amenity_id")
     )
     private List<AmenityEntity> amenities ;
-
-
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_id") // Trường này trong DB có thể null
-    private ServicePlanEntity servicePlan;
-
+    
 
 }
