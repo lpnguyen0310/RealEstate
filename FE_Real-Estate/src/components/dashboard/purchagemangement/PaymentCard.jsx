@@ -5,6 +5,7 @@ export default function PaymentCard({
   total = 0,
   fmt = (n) => n?.toString(),
   onPay,                    // optional
+  disabled
 }) {
   const hasItems = allItems.some((it) => (qty[it.id] || 0) > 0);
 
@@ -93,7 +94,7 @@ export default function PaymentCard({
 
       {/* Button */}
       <button
-        disabled={total === 0}
+        disabled={total === 0 || disabled}
         onClick={onPay}
         className={`mt-4 w-full h-[48px] rounded-xl text-white font-semibold transition-colors duration-200 ${
           total > 0 ? "bg-[#0f2f63] hover:bg-[#0c2550]" : "bg-[#93a3bd] cursor-not-allowed"

@@ -2,6 +2,7 @@ package com.backend.be_realestate.converter;
 
 import com.backend.be_realestate.entity.ListingPackage;
 import com.backend.be_realestate.entity.PackageItem;
+import com.backend.be_realestate.enums.ListingType;
 import com.backend.be_realestate.enums.PackageType;
 import com.backend.be_realestate.modals.dto.packageEstate.ListingPackageDTO;
 import com.backend.be_realestate.modals.dto.packageEstate.PackageItemDTO;
@@ -36,14 +37,19 @@ public class ListingPackageConverter {
     }
 
     public ListingPackage toEntity(ListingPackageDTO dto) {
+        if (dto == null) return null; // Thêm kiểm tra null cho an toàn
         ListingPackage entity = modelMapper.map(dto, ListingPackage.class);
 
-        // String -> enum
-        if (dto.getPackageType() != null) {
+        // String -> enum cho packageType (bạn đã có)
+        if (dto.getPackageType() != null && !dto.getPackageType().isBlank()) {
             entity.setPackageType(PackageType.valueOf(dto.getPackageType()));
         }
 
-        // itemsDTO -> items (giữ 2 chiều)
+        if (dto.getListingType() != null && !dto.getListingType().isBlank()) {
+            entity.setListingType(ListingType.valueOf(dto.getListingType()));
+        }
+
+        // itemsDTO -> items (giữ 2 chiều) (bạn đã có)
         if (dto.getItems() != null) {
             List<PackageItem> items = new ArrayList<>();
             for (PackageItemDTO iDto : dto.getItems()) {
@@ -53,6 +59,7 @@ public class ListingPackageConverter {
             }
             entity.setItems(items);
         }
+
         return entity;
     }
 }
