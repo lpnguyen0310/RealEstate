@@ -42,7 +42,7 @@ public class PropertyConverter {
                     .collect(Collectors.toList());
             dto.setAmenityIds(amenityIds);
         }
-
+        // map postedAt and expiresAt
         return dto;
     }
 

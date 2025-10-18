@@ -1,12 +1,13 @@
 package com.backend.be_realestate.modals.dto;
 
 import java.math.BigDecimal;
-import java.security.Timestamp;
+import java.sql.Timestamp;
 
 
 import com.backend.be_realestate.enums.PriceType;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.enums.PropertyType;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,7 +22,7 @@ public class PropertyDTO {
     private String title;
     private Double price;
     private PropertyType propertyType;
-    private PriceType tradeType;
+    private PriceType priceType;
 
 
     private Long bedrooms;

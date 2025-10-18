@@ -60,16 +60,17 @@ export default function PostManagerPage() {
 
     const handlePageChange = (p) => dispatch(setPage(p - 1));
     const handlePageSizeChange = (n) => dispatch(setSize(n));
-
+    const filtered = useMemo(() => {
+        return list.filter(it => it.statusKey === status);
+    }, [list, status]);
     // Đếm số tin theo trạng thái (nếu muốn hiển thị tab số lượng)
-    const counts = (() => {
+    const counts = useMemo(() => {
         const base = { active: 0, pending: 0, draft: 0, rejected: 0, hidden: 0, expired: 0, expiringSoon: 0 };
         for (const it of list) {
-            const k = tagToKey(it.statusTag);
-            if (k && base[k] !== undefined) base[k]++;
+            if (base[it.statusKey] !== undefined) base[it.statusKey]++;
         }
         return base;
-    })();
+    }, [list]);
 
     return (
         <div>
@@ -142,8 +143,8 @@ export default function PostManagerPage() {
                     </div>
                 ) : (
                     <PostList
-                        items={list}
-                        total={totalElements}
+                        items={filtered}
+                        total={filtered.length}
                         page={page + 1}
                         pageSize={size}
                         onPageChange={handlePageChange}
@@ -162,7 +163,7 @@ export default function PostManagerPage() {
                 onContinue={(values) => {
                     console.log("CONTINUE:", values);
                 }}
-                 onCreated={() => {
+                onCreated={() => {
                     setOpenCreate(false);                // đóng Drawer
                     dispatch(setPage(0));                // về trang 1 (tuỳ bạn)
                     dispatch(fetchMyPropertiesThunk({ page: 0, size })); // reload danh sách

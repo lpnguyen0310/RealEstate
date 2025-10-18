@@ -109,8 +109,8 @@ function mapDtoToPostCard(p) {
     const addressMain =
         p?.displayAddress ||
         [p?.addressStreet /* + tên phường-quận-thành phố nếu bạn muốn */].filter(Boolean).join(", ");
-    const createdAt = formatViDate(p?.postedAt);
-    console.log("createdAt", createdAt);
+    const postat = p?.postedAt;
+console.log("Postat:", postat);
     return {
         id: p.id,
         // hình: ưu tiên imageUrls từ BE; fallback sang images (nếu nơi khác trả kiểu khác)
@@ -123,6 +123,7 @@ function mapDtoToPostCard(p) {
         landPriceText: "",            // nếu có công thức riêng, bạn bổ sung sau
         installmentText: p?.propertyType === "sell" ? "Mua bán" :
             p?.propertyType === "rent" ? "Cho thuê" : "",
+        statusKey: statusEnumToKey(p?.status),
 
         addressMain,
         area: p?.area,
@@ -131,7 +132,7 @@ function mapDtoToPostCard(p) {
         sizeText: p?.width && p?.height ? `${p.width}m x ${p.height}m` : "",
         note: "",                     // nếu muốn hiển thị ghi chú
 
-        createdAt,
+        createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
         views: p?.views ?? 0,         // nếu BE có trường này
     };
 }
@@ -150,6 +151,22 @@ function toStatusTag(status) {
         default: return "Nháp";
     }
 }
+
+function statusEnumToKey(status) {
+    const s = (status ?? "").toString().trim().toUpperCase();
+    switch (s) {
+        case "PUBLISHED": return "active";
+        case "PENDING_REVIEW": return "pending";
+        case "DRAFT": return "draft";
+        case "REJECTED": return "rejected";
+        case "HIDDEN": return "hidden";
+        case "EXPIRED": return "expired";
+        case "EXPIRINGSOON": return "expiringSoon";
+        case "ARCHIVED": return "hidden"; // hoặc làm tab riêng nếu muốn
+        default: return "draft";
+    }
+}
+
 
 const initialState = {
     // server page
