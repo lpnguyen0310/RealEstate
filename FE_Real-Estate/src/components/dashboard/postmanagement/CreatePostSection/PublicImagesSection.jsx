@@ -1,12 +1,5 @@
-import { useRef, useState } from "react";
-import {
-    Box,
-    Card,
-    CardContent,
-    Divider,
-    Typography,
-    IconButton,
-} from "@mui/material";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { Box, Card, CardContent, Divider, Typography, IconButton } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
@@ -19,32 +12,43 @@ export default function PublicImagesSection({ images = [], onChange }) {
     const fileInputRef = useRef(null);
     const [dragOver, setDragOver] = useState(false);
 
-    const triggerPick = () => fileInputRef.current?.click();
+    // Tạo sẵn preview URL + cleanup để tránh memory leak
+    const [previews, setPreviews] = useState([]);
+    useEffect(() => {
+        const urls = (images || []).map((it) =>
+            typeof it === "string" ? it : URL.createObjectURL(it)
+        );
+        setPreviews(urls);
+        return () => {
+            urls.forEach((u) => { if (u?.startsWith?.("blob:")) URL.revokeObjectURL(u); });
+        };
+    }, [images]);
 
-    const toPreview = (file) =>
-        typeof file === "string" ? file : URL.createObjectURL(file);
+    const triggerPick = () => fileInputRef.current?.click();
 
     const handleFiles = (fileList) => {
         if (!fileList?.length) return;
 
         const current = images.slice();
-        const errors = [];
-        for (const f of Array.from(fileList)) {
-            if (!ACCEPT.includes(f.type)) {
-                errors.push(`Tệp không hợp lệ: ${f.name}`);
-                continue;
-            }
-            if (f.size > MAX_SIZE) {
-                errors.push(`Quá 10MB: ${f.name}`);
-                continue;
-            }
-            if (current.length >= MAX_FILES) break;
-            current.push(f);
-        }
-        onChange?.(current);
+        const remain = Math.max(0, MAX_FILES - current.length);
 
-        // optional: log lỗi (có thể thay bằng toast)
-        if (errors.length) console.warn(errors.join("\n"));
+        const errors = [];
+        Array.from(fileList)
+            .slice(0, remain)
+            .forEach((f) => {
+                if (!ACCEPT.includes(f.type)) {
+                    errors.push(`Tệp không hợp lệ: ${f.name}`);
+                    return;
+                }
+                if (f.size > MAX_SIZE) {
+                    errors.push(`Quá 10MB: ${f.name}`);
+                    return;
+                }
+                current.push(f);
+            });
+
+        onChange?.(current);
+        if (errors.length) console.warn(errors.join("\n")); // có thể thay bằng toast
     };
 
     const onDrop = (e) => {
@@ -61,14 +65,7 @@ export default function PublicImagesSection({ images = [], onChange }) {
     };
 
     return (
-        <Card
-            variant="outlined"
-            sx={{
-                borderRadius: "16px",
-                borderColor: "#e1e5ee",
-                boxShadow: "0 2px 8px rgba(15,23,42,0.05)",
-            }}
-        >
+        <Card variant="outlined" sx={{ borderRadius: "16px", borderColor: "#e1e5ee", boxShadow: "0 2px 8px rgba(15,23,42,0.05)" }}>
             <CardContent sx={{ p: 2.5 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0f223a", fontSize: 18 }}>
                     Hình ảnh công khai <span style={{ color: "red" }}>*</span>
@@ -78,25 +75,13 @@ export default function PublicImagesSection({ images = [], onChange }) {
                 </Typography>
                 <Divider sx={{ borderColor: "#0f223a", mb: 2 }} />
 
-                {/* State: no images */}
+                {/* Empty state */}
                 {(!images || images.length === 0) && (
                     <Box
                         onClick={triggerPick}
-                        onDragEnter={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setDragOver(true);
-                        }}
-                        onDragOver={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setDragOver(true);
-                        }}
-                        onDragLeave={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setDragOver(false);
-                        }}
+                        onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+                        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }}
                         onDrop={onDrop}
                         sx={{
                             cursor: "pointer",
@@ -114,24 +99,21 @@ export default function PublicImagesSection({ images = [], onChange }) {
                             Kéo và thả ảnh vào đây hoặc nhấp để chọn tệp
                         </Typography>
                         <Typography sx={{ fontSize: 13, mt: 0.5 }}>
-                            (Các loại tệp được hỗ trợ: JPG, JPEG, PNG với kích thước tệp dưới 10MB)
+                            (JPG, JPEG, PNG • &lt; 10MB mỗi ảnh)
                         </Typography>
                     </Box>
                 )}
 
-                {/* State: has images */}
+                {/* Has images */}
                 {images && images.length > 0 && (
                     <Box
                         sx={{
                             display: "grid",
-                            gridTemplateColumns: {
-                                xs: "repeat(4, 1fr)",
-                                sm: "repeat(6, 1fr)",
-                            },
+                            gridTemplateColumns: { xs: "repeat(4, 1fr)", sm: "repeat(6, 1fr)" },
                             gap: 1.5,
                         }}
                     >
-                        {images.map((img, idx) => (
+                        {images.map((_, idx) => (
                             <Box
                                 key={idx}
                                 sx={{
@@ -145,7 +127,7 @@ export default function PublicImagesSection({ images = [], onChange }) {
                                 }}
                             >
                                 <img
-                                    src={toPreview(img)}
+                                    src={previews[idx]}
                                     alt={`upload-${idx}`}
                                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                                 />
@@ -193,11 +175,7 @@ export default function PublicImagesSection({ images = [], onChange }) {
                     accept={ACCEPT.join(",")}
                     multiple
                     ref={fileInputRef}
-                    onChange={(e) => {
-                        handleFiles(e.target.files);
-                        // reset để chọn trùng tên vẫn nhận
-                        e.target.value = "";
-                    }}
+                    onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
                     hidden
                 />
             </CardContent>

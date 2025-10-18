@@ -26,10 +26,6 @@ public class PropertyMapper {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // =================================================================================
-    // MAPPER CHO CARD VIEW (PHẦN NÀY GIỮ NGUYÊN NHƯ BẠN YÊU CẦU)
-    // =================================================================================
-
     public PropertyCardDTO toPropertyCardDTO(PropertyEntity entity) {
         if (entity == null) {
             return null;
@@ -62,12 +58,6 @@ public class PropertyMapper {
             dto.setImages(Collections.emptyList());
         }
 
-        // --- Định dạng giá và thời gian ---
-        dto.setPrice(formatPrice(entity.getPrice().longValue()));
-        if (entity.getPricePerM2() != null) {
-            String formattedPricePerM2 = formatPrice(entity.getPricePerM2().longValue() / 1_000_000);
-            dto.setPricePerM2(String.format("~%s triệu/m²", formattedPricePerM2));
-        }
         dto.setPostedAt(formatRelativeTime(entity.getPostedAt()));
 
         // --- Ghép chuỗi địa chỉ ---
@@ -137,9 +127,7 @@ public class PropertyMapper {
 
         StatsDTO stats = new StatsDTO();
         stats.setPriceText(formatPrice(entity.getPrice().longValue()));
-        if (entity.getPricePerM2() != null) {
-            stats.setPricePerM2(String.format("~%s triệu/m²", formatPrice(entity.getPricePerM2().longValue() / 1_000_000)));
-        }
+
         stats.setAreaText(entity.getArea() + " m²");
 
         postInfo.setStats(stats);
@@ -183,7 +171,7 @@ public class PropertyMapper {
         return List.of(
                 new MapMetaDTO("Ngày đăng", entity.getPostedAt().toLocalDateTime().format(formatter)),
                 new MapMetaDTO("Ngày hết hạn", entity.getExpiresAt() != null ? entity.getExpiresAt().toLocalDateTime().format(formatter) : "N/A"),
-                new MapMetaDTO("Loại tin", entity.getListingType()),
+                new MapMetaDTO("Loại tin", entity.getListingTypePolicy().getListingType().name()),
                 new MapMetaDTO("Mã tin", entity.getId().toString())
         );
     }

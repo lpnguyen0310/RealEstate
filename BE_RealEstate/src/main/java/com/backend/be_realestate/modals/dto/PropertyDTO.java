@@ -5,6 +5,7 @@ import java.security.Timestamp;
 
 
 import com.backend.be_realestate.enums.PriceType;
+import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.enums.PropertyType;
 import lombok.*;
 import java.math.BigDecimal;
@@ -17,20 +18,19 @@ import java.util.List;
 @Builder
 public class PropertyDTO {
     private Long id;
-
     private String title;
-    private BigDecimal price;
-    private BigDecimal pricePerM2;
-
-    private Float landAreaM2;
-    private Float usableAreaM2;
-
+    private Double price;
     private PropertyType propertyType;
     private PriceType tradeType;
 
-    private Integer bedrooms;
-    private Integer bathrooms;
-    private Integer floors;
+
+    private Long bedrooms;
+    private Long bathrooms;
+    private Long floors;
+    private Double area;
+    private Double landArea;
+    private Double width;
+    private Double height;
 
     private String displayAddress;
     private String addressStreet;
@@ -39,7 +39,7 @@ public class PropertyDTO {
     private String description;
     private String position;
 
-    private String status;
+    private PropertyStatus status;
     private String listingType;
     private Timestamp postedAt;
     private Timestamp expiresAt;

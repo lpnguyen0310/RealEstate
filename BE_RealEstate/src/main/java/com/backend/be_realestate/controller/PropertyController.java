@@ -5,6 +5,7 @@ import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
+import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import com.backend.be_realestate.modals.response.PageResponse;
 import com.backend.be_realestate.service.IPropertyService;
 import com.backend.be_realestate.utils.SecurityUtils;
@@ -60,6 +61,21 @@ public class PropertyController {
 
         var pageDto = propertyService.getPropertiesByUser(userId, pageable);
         return ResponseEntity.ok(PageResponse.from(pageDto));
+    }
+
+
+    @PostMapping("create")
+    public ResponseEntity<CreatePropertyResponse> create(
+            Authentication authentication,
+            @RequestBody CreatePropertyRequest req
+    ) {
+        Long userId = securityUtils.currentUserId(authentication);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        var res = propertyService.create(userId, req);
+        return ResponseEntity.status(HttpStatus.CREATED).body(res);
     }
 
 }

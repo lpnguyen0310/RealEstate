@@ -1,21 +1,34 @@
-// src/components/post-create/PostCreateDrawer.jsx
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { Drawer, Button, Switch, Tooltip, Tag, Spin } from "antd";
 import { CloseOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { useSelector, useDispatch } from "react-redux";
+import { Modal } from "antd";
+import { CreditCardOutlined } from "@ant-design/icons";
+import { message } from "antd";
+import { createPropertyThunk, fetchMyPropertiesThunk, setPage } from "@/store/propertySlice";
+import { useNavigate } from "react-router-dom";
 
+// Các section con
 import {
-    TitlePostSection, TradeInfoSection, PropertyDetailSection, PublicImagesSection, VideoLibrarySection, AmenitiesSection, ContactInfoSection, PostPreviewSection,
+    TitlePostSection,
+    TradeInfoSection,
+    PropertyDetailSection,
+    PublicImagesSection,
+    VideoLibrarySection,
+    AmenitiesSection,
+    ContactInfoSection,
+    PostPreviewSection,
 } from "./CreatePostSection";
 import PostTypeSection from "./PostTypeDrawer";
-
+import { fetchUserInventory } from "@/store/inventorySlice";
 // Hooks & utils
 import { validateField, validateMany } from "@/utils/validators";
-import { useVNLocations, useAddressSuggestions } from "@/hooks";
+import { useVNLocations, useAddressSuggestions, useListingTypes } from "@/hooks";
 
 const REQUIRED_FIELDS = [
     "title",
     "description",
-    "propertyType",
+    "categoryId",
     "price",
     "position",
     "landArea",
@@ -26,6 +39,7 @@ const REQUIRED_FIELDS = [
     "legalDocument",
 ];
 
+// ===================== HEADER =====================
 const Header = React.memo(function Header({ step, onClose }) {
     return (
         <div className="mx-2 mt-2 rounded-2xl bg-[#eef4ff] border border-[#e5ecff] px-4 py-3 flex items-center justify-between">
@@ -45,6 +59,7 @@ const Header = React.memo(function Header({ step, onClose }) {
     );
 });
 
+// ===================== BODY FORM =====================
 const BodyForm = React.memo(function BodyForm({
     formData,
     onFieldChange,
@@ -81,7 +96,7 @@ const BodyForm = React.memo(function BodyForm({
             />
             <AmenitiesSection
                 value={formData.amenityIds}
-                onChange={(next) => setFormData(p => ({ ...p, amenityIds: next }))}
+                onChange={(next) => setFormData((p) => ({ ...p, amenityIds: next }))}
             />
             <ContactInfoSection
                 value={formData.contact}
@@ -91,14 +106,52 @@ const BodyForm = React.memo(function BodyForm({
     );
 });
 
-const BodyType = React.memo(function BodyType({ postType, setPostType, formData, setFormData }) {
+// ===================== BODY TYPE =====================
+const BodyType = React.memo(function BodyType({
+    postTypeId,
+    setPostTypeId,
+    formData,
+    setFormData,
+    listingTypes,
+    loadingTypes,
+    listingError,
+    inventory,
+    inventoryLoading,
+}) {
+    // id -> type (NORMAL | VIP | PREMIUM)
+    const idToTypeMap = useMemo(() => {
+        const m = {};
+        (listingTypes || []).forEach((p) => { m[p.id] = p.listingType; });
+        return m;
+    }, [listingTypes]);
+
+    // 👉 Map sang chuỗi mà PostPreviewSection hiểu: "free" | "vip" | "premium"
+    const previewPostType = useMemo(() => {
+        const t =
+            idToTypeMap[postTypeId] ||
+            idToTypeMap[formData.listingTypePolicyId] ||
+            "NORMAL";
+        return t === "NORMAL" ? "free" : t.toLowerCase(); // "VIP" -> "vip", "PREMIUM" -> "premium"
+    }, [idToTypeMap, postTypeId, formData.listingTypePolicyId]);
+
     return (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 bg-[#f8faff]">
-            <PostTypeSection value={postType} onChange={setPostType} />
+            <PostTypeSection
+                value={postTypeId ?? formData.listingTypePolicyId ?? null}
+                onChange={(id) => {
+                    setPostTypeId(id);
+                    setFormData((p) => ({ ...p, listingTypePolicyId: id }));
+                }}
+                items={listingTypes}
+                loading={loadingTypes}
+                error={listingError}
+                inventory={inventory}
+            />
+
             <div className="rounded-2xl border border-[#e3e9f5] bg-[#f6f9ff]/40 p-4">
                 <PostPreviewSection
                     data={formData}
-                    postType={postType}
+                    postType={previewPostType}
                     editable
                     onImagesChange={(next) => setFormData((p) => ({ ...p, images: next }))}
                 />
@@ -106,6 +159,8 @@ const BodyType = React.memo(function BodyType({ postType, setPostType, formData,
         </div>
     );
 });
+
+// ===================== FOOTER FORM =====================
 const FooterForm = React.memo(function FooterForm({
     onClose,
     onSaveDraft,
@@ -124,54 +179,127 @@ const FooterForm = React.memo(function FooterForm({
     );
 });
 
+// ===================== FOOTER TYPE =====================
 const FooterType = React.memo(function FooterType({
     setStep,
     autoRepost,
     setAutoRepost,
     formData,
-    postType,
+    postTypeId,
+    inventory = {},       // { VIP: number, PREMIUM: number }
+    listingTypes = [],    // danh sách loại tin từ BE
+    onCreated,
 }) {
+    const navigate = useNavigate();
+    const [showPrompt, setShowPrompt] = useState(false);
+    const dispatch = useDispatch();
+    const posting = useSelector((s) => s.property?.creating);
+    // Map id -> type
+    const idToTypeMap = useMemo(() => {
+        const m = {};
+        (listingTypes || []).forEach((x) => (m[x.id] = x.listingType));
+        return m;
+    }, [listingTypes]);
+
+    // Tính loại gói đang chọn
+    const currentType = idToTypeMap?.[postTypeId];
+    const isVipLike = currentType === "VIP" || currentType === "PREMIUM";
+    const qty = isVipLike ? (inventory?.[currentType] ?? 0) : Infinity;
+    const outOfStock = isVipLike && qty <= 0;
+
+    const handlePost = async () => {
+        if (outOfStock) { setShowPrompt(true); return; }
+
+        const payload = {
+            ...formData,
+            listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
+            autoRepost,
+        };
+
+        try {
+            await dispatch(
+                createPropertyThunk({ formData: payload, listingTypePolicyId: payload.listingTypePolicyId })
+            ).unwrap();
+
+            message.success("Đăng tin thành công!");
+            onCreated?.();  // cho component cha đóng Drawer + reload
+        } catch (e) {
+            message.error(e || "Đăng tin thất bại");
+        }
+    };
     return (
-        <div className="flex items-center justify-between px-4 pb-3 pt-2 border-t border-[#e3e9f5] bg-[#f8faff]">
-            <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
-            <div className="flex items-center gap-2">
-                <Switch checked={autoRepost} onChange={setAutoRepost} />
-                <span className="text-gray-700 text-sm">Tự động đăng lại</span>
-                <Tooltip title="Tự động đăng lại tin khi hết hạn">
-                    <InfoCircleOutlined className="text-gray-500 text-xs" />
-                </Tooltip>
+        <>
+            <div className="flex items-center justify-between px-4 pb-3 pt-2 border-t border-[#e3e9f5] bg-[#f8faff]">
+                <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
+                <div className="flex items-center gap-2">
+                    <Switch checked={autoRepost} onChange={setAutoRepost} />
+                    <span className="text-gray-700 text-sm">Tự động đăng lại</span>
+                    <Tooltip title="Tự động đăng lại tin khi hết hạn">
+                        <InfoCircleOutlined className="text-gray-500 text-xs" />
+                    </Tooltip>
+                </div>
+                <Button
+                    type="primary"
+                    loading={posting}
+                    className="bg-[#1b264f] hover:bg-[#22347c]"
+                    onClick={handlePost}
+                >
+                    Đăng tin
+                </Button>
             </div>
-            <Button
-                type="primary"
-                className="bg-[#1b264f] hover:bg-[#22347c]"
-                onClick={() => {
-                    console.log("SUBMIT:", { formData, postType, autoRepost });
-                }}
+
+            {/* Modal hiện giữa màn hình */}
+            <Modal
+                centered
+                open={showPrompt}
+                footer={null}
+                onCancel={() => setShowPrompt(false)}
+                title={null}
             >
-                Đăng tin
-            </Button>
-        </div>
+                <div className="text-center space-y-3">
+                    <div className="text-lg font-semibold text-[#0f223a]">
+                        Bạn không còn lượt đăng cho gói {currentType}
+                    </div>
+                    <p className="text-gray-600">
+                        Gói <b>{currentType}</b> của bạn đã hết số lượng. Bạn có muốn mua thêm không?
+                    </p>
+                    <div className="flex justify-center gap-2 pt-2">
+                        <Button onClick={() => setShowPrompt(false)}>Để sau</Button>
+                        <Button
+                            type="primary"
+                            icon={<CreditCardOutlined />}
+                            onClick={() => {
+                                setShowPrompt(false);
+                                navigate("/dashboard/purchase"); // hoặc /dashboard/purchage nếu bạn viết sai chính tả
+                            }}
+                        >
+                            Tiếp tục
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+        </>
     );
 });
 
-// ----------------- main component -----------------
-export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinue, user }) {
+// ===================== MAIN COMPONENT =====================
+export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinue, user ,onCreated}) {
     const [step, setStep] = useState("form");
     const [loading, setLoading] = useState(false);
     const [autoRepost, setAutoRepost] = useState(false);
-    const [postType, setPostType] = useState("free");
-
+    const [postTypeId, setPostTypeId] = useState(null); // ✅ THÊM DÒNG NÀY
+    const dispatch = useDispatch();
     const [formData, setFormData] = useState({
         title: "",
         description: "",
         categoryId: "",
-        tradeType: "sell",
+        propertyType: "sell",
         propertyType: "",
-        priceType: "sellPrice",
+        priceType: "SELL_PRICE",
         price: "",
         images: [],
         videoUrls: ["", ""],
-        amenities: [],
+        amenityIds: [],
         contact: { name: "", phone: "", email: "", zalo: "" },
         provinceId: "",
         districtId: "",
@@ -190,18 +318,29 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
     });
     const [errors, setErrors] = useState({});
 
-    // địa giới VN (tải theo open) + loader & hàm fetch con
-    const {
-        provinces,
-        districts,
-        wards,
-        loadingDistricts,
-        loadingWards,
-        loadDistricts,
-        loadWards,
-    } = useVNLocations(open);
+    // Địa giới VN
+    const { provinces, districts, wards, loadingDistricts, loadingWards, loadDistricts, loadWards } =
+        useVNLocations(open);
 
-    // Prefill contact từ user
+    const { items: listingTypes, loading: loadingTypes, error: listingError } = useListingTypes(open);
+    const { items: invItems, loading: invLoading } = useSelector((s) => s.inventory || { items: [] });
+    useEffect(() => {
+        if (open) dispatch(fetchUserInventory());
+    }, [open, dispatch]);
+
+    const invMap = useMemo(() => {
+        const m = {};
+        (invItems || []).forEach((it) => {
+            // itemType ở BE/FE là 'VIP' / 'PREMIUM' / 'NORMAL'?
+            if (it?.itemType) m[it.itemType] = it.quantity ?? 0;
+        });
+        return m;
+    }, [invItems]);
+
+
+
+
+    // Prefill contact
     useEffect(() => {
         if (!user) return;
         setFormData((p) => {
@@ -212,10 +351,25 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
                 phone: cur.phone || user.phone || user.phoneNumber || "",
                 zalo: cur.zalo || user.zalo || user.zaloPhone || user.phone || user.phoneNumber || "",
             };
-            const changed = Object.keys(next).some((k) => next[k] !== cur[k]);
-            return changed ? { ...p, contact: next } : p;
+            return { ...p, contact: next };
         });
     }, [user]);
+
+    // ✅ Set gói mặc định: NORMAL hoặc phần tử đầu
+    useEffect(() => {
+        if (!open) return;
+        if (!listingTypes?.length) return;
+        setPostTypeId((prev) => {
+            if (prev) return prev;
+            const normal = listingTypes.find((x) => x.listingType === "NORMAL") || listingTypes[0];
+            return normal?.id ?? null;
+        });
+        setFormData((p) => {
+            if (p.listingTypePolicyId) return p;
+            const normal = listingTypes.find((x) => x.listingType === "NORMAL") || listingTypes[0];
+            return { ...p, listingTypePolicyId: normal?.id ?? null };
+        });
+    }, [open, listingTypes]);
 
     // Reset khi đóng Drawer
     useEffect(() => {
@@ -223,49 +377,68 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
             setStep("form");
             setLoading(false);
             setAutoRepost(false);
-            setPostType("free");
+            setPostTypeId(null); // ✅ reset id gói
             setErrors({});
         }
     }, [open]);
 
-    // Handler field chung (kèm ràng buộc phụ thuộc)
-    const onFieldChange = useCallback((name, value) => {
-        // 1) set form
-        setFormData((p) => ({ ...p, [name]: value }));
+    // Validate field change
+    const onFieldChange = useCallback(
+        (name, value) => {
+            setFormData((p) => ({ ...p, [name]: value }));
+            setErrors((prev) => {
+                const msg = validateField(name, value);
+                const next = { ...prev };
+                if (msg) next[name] = msg;
+                else delete next[name];
+                return next;
+            });
+            if (name === "provinceId") {
+                setFormData((p) => ({ ...p, districtId: "", wardId: "" }));
+                loadDistricts(value);
+            }
+            if (name === "districtId") {
+                setFormData((p) => ({ ...p, wardId: "" }));
+                loadWards(value);
+            }
+            if (name === "suggestedAddress") {
+                setFormData((p) => ({ ...p, displayAddress: value }));
+            }
+        },
+        [loadDistricts, loadWards]
+    );
 
-        // 2) validate
-        setErrors((prev) => {
-            const msg = validateField(name, value);
-            const next = { ...prev };
-            if (msg) next[name] = msg;
-            else delete next[name];
-            return next;
-        });
-
-        // 3) phụ thuộc
-        if (name === "provinceId") {
-            setFormData((p) => ({ ...p, districtId: "", wardId: "" }));
-            loadDistricts(value);
-        }
-        if (name === "districtId") {
-            setFormData((p) => ({ ...p, wardId: "" }));
-            loadWards(value);
-        }
-        if (name === "suggestedAddress") {
-            setFormData((p) => ({ ...p, displayAddress: value }));
-        }
-    }, [loadDistricts, loadWards]);
-
-    // Tự động gợi ý địa chỉ khi đủ dữ liệu
     useAddressSuggestions(formData, setFormData, provinces, districts, wards);
 
     // Sang bước chọn loại tin
     const goToTypeStep = useCallback(() => {
-        const errs = validateMany(formData, REQUIRED_FIELDS);
-        if (Object.keys(errs).length) {
-            setErrors(errs);
+        // coi "" / null / undefined / [] là rỗng
+        const isEmpty = (v) =>
+            v == null ||
+            (typeof v === "string" && v.trim() === "") ||
+            (Array.isArray(v) && v.length === 0);
+
+        const requiredErrs = {};
+        for (const k of REQUIRED_FIELDS) {
+            if (isEmpty(formData[k])) {
+                requiredErrs[k] =
+                    {
+                        provinceId: "Vui lòng chọn Tỉnh/Thành phố",
+                        districtId: "Vui lòng chọn Quận/Huyện",
+                        wardId: "Vui lòng chọn Phường/Xã",
+                        suggestedAddress: "Vui lòng chọn Địa chỉ đề xuất",
+                        position: "Vui lòng chọn Vị trí",
+                        landArea: "Vui lòng nhập Diện tích đất",
+                        legalDocument: "Vui lòng chọn Giấy tờ pháp lý",
+                    }[k] || "Trường này là bắt buộc";
+            }
+        }
+
+        if (Object.keys(requiredErrs).length) {
+            setErrors((prev) => ({ ...prev, ...requiredErrs }));
             return;
         }
+
         setLoading(true);
         setTimeout(() => {
             setLoading(false);
@@ -274,7 +447,6 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
         }, 900);
     }, [formData, onContinue]);
 
-    // footer memo để Drawer không re-mount footer mỗi keystroke
     const footerNode = useMemo(() => {
         return step === "form" ? (
             <FooterForm
@@ -290,10 +462,13 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
                 autoRepost={autoRepost}
                 setAutoRepost={setAutoRepost}
                 formData={formData}
-                postType={postType}
+                postTypeId={postTypeId}
+                inventory={invMap}
+                listingTypes={listingTypes}
+                onCreated={onCreated}
             />
         );
-    }, [step, onClose, onSaveDraft, formData, loading, goToTypeStep, autoRepost, postType]);
+    }, [step, onClose, onSaveDraft, formData, loading, goToTypeStep, autoRepost, postTypeId]);
 
     return (
         <Drawer
@@ -338,7 +513,18 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
                     loadingWards={loadingWards}
                 />
             ) : (
-                <BodyType postType={postType} setPostType={setPostType} formData={formData} setFormData={setFormData} />
+                <BodyType
+                    postTypeId={postTypeId}
+                    setPostTypeId={setPostTypeId}
+                    formData={formData}
+                    setFormData={setFormData}
+                    listingTypes={listingTypes}
+                    loadingTypes={loadingTypes}
+                    listingError={listingError}
+                    inventory={invMap}
+                    inventoryLoading={invLoading}
+
+                />
             )}
         </Drawer>
     );

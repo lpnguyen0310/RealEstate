@@ -18,8 +18,6 @@ public class UserInventoryEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity user;
 
-    // Loại vật phẩm, ví dụ: "PREMIUM", "VIP".
-    // Trùng với ListingType enum để dễ quản lý.
     @Column(name = "item_type", nullable = false)
     private String itemType;
 

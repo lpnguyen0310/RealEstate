@@ -1,6 +1,8 @@
 package com.backend.be_realestate.entity;
 
+import com.backend.be_realestate.enums.ListingType;
 import com.backend.be_realestate.enums.PriceType;
+import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.enums.PropertyType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -34,14 +36,11 @@ public class PropertyEntity {
     @Column(name = "title", length = 255, nullable = false)
     private String title;
 
-    @Column(name = "price", precision = 18, scale = 2, nullable = false)
-    private BigDecimal price;
-
-    @Column(name = "price_per_m2", precision = 18, scale = 2)
-    private BigDecimal pricePerM2;
+    @Column(name = "price", nullable = false)
+    private Double price;
 
     @Column(name = "area", nullable = false)
-    private Float area;
+    private float area; // Diện tích sử dụng
 
     @Column(name = "bedrooms")
     private Integer bedrooms;
@@ -56,11 +55,15 @@ public class PropertyEntity {
     @Column(name = "property_type", nullable = false)
     private PropertyType propertyType;
 
-    @Column(name = "status", length = 20, nullable = false)
-    private String status = "active";
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pricetype", nullable = false)
+    private PriceType priceType;
 
-    @Column(name = "listing_type", length = 20, nullable = false)
-    private String listingType = "normal";
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 32)
+    private PropertyStatus status;
+
 
     @Column(name = "legal_status", length = 100)
     private String legalStatus;
@@ -78,13 +81,6 @@ public class PropertyEntity {
     @Column(name = "expires_at")
     private Timestamp expiresAt;
 
-    @Column(name = "usablearea")
-    private Float usableAreaM2;
-
-    @Column(name = "landarea")
-    private Float landAreaM2;
-
-
     @Column(name = "floors")
     private Integer floors;
 
@@ -94,13 +90,10 @@ public class PropertyEntity {
     @Column(name = "display_address", length = 500)
     private String displayAddress;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "trade_type", nullable = false)
-    private PriceType tradeType;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "price_type", nullable = false)
-    private PropertyType priceType;
+    @Column(name = "landarea")
+    private Double landArea; // Diện tích đất
+
 
     @Column(name = "width")
     private Double width; // Ngang
@@ -133,8 +126,6 @@ public class PropertyEntity {
     @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<PropertyImageEntity> images;
 
-    @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<PriceHistoryEntity> priceHistories;
 
     @ManyToMany
     @JoinTable(
@@ -143,6 +134,13 @@ public class PropertyEntity {
             inverseJoinColumns = @JoinColumn(name = "amenity_id")
     )
     private List<AmenityEntity> amenities ;
-    
 
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "listing_type_policy_id", referencedColumnName = "id")
+    private ListingTypePolicy listingTypePolicy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "listing_type", nullable = false, length = 16)
+    private ListingType listingType;
 }

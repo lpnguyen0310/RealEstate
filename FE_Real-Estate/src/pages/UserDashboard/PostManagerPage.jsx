@@ -162,6 +162,11 @@ export default function PostManagerPage() {
                 onContinue={(values) => {
                     console.log("CONTINUE:", values);
                 }}
+                 onCreated={() => {
+                    setOpenCreate(false);                // đóng Drawer
+                    dispatch(setPage(0));                // về trang 1 (tuỳ bạn)
+                    dispatch(fetchMyPropertiesThunk({ page: 0, size })); // reload danh sách
+                }}
                 user={user}
             />
         </div>

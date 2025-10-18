@@ -2,7 +2,6 @@ package com.backend.be_realestate.modals.request;
 
 import com.backend.be_realestate.enums.PriceType;
 import com.backend.be_realestate.enums.PropertyType;
-import com.backend.be_realestate.enums.TradeType;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -12,36 +11,27 @@ import java.util.List;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CreatePropertyRequest {
-
+    private Long listingTypePolicyId;
     @NotBlank @Size(max = 255)
     private String title;
 
-    @NotNull @DecimalMin("0.0")
-    private BigDecimal price;
+    private Double price;
 
     @NotNull(message = "Diện tích (area) là bắt buộc")
-    private BigDecimal area;
+    private float area;
 
-    @DecimalMin("0.0")
-    private BigDecimal landAreaM2;
+    private Double landArea;
 
-    @DecimalMin("0.0")
-    private BigDecimal usableAreaM2;
-
+    private Double usableAreaM2;
+    private Double width;
+    private Double height;
     @NotNull
     private PropertyType propertyType;     // APARTMENT/HOUSE/...
-
-    @NotNull(message = "Loại giao dịch (tradeType) là bắt buộc")
-    @JsonAlias({"trade_type"})             // nếu FE lỡ gửi trade_type
-    private TradeType tradeType;           // SELL / RENT
-
-    @NotNull(message = "priceType là bắt buộc (TOTAL | PER_M2 | NEGOTIABLE)")
-    @JsonAlias({"priceUnit", "price_type"}) // hỗ trợ key khác từ FE
     private PriceType priceType;           // TOTAL / PER_M2 / NEGOTIABLE
 
-    @Min(0) private Integer bedrooms;
-    @Min(0) private Integer bathrooms;
-    @Min(0) private Integer floors;
+   private Integer bedrooms;
+    private Integer bathrooms;
+    private Integer floors;
 
     @Size(max = 500) private String displayAddress;
     @Size(max = 255) private String addressStreet;
@@ -58,6 +48,4 @@ public class CreatePropertyRequest {
     private List<Long> amenityIds;
     private List<String> imageUrls;
 
-    @Pattern(regexp = "free|vip|premium")
-    private String listingType;
 }

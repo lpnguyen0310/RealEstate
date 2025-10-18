@@ -17,26 +17,16 @@ import {
 } from "@mui/material";
 import useCategories from "@/hooks/useCategories";
 
-// =========== CẤU HÌNH MENU GỌN (áp dụng cho Select) ===========
+// Menu gọn cho Select
 const COMPACT_MENU_PROPS = {
     PaperProps: {
-        sx: {
-            borderRadius: 1.25,
-            boxShadow: "0 8px 24px rgba(15,23,42,.12)",
-            maxHeight: 360,
-        },
+        sx: { borderRadius: 1.25, boxShadow: "0 8px 24px rgba(15,23,42,.12)", maxHeight: 360 },
     },
     MenuListProps: {
         dense: true,
         sx: {
             py: 0,
-            "& .MuiMenuItem-root": {
-                fontSize: 14,
-                lineHeight: 1.25,
-                minHeight: "unset",
-                px: 1.25,
-                py: 0.5,
-            },
+            "& .MuiMenuItem-root": { fontSize: 14, lineHeight: 1.25, minHeight: "unset", px: 1.25, py: 0.5 },
         },
     },
 };
@@ -52,6 +42,18 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
         "&.Mui-focused fieldset": { borderColor: "#9aa8c7" },
     };
 
+    // propertyType (BE): "sell" | "rent"
+    const propertyType = formData.propertyType ?? "sell";
+    // priceType (BE): "SELL_PRICE" | "RENT_PRICE"
+    const priceType = formData.priceType ?? (propertyType === "sell" ? "SELL_PRICE" : "RENT_PRICE");
+
+    const handleSwitchPropertyType = (_e, v) => {
+        if (!v) return;
+        // cập nhật đúng enum BE
+        onChange("propertyType", v); // "sell" | "rent"
+        onChange("priceType", v === "sell" ? "SELL_PRICE" : "RENT_PRICE");
+    };
+
     return (
         <Card
             variant="outlined"
@@ -63,7 +65,7 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
                 </Typography>
                 <Divider sx={{ borderColor: "#000", mb: 2 }} />
 
-                {/* Loại giao dịch */}
+                {/* Loại giao dịch (map thẳng BE: sell/rent) */}
                 <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
                     <Typography variant="body2" sx={{ color: "#475569", fontWeight: 500 }}>
                         Loại giao dịch
@@ -71,12 +73,8 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
 
                     <ToggleButtonGroup
                         exclusive
-                        value={formData.tradeType}
-                        onChange={(_e, v) => {
-                            if (!v) return;
-                            onChange("tradeType", v);
-                            onChange("priceType", v === "sell" ? "sellPrice" : "rentPrice");
-                        }}
+                        value={propertyType} // "sell" | "rent"
+                        onChange={handleSwitchPropertyType}
                         size="small"
                         sx={{
                             bgcolor: "#eef2ff",
@@ -111,7 +109,7 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
                         rowGap: 1.5,
                     }}
                 >
-                    {/* Label + Select Danh mục (từ BE) */}
+                    {/* Danh mục */}
                     <Typography variant="body2" sx={{ color: "#475569", fontWeight: 500, alignSelf: "center" }}>
                         Danh mục <span style={{ color: "red" }}>*</span>
                     </Typography>
@@ -127,12 +125,10 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
                             onChange={(e) => onChange("categoryId", e.target.value)}
                             displayEmpty
                             renderValue={(val) =>
-                                val
-                                    ? (categories.find((c) => c.id === val)?.name ?? "")
-                                    : <span style={{ color: "#94a3b8" }}>Chọn Danh Mục</span>
+                                val ? (categories.find((c) => c.id === val)?.name ?? "") : <span style={{ color: "#94a3b8" }}>Chọn Danh Mục</span>
                             }
                             disabled={loading}
-                            MenuProps={COMPACT_MENU_PROPS}   // 👈 gọn như hình 2
+                            MenuProps={COMPACT_MENU_PROPS}
                         >
                             <MenuItem disabled value="">
                                 <em>Chọn Danh Mục</em>
@@ -146,7 +142,7 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
                         {errors?.categoryId && <FormHelperText>{errors.categoryId}</FormHelperText>}
                     </FormControl>
 
-                    {/* Select loại giá */}
+                    {/* Loại giá: dùng enum BE */}
                     <FormControl
                         size="small"
                         sx={{
@@ -157,26 +153,23 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
                         }}
                     >
                         <Select
-                            value={formData.priceType}
-                            onChange={(e) => onChange("priceType", e.target.value)}
-                            MenuProps={COMPACT_MENU_PROPS}   // 👈 áp dụng style gọn
+                            value={priceType}
+                            onChange={(e) => onChange("priceType", e.target.value)} // "SELL_PRICE" | "RENT_PRICE"
+                            MenuProps={COMPACT_MENU_PROPS}
                         >
-                            <MenuItem value="sellPrice">Giá bán</MenuItem>
-                            <MenuItem value="rentPrice">Giá thuê</MenuItem>
+                            <MenuItem value="SELL_PRICE">Giá bán</MenuItem>
+                            <MenuItem value="RENT_PRICE">Giá thuê</MenuItem>
                         </Select>
                     </FormControl>
 
                     {/* Ô nhập giá */}
                     <TextField
                         required
-                        label={formData.priceType === "sellPrice" ? "Giá bán" : "Giá thuê"}
+                        label={priceType === "SELL_PRICE" ? "Giá bán" : "Giá thuê"}
                         fullWidth
                         size="small"
-                        value={formData.price}
-                        onChange={(e) => {
-                            const onlyDigits = e.target.value.replace(/\D/g, "");
-                            onChange("price", onlyDigits);
-                        }}
+                        value={formData.price ?? ""}
+                        onChange={(e) => onChange("price", e.target.value.replace(/\D/g, ""))}
                         inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
                         InputProps={{
                             endAdornment: (
