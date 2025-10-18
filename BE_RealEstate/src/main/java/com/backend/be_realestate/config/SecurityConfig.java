@@ -35,6 +35,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**","/oauth2/**","/login/oauth2/**").permitAll()
                         .requestMatchers("/api/properties/**").permitAll()
                         .requestMatchers("/api/maps/**").permitAll()
+                        .requestMatchers("/api/amenities/**").permitAll()
+                        .requestMatchers("/api/categories/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // bật oauth2 login

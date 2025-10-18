@@ -1,17 +1,49 @@
+// src/components/post-create/CreatePostSection/TradeInfoSection.jsx
+import React from "react";
 import {
-    Box, Typography, Card, CardContent, Divider, ToggleButtonGroup, ToggleButton,
-    FormControl, Select, MenuItem, TextField, InputAdornment, FormHelperText,
+    Box,
+    Typography,
+    Card,
+    CardContent,
+    Divider,
+    ToggleButtonGroup,
+    ToggleButton,
+    FormControl,
+    Select,
+    MenuItem,
+    TextField,
+    InputAdornment,
+    FormHelperText,
 } from "@mui/material";
+import useCategories from "@/hooks/useCategories";
 
-const PROPERTY_TYPES = [
-    { value: "apartment", label: "Căn hộ" },
-    { value: "house", label: "Nhà riêng" },
-    { value: "villa", label: "Biệt thự" },
-    { value: "land", label: "Đất" },
-    { value: "office", label: "Văn phòng" },
-];
+// =========== CẤU HÌNH MENU GỌN (áp dụng cho Select) ===========
+const COMPACT_MENU_PROPS = {
+    PaperProps: {
+        sx: {
+            borderRadius: 1.25,
+            boxShadow: "0 8px 24px rgba(15,23,42,.12)",
+            maxHeight: 360,
+        },
+    },
+    MenuListProps: {
+        dense: true,
+        sx: {
+            py: 0,
+            "& .MuiMenuItem-root": {
+                fontSize: 14,
+                lineHeight: 1.25,
+                minHeight: "unset",
+                px: 1.25,
+                py: 0.5,
+            },
+        },
+    },
+};
 
 export default function TradeInfoSection({ formData, onChange, errors }) {
+    const { data: categories, loading } = useCategories();
+
     const inputRootSx = {
         borderRadius: "10px",
         height: 40,
@@ -21,14 +53,17 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
     };
 
     return (
-        <Card variant="outlined" sx={{ borderRadius: "14px", borderColor: "#e1e5ee", boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }}>
+        <Card
+            variant="outlined"
+            sx={{ borderRadius: "14px", borderColor: "#e1e5ee", boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }}
+        >
             <CardContent sx={{ p: 2.5 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0f223a", fontSize: "18px", mb: 1.5 }}>
                     Thông tin giao dịch
                 </Typography>
                 <Divider sx={{ borderColor: "#000", mb: 2 }} />
 
-                {/* Hàng: label + pill */}
+                {/* Loại giao dịch */}
                 <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
                     <Typography variant="body2" sx={{ color: "#475569", fontWeight: 500 }}>
                         Loại giao dịch
@@ -67,7 +102,7 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
                     </ToggleButtonGroup>
                 </Box>
 
-                {/* GRID 2 cột */}
+                {/* Lưới 2 cột */}
                 <Box
                     sx={{
                         display: "grid",
@@ -76,40 +111,42 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
                         rowGap: 1.5,
                     }}
                 >
-                    {/* Hàng 1: Label + Select Loại BĐS */}
+                    {/* Label + Select Danh mục (từ BE) */}
                     <Typography variant="body2" sx={{ color: "#475569", fontWeight: 500, alignSelf: "center" }}>
-                        Loại bất động sản <span style={{ color: "red" }}>*</span>
+                        Danh mục <span style={{ color: "red" }}>*</span>
                     </Typography>
 
                     <FormControl
                         fullWidth
                         size="small"
-                        error={!!errors?.propertyType}
+                        error={!!errors?.categoryId}
                         sx={{ "& .MuiOutlinedInput-root": inputRootSx, "& .MuiSelect-select": { py: "8px !important" } }}
                     >
                         <Select
-                            value={formData.propertyType}
-                            onChange={(e) => onChange("propertyType", e.target.value)}
+                            value={formData.categoryId ?? ""}
+                            onChange={(e) => onChange("categoryId", e.target.value)}
                             displayEmpty
                             renderValue={(val) =>
                                 val
-                                    ? PROPERTY_TYPES.find((t) => t.value === val)?.label
-                                    : <span style={{ color: "#94a3b8" }}>Chọn Loại Bất Động Sản</span>
+                                    ? (categories.find((c) => c.id === val)?.name ?? "")
+                                    : <span style={{ color: "#94a3b8" }}>Chọn Danh Mục</span>
                             }
+                            disabled={loading}
+                            MenuProps={COMPACT_MENU_PROPS}   // 👈 gọn như hình 2
                         >
                             <MenuItem disabled value="">
-                                <em>Chọn Loại Bất Động Sản</em>
+                                <em>Chọn Danh Mục</em>
                             </MenuItem>
-                            {PROPERTY_TYPES.map((t) => (
-                                <MenuItem key={t.value} value={t.value}>
-                                    {t.label}
+                            {categories.map((c) => (
+                                <MenuItem key={c.id} value={c.id}>
+                                    {c.name}
                                 </MenuItem>
                             ))}
                         </Select>
-                        {errors?.propertyType && <FormHelperText>{errors.propertyType}</FormHelperText>}
+                        {errors?.categoryId && <FormHelperText>{errors.categoryId}</FormHelperText>}
                     </FormControl>
 
-                    {/* Hàng 2: Select giá (trái) + Input giá (phải) */}
+                    {/* Select loại giá */}
                     <FormControl
                         size="small"
                         sx={{
@@ -122,12 +159,14 @@ export default function TradeInfoSection({ formData, onChange, errors }) {
                         <Select
                             value={formData.priceType}
                             onChange={(e) => onChange("priceType", e.target.value)}
+                            MenuProps={COMPACT_MENU_PROPS}   // 👈 áp dụng style gọn
                         >
                             <MenuItem value="sellPrice">Giá bán</MenuItem>
                             <MenuItem value="rentPrice">Giá thuê</MenuItem>
                         </Select>
                     </FormControl>
 
+                    {/* Ô nhập giá */}
                     <TextField
                         required
                         label={formData.priceType === "sellPrice" ? "Giá bán" : "Giá thuê"}

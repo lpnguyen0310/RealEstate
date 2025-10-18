@@ -225,14 +225,7 @@ export default function PropertyDetailSection({
                     </Box>
                 </Box>
 
-                {/* Các field khác giữ nguyên */}
-                {/* <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5, mt: 1.5 }}>
-                    <TextField label="Phân khu" size="small" {...F("subdivision")} InputProps={{ sx: inputRootSx }} />
-                    <TextField label="Block" size="small" {...F("block")} InputProps={{ sx: inputRootSx }} />
-                    <TextField label="Tầng" size="small" {...F("floor")} InputProps={{ sx: inputRootSx }} />
-                    <TextField label="Mã căn hộ" size="small" {...F("apartmentCode")} InputProps={{ sx: inputRootSx }} />
-                </Box> */}
-
+    
                 <Typography sx={{ fontWeight: 600, color: "#475569", mt: 2, mb: 1 }}>
                     Thông tin chi tiết
                 </Typography>

@@ -80,8 +80,8 @@ const BodyForm = React.memo(function BodyForm({
                 onChange={(arr) => setFormData((p) => ({ ...p, videoUrls: arr }))}
             />
             <AmenitiesSection
-                value={formData.amenities}
-                onChange={(next) => setFormData((p) => ({ ...p, amenities: next }))}
+                value={formData.amenityIds}
+                onChange={(next) => setFormData(p => ({ ...p, amenityIds: next }))}
             />
             <ContactInfoSection
                 value={formData.contact}
@@ -164,6 +164,7 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
     const [formData, setFormData] = useState({
         title: "",
         description: "",
+        categoryId: "",
         tradeType: "sell",
         propertyType: "",
         priceType: "sellPrice",
