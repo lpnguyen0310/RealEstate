@@ -120,8 +120,7 @@ public class PropertyMapper {
 
     private PostInfoDTO buildPostInfo(PropertyEntity entity) {
         PostInfoDTO postInfo = new PostInfoDTO();
-        // TODO: Logic tạo breadcrumb động có thể phức tạp hơn
-        postInfo.setBreadcrumb(List.of("Bán", entity.getCity().getName(), entity.getDistrict().getName()));
+        // TODO: Logic tạo breadcrumb động có thể phức tạp
         postInfo.setTitle(entity.getTitle());
         postInfo.setAddress(formatFullAddress(entity));
 
