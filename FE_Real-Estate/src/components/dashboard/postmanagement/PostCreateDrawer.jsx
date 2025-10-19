@@ -294,7 +294,6 @@ export default function PostCreateDrawer({ open, onClose, onSaveDraft, onContinu
         description: "",
         categoryId: "",
         propertyType: "sell",
-        propertyType: "",
         priceType: "SELL_PRICE",
         price: "",
         images: [],

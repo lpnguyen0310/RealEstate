@@ -21,6 +21,9 @@ public class WardEntity {
     @Column(name = "name", length = 100, nullable = false)
     private String name;
 
+    @Column(name= "slug")
+    private String slug;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "district_id", nullable = false)
     private DistrictEntity district;

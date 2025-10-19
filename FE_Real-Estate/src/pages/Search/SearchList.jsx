@@ -114,10 +114,10 @@ function PropertyListItem({ data, onClick }) {
             </h3>
             <div className="text-right shrink-0">
               <div className="text-blue-600 font-bold text-lg">
-                {data.priceLabel || `${data.priceTrieu} triệu`}
+                {data.price || 'Thỏa thuận'}
               </div>
-              {data.pricePerM2Text && (
-                <div className="text-xs text-gray-500">({data.pricePerM2Text})</div>
+              {data.pricePerM2 && (
+                <div className="text-xs text-gray-500">({data.pricePerM2})</div>
               )}
             </div>
           </div>
@@ -125,7 +125,7 @@ function PropertyListItem({ data, onClick }) {
           {/* Địa chỉ */}
           <div className="mt-2 flex items-center gap-2 text-gray-600">
             <Icon.Pin />
-            <span className="text-sm truncate">{data.address}</span>
+            <span className="text-sm truncate">{data.addressMain}</span>
           </div>
 
           {/* Meta */}

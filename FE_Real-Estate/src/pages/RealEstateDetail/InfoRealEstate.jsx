@@ -388,8 +388,16 @@ export default function InfoRealEstate() {
                 <div className="mt-6">
                     {/* Breadcrumb đơn giản */}
                     <div className="text-sm text-gray-500 mb-[15px]">
-                        {postInfo.breadcrumb.slice(0, 3).join(" / ")} /{" "}
-                        <span className="text-gray-600">{postInfo.breadcrumb[3]}</span>
+                        {/* Dùng optional chaining (?.) để đảm bảo không bị lỗi nếu breadcrumb không tồn tại */}
+                        {postInfo?.breadcrumb?.slice(0, 3).join(" / ")}
+                        
+                        {/* Chỉ hiển thị phần tử thứ 4 NẾU nó tồn tại */}
+                        {postInfo?.breadcrumb?.[3] && (
+                            <>
+                                {" / "}
+                                <span className="text-gray-600">{postInfo.breadcrumb[3]}</span>
+                            </>
+                        )}
                     </div>
 
                     {/* Tiêu đề bài đăng */}

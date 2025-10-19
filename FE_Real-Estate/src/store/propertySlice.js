@@ -1,6 +1,36 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "@/api/axios";
 import { uploadMany } from "@/api/cloudinary";
+
+
+export const fetchPropertiesThunk = createAsyncThunk(
+    "property/fetchAll",
+    // 1. Nhận vào một object `params` chứa tất cả bộ lọc, không giới hạn
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            // 2. Truyền thẳng object `params` vào request. 
+            // Axios sẽ tự động chuyển nó thành query string (ví dụ: ?keyword=abc&sort=price,asc)
+            const res = await api.get("/properties", { params });
+            return res?.data?.data ?? res?.data;
+        } catch (e) {
+            return rejectWithValue(e?.response?.data?.message || "Không thể tải danh sách tin đăng");
+        }
+    }
+);
+
+// === THUNK LẤY CHI TIẾT ===
+export const fetchPropertyByIdThunk = createAsyncThunk(
+    "property/fetchById",
+    async (propertyId, { rejectWithValue }) => {
+        try {
+            const res = await api.get(`/properties/${propertyId}`);
+            return res?.data?.data ?? res?.data;
+        } catch (e) {
+            return rejectWithValue(e?.response?.data?.message || "Không thể tải chi tiết tin đăng");
+        }
+    }
+);
+
 export const createPropertyThunk = createAsyncThunk(
     "property/create",
     /**
@@ -110,7 +140,7 @@ function mapDtoToPostCard(p) {
         p?.displayAddress ||
         [p?.addressStreet /* + tên phường-quận-thành phố nếu bạn muốn */].filter(Boolean).join(", ");
     const postat = p?.postedAt;
-console.log("Postat:", postat);
+    console.log("Postat:", postat);
     return {
         id: p.id,
         // hình: ưu tiên imageUrls từ BE; fallback sang images (nếu nơi khác trả kiểu khác)
@@ -167,6 +197,41 @@ function statusEnumToKey(status) {
     }
 }
 
+function mapPublicPropertyToCard(p) {
+    if (!p) return {}; // Trả về object rỗng nếu không có dữ liệu để tránh lỗi
+
+    return {
+        id: p.id,
+        image: p.image,
+        images: Array.isArray(p.images) ? p.images : [],
+        title: p.title,
+        description: p.description,
+        
+        // Lấy trực tiếp các trường đã được Backend định dạng sẵn
+        price: p.price,
+        pricePerM2: p.pricePerM2,
+        postedAt: p.postedAt,
+        photos: p.photos,
+
+        // Gộp địa chỉ vào một trường `addressMain` mà PropertyCard đang dùng
+        addressMain: p.addressFull || p.addressShort || "",
+        addressShort: p.addressShort || "",
+        addressFull: p.addressFull || "",
+
+        area: p.area,
+        // Dùng đúng tên thuộc tính mà API trả về
+        bed: p.bed,
+        bath: p.bath,
+
+        // Giữ lại các thông tin khác nếu cần
+        agent: p.agent,
+        type: p.type,
+        category: p.category,
+
+        listingType: p.listing_type || "normal",
+    };
+}
+
 
 const initialState = {
     // server page
@@ -180,12 +245,17 @@ const initialState = {
     loading: false,
     error: null,
 
+    currentProperty: null,
+    loadingDetail: false,
+    errorDetail: null,
+
     // query state (để đồng bộ Pagination/Sort)
     sort: "postedAt,desc",
     creating: false,
     createError: null,
     lastCreated: null,
 };
+
 
 const propertySlice = createSlice({
     name: "property",
@@ -204,6 +274,12 @@ const propertySlice = createSlice({
             state.createError = null;
             state.creating = false;
         },
+        // === PHẦN THÊM MỚI ===
+        // Reducer để dọn dẹp state của trang chi tiết khi người dùng rời đi
+        clearCurrentProperty(state) {
+            state.currentProperty = null;
+            state.errorDetail = null;
+        },
     },
     extraReducers: (b) => {
         b
@@ -215,17 +291,16 @@ const propertySlice = createSlice({
             .addCase(createPropertyThunk.fulfilled, (s, a) => {
                 s.creating = false;
                 s.lastCreated = a.payload || null;
-                // (tuỳ chọn) Optimistic update ngay đầu danh sách:
-                // if (a.payload) s.list.unshift(mapDtoToPostCard(a.payload));
             })
             .addCase(createPropertyThunk.rejected, (s, a) => {
                 s.creating = false;
                 s.createError = a.payload || "Đăng tin thất bại";
             })
+
+            // ===== lấy tin của tôi =====
             .addCase(fetchMyPropertiesThunk.pending, (s) => { s.loading = true; s.error = null; })
             .addCase(fetchMyPropertiesThunk.fulfilled, (s, a) => {
                 const d = a.payload || {};
-                // Map content -> PostCard data cho đúng UI hiện tại
                 s.list = Array.isArray(d.content) ? d.content.map(mapDtoToPostCard) : [];
                 s.page = d.page ?? 0;
                 s.size = d.size ?? s.size;
@@ -236,6 +311,44 @@ const propertySlice = createSlice({
             .addCase(fetchMyPropertiesThunk.rejected, (s, a) => {
                 s.loading = false;
                 s.error = a.payload || "Không thể tải danh sách tin đăng";
+            })
+
+            // === PHẦN THÊM MỚI ===
+            // ===== lấy danh sách public =====
+            .addCase(fetchPropertiesThunk.pending, (s) => {
+                s.loading = true;
+                s.error = null;
+            })
+            .addCase(fetchPropertiesThunk.fulfilled, (s, a) => {
+                const propertiesArray = a.payload || [];
+
+                // SỬA Ở ĐÂY: Gọi hàm `mapPublicPropertyToCard` mới
+                s.list = Array.isArray(propertiesArray) ? propertiesArray.map(mapPublicPropertyToCard) : [];
+
+                // Giữ nguyên logic phân trang tự suy ra
+                s.page = 0;
+                s.totalElements = propertiesArray.length;
+                s.totalPages = 1;
+                s.loading = false;
+            })
+            .addCase(fetchPropertiesThunk.rejected, (s, a) => {
+                s.loading = false;
+                s.error = a.payload || "Không thể tải danh sách tin đăng";
+            })
+
+            // ===== lấy chi tiết 1 tin =====
+            .addCase(fetchPropertyByIdThunk.pending, (state) => {
+                state.loadingDetail = true;
+                state.errorDetail = null;
+                state.currentProperty = null;
+            })
+            .addCase(fetchPropertyByIdThunk.fulfilled, (state, action) => {
+                state.loadingDetail = false;
+                state.currentProperty = action.payload;
+            })
+            .addCase(fetchPropertyByIdThunk.rejected, (state, action) => {
+                state.loadingDetail = false;
+                state.errorDetail = action.payload;
             });
     },
 });
