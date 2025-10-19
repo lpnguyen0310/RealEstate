@@ -91,11 +91,11 @@ const authSlice = createSlice({
     extraReducers: (b) => {
         b
             .addCase(loginThunk.pending, (s) => { s.status = "loading"; s.error = null; })
-            .addCase(loginThunk.fulfilled, (s, a) => { s.status = "succeeded"; s.user = a.payload?.profile || null;  s.roles  = a.payload?.roles   || [];})
+            .addCase(loginThunk.fulfilled, (s, a) => { s.status = "succeeded"; s.user = a.payload?.profile || null; s.roles = a.payload?.roles || []; })
             .addCase(loginThunk.rejected, (s, a) => { s.status = "failed"; s.error = a.payload || "Đăng nhập thất bại"; })
 
             .addCase(getProfileThunk.pending, (s) => { s.status = "loading"; })
-            .addCase(getProfileThunk.fulfilled, (s, a) => { s.status = "succeeded"; s.user = a.payload || null; s.roles  = a.payload?.roles   || []; })
+            .addCase(getProfileThunk.fulfilled, (s, a) => { s.status = "succeeded"; s.user = a.payload || null; s.roles = extractRoles(a.payload); })
             .addCase(getProfileThunk.rejected, (s, a) => { s.status = "failed"; s.error = a.payload || "Lấy hồ sơ thất bại"; })
 
             .addCase(logoutThunk.fulfilled, (s) => { s.user = null; s.status = "idle"; s.error = null; });
