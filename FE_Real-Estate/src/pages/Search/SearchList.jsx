@@ -114,7 +114,7 @@ function PropertyListItem({ data, onClick }) {
             </h3>
             <div className="text-right shrink-0">
               <div className="text-blue-600 font-bold text-lg">
-                {data.priceLabel || `${data.priceTrieu} triệu`}
+                {data.priceLabel || (data.priceTrieu ? `${data.priceTrieu} triệu` : 'Thỏa thuận')}
               </div>
               {data.pricePerM2Text && (
                 <div className="text-xs text-gray-500">({data.pricePerM2Text})</div>

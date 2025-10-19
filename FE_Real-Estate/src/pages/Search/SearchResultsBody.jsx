@@ -75,6 +75,7 @@ export default function SearchResultsPage() {
         // Dữ liệu từ API sẽ nằm trong `response.data`
         // Axios đã tự động parse JSON cho bạn
         setAllProperties(response.data); 
+        console.log("Dữ liệu từ API:", response.data);
       } catch (err) {
         // Nếu API trả về lỗi (như 404, 500), axios sẽ tự động nhảy vào đây
         setError(err);
