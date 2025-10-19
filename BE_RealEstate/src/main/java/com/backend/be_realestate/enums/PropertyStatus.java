@@ -10,5 +10,7 @@ public enum PropertyStatus {
     EXPIRINGSOON,
 
     HIDDEN,
-    ARCHIVED
+    ARCHIVED,
+
+    ACTIVE
 }

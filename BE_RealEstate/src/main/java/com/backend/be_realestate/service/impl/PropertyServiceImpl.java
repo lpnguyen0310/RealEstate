@@ -81,19 +81,19 @@ public class PropertyServiceImpl implements IPropertyService {
             throw new IllegalStateException("Listing type is inactive");
         }
 
-        // Kiểm tra & trừ tồn kho nếu VIP/PREMIUM
-        var type = policy.getListingType(); // NORMAL / VIP / PREMIUM
-        if (type != ListingType.NORMAL) {
-            // dùng khoá bi quan để tránh race condition (khuyên dùng), hoặc optimistic lock với @Version
-            UserInventoryEntity inv = inventoryRepo.lockByUserAndType(userId, type.name())
-                    .orElseGet(() -> inventoryRepo.findByUser_UserIdAndItemType(userId, type.name())
-                            .orElseThrow(() -> new IllegalStateException("Inventory not found")));
-            if (inv.getQuantity() == null || inv.getQuantity() <= 0) {
-                throw new OutOfStockException(type.name());
-            }
-            inv.setQuantity(inv.getQuantity() - 1);
-            inventoryRepo.save(inv);
-        }
+//        // Kiểm tra & trừ tồn kho nếu VIP/PREMIUM
+//        var type = policy.getListingType(); // NORMAL / VIP / PREMIUM
+//        if (type != ListingType.NORMAL) {
+//            // dùng khoá bi quan để tránh race condition (khuyên dùng), hoặc optimistic lock với @Version
+//            UserInventoryEntity inv = inventoryRepo.lockByUserAndType(userId, type.name())
+//                    .orElseGet(() -> inventoryRepo.findByUser_UserIdAndItemType(userId, type.name())
+//                            .orElseThrow(() -> new IllegalStateException("Inventory not found")));
+//            if (inv.getQuantity() == null || inv.getQuantity() <= 0) {
+//                throw new OutOfStockException(type.name());
+//            }
+//            inv.setQuantity(inv.getQuantity() - 1);
+//            inventoryRepo.save(inv);
+//        }
 
         // Map các quan hệ
         var property = new PropertyEntity();

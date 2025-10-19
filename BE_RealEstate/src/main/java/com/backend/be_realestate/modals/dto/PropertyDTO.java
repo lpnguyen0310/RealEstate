@@ -53,4 +53,7 @@ public class PropertyDTO {
 
     private List<String> imageUrls;
     private List<Long> amenityIds;
+    private String categoryName;
+    private String authorName;
+    private String authorEmail;
 }

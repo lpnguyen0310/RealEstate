@@ -18,9 +18,10 @@ function Row({ label, value }) {
 }
 
 export default function PostDetailDrawer({
-    open, onClose, detail, decision, setDecision, money, fmtDate, onApprove, onReject,
+    open, onClose, detail, decision, setDecision, money, fmtDate, onApprove, onReject, actioningId, // NEW
 }) {
     if (!detail) return null;
+    const busy = actioningId === detail.id; // NEW
 
     return (
         <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 860 } }}>
@@ -47,8 +48,11 @@ export default function PostDetailDrawer({
                             <Grid item xs={12} sm={6}><Row label="Giá" value={money(detail.price)} /></Grid>
                             <Grid item xs={12} sm={6}><Row label="Diện tích" value={`${detail.area ?? "-"} m²`} /></Grid>
                             <Grid item xs={12} sm={6}>
-                                <Row label="Loại tin" value={<Chip label={detail.listingType || "NORMAL"}
-                                    color={detail.listingType === "VIP" ? "secondary" : detail.listingType === "PREMIUM" ? "warning" : "info"} size="small" />} />
+                                <Row label="Loại tin" value={
+                                    <Chip label={detail.listingType || "NORMAL"}
+                                        color={detail.listingType === "VIP" ? "secondary" : detail.listingType === "PREMIUM" ? "warning" : "info"}
+                                        size="small" />
+                                } />
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <Row label="Trạng thái" value={<Chip label={STATUS_LABEL[detail.status]} color={STATUS_CHIP_COLOR[detail.status]} size="small" />} />
@@ -67,14 +71,21 @@ export default function PostDetailDrawer({
                     <Select size="small" value={decision.durationDays} onChange={(e) => setDecision((s) => ({ ...s, durationDays: e.target.value }))} sx={{ width: 140 }}>
                         {[10, 15, 20, 30].map((d) => <MenuItem key={d} value={d}>{d} ngày</MenuItem>)}
                     </Select>
-                    <TextField size="small" placeholder="Ghi chú duyệt / lý do từ chối" value={decision.reason}
-                        onChange={(e) => setDecision((s) => ({ ...s, reason: e.target.value }))} sx={{ width: 420 }} multiline minRows={2} maxRows={4} />
-                    <Button variant="contained" startIcon={<CheckCircleOutlineIcon />} onClick={() => { onApprove(detail.id); onClose(); }}>
+                    <TextField
+                        label="Lý do từ chối (không bắt buộc)"
+                        value={decision.reason}
+                        onChange={(e) => setDecision(d => ({ ...d, reason: e.target.value }))}
+                        multiline
+                        minRows={3}
+                        placeholder="Có thể để trống"
+                        fullWidth
+                    />
+                    <Button variant="contained" startIcon={<CheckCircleOutlineIcon />} disabled={busy}
+                        onClick={() => { onApprove(detail.id); onClose(); }}>
                         Duyệt
                     </Button>
-                    <Button color="error" variant="outlined" startIcon={<HighlightOffOutlinedIcon />} onClick={() => {
-                        if (window.confirm("Từ chối tin này?")) { onReject(detail.id); onClose(); }
-                    }}>
+                    <Button color="error" variant="outlined" startIcon={<HighlightOffOutlinedIcon />} disabled={busy}
+                        onClick={() => { if (window.confirm("Từ chối tin này?")) { onReject(detail.id); onClose(); } }}>
                         Từ chối
                     </Button>
                 </Stack>

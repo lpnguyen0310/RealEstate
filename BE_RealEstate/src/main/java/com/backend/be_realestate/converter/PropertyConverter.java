@@ -20,21 +20,31 @@ public class PropertyConverter {
     public PropertyDTO toDto(PropertyEntity entity) {
         PropertyDTO dto = modelMapper.map(entity, PropertyDTO.class);
 
-        // set FK ids
+        // FK ids
         if (entity.getUser() != null)     dto.setUserId(entity.getUser().getUserId());
         if (entity.getCategory() != null) dto.setCategoryId(entity.getCategory().getId());
         if (entity.getWard() != null)     dto.setWardId(entity.getWard().getId());
         if (entity.getDistrict() != null) dto.setDistrictId(entity.getDistrict().getId());
         if (entity.getCity() != null)     dto.setCityId(entity.getCity().getId());
+
+        // Hiển thị thêm cho Admin UI
+        if (entity.getCategory() != null) dto.setCategoryName(entity.getCategory().getName());
+        if (entity.getUser() != null) {
+            dto.setAuthorName(entity.getUser().getFirstName() + " " + entity.getUser().getLastName());
+            dto.setAuthorEmail(entity.getUser().getEmail());
+        }
+
+        // Ảnh theo displayOrder (bạn đã làm chuẩn)
         if (entity.getImages() != null) {
             List<String> urls = entity.getImages().stream()
                     .filter(Objects::nonNull)
-                    .sorted(Comparator.comparingInt(i ->
-                            i.getDisplayOrder() == null ? 0 : i.getDisplayOrder()))
+                    .sorted(Comparator.comparingInt(i -> i.getDisplayOrder() == null ? 0 : i.getDisplayOrder()))
                     .map(PropertyImageEntity::getImageUrl)
                     .collect(Collectors.toList());
             dto.setImageUrls(urls);
         }
+
+        // Tiện ích
         if (entity.getAmenities() != null) {
             List<Long> amenityIds = entity.getAmenities().stream()
                     .filter(Objects::nonNull)
@@ -42,7 +52,17 @@ public class PropertyConverter {
                     .collect(Collectors.toList());
             dto.setAmenityIds(amenityIds);
         }
-        // map postedAt and expiresAt
+
+        // Thời gian (nếu entity đã là Timestamp thì modelMapper đã map OK;
+        // thêm bảo hiểm null để rõ ràng)
+        dto.setPostedAt(entity.getPostedAt() == null ? null : entity.getPostedAt());
+        dto.setExpiresAt(entity.getExpiresAt() == null ? null : entity.getExpiresAt());
+
+        // listingType trong DTO là String: chắc chắn hoá theo enum của entity
+        if (entity.getListingType() != null) {
+            dto.setListingType(entity.getListingType().name()); // NORMAL | VIP | PREMIUM
+        }
+
         return dto;
     }
 
