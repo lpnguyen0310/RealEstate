@@ -1,253 +1,139 @@
-import { useMemo, useState, useEffect } from "react";
+// src/pages/SearchResultsPage.jsx
+
+import { useState, useEffect } from "react";
 import { Tag, Pagination } from "antd";
 import { useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+
 import SearchFilters from "../Search/SearchFilters";
 import SearchList from "../Search/SearchList";
-import axios from "axios";
+import { fetchPropertiesThunk, setPage as setReduxPage } from "@/store/propertySlice"; // Chỉnh lại đường dẫn nếu cần
 
-// ===== Helpers (Không thay đổi) =====
-const parsePriceToTrieu = (label) => {
-  if (!label) return null;
-  const txt = String(label).toLowerCase().replace(/\s/g, "");
-  const num = parseFloat(txt.replace(/[^\d.]/g, ""));
-  if (!Number.isFinite(num)) return null;
-  return txt.includes("tỷ") ? Math.round(num * 1000) : Math.round(num);
-};
-
-const normalize = (s) =>
-  (s || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
-
-const matchKeyword = (item, q) => {
-  if (!q) return true;
-  const s = normalize(q);
-  return [item.title, item.address, (item.tags || []).join(" ")].some((f) =>
-    normalize(f).includes(s)
-  );
-};
-
-const sortItems = (items, sort) => {
-  const arr = [...items];
-  switch (sort) {
-    case "priceAsc":
-      arr.sort((a, b) => (a.priceTrieu ?? 0) - (b.priceTrieu ?? 0));
-      break;
-    case "priceDesc":
-      arr.sort((a, b) => (b.priceTrieu ?? 0) - (a.priceTrieu ?? 0));
-      break;
-    case "areaAsc":
-      arr.sort((a, b) => (a.area ?? 0) - (b.area ?? 0));
-      break;
-    case "areaDesc":
-      arr.sort((a, b) => (b.area ?? 0) - (a.area ?? 0));
-      break;
-    default:
-      break;
-  }
-  return arr;
-};
-
-const vndToTrieu = (v) => (v == null ? null : Math.round(v / 1_000_000));
-const extractInt = (label) => {
-  if (label == null) return null;
-  const m = String(label).match(/\d+/);
-  return m ? Number(m[0]) : null;
-};
+// Các hàm helpers không cần thiết cho việc lọc/sắp xếp ở client nữa
+// bạn có thể xóa chúng nếu không dùng ở đâu khác.
+// const parsePriceToTrieu = ...
+// const normalize = ...
+// const matchKeyword = ...
+// const sortItems = ...
 
 export default function SearchResultsPage() {
-  const [searchParams] = useSearchParams();
-  const type = searchParams.get("type");
-  const category = searchParams.get("category");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const dispatch = useDispatch();
 
-  // ==================== THAY ĐỔI BẮT ĐẦU TỪ ĐÂY ====================
+    // 1. KẾT NỐI REDUX STORE
+    // Lấy state trực tiếp từ Redux thay vì quản lý bằng useState và gọi axios
+    const {
+        list: pageItems,      // Dữ liệu của trang hiện tại
+        loading,
+        error,
+        page: currentPage,    // Số trang hiện tại (bắt đầu từ 0)
+        pageSize: currentPageSize, // Kích thước trang
+        totalElements: total, // Tổng số kết quả
+    } = useSelector((state) => state.property);
 
-  // 1. Khai báo state để lưu dữ liệu từ API
-  const [allProperties, setAllProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+    console.log("SearchResultsPage - pageItems:", pageItems, "loading:", loading, "error:", error, "currentPage:", currentPage, "currentPageSize:", currentPageSize, "total:", total);
 
-  // 2. Dùng useEffect để gọi API
-  useEffect(() => {
-    const fetchAllProperties = async () => {
-      try {
-        // Dùng axios để gọi API
-        const response = await axios.get('http://localhost:8080/api/properties');
-        
-        // Dữ liệu từ API sẽ nằm trong `response.data`
-        // Axios đã tự động parse JSON cho bạn
-        setAllProperties(response.data); 
-        console.log("Dữ liệu từ API:", response.data);
-      } catch (err) {
-        // Nếu API trả về lỗi (như 404, 500), axios sẽ tự động nhảy vào đây
-        setError(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // 2. QUẢN LÝ CÁC GIÁ TRỊ LỌC TẠI LOCAL STATE
+    // State này chỉ dùng để điều khiển các ô input, select box...
+    const [keyword, setKeyword] = useState(() => searchParams.get("q") || "");
+    const [sort, setSort] = useState("relevance");
+    const [filters, setFilters] = useState(null);
 
-    fetchAllProperties();
-  }, []); // [] đảm bảo chỉ gọi 1 lần
-
-  // 3. Chuẩn hoá dữ liệu từ state `allProperties` thay vì mock data
-  const baseItems = useMemo(
-    () =>
-      (allProperties || []).map((x) => {
-        const images = Array.isArray(x.images) && x.images.length
-          ? x.images.slice(0, 4)
-          : Array.from(
-              { length: Math.max(1, Math.min(4, Number(x.photos) || 1)) },
-              () => x.image
-            ).filter(Boolean);
-
-        return {
-          id: x.id,
-          title: x.title,
-          address: x.addressFull || x.addressShort,
-          area: x.area,
-          bed: x.bed,
-          bath: x.bath,
-          priceLabel: x.price,
-          priceTrieu: parsePriceToTrieu(x.price),
-          pricePerM2Text: x.pricePerM2,
-          postedAt: x.postedAt,
-          description: x.description || "",
-          agent: x.agent || null,
-          image: x.image,
-          images,
-          photosCount: images.length,
-          tags: x.tags || [],
-          type: x.type,
-          category: x.category,
+    // 3. EFFECT "THẦN THÁNH" - GỌI LẠI API MỖI KHI BỘ LỌC THAY ĐỔI
+    useEffect(() => {
+        // Xây dựng object `params` để gửi lên cho thunk
+        const params = {
+            page: currentPage,
+            size: currentPageSize,
+            sort: sort === "relevance" ? "postedAt,desc" : sort.replace('Asc', ',asc').replace('Desc', ',desc'),
         };
-      }),
-    [allProperties] // Phụ thuộc vào `allProperties`
-  );
 
-  // ==================== THAY ĐỔI KẾT THÚC TẠI ĐÂY ====================
+        // Lấy các tham số từ URL
+        const type = searchParams.get("type");
+        const category = searchParams.get("category");
 
-  const [keyword, setKeyword] = useState("");
-  const [sort, setSort] = useState("relevance");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(9);
-  const [filters, setFilters] = useState(null);
+        // Thêm các bộ lọc vào params nếu chúng tồn tại
+        if (keyword) params.keyword = keyword;
+        if (type) params.type = type;
+        if (category) params.category = category;
+        if (filters?.priceFrom) params.priceFrom = filters.priceFrom;
+        if (filters?.priceTo) params.priceTo = filters.priceTo;
+        if (filters?.areaFrom) params.areaFrom = filters.areaFrom;
+        if (filters?.areaTo) params.areaTo = filters.areaTo;
+        // ... thêm các filter khác cho phòng ngủ, phòng tắm nếu có
+        
+        // GỌI API với các tham số đã tổng hợp
+        dispatch(fetchPropertiesThunk(params));
 
-  const filteredAll = useMemo(() => {
-    let arr = baseItems;
+        // Đồng bộ hóa keyword với URL
+        if (keyword) {
+            searchParams.set('q', keyword);
+        } else {
+            searchParams.delete('q');
+        }
+        setSearchParams(searchParams);
 
-    const clean = (s) => {
-      if (!s) return "";
-      let t = decodeURIComponent(s);
-      if (t.startsWith("/")) {
-        t = t.slice(1);
-      }
-      return t;
+    }, [dispatch, keyword, sort, filters, currentPage, currentPageSize, searchParams, setSearchParams]);
+
+    const handleResetAll = () => {
+        setKeyword("");
+        setSort("relevance");
+        setFilters(null);
+        dispatch(setReduxPage(0)); // Reset về trang đầu tiên trong Redux
+        searchParams.delete('q');
+        searchParams.delete('type');
+        searchParams.delete('category');
+        setSearchParams(searchParams);
     };
 
-    if (type) {
-      arr = arr.filter((p) => p.type === type);
+    // Giao diện cho Loading và Error (dùng state từ Redux)
+    if (loading) {
+        return <div className="text-center py-20">Đang tải dữ liệu...</div>;
     }
-    if (category) {
-      const cat = clean(category);
-      arr = arr.filter((p) => {
-        const pcat = clean(p.category);
-        return pcat === cat;
-      });
+    if (error) {
+        return <div className="text-center py-20 text-red-600">Lỗi: {error}. Vui lòng thử lại.</div>;
     }
-    if (keyword) {
-      arr = arr.filter((it) => matchKeyword(it, keyword));
-    }
-    if (filters) {
-      const minTrieu = vndToTrieu(filters.priceFrom);
-      const maxTrieu = vndToTrieu(filters.priceTo);
-      if (minTrieu != null) arr = arr.filter((p) => (p.priceTrieu ?? 0) >= minTrieu);
-      if (maxTrieu != null) arr = arr.filter((p) => (p.priceTrieu ?? 0) <= maxTrieu);
-      if (filters.areaFrom != null)
-        arr = arr.filter((p) => (p.area ?? 0) >= filters.areaFrom);
-      if (filters.areaTo != null)
-        arr = arr.filter((p) => (p.area ?? 0) <= filters.areaTo);
-      if (Array.isArray(filters.beds) && filters.beds.length) {
-        const maxBeds = Math.max(
-          ...filters.beds.map(extractInt).filter((x) => x != null)
-        );
-        if (Number.isFinite(maxBeds))
-          arr = arr.filter((p) => (p.bed ?? 0) >= maxBeds);
-      }
-      if (Array.isArray(filters.baths) && filters.baths.length) {
-        const maxBaths = Math.max(
-          ...filters.baths.map(extractInt).filter((x) => x != null)
-        );
-        if (Number.isFinite(maxBaths))
-          arr = arr.filter((p) => (p.bath ?? 0) >= maxBaths);
-      }
-    }
-    return sortItems(arr, sort);
-  }, [baseItems, type, category, keyword, sort, filters]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [keyword, sort, filters, type, category]);
+    return (
+        <div className="mx-auto max-w-[1200px] px-4 py-6">
+            <SearchFilters
+                keyword={keyword}
+                onKeywordChange={setKeyword}
+                sort={sort}
+                onSortChange={setSort}
+                onResetAll={handleResetAll}
+                initialFilters={filters}
+                onApplyFilters={(newFilters) => {
+                    setFilters(newFilters);
+                    dispatch(setReduxPage(0)); // Reset về trang đầu khi áp dụng bộ lọc mới
+                }}
+            />
 
-  const total = filteredAll.length;
-  const start = (page - 1) * pageSize;
-  const pageItems = filteredAll.slice(start, start + pageSize);
+            <div className="mt-3 text-sm text-gray-600">
+                {searchParams.get("type") && (
+                    <span>Loại: <Tag color="blue">{searchParams.get("type")}</Tag></span>
+                )}
+                {searchParams.get("category") && (
+                    <span> / Danh mục: <Tag color="blue">{searchParams.get("category")}</Tag></span>
+                )}
+                <> — Tìm thấy <b>{total}</b> kết quả</>
+            </div>
 
-  const handleResetAll = () => {
-    setKeyword("");
-    setSort("relevance");
-    setFilters(null);
-    setPage(1);
-  };
+            {/* `pageItems` giờ là `list` từ Redux, đã được map sẵn trong slice */}
+            <SearchList items={pageItems} />
 
-  // 4. Xử lý giao diện cho Loading và Error
-  if (loading) {
-    return <div className="text-center py-20">Đang tải dữ liệu...</div>;
-  }
-
-  if (error) {
-    return <div className="text-center py-20 text-red-600">Lỗi: {error.message}. Vui lòng kiểm tra lại kết nối API.</div>;
-  }
-  
-  return (
-    <div className="mx-auto max-w-[1200px] px-4 py-6">
-      <SearchFilters
-        keyword={keyword}
-        onKeywordChange={setKeyword}
-        sort={sort}
-        onSortChange={setSort}
-        onResetAll={handleResetAll}
-        initialFilters={filters}
-        onApplyFilters={setFilters}
-      />
-
-      <div className="mt-3 text-sm text-gray-600">
-        {type && (
-          <span>
-            Loại: <Tag color="blue">{type}</Tag>
-          </span>
-        )}
-        {category && (
-          <span>
-            {" "}
-            / Danh mục: <Tag color="blue">{category}</Tag>
-          </span>
-        )}
-        <> — Tìm thấy <b>{total}</b> kết quả</>
-      </div>
-
-      <SearchList items={pageItems} />
-
-      <div className="mt-6 flex justify-center">
-        <Pagination
-          current={page}
-          pageSize={pageSize}
-          total={total}
-          showSizeChanger
-          pageSizeOptions={[6, 9, 12, 18, 24, 36]}
-          onChange={(pg, ps) => {
-            setPage(pg);
-            setPageSize(ps);
-          }}
-        />
-      </div>
-    </div>
-  );
+            <div className="mt-6 flex justify-center">
+                <Pagination
+                    current={currentPage + 1} // Antd Pagination bắt đầu từ 1
+                    pageSize={currentPageSize}
+                    total={total}
+                    showSizeChanger={false} // Tạm thời ẩn đi để đơn giản
+                    onChange={(page) => {
+                        // Khi đổi trang, chỉ cần dispatch action, useEffect sẽ lo việc gọi lại API
+                        dispatch(setReduxPage(page - 1));
+                    }}
+                />
+            </div>
+        </div>
+    );
 }

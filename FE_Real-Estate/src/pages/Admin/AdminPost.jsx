@@ -9,6 +9,7 @@ import {
   PostsTable,
   PostDetailDrawer,
 } from "../../components/admidashboard/post";
+import dayjs from "dayjs";
 
 /* ---------- Mock data (đủ field cho Drawer) ---------- */
 const INITIAL_POSTS = [

@@ -37,9 +37,22 @@ public class PropertyMapper {
         dto.setId(entity.getId());
         dto.setTitle(entity.getTitle());
         dto.setArea(entity.getArea());
-        dto.setDescription(entity.getDescription()); // Giả định đã có cột description
+        dto.setDescription(entity.getDescription());
+        dto.setListing_type(entity.getListingType().name());
         dto.setBed(entity.getBedrooms() != null ? entity.getBedrooms() : 0);
         dto.setBath(entity.getBathrooms() != null ? entity.getBathrooms() : 0);
+
+        // === THAY ĐỔI 1: Thêm trường price đã được định dạng ===
+        if (entity.getPrice() != null) {
+            dto.setPrice(formatPrice(entity.getPrice().longValue()));
+        }
+
+        double price = entity.getPrice();
+        float area = entity.getArea();
+        if (price > 0 && area > 0) {
+            double pricePerM2 = price / area;
+            dto.setPricePerM2(formatPricePerM2(pricePerM2));
+        }
 
         // --- Xử lý hình ảnh ---
         if (entity.getImages() != null && !entity.getImages().isEmpty()) {
@@ -62,7 +75,8 @@ public class PropertyMapper {
 
         // --- Ghép chuỗi địa chỉ ---
         dto.setAddressShort(formatShortAddress(entity));
-        dto.setAddressFull(formatFullAddress(entity));
+        // === THAY ĐỔI 2: Lấy địa chỉ đầy đủ trực tiếp từ display_address ===
+        dto.setAddressFull(entity.getDisplayAddress());
 
         // --- Mapping thông tin liên quan ---
         if (entity.getUser() != null) {
@@ -122,7 +136,8 @@ public class PropertyMapper {
         PostInfoDTO postInfo = new PostInfoDTO();
         // TODO: Logic tạo breadcrumb động có thể phức tạp
         postInfo.setTitle(entity.getTitle());
-        postInfo.setAddress(formatFullAddress(entity));
+        // Lấy địa chỉ từ display_address cho cả DTO chi tiết
+        postInfo.setAddress(entity.getDisplayAddress());
 
         StatsDTO stats = new StatsDTO();
         stats.setPriceText(formatPrice(entity.getPrice().longValue()));
@@ -195,26 +210,13 @@ public class PropertyMapper {
         return "N/A";
     }
 
-    private String formatFullAddress(PropertyEntity entity) {
-        StringBuilder builder = new StringBuilder();
-        if (entity.getAddressStreet() != null && !entity.getAddressStreet().isEmpty()) {
-            builder.append(entity.getAddressStreet()).append(", ");
-        }
-        if (entity.getWard() != null) {
-            builder.append(entity.getWard().getName()).append(", ");
-        }
-        if (entity.getDistrict() != null) {
-            builder.append(entity.getDistrict().getName()).append(", ");
-        }
-        if (entity.getCity() != null) {
-            builder.append(entity.getCity().getName());
-        }
-        return builder.toString();
-    }
+    // Phương thức này không còn được sử dụng cho addressFull trong PropertyCardDTO nữa
+    // private String formatFullAddress(PropertyEntity entity) { ... }
 
     private String formatPrice(long price) {
         if (price >= 1_000_000_000) {
-            return String.format(Locale.US, "%.1f tỷ", price / 1_000_000_000.0).replace(".0", "");
+            // Sử dụng %.2f để hiển thị đẹp hơn cho các số lẻ, ví dụ 2.5 tỷ
+            return String.format(Locale.US, "%.2f tỷ", price / 1_000_000_000.0).replaceAll("\\.00|\\.0$", "");
         }
         if (price >= 1_000_000) {
             return String.format("%d triệu", price / 1_000_000);
@@ -234,5 +236,17 @@ public class PropertyMapper {
         long minutes = duration.toMinutes();
         if (minutes > 0) return minutes + " phút trước";
         return "Vừa xong";
+    }
+
+    private String formatPricePerM2(double pricePerM2) {
+        if (pricePerM2 >= 1_000_000) {
+            // Làm tròn đến 1 chữ số thập phân, ví dụ: "25.5 triệu/m²"
+            return String.format(Locale.US, "%.1f triệu/m²", pricePerM2 / 1_000_000.0);
+        }
+        if (pricePerM2 >= 1_000) {
+            return String.format("%d nghìn/m²", Math.round(pricePerM2 / 1_000));
+        }
+        // Trả về số gốc nếu quá nhỏ
+        return NumberFormat.getNumberInstance(new Locale("vi", "VN")).format(pricePerM2) + " đ/m²";
     }
 }

@@ -21,6 +21,9 @@ public class CityEntity {
     @Column(name = "name", length = 100, nullable = false)
     private String name;
 
+    @Column(name= "slug")
+    private String slug;
+
     @OneToMany(mappedBy = "city", fetch = FetchType.LAZY)
     @JsonIgnore
     private List<DistrictEntity> districts;

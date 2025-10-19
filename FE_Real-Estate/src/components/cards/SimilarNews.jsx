@@ -1,16 +1,29 @@
-import { useRef, useCallback } from "react";
-import { Swiper, SwiperSlide } from "swiper/react";
+import { useEffect, useRef, useCallback } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Navigation, Autoplay } from "swiper/modules";
 import { Link } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
 import PropertyCard from "./PropertyCard";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { fetchPropertiesThunk } from "@/store/propertySlice";
 
 import { FEATURED_PROPERTIES } from "../../data/featuredProperties";
 
 export default function SimilarNews() {
   const prevRef = useRef(null);
   const nextRef = useRef(null);
+
+  // === BƯỚC 1: KẾT NỐI REDUX ===
+  const dispatch = useDispatch();
+  const { list, loading, error } = useSelector((state) => state.property);
+  console.log("SimilarNews - list:", list, "loading:", loading, "error:", error);
+
+  // === BƯỚC 2: GỌI API KHI COMPONENT TẢI LẦN ĐẦU ===
+  useEffect(() => {
+      // Gọi thunk để lấy dữ liệu, ví dụ lấy 8 tin đầu tiên
+      dispatch(fetchPropertiesThunk({ page: 0, size: 8 }));
+  }, [dispatch]); // Dependency là dispatch để chỉ chạy 1 lần
 
   const handleInit = useCallback((swiper) => {
     if (!prevRef.current || !nextRef.current) return;
@@ -19,6 +32,18 @@ export default function SimilarNews() {
     swiper.navigation.init();
     swiper.navigation.update();
   }, []);
+
+  if (loading) {
+      return <div className="mt-10 text-center">Đang tải các tin tương tự...</div>;
+  }
+
+  if (error) {
+      return <div className="mt-10 text-center text-red-500">Lỗi: {error}</div>;
+  }
+
+  if (!loading && list.length === 0) {
+        return null;
+  }
 
   return (
     <section className="mt-10">
@@ -48,7 +73,7 @@ export default function SimilarNews() {
           }}
           className="!px-2"
         >
-          {FEATURED_PROPERTIES.map((p) => (
+          {list.map((p) => (
             <SwiperSlide key={p.id}>
               <Link to={`/real-estate/${p.id}`} className="block group">
                 <PropertyCard item={p} />
