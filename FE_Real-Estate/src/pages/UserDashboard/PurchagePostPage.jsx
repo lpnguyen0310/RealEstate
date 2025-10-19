@@ -5,13 +5,14 @@ import { loadPricing } from "@/store/pricingSlice";
 import { createOrder, clearOrderError } from "@/store/orderSlice";
 import { fmtVND as fmt, calcTotal } from "@/utils/countToToal";
 import { SingleCard, ComboCard, PaymentCard } from "@/components/dashboard/purchagemangement";
+import { useNavigate } from "react-router-dom";
 
 export default function PurchagePostPage() {
     const dispatch = useDispatch();
-
+    const navigate = useNavigate();
     // Lấy state từ slice quản lý giá sản phẩm
     const { SINGLE, COMBOS, ALL_ITEMS, loading: pricingLoading, error: pricingError } = useSelector((s) => s.pricing);
-    
+
     // 2. LẤY STATE TỪ SLICE QUẢN LÝ ORDER
     const { loading: isCreatingOrder, error: orderError } = useSelector((s) => s.orders);
 
@@ -28,7 +29,7 @@ export default function PurchagePostPage() {
     // 3. HÀM XỬ LÝ KHI NHẤN NÚT "THANH TOÁN"
     const handlePayment = async () => {
         // Xóa lỗi cũ (nếu có) trước khi thực hiện lần mới
-        if(orderError) {
+        if (orderError) {
             dispatch(clearOrderError());
         }
 
@@ -68,18 +69,11 @@ export default function PurchagePostPage() {
 
         // Dispatch action `createOrder` để bắt đầu quá trình
         const resultAction = await dispatch(createOrder(itemsPayload));
-        
-        // Kiểm tra kết quả sau khi Thunk hoàn thành
         if (createOrder.fulfilled.match(resultAction)) {
-            const newOrder = resultAction.payload;
-            alert(`Tạo đơn hàng thành công! Mã đơn hàng của bạn là: ${newOrder.orderId}`);
-            setQty({}); // Reset giỏ hàng
-            // Optional: Chuyển hướng người dùng đến trang thành công
-            // history.push(`/payment-success/${newOrder.orderId}`);
-        } else {
-             // Lỗi đã được `orderSlice` tự động cập nhật vào state `orderError`
-             // và sẽ hiển thị ra màn hình. Bạn cũng có thể thêm alert ở đây nếu muốn.
-             // alert(`Lỗi: ${resultAction.payload?.message || 'Không thể tạo đơn hàng'}`);
+            const newOrder = resultAction.payload; // { orderId, ... }
+            setQty({}); // reset giỏ hàng
+            // 👉 Điều hướng sang trang thanh toán thẻ (mock)
+            navigate(`/dashboard/pay?orderId=${encodeURIComponent(newOrder.orderId)}&amount=${encodeURIComponent(total)}`);
         }
     };
 
@@ -114,9 +108,9 @@ export default function PurchagePostPage() {
                     fmt={fmt}
                     onPay={handlePayment}
                     // Vô hiệu hóa nút thanh toán khi đang gọi API
-                    disabled={isCreatingOrder} 
+                    disabled={isCreatingOrder}
                 />
-                
+
                 {/* Hiển thị các thông báo trạng thái cho người dùng */}
                 {pricingError && <div className="mt-3 text-xs text-amber-600">{pricingError}</div>}
                 {isCreatingOrder && <div className="mt-3 text-center text-blue-600 font-semibold">Đang xử lý đơn hàng...</div>}

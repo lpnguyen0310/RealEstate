@@ -4,6 +4,8 @@ import com.backend.be_realestate.enums.ListingType;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.List;
+
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor @Builder
 @Entity
@@ -34,6 +36,8 @@ public class ListingTypePolicy extends BaseEntity {
 
     // SLA xác thực/duyệt
     @Column(name="verify_sla_minutes", nullable=false)
-    private Integer verifySlaMinutes;                 // 240 | 120 | 30
-
+    private Integer verifySlaMinutes;
+    // 240 | 120 | 30
+    @OneToMany(mappedBy = "listingTypePolicy", fetch = FetchType.LAZY)
+    private List<PropertyEntity> properties;
 }

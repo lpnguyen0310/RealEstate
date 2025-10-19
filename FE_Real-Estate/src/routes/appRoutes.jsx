@@ -22,6 +22,7 @@ import PurchagePostPage from "@/pages/UserDashboard/PurchagePostPage";
 import OrderManagement from "@/pages/UserDashboard/OrderMangement";
 import TransactionManagement from "@/pages/UserDashboard/TransactionManagement";
 import DashboardNotFound from "@/pages/UserDashboard/DashboardNotFound";
+import MockCheckoutPage from "../pages/UserDashboard/CheckoutPage";
 // (import QRGeneratorPage nếu dùng, hiện chưa gắn vào route)
 
 export default function AppRoutes() {
@@ -44,6 +45,7 @@ export default function AppRoutes() {
           <Route path="purchase" element={<PurchagePostPage />} />
           <Route path="orders" element={<OrderManagement />} />
           <Route path="transactions" element={<TransactionManagement />} />
+          <Route path="pay" element={<MockCheckoutPage />} />
           <Route path="*" element={<DashboardNotFound />} />
         </Route>
       </Route>
