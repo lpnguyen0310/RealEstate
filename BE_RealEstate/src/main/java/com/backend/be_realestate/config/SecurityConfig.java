@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/categories/**").permitAll()
                         .requestMatchers("/api/listingtype/**").permitAll()
                         .requestMatchers("/api/payments/**").permitAll()
+                        .requestMatchers( "/api/admin/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // bật oauth2 login
