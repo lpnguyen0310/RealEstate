@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 export const isPhone = (v) =>
   /^(0|\+?\d{1,3})?\d{8,12}$/.test((v || "").replace(/\s|-/g, ""));
 
@@ -92,4 +93,38 @@ export const makeUrl = (item) => {
   if (item.url) return item.url;
   if (item.previewUrl) return item.previewUrl;
   return ""; // File/Blob -> tạo objectURL ở component
+};
+
+
+
+export const fmtDate = (v) =>
+  v && dayjs(v).isValid() ? dayjs(v).format("HH:mm:ss DD/MM/YYYY") : "-";
+
+export const initials = (name = "") => {
+  const parts = name.trim().split(/\s+/);
+  if (!parts.length) return "NA";
+  const f = parts[0][0] || "";
+  const l = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (f + l).toUpperCase();
+};
+
+export const money = (v) =>
+  typeof v === "number" ? v.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + " đ" : "-";
+
+/** Chuẩn hoá trạng thái: PUBLISHED -> EXPIRING_SOON / EXPIRED theo expiresAt */
+export const normalizeStatuses = (posts) => {
+  const now = dayjs();
+  return posts.map((p) => {
+    if (p.status === "PUBLISHED") {
+      if (p.expiresAt && dayjs(p.expiresAt).isBefore(now)) return { ...p, status: "EXPIRED" };
+      if (p.expiresAt && dayjs(p.expiresAt).diff(now, "day") <= 7) return { ...p, status: "EXPIRING_SOON" };
+    }
+    return p;
+  });
+};
+
+export const countByStatus = (list) => {
+  const map = { PUBLISHED: 0, PENDING: 0, DRAFT: 0, REJECTED: 0, EXPIRED: 0, EXPIRING_SOON: 0, HIDDEN: 0 };
+  list.forEach((p) => (map[p.status] = (map[p.status] || 0) + 1));
+  return map;
 };

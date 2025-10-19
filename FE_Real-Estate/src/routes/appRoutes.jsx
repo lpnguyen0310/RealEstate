@@ -24,7 +24,10 @@ import TransactionManagement from "@/pages/UserDashboard/TransactionManagement";
 import DashboardNotFound from "@/pages/UserDashboard/DashboardNotFound";
 import MockCheckoutPage from "../pages/UserDashboard/CheckoutPage";
 // (import QRGeneratorPage nếu dùng, hiện chưa gắn vào route)
-
+import AdminLayout from "@/layouts/AdminLayout";              // <-- mới
+import AdminDashboard from "@/pages/Admin/AdminDashboard";
+import AdminUsers from "@/pages/Admin/AdminUsers";
+import AdminPostsMUI from "@/pages/Admin/AdminPost";
 export default function AppRoutes() {
   return (
     <Routes>
@@ -51,10 +54,13 @@ export default function AppRoutes() {
       </Route>
 
       {/* ADMIN (YÊU CẦU ROLE) */}
-      <Route element={<RequireRole roles={['ADMIN']} />}>
-        {adminRoutes.map(({ path, element }) => (
-          <Route key={path} path={path} element={element} />
-        ))}
+      <Route element={<RequireRole roles={['ROLE_ADMIN']} />}>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="posts" element={<AdminPostsMUI />} />
+          {/* <Route path="users" element={<AdminUsers />} /> */}
+        </Route>
       </Route>
 
       {/* 404 */}

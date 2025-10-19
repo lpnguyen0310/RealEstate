@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Modal, Form, message } from "antd";
 import { useDispatch } from "react-redux";
 import { loginThunk } from "@/store/authSlice";
+import { redirectAfterLogin } from "@/routes/helpers/redirectAfterLogin"; // file helper đã nói
+import { useNavigate, useLocation } from "react-router-dom";
 
 import LoginForm from "@/components/auth/forms/LoginForm";
 import ForgotForm from "@/components/auth/forms/ForgotForm";
@@ -25,11 +27,14 @@ export default function LoginModal({
   const [forgotForm] = Form.useForm();
   const [otpForm] = Form.useForm();
   const [resetForm] = Form.useForm();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // login | forgot | otp_zalo | reset | logging_in
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
   const [forceClosed, setForceClosed] = useState(false);
+  const [loginRoles, setLoginRoles] = useState([]);
 
   const [sentTo, setSentTo] = useState("");
   const [maskInfo, setMaskInfo] = useState("");
@@ -57,15 +62,17 @@ export default function LoginModal({
   const onFinishLogin = async (values) => {
     try {
       setLoading(true);
-      await dispatch(
+
+      // ⬇️ SỬA: lấy ra roles từ loginThunk
+      const { roles = [] } = await dispatch(
         loginThunk({
           username: values.username,
           password: values.password,
         })
       ).unwrap();
 
-      // Không đóng ngay → panel “Đang đăng nhập”
-      setMode("logging_in");
+      setLoginRoles(roles);               // ⬅️ LƯU roles để điều hướng sau khi xong panel
+      setMode("logging_in");              // ⬅️ như cũ
       onBeginLogging?.();
       message.success("Đăng nhập thành công!");
     } catch (errMsg) {
@@ -179,8 +186,15 @@ export default function LoginModal({
 
   // Panel “Đang đăng nhập” hoàn tất → ép đóng chắc chắn + báo ra ngoài
   const handleLoggingDone = () => {
-    setForceClosed(true); // ép đóng nội bộ
-    onSuccess?.(); // báo cho Header tắt Skeleton + đóng modal
+    // ⬇️ ĐIỀU HƯỚNG THEO ROLE Ở ĐÂY
+    redirectAfterLogin({
+      roles: loginRoles,     // ["ADMIN","USER",...]
+      navigate,
+      location,
+    });
+
+    setForceClosed(true);
+    onSuccess?.();
     onClose?.();
   };
 
