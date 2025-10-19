@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface PropertyAuditRepository extends JpaRepository<PropertyAuditEntity, Long> {
     List<PropertyAuditEntity> findAllByProperty_IdOrderByAtDesc(Long propertyId);
+    void deleteByPropertyId(Long propertyId);
+
 }

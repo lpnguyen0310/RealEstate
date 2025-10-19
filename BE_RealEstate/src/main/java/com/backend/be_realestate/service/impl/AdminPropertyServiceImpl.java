@@ -40,6 +40,7 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
     private final PropertyAuditRepository auditRepo; // nếu có bảng audit
     private final PropertyConverter propertyConverter;
     private final PropertyImage propertyImageRepository;
+
     @Override
     @Transactional
     public PropertyShortResponse approve(Long propertyId, ApprovePropertyRequest req, Long adminId) {
@@ -140,6 +141,8 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
     @Override
     @Transactional
     public void hardDelete(Long propertyId) {
+        auditRepo.deleteByPropertyId(propertyId);
+
         propertyRepository.deleteById(propertyId);
     }
 
