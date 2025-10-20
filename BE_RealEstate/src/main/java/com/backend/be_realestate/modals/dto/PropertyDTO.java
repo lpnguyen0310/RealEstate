@@ -56,4 +56,5 @@ public class PropertyDTO {
     private String categoryName;
     private String authorName;
     private String authorEmail;
+    private Long durationDays;
 }

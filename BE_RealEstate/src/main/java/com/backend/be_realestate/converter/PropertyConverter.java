@@ -52,7 +52,9 @@ public class PropertyConverter {
                     .collect(Collectors.toList());
             dto.setAmenityIds(amenityIds);
         }
-
+        if (entity.getListingTypePolicy() != null) {
+            dto.setDurationDays(Long.valueOf(entity.getListingTypePolicy().getDurationDays()));
+        }
         // Thời gian (nếu entity đã là Timestamp thì modelMapper đã map OK;
         // thêm bảo hiểm null để rõ ràng)
         dto.setPostedAt(entity.getPostedAt() == null ? null : entity.getPostedAt());
@@ -62,6 +64,7 @@ public class PropertyConverter {
         if (entity.getListingType() != null) {
             dto.setListingType(entity.getListingType().name()); // NORMAL | VIP | PREMIUM
         }
+
 
         return dto;
     }

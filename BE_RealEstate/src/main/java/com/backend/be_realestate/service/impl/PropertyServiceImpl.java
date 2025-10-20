@@ -137,9 +137,9 @@ public class PropertyServiceImpl implements IPropertyService {
         }
 
         // Status + thời hạn
-        var now = Instant.now();
-        property.setPostedAt(Timestamp.from(now)); // có @CreationTimestamp cũng ok
-        property.setExpiresAt(Timestamp.from(now.plus(policy.getDurationDays(), ChronoUnit.DAYS)));
+//        var now = Instant.now();
+//        property.setPostedAt(Timestamp.from(now)); // có @CreationTimestamp cũng ok
+//        property.setExpiresAt(Timestamp.from(now.plus(policy.getDurationDays(), ChronoUnit.DAYS)));
         property.setStatus(PropertyStatus.PENDING_REVIEW); // hoặc ACTIVE tuỳ quy trình duyệt
 
         // Ảnh: nếu dùng bảng con PropertyImageEntity

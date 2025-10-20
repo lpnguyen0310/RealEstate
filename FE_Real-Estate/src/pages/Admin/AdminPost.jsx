@@ -57,27 +57,42 @@ export default function AdminPostsMUI() {
                 });
 
                 const content = Array.isArray(res?.content) ? res.content : [];
-                const normalizedRows = (res?.content || []).map((p) => ({
-                    id: p.id,
-                    title: p.title,
-                    category: p.categoryName,
-                    listingType: p.listingType,
-                    displayAddress: p.displayAddress,
-                    price: p.price,
-                    status: p.status,
-                    createdAt: p.postedAt,
-                    expiresAt: p.expiresAt,
-                    author: { name: p.authorName, email: p.authorEmail },
-                    images: p.imageUrls || [],
-                }));
+                const normalizedRows = (res?.content || []).map((p) => {
+                    const posted = p.postedAt ? dayjs(p.postedAt) : null;
+                    const expires = p.expiresAt ? dayjs(p.expiresAt) : null;
+
+                    const actualDurationDays =
+                        p.actualDurationDays ??
+                        (posted && expires ? expires.diff(posted, "day") : null);
+
+                    return {
+                        id: p.id,
+                        title: p.title,
+                        category: p.categoryName,
+                        listingType: p.listingType,
+                        displayAddress: p.displayAddress,
+                        description: p.description,
+                        price: p.price,
+                        status: p.status,
+                        createdAt: p.postedAt,
+                        expiresAt: p.expiresAt,
+
+                        // BẢNG dùng số ngày THỰC TẾ:
+                        durationDays: actualDurationDays,
+
+                        // Lưu riêng số ngày THEO GÓI để Drawer dùng:
+                        policyDurationDays: p.policyDurationDays ?? p.durationDays ?? null,
+
+                        author: { name: p.authorName, email: p.authorEmail },
+                        images: p.imageUrls || [],
+                    };
+                });
+
 
                 const normalized = normalizeStatuses(normalizedRows);
                 setPosts(normalized);
                 setTotalItems(res?.totalElements ?? content.length);
                 setTotalPages(res?.totalPages ?? 1);
-
-                // ✅ FIX: Khi không có counts API, chỉ cập nhật counts khi tab = ALL
-                // để counts phản ánh bộ lọc (q/category/listingType) nhưng không bị lọc theo status.
                 if (!hasCountsApi && selectedTab === "ALL") {
                     const newCounts = countByStatus(normalized);
                     setCounts(newCounts);
@@ -93,7 +108,6 @@ export default function AdminPostsMUI() {
         return () => clearTimeout(t);
     }, [selectedTab, page, pageSize, q, category, listingType, hasCountsApi]);
 
-    // ================== FETCH COUNTS ==================
     useEffect(() => {
         if (!hasCountsApi) return;
         let t;
@@ -134,21 +148,25 @@ export default function AdminPostsMUI() {
         async (id) => {
             try {
                 setActioningId(id);
-                await adminPropertyApi.approve(id, {
+                const res = await adminPropertyApi.approve(id, {
                     durationDays: Number(decision.durationDays) || null,
                     note: decision.note || "",
                 });
+
                 setPosts((prev) =>
                     prev.map((x) =>
                         x.id === id
                             ? {
                                 ...x,
-                                status: "PUBLISHED",
-                                expiresAt: dayjs().add(decision.durationDays, "day").toISOString(),
+                                status: res?.status ?? "PUBLISHED",
+                                postedAt: res?.postedAt ?? x.postedAt,
+                                expiresAt: res?.expiresAt ?? x.expiresAt,
+                                durationDays: res?.durationDays ?? x.durationDays,
                             }
                             : x
                     )
                 );
+
                 bumpCounts("PENDING_REVIEW", "PUBLISHED");
                 await refreshCounts();
             } catch (e) {
@@ -159,6 +177,7 @@ export default function AdminPostsMUI() {
         },
         [decision, refreshCounts]
     );
+
 
     const bumpCounts = useCallback((from, to, removed = false) => {
         setCounts((prev) => {
@@ -260,15 +279,18 @@ export default function AdminPostsMUI() {
         [bumpCounts, refreshCounts]
     );
 
+    // onOpenDetail
     const onOpenDetail = useCallback((r) => {
-        setDetail({ ...r, priceLabel: money(r.price) });
+        const effectiveDuration = r.policyDurationDays ?? 30; setDetail({ ...r, priceLabel: money(r.price) });
         setDecision({
             listingType: r.listingType || "NORMAL",
-            durationDays: 30,
+            durationDays: effectiveDuration,
             note: "",
         });
         setOpen(true);
-    }, []);
+    }, [money]);
+
+
 
     const resetFilters = useCallback(() => {
         setQ("");
@@ -357,6 +379,7 @@ export default function AdminPostsMUI() {
                     onApprove={approve}
                     onReject={reject}
                     actioningId={actioningId}
+                    canEditDuration={false}
                 />
             </Box>
         </Box>
