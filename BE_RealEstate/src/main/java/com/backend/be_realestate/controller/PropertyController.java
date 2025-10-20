@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/properties")
@@ -34,9 +35,11 @@ public class PropertyController {
     private final SecurityUtils securityUtils;
 
     @GetMapping
-    public ResponseEntity<List<PropertyCardDTO>> getAllProperties() {
-        List<PropertyCardDTO> properties = propertyService.getAllPropertiesForCardView();
-        return ResponseEntity.ok(properties);
+    public ResponseEntity<Page<PropertyCardDTO>> searchProperties(
+            @RequestParam Map<String, String> allParams
+    ) {
+        Page<PropertyCardDTO> propertyPage = propertyService.searchProperties(allParams);
+        return ResponseEntity.ok(propertyPage);
     }
 
     @GetMapping("/{id}")
