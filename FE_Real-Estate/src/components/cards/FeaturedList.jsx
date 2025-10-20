@@ -17,7 +17,7 @@ export default function SimilarNews() {
   // === BƯỚC 1: KẾT NỐI REDUX ===
   const dispatch = useDispatch();
   const { list, loading, error } = useSelector((state) => state.property);
-  console.log("SimilarNews - list:", list, "loading:", loading, "error:", error);
+  console.log("Featured - list:", list, "loading:", loading, "error:", error);
 
   // === BƯỚC 2: GỌI API KHI COMPONENT TẢI LẦN ĐẦU ===
   useEffect(() => {

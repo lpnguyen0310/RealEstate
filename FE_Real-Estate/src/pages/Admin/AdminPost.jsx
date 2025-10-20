@@ -33,7 +33,6 @@ export default function AdminPostsMUI() {
     const [open, setOpen] = useState(false);
     const [detail, setDetail] = useState(null);
     const [decision, setDecision] = useState({
-        listingType: "NORMAL",
         durationDays: 30,
         reason: "",
     });
