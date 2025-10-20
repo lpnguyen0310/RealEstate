@@ -6,7 +6,7 @@ export default function PostList({
     items = [],
     total = 0,
     page = 1,
-    pageSize = 20,
+    pageSize = 5,
     onPageChange = () => { },
     onPageSizeChange = () => { },
 }) {

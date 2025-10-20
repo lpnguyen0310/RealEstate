@@ -135,7 +135,6 @@ export default function AdminPostsMUI() {
             try {
                 setActioningId(id);
                 await adminPropertyApi.approve(id, {
-                    listingType: decision.listingType,
                     durationDays: Number(decision.durationDays) || null,
                     note: decision.note || "",
                 });
@@ -297,7 +296,8 @@ export default function AdminPostsMUI() {
                 display: "flex",
                 justifyContent: "center",
                 bgcolor: "#f8f9fc",
-                p: 3,
+                px: "-24px",
+                py: "3px",
             }}
         >
             <Box sx={{ width: "100%", maxWidth: 1440 }}>

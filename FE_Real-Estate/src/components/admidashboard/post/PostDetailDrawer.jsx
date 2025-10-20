@@ -1,11 +1,12 @@
 import {
-    Drawer, Box, Stack, Avatar, Typography, Divider, Chip, Button, Card, CardContent, Grid, Select, MenuItem, TextField
+    Drawer, Box, Stack, Avatar, Typography, Divider, Chip, Button, Card, CardContent,
+    Grid, Select, MenuItem, TextField, Tooltip
 } from "@mui/material";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
-import { STATUS_LABEL, STATUS_CHIP_COLOR, LISTING_TYPES } from "./constants";
+import { STATUS_LABEL, STATUS_CHIP_COLOR } from "./constants";
 import ImageViewer from "./ImageViewer";
 
 function Row({ label, value }) {
@@ -18,13 +19,18 @@ function Row({ label, value }) {
 }
 
 export default function PostDetailDrawer({
-    open, onClose, detail, decision, setDecision, money, fmtDate, onApprove, onReject, actioningId, // NEW
+    open, onClose, detail, decision, setDecision, money, fmtDate, onApprove, onReject, actioningId,
 }) {
     if (!detail) return null;
-    const busy = actioningId === detail.id; // NEW
+    const busy = actioningId === detail.id;
+
+    const listingChipColor =
+        detail.listingType === "VIP" ? "secondary"
+            : detail.listingType === "PREMIUM" ? "warning"
+                : "info";
 
     return (
-        <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 860 } }}>
+        <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 650 } }}>
             <Box sx={{ p: 2 }}>
                 <Stack direction="row" spacing={1.5} alignItems="center" mb={1}>
                     <Avatar sx={{ bgcolor: "#e6f0ff", color: "#3059ff", fontWeight: 700, width: 48, height: 48 }}>
@@ -32,12 +38,20 @@ export default function PostDetailDrawer({
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
                         <Typography fontWeight={700}>{detail.title}</Typography>
-                        <Typography fontSize={13} color="#7a8aa1">{detail.id} • {STATUS_LABEL[detail.status]}</Typography>
+                        <Typography fontSize={13} color="#7a8aa1">
+                            {detail.id} • {STATUS_LABEL[detail.status]}
+                        </Typography>
                     </Box>
-                    <Button variant="outlined" size="small" startIcon={<OpenInNewIcon />} onClick={() => window.open(`/posts/${detail.id}`, "_blank")}>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<OpenInNewIcon />}
+                        onClick={() => window.open(`/posts/${detail.id}`, "_blank")}
+                    >
                         Mở trên FE
                     </Button>
                 </Stack>
+
                 <Divider sx={{ my: 1.5 }} />
 
                 <ImageViewer images={detail.images} />
@@ -47,16 +61,31 @@ export default function PostDetailDrawer({
                         <Grid container spacing={1.5}>
                             <Grid item xs={12} sm={6}><Row label="Giá" value={money(detail.price)} /></Grid>
                             <Grid item xs={12} sm={6}><Row label="Diện tích" value={`${detail.area ?? "-"} m²`} /></Grid>
+
+                            {/* Loại tin: READ-ONLY */}
                             <Grid item xs={12} sm={6}>
-                                <Row label="Loại tin" value={
-                                    <Chip label={detail.listingType || "NORMAL"}
-                                        color={detail.listingType === "VIP" ? "secondary" : detail.listingType === "PREMIUM" ? "warning" : "info"}
-                                        size="small" />
-                                } />
+                                <Row
+                                    label="Loại tin"
+                                    value={
+                                        <Tooltip title="Loại tin do người đăng chọn / chính sách bài. Admin không đổi tại bước duyệt.">
+                                            <Chip
+                                                label={detail.listingType || "NORMAL"}
+                                                color={listingChipColor}
+                                                size="small"
+                                                variant="filled"
+                                            />
+                                        </Tooltip>
+                                    }
+                                />
                             </Grid>
+
                             <Grid item xs={12} sm={6}>
-                                <Row label="Trạng thái" value={<Chip label={STATUS_LABEL[detail.status]} color={STATUS_CHIP_COLOR[detail.status]} size="small" />} />
+                                <Row
+                                    label="Trạng thái"
+                                    value={<Chip label={STATUS_LABEL[detail.status]} color={STATUS_CHIP_COLOR[detail.status]} size="small" />}
+                                />
                             </Grid>
+
                             <Grid item xs={12}><Row label="Địa chỉ" value={detail.displayAddress || "-"} /></Grid>
                             <Grid item xs={12}><Row label="Mô tả" value={detail.description || "-"} /></Grid>
                         </Grid>
@@ -64,31 +93,70 @@ export default function PostDetailDrawer({
                 </Card>
 
                 <Divider sx={{ my: 2 }}>Quyết định duyệt</Divider>
-                <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
-                    <Select size="small" value={decision.listingType} onChange={(e) => setDecision((s) => ({ ...s, listingType: e.target.value }))} sx={{ width: 160 }}>
-                        {LISTING_TYPES.map((v) => <MenuItem key={v} value={v}>{v === "NORMAL" ? "Thường" : v}</MenuItem>)}
-                    </Select>
-                    <Select size="small" value={decision.durationDays} onChange={(e) => setDecision((s) => ({ ...s, durationDays: e.target.value }))} sx={{ width: 140 }}>
-                        {[10, 15, 20, 30].map((d) => <MenuItem key={d} value={d}>{d} ngày</MenuItem>)}
-                    </Select>
-                    <TextField
-                        label="Lý do từ chối (không bắt buộc)"
-                        value={decision.reason}
-                        onChange={(e) => setDecision(d => ({ ...d, reason: e.target.value }))}
-                        multiline
-                        minRows={3}
-                        placeholder="Có thể để trống"
-                        fullWidth
-                    />
-                    <Button variant="contained" startIcon={<CheckCircleOutlineIcon />} disabled={busy}
-                        onClick={() => { onApprove(detail.id); onClose(); }}>
-                        Duyệt
-                    </Button>
-                    <Button color="error" variant="outlined" startIcon={<HighlightOffOutlinedIcon />} disabled={busy}
-                        onClick={() => { if (window.confirm("Từ chối tin này?")) { onReject(detail.id); onClose(); } }}>
-                        Từ chối
-                    </Button>
-                </Stack>
+
+                <Grid container spacing={2}>
+                    {/* Giữ mỗi durationDays (admin có thể set hạn đăng) */}
+                    <Grid item xs={12} md={6}>
+                        <Select
+                            size="small"
+                            value={decision.durationDays}
+                            onChange={(e) => setDecision((s) => ({ ...s, durationDays: e.target.value }))}
+                            fullWidth
+                            sx={{ minWidth: 160 }}
+                        >
+                            {[10, 15, 20, 30].map((d) => (
+                                <MenuItem key={d} value={d}>{d} ngày</MenuItem>
+                            ))}
+                        </Select>
+                    </Grid>
+
+                    {/* chừa trống cột còn lại hoặc hiển thị read-only listingType nếu muốn */}
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            size="small"
+                            label="Loại tin"
+                            value={detail.listingType || "NORMAL"}
+                            InputProps={{ readOnly: true }}
+                            fullWidth
+                        />
+                    </Grid>
+
+                    {/* Lý do từ chối */}
+                    <Grid item xs={12}>
+                        <TextField
+                            label="Lý do từ chối (không bắt buộc)"
+                            value={decision.reason || ""}
+                            onChange={(e) => setDecision((s) => ({ ...s, reason: e.target.value }))}
+                            multiline
+                            minRows={3}
+                            placeholder="Có thể để trống"
+                            fullWidth
+                        />
+                    </Grid>
+
+                    {/* Nút hành động */}
+                    <Grid item xs={12}>
+                        <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+                            <Button
+                                variant="contained"
+                                startIcon={<CheckCircleOutlineIcon />}
+                                disabled={busy}
+                                onClick={() => { onApprove(detail.id); onClose(); }}
+                            >
+                                Duyệt
+                            </Button>
+                            <Button
+                                color="error"
+                                variant="outlined"
+                                startIcon={<HighlightOffOutlinedIcon />}
+                                disabled={busy}
+                                onClick={() => { if (window.confirm("Từ chối tin này?")) { onReject(detail.id); onClose(); } }}
+                            >
+                                Từ chối
+                            </Button>
+                        </Stack>
+                    </Grid>
+                </Grid>
 
                 <Divider sx={{ my: 2 }}>Lịch sử</Divider>
                 <Card sx={{ borderRadius: 2 }}>
@@ -99,7 +167,9 @@ export default function PostDetailDrawer({
                                     <strong>{i.at}</strong> • <em>{i.by}</em>: {i.message || i.type}
                                 </Typography>
                             ))}
-                            {!(detail.audit || []).length && <Typography color="text.secondary">Chưa có lịch sử</Typography>}
+                            {!(detail.audit || []).length && (
+                                <Typography color="text.secondary">Chưa có lịch sử</Typography>
+                            )}
                         </Stack>
                     </CardContent>
                 </Card>

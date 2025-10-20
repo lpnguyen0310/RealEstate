@@ -12,6 +12,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -23,6 +24,7 @@ public class AuthService {
     private final AuthenticationManager authManager;
     private final JwtService jwt;
     private final UserRepository userRepo;
+    private final UserDetailsService userDetailsService;
     public TokenResponse login(LoginRequest req) {
         String id = req.getIdentifier();
         if (id == null || id.isBlank()) {
@@ -53,11 +55,23 @@ public class AuthService {
     }
 
     public TokenResponse refresh(RefreshRequest req) {
-        if (!jwt.isValid(req.getRefreshToken()) || !jwt.isRefresh(req.getRefreshToken())) {
+        String refreshToken = req.getRefreshToken();
+        if (!jwt.isValid(refreshToken) || !jwt.isRefresh(refreshToken)) {
             throw new BadCredentialsException("Invalid refresh token");
         }
-        String subject = jwt.getSubject(req.getRefreshToken());
-        Map<String,Object> claims = Map.of("sub", subject);
+
+        String subject = jwt.getSubject(refreshToken);
+
+        UserDetails user = userDetailsService.loadUserByUsername(subject);
+        Long userId = userRepo.findByIdentifier(subject)
+                .map(u -> u.getUserId())
+                .orElseThrow(() -> new BadCredentialsException("User not found"));
+
+        Map<String,Object> claims = Map.of(
+                "uid", userId,
+                "roles", user.getAuthorities().stream().map(a -> a.getAuthority()).toList()
+        );
+
         String access  = jwt.generateAccess(subject, claims);
         String refresh = jwt.generateRefresh(subject);
         return new TokenResponse(access, refresh);

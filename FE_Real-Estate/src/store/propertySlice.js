@@ -97,9 +97,7 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
     async ({ page = 0, size = 20, sort = "postedAt,desc" } = {}, { rejectWithValue }) => {
         try {
             const res = await api.get("/properties/me", { params: { page, size, sort } });
-            // Nếu bạn bọc ApiResponse<T>
-            const data = res?.data?.data ?? res?.data;
-            return data;
+            return res.data;
         } catch (e) {
             const msg = e?.response?.data?.message || "Không thể tải danh sách tin đăng của tôi";
             return rejectWithValue(msg);
@@ -206,7 +204,7 @@ function mapPublicPropertyToCard(p) {
         images: Array.isArray(p.images) ? p.images : [],
         title: p.title,
         description: p.description,
-        
+
         // Lấy trực tiếp các trường đã được Backend định dạng sẵn
         price: p.price,
         pricePerM2: p.pricePerM2,

@@ -63,6 +63,7 @@ export default function PostManagerPage() {
     const filtered = useMemo(() => {
         return list.filter(it => it.statusKey === status);
     }, [list, status]);
+
     // Đếm số tin theo trạng thái (nếu muốn hiển thị tab số lượng)
     const counts = useMemo(() => {
         const base = { active: 0, pending: 0, draft: 0, rejected: 0, hidden: 0, expired: 0, expiringSoon: 0 };
@@ -143,12 +144,12 @@ export default function PostManagerPage() {
                     </div>
                 ) : (
                     <PostList
-                        items={filtered}
-                        total={filtered.length}
-                        page={page + 1}
+                        items={list}               
+                        total={totalElements}         
+                        page={page + 1}              
                         pageSize={size}
-                        onPageChange={handlePageChange}
-                        onPageSizeChange={handlePageSizeChange}
+                        onPageChange={(p) => dispatch(setPage(p - 1))}
+                        onPageSizeChange={(n) => dispatch(setSize(n))}
                     />
                 )}
             </div>

@@ -1,50 +1,94 @@
 // src/api/axios.js
 import axios from "axios";
-import { getAccessToken, setAccessToken, clearAccessToken /*, logout*/ } from "@/utils/auth";
+import { getAccessToken, setAccessToken, clearAccessToken } from "@/utils/auth";
 
 const api = axios.create({ baseURL: "/api", withCredentials: true });
+const refreshClient = axios.create({ baseURL: "/api", withCredentials: true });
+
+// helper set header an toàn cho Axios v1
+const setAuthHeader = (cfg, token) => {
+  if (!cfg.headers) cfg.headers = {};
+  if (typeof cfg.headers.set === "function") cfg.headers.set("Authorization", `Bearer ${token}`);
+  else cfg.headers = { ...cfg.headers, Authorization: `Bearer ${token}` };
+};
+
+// chuẩn hoá path để skip refresh cho /auth/*
+const skipAuth = (url = "") => {
+  const path = url.replace(/^https?:\/\/[^/]+/, "");
+  return (
+    path.startsWith("/auth/login") ||
+    path.startsWith("/auth/refresh") ||
+    path.startsWith("/auth/logout") ||
+    path.startsWith("/auth/google")
+  );
+};
+
+const isUnauth = (s) => s === 401 || s === 403;
 
 api.interceptors.request.use((cfg) => {
   const t = getAccessToken();
-  if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  if (t) setAuthHeader(cfg, t);
   return cfg;
 });
 
-let refreshing = null;
-
-
+let isRefreshing = false;
+let queued = [];
 let onUnauthorized = null;
 export function setOnUnauthorized(fn) { onUnauthorized = fn; }
+
+const notifySubscribers = (newToken) => {
+  queued.forEach((cb) => cb(newToken));
+  queued = [];
+};
 
 api.interceptors.response.use(
   (r) => r,
   async (err) => {
     const { response, config } = err || {};
     const url = config?.url || "";
-    const isAuthEndpoint =
-      url.startsWith("/auth/login") ||
-      url.startsWith("/auth/refresh") ||
-      url.startsWith("/auth/logout");
 
-    if (!isAuthEndpoint && response?.status === 401 && !config._retry) {
+    if (response && isUnauth(response.status) && !config?._retry && !skipAuth(url)) {
       config._retry = true;
+
+      // đang refresh → chờ token rồi retry
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          queued.push((newToken) => {
+            const cfg = { ...config };                   
+            if (newToken) setAuthHeader(cfg, newToken); 
+            if (!cfg.baseURL) cfg.baseURL = api.defaults.baseURL;
+            resolve(api.request(cfg));                 
+          });
+        });
+      }
+
+      // bắt đầu refresh
+      isRefreshing = true;
       try {
-        refreshing = refreshing ?? api.post("/auth/refresh");
-        const { data } = await refreshing; refreshing = null;
-        const access = data?.data?.access || data?.data?.accessToken;
-        if (access) {
-          setAccessToken(access);
-          config.headers.Authorization = `Bearer ${access}`;
-          return api(config);
-        }
-      } catch {
-        refreshing = null;
+        const { data } = await refreshClient.post("/auth/refresh");
+        const access =
+          data?.access || data?.accessToken || data?.data?.access || data?.data?.accessToken;
+        if (!access) throw new Error("No access token returned");
+
+        setAccessToken(access);
+        notifySubscribers(access);
+
+        // retry request hiện tại
+        const cfg = { ...config };
+        setAuthHeader(cfg, access);                      // ✅ gắn header đúng cách
+        if (!cfg.baseURL) cfg.baseURL = api.defaults.baseURL;
+        return api.request(cfg);
+      } catch (e) {
         clearAccessToken();
-        try { await api.post("/auth/logout"); } catch { }
-        // logout(); // ❌ bỏ hẳn nếu nó phụ thuộc Context
-        if (onUnauthorized) onUnauthorized(); // ✅ báo cho Redux
+        notifySubscribers(null);
+        try { await refreshClient.post("/auth/logout"); } catch { }
+        if (onUnauthorized) onUnauthorized();
+        throw e;
+      } finally {
+        isRefreshing = false;
       }
     }
+
     return Promise.reject(err);
   }
 );

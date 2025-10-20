@@ -1,3 +1,4 @@
+// src/components/payments/StripeCheckout.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -7,11 +8,12 @@ import {
     useStripe,
 } from "@stripe/react-stripe-js";
 import { useNavigate } from "react-router-dom";
+import { createPaymentIntent } from "@/api/paymentApi";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK);
-const BACK_HREF = "/dashboard/purchage"; // chỉnh nếu route khác
+const BACK_HREF = "/dashboard/purchage"; // đổi nếu route khác
 
-// ====== UI: Modal đơn giản (overlay + card) ======
+/* ---------- Small UI helpers ---------- */
 function Modal({ open, onClose, children, width = "max-w-md" }) {
     if (!open) return null;
     return (
@@ -40,14 +42,14 @@ function Spinner({ label }) {
     );
 }
 
-// ====== Inner (form + confirm + modals) ======
+/* ---------- Inner: confirm + modals ---------- */
 function Inner({ orderId, amount, onPaid }) {
     const stripe = useStripe();
     const elements = useElements();
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(false);
-    const [info, setInfo] = useState(""); // message nhỏ dưới nút
+    const [info, setInfo] = useState(""); // small note under button
     const [openProcessing, setOpenProcessing] = useState(false);
     const [openSuccess, setOpenSuccess] = useState(false);
     const [openError, setOpenError] = useState(false);
@@ -56,7 +58,9 @@ function Inner({ orderId, amount, onPaid }) {
     const mounted = useRef(true);
     useEffect(() => {
         mounted.current = true;
-        return () => (mounted.current = false);
+        return () => {
+            mounted.current = false;
+        };
     }, []);
 
     const pollOrder = async (timeoutMs = 60000, intervalMs = 1200) => {
@@ -75,9 +79,10 @@ function Inner({ orderId, amount, onPaid }) {
         }
         return false;
     };
-
+    
     const handlePay = async () => {
         if (!stripe || !elements) return;
+
         setInfo("");
         setLoading(true);
         setOpenProcessing(true);
@@ -107,7 +112,7 @@ function Inner({ orderId, amount, onPaid }) {
             return;
         }
 
-        // Async flow (processing / requires_action / null): chờ webhook
+        // Async: chờ webhook cập nhật đơn
         setInfo("Đang xử lý qua ngân hàng…");
         const ok = await pollOrder();
         if (!mounted.current) return;
@@ -154,6 +159,7 @@ function Inner({ orderId, amount, onPaid }) {
                 <Spinner label="Đang xác thực với ngân hàng…" />
             </Modal>
 
+            {/* Modal: Success */}
             <Modal open={openSuccess} onClose={() => setOpenSuccess(false)}>
                 <div className="flex items-center gap-3 mb-3">
                     <div className="h-10 w-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
@@ -166,7 +172,10 @@ function Inner({ orderId, amount, onPaid }) {
                 <div className="text-sm text-gray-700 mb-4">
                     Mã đơn: <span className="font-mono">{orderId}</span>
                     {typeof amount === "number" && (
-                        <> • Số tiền: <b>{amount.toLocaleString("vi-VN")}₫</b></>
+                        <>
+                            {" "}
+                            • Số tiền: <b>{amount.toLocaleString("vi-VN")}₫</b>
+                        </>
                     )}
                 </div>
                 <div className="flex justify-end gap-2">
@@ -203,30 +212,24 @@ function Inner({ orderId, amount, onPaid }) {
     );
 }
 
+/* ---------- Outer: init clientSecret (idempotent, no double-call) ---------- */
 export default function StripeCheckout({ orderId, amount, onPaid }) {
     const [clientSecret, setClientSecret] = useState("");
     const [initMsg, setInitMsg] = useState("");
 
+    // Chặn gọi trùng trong dev (React Strict Mode mount/unmount)
+    const initLock = useRef(new Set());
+
     useEffect(() => {
-        if (!orderId || orderId === "N/A" || clientSecret) return;
-        let canceled = false;
+        if (!orderId || clientSecret) return;
+        if (initLock.current.has(orderId)) return; // đã gọi rồi
+        initLock.current.add(orderId);
 
         (async () => {
             setInitMsg("Đang khởi tạo thanh toán…");
             try {
-                const r = await fetch(`/api/payments/orders/${orderId}/pay`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                });
-                if (!r.ok) {
-                    const t = await r.text();
-                    setInitMsg(`Không tạo được thanh toán: ${t}`);
-                    return;
-                }
-                const data = await r.json();
-                if (canceled) return;
-
-                if (data.alreadyPaid) {
+                const data = await createPaymentIntent(orderId); // chỉ gọi 1 nơi
+                if (data?.alreadyPaid) {
                     setInitMsg("Đơn hàng đã được thanh toán.");
                     onPaid?.();
                     return;
@@ -238,13 +241,10 @@ export default function StripeCheckout({ orderId, amount, onPaid }) {
                     setInitMsg("Thiếu clientSecret từ server.");
                 }
             } catch (e) {
-                setInitMsg("Không kết nối được máy chủ.");
+                // Hàm helper trả message từ BE (409/400/500) => e.message
+                setInitMsg(e.message || "Không tạo được thanh toán");
             }
         })();
-
-        return () => {
-            canceled = true;
-        };
     }, [orderId, clientSecret, onPaid]);
 
     const options = useMemo(

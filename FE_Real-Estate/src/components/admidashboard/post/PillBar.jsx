@@ -6,7 +6,7 @@ export default function PillBar({ selected, onSelect, counts = {} }) {
     const pills = useMemo(
         () => [
             { key: "PENDING_REVIEW", label: "Chờ duyệt", badgeBg: "#fde68a" },
-            { key: "ACTIVE", label: "Đang hiển thị", badgeBg: "#e6edf9" },
+            { key: "PUBLISHED", label: "Đang hiển thị", badgeBg: "#e6edf9" },
             { key: "EXPIRING_SOON", label: "Sắp hết hạn", badgeBg: "#fed7aa" },
             { key: "EXPIRED", label: "Hết hạn", badgeBg: "#cbd5e1" },
             { key: "HIDDEN", label: "Đã ẩn", badgeBg: "#cbd5e1" },

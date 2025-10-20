@@ -25,8 +25,10 @@ public class JwtService {
         this.refreshExpMs = refreshExpMs;
     }
 
-    public String generateAccess(String subject, Map<String, Object> claims){
-        return buildToken(subject, claims, accessExpMs);
+    public String generateAccess(String subject, Map<String, Object> claims) {
+        Map<String,Object> c = new java.util.HashMap<>(claims == null ? Map.of() : claims);
+        c.putIfAbsent("typ", "access");
+        return buildToken(subject, c, accessExpMs);
     }
     public String generateRefresh(String subject){
         return buildToken(subject, Map.of("typ","refresh"), refreshExpMs);
