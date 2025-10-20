@@ -9,6 +9,7 @@ import com.backend.be_realestate.modals.dto.order.OrderItemDTO;
 import com.backend.be_realestate.modals.request.order.CheckoutReq;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.OrderService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final ListingPackageRepository listingPackageRepository;
     private final OrderConverter orderConverter;
+    private final ObjectMapper objectMapper;
 
     @Autowired
     private UserRepository userRepository;
@@ -49,12 +52,8 @@ public class OrderServiceImpl implements OrderService {
         // 2. Normalize giỏ hàng
         Map<String, Integer> qtyMap = new LinkedHashMap<>();
         req.getItems().forEach(it -> {
-            // Lấy code ra một biến riêng để kiểm tra
             String code = it.getCode();
-
-            // KIỂM TRA AN TOÀN: Chỉ xử lý khi item có code hợp lệ và số lượng > 0
             if (it.getQty() > 0 && code != null && !code.trim().isEmpty()) {
-                // Chỉ gọi trim() sau khi đã chắc chắn code không phải là null
                 qtyMap.merge(code.trim(), it.getQty(), Integer::sum);
             }
         });
@@ -96,13 +95,9 @@ public class OrderServiceImpl implements OrderService {
             // Liên kết OrderItem với Order (quan trọng!)
             order.addItem(orderItem);
         }
-
-        // 4. Gán các giá trị tổng tiền cuối cùng cho Order
         order.setSubtotal(calculatedSubtotal);
         order.setTotal(calculatedSubtotal); // Giả sử total = subtotal
 
-        // 5. LƯU XUỐNG DATABASE MỘT LẦN DUY NHẤT
-        // Nhờ CascadeType.ALL, khi lưu order, tất cả các orderItem liên quan cũng sẽ được lưu theo.
         OrderEntity savedOrder = orderRepository.save(order);
 
         // 6. Trả về DTO
@@ -159,6 +154,31 @@ public class OrderServiceImpl implements OrderService {
         }
 
         System.out.println("Đã xử lý thành công đơn hàng " + orderId + " và cộng vật phẩm cho người dùng " + user.getEmail());
+    }
+
+    @Override
+    public List<Map<String, Object>> getOrdersByUserId(Long userId) {
+        List<OrderEntity> orders = orderRepository.findOrdersByUserId(userId);
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (OrderEntity order : orders) {
+            // a. Chuyển đổi sang DTO cơ bản (không có userName)
+            OrderDTO baseDto = orderConverter.toDto(order);
+
+            // b. Dùng ObjectMapper để chuyển DTO thành Map
+            Map<String, Object> orderMap = objectMapper.convertValue(baseDto, Map.class);
+
+            // c. Thêm thủ công trường userName vào Map
+            if (order.getUser() != null) {
+                orderMap.put("userName", order.getUser().getLastName() + " " + order.getUser().getFirstName());
+            } else {
+                orderMap.put("userName", "N/A");
+            }
+
+            results.add(orderMap);
+        }
+
+        return results;
     }
 
     /**

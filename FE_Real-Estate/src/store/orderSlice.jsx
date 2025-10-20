@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { createOrderApi } from "@/services/orderApi";
+import { createOrderApi, getMyOrdersApi } from "@/services/orderApi";
 
 // AsyncThunk để xử lý việc gọi API tạo đơn hàng một cách bất đồng bộ
 export const createOrder = createAsyncThunk(
@@ -16,7 +16,34 @@ export const createOrder = createAsyncThunk(
   }
 );
 
+export const fetchMyOrders = createAsyncThunk(
+  "orders/fetchMy", // Đặt tên action type khác
+  async (_, { rejectWithValue }) => { // Không cần payload nên dùng dấu "_"
+    try {
+      const response = await getMyOrdersApi();
+      // API trả về { code, message, data, errors }, chúng ta cần mảng `data`
+      console.log('Payload being sent to Reducer:', response.data);
+      return response.data; 
+    } catch (error) {
+      return rejectWithValue(error.response ? error.response.data : error.message);
+    }
+  }
+);
+export const getTransactionsForOrderApi = async (orderId) => {
+  if (!orderId) return [];
+  
+  const API_URL = `/orders/${orderId}/transactions`;
+  
+  try {
+    const response = await api.get(API_URL);
+    return response.data.data || [];
+  } catch (error) {
+    console.error(`Failed to fetch transactions for order ${orderId}`, error);
+    throw error;
+  }
+};
 const initialState = {
+  myOrders: [],
   currentOrder: null, // Lưu thông tin đơn hàng vừa tạo thành công
   loading: false,
   error: null,
@@ -47,6 +74,18 @@ const orderSlice = createSlice({
       .addCase(createOrder.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || "Tạo đơn hàng thất bại. Vui lòng thử lại.";
+      })
+      .addCase(fetchMyOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMyOrders.fulfilled, (state, action) => {
+        state.loading = false;
+        state.myOrders = action.payload; // Cập nhật danh sách đơn hàng vào state
+      })
+      .addCase(fetchMyOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || "Tải lịch sử đơn hàng thất bại.";
       });
   },
 });

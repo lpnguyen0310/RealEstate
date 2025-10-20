@@ -1,239 +1,161 @@
+import { useSelector } from 'react-redux'; // ✨ 1. CHỈ CẦN IMPORT useSelector
 import {
-    Dialog, DialogTitle, DialogContent, DialogActions,
-    Typography, Box, Table, TableHead, TableRow, TableCell, TableBody,
-    Paper, Button
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Typography, Box, Table, TableHead, TableRow, TableCell, TableBody,
+  Paper, Button
 } from "@mui/material";
-import { TRANSACTIONS } from "@/data/Dashboard/OrderManagementData";
+import dayjs from "dayjs";
+
+// --- Các hàm hỗ trợ định dạng (giữ nguyên) ---
+const formatOrderStatus = (status) => {
+  switch (status) {
+    case 'PAID': return { text: 'Thành công', color: '#1aa260' };
+    case 'PENDING_PAYMENT': return { text: 'Đang xử lý', color: '#f28c38' };
+    case 'CANCELED': return { text: 'Đã hủy', color: '#e53935' };
+    default: return { text: status, color: 'grey' };
+  }
+};
+const formatDateTime = (isoString) => {
+  if (!isoString) return '';
+  return dayjs(isoString).format('DD/MM/YYYY HH:mm');
+};
+const formatCurrency = (amount) => {
+  if (typeof amount !== 'number') return '0 ₫';
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+};
+
 
 export default function OrderDetailModal({ open, onClose, order }) {
-    if (!order) return null;
+  // ✨ 2. XÓA BỎ STATE VÀ useEffect ĐỂ GỌI API
+  // const [transactions, setTransactions] = useState([]);
+  // const [isLoadingTx, setIsLoadingTx] = useState(false);
+  // const [errorTx, setErrorTx] = useState(null);
+  // useEffect(...);
 
-    // lọc giao dịch liên quan
-    const txList = TRANSACTIONS.filter(tx => tx.orderCode === order.code);
+  // ✨ 3. LẤY DANH SÁCH TẤT CẢ ĐƠN HÀNG TỪ REDUX
+  const { myOrders } = useSelector((state) => state.orders);
 
-    return (
-        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-            <DialogTitle
-                sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    fontWeight: 700,
-                    fontSize: 18,
-                    backgroundColor: "#F0F5FF", // nền xanh nhạt
-                    px: 2.5,
-                    py: 2.5,
-                }}
-            >
-                Chi tiết đơn hàng
+  if (!order) return null;
 
-                {/* Nút X */}
-                <Box
-                    component="button"
-                    onClick={onClose}
-                    sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "8px",
-                        border: "none",
-                        backgroundColor: "#E4EBFF",
-                        color: "#1E3A8A",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                        transition: "0.2s",
-                        "&:hover": {
-                            backgroundColor: "#d7e2ff",
-                        },
-                    }}
-                >
-                    ×
-                </Box>
-            </DialogTitle>
+  // ✨ 4. LỌC RA CÁC ĐƠN HÀNG CÒN LẠI
+  const otherOrders = myOrders.filter(o => o.orderId !== order.orderId);
 
+  const statusInfo = formatOrderStatus(order.status);
 
-            <DialogContent dividers sx={{ backgroundColor: "#F0F5FF" }}>
-                {/* ==== Thông tin đơn hàng ==== */}
-                <Paper
-                    sx={{
-                        p: 2.5,
-                        mb: 3,
-                        bgcolor: "#eaf2ff",          // xanh nhạt hơn một chút
-                        borderRadius: 2,
-                    }}
-                >
-                    <Box
-                        sx={{
-                            display: "grid",
-                            // xs: 1 cột; >=sm: 4 cột (label-value | label-value)
-                            gridTemplateColumns: { xs: "1fr", sm: "auto 1fr auto 1fr" },
-                            columnGap: { xs: 2, sm: 6 },
-                            rowGap: 1.5,
-                            alignItems: "center",
-                        }}
-                    >
-                        {/* Row 1: Mã đơn hàng | Trạng thái */}
-                        <Typography sx={{ fontWeight: 700, color: "#1a2b4c" }}>
-                            Mã đơn hàng
-                        </Typography>
-                        <Typography sx={{ fontWeight: 500 }}>{order.code}</Typography>
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle
+        sx={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          fontWeight: 700, fontSize: 18, backgroundColor: "#F0F5FF",
+          px: 2.5, py: 2.5,
+        }}
+      >
+        Chi tiết đơn hàng
+        <Box
+          component="button"
+          onClick={onClose}
+          sx={{
+            width: 28, height: 28, borderRadius: "8px", border: "none",
+            backgroundColor: "#E4EBFF", color: "#1E3A8A", fontWeight: "bold",
+            cursor: "pointer", transition: "0.2s",
+            "&:hover": { backgroundColor: "#d7e2ff" },
+          }}
+        >
+          ×
+        </Box>
+      </DialogTitle>
 
-                        <Typography sx={{ fontWeight: 700, color: "#1a2b4c" }}>
-                            Trạng thái
-                        </Typography>
-                        <Typography
-                            sx={{
-                                fontWeight: 700,
-                                color:
-                                    order.status === "Thành công"
-                                        ? "#1aa260"
-                                        : order.status === "Đang xử lý"
-                                            ? "#f28c38"
-                                            : "#e53935",
-                                textAlign: { xs: "left", sm: "right" }, // canh phải như ảnh
-                            }}
-                        >
-                            {order.status}
-                        </Typography>
+      <DialogContent dividers sx={{ backgroundColor: "#F0F5FF" }}>
+        {/* ==== Thông tin đơn hàng ==== (Giữ nguyên) */}
+        <Paper sx={{ p: 2.5, mb: 3, bgcolor: "#eaf2ff", borderRadius: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "auto 1fr auto 1fr" }, columnGap: { xs: 2, sm: 6 }, rowGap: 1.5, alignItems: "center" }}>
+                <Typography sx={{ fontWeight: 700, color: "#1a2b4c" }}>Mã đơn hàng</Typography>
+                <Typography sx={{ fontWeight: 500 }}>{order.orderId}</Typography>
+                <Typography sx={{ fontWeight: 700, color: "#1a2b4c" }}>Trạng thái</Typography>
+                <Typography sx={{ fontWeight: 700, color: statusInfo.color, textAlign: { xs: "left", sm: "right" } }}>
+                {statusInfo.text}
+                </Typography>
+                <Typography sx={{ fontWeight: 700, color: "#1a2b4c" }}>Ngày tạo đơn</Typography>
+                <Typography sx={{ fontWeight: 500 }}>{formatDateTime(order.createdAt)}</Typography>
+                <Typography sx={{ fontWeight: 700, color: "#1a2b4c" }}>Tổng thanh toán</Typography>
+                <Typography sx={{ fontWeight: 700, textAlign: { xs: "left", sm: "right" }, color: "#2b3a55" }}>
+                {formatCurrency(order.total)}
+                </Typography>
+            </Box>
+        </Paper>
 
-                        {/* Row 2: Ngày tạo đơn | Tổng thanh toán */}
-                        <Typography sx={{ fontWeight: 700, color: "#1a2b4c" }}>
-                            Ngày tạo đơn
-                        </Typography>
-                        <Typography sx={{ fontWeight: 500 }}>{order.createdAt}</Typography>
+        {/* ==== Danh sách gói tin đã mua ==== (Giữ nguyên) */}
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography fontWeight={700} mb={1.5}>Danh sách gói tin đã mua</Typography>
+          {order.items?.length ? (
+            <Table size="small">
+              <TableHead sx={{ backgroundColor: "#f3f7ff", "& th": { fontWeight: 700, color: "#1a2b4c", fontSize: 14, borderBottom: "none", paddingY: 1.2 } }}>
+                <TableRow>
+                  <TableCell>Tên gói</TableCell>
+                  <TableCell align="right">Số lượng</TableCell>
+                  <TableCell align="right">Thành tiền</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody sx={{ "& td": { py: 1.5 } }}>
+                {order.items.map((it, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{it.title}</TableCell>
+                    <TableCell align="right">{it.qty}</TableCell>
+                    <TableCell align="right">{formatCurrency(it.lineTotal)}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700, borderBottom: 'none' }}>Tổng cộng</TableCell>
+                  <TableCell sx={{ borderBottom: 'none' }} />
+                  <TableCell align="right" sx={{ fontWeight: 700, color: "#e53935", borderBottom: 'none' }}>
+                    {formatCurrency(order.total)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          ) : (
+            <Typography color="text.secondary">Không có dữ liệu gói tin.</Typography>
+          )}
+        </Paper>
 
-                        <Typography sx={{ fontWeight: 700, color: "#1a2b4c" }}>
-                            Tổng thanh toán
-                        </Typography>
-                        <Typography
-                            sx={{
-                                fontWeight: 700,
-                                textAlign: { xs: "left", sm: "right" },
-                                color: "#2b3a55",
-                            }}
-                        >
-                            {order.amount}
-                        </Typography>
-                    </Box>
-                </Paper>
+        {/* ==== ✨ 5. CẬP NHẬT PHẦN NÀY ĐỂ HIỂN THỊ "CÁC ĐƠN HÀNG KHÁC" ==== */}
+        <Paper sx={{ p: 2 }}>
+          <Typography fontWeight={700} mb={1.5}>Các đơn hàng khác</Typography>
+          {otherOrders.length === 0 ? (
+            <Typography color="text.secondary">Không có đơn hàng nào khác.</Typography>
+          ) : (
+            <Table size="small">
+              <TableHead sx={{ backgroundColor: "#f3f7ff", "& th": { fontWeight: 700, color: "#1a2b4c", fontSize: 14, borderBottom: "none", paddingY: 1.2 } }}>
+                <TableRow>
+                  <TableCell>Mã đơn hàng</TableCell>
+                  <TableCell>Thời gian</TableCell>
+                  <TableCell>Số tiền</TableCell>
+                  <TableCell>Trạng thái</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody sx={{ "& td": { py: 1.5 } }}>
+                {otherOrders.map((other) => {
+                  const otherStatus = formatOrderStatus(other.status);
+                  return (
+                    <TableRow key={other.orderId}>
+                      <TableCell>{other.orderId}</TableCell>
+                      <TableCell>{formatDateTime(other.createdAt)}</TableCell>
+                      <TableCell>{formatCurrency(other.total)}</TableCell>
+                      <TableCell sx={{ color: otherStatus.color, fontWeight: 'bold' }}>{otherStatus.text}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </Paper>
+      </DialogContent>
 
-
-                {/* ==== Danh sách gói tin đã mua ==== */}
-                <Paper sx={{ p: 2, mb: 3 }}>
-                    <Typography fontWeight={700} mb={1.5}>Danh sách gói tin đã mua</Typography>
-                    {order.items?.length ? (
-                        <Table size="small">
-                            <TableHead sx={{
-                                backgroundColor: "#f3f7ff",       // màu nền xanh nhạt
-                                "& th": {
-                                    fontWeight: 700,               // chữ đậm
-                                    color: "#1a2b4c",              // màu xanh đậm chữ
-                                    fontSize: 14,
-                                    borderBottom: "none",
-                                    paddingY: 1.2,
-                                },
-                            }}>
-                                <TableRow>
-                                    <TableCell>Tên gói</TableCell>
-                                    <TableCell align="right">Số lượng</TableCell>
-                                    <TableCell align="right">Giá</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody sx={{
-                                "& td": { py: 1.5 },
-                            }}>
-                                {order.items.map((it, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell>{it.name}</TableCell>
-                                        <TableCell align="right">{it.qty}</TableCell>
-                                        <TableCell align="right">
-                                            {it.priceVND.toLocaleString("vi-VN")} VNĐ
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                <TableRow>
-                                    <TableCell sx={{ fontWeight: 700 }}>Tổng cộng</TableCell>
-                                    <TableCell /> {/* cột trống giữa */}
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: "#e53935", // màu đỏ cho tổng tiền
-                                        }}
-                                    >
-                                        {order.items
-                                            .reduce((sum, it) => sum + it.qty * it.priceVND, 0)
-                                            .toLocaleString("vi-VN")}{" "}
-                                        VNĐ
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    ) : (
-                        <Typography color="text.secondary">Không có dữ liệu gói tin.</Typography>
-                    )}
-                </Paper>
-
-                {/* ==== Thông tin giao dịch ==== */}
-                <Paper sx={{ p: 2 }}>
-                    <Typography fontWeight={700} mb={1.5}>Thông tin giao dịch</Typography>
-                    {txList.length === 0 ? (
-                        <Typography color="text.secondary">Không có giao dịch nào.</Typography>
-                    ) : (
-                        <Table size="small">
-                            <TableHead
-                                sx={{
-                                    backgroundColor: "#f3f7ff",       // màu nền xanh nhạt
-                                    "& th": {
-                                        fontWeight: 700,               // chữ đậm
-                                        color: "#1a2b4c",              // màu xanh đậm chữ
-                                        fontSize: 14,
-                                        borderBottom: "none",
-                                        paddingY: 1.2,
-                                    },
-                                }}
-                            >
-                                <TableRow>
-                                    <TableCell>Mã giao dịch</TableCell>
-                                    <TableCell>Thời gian</TableCell>
-                                    <TableCell>Loại giao dịch</TableCell>
-                                    <TableCell>Số tiền</TableCell>
-                                    <TableCell>Trạng thái</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody sx={{
-                                "& td": { py: 1.5 },
-                            }}>
-                                {txList.map((tx) => (
-                                    <TableRow key={tx.id}>
-                                        <TableCell>{tx.id}</TableCell>
-                                        <TableCell>{tx.createdAt}</TableCell>
-                                        <TableCell>{tx.type}</TableCell>
-                                        <TableCell>{tx.amount}</TableCell>
-                                        <TableCell>
-                                            <span style={{
-                                                color:
-                                                    tx.status === "Thành công"
-                                                        ? "#1aa260"
-                                                        : tx.status === "Đang xử lý"
-                                                            ? "#f28c38"
-                                                            : "#e53935",
-                                                fontWeight: 600,
-                                            }}>
-                                                {tx.status}
-                                            </span>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </Paper>
-            </DialogContent>
-
-            <DialogActions sx={{ p: 2 }}>
-                <Button variant="outlined" onClick={onClose}>Đóng</Button>
-                <Button variant="contained" color="primary">Mua lại</Button>
-            </DialogActions>
-        </Dialog>
-    );
+      <DialogActions sx={{ p: 2 }}>
+        <Button variant="outlined" onClick={onClose}>Đóng</Button>
+        <Button variant="contained" color="primary">Mua lại</Button>
+      </DialogActions>
+    </Dialog>
+  );
 }

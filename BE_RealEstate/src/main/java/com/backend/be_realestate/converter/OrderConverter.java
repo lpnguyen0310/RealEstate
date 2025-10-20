@@ -7,6 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
 
 @Component
@@ -32,6 +35,14 @@ public class OrderConverter {
 
         if (order.getUser() != null) {
             dto.setUserId(order.getUser().getUserId());
+        }
+
+        if (order.getCreatedAt() != null) {
+            Date oldDate = order.getCreatedAt();
+            String formattedDate = oldDate.toInstant()
+                    .atZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            dto.setCreatedAt(formattedDate);
         }
 
         // Map danh sách items (bên trong OrderItemConverter vẫn dùng modelMapper + chuẩn hoá)
