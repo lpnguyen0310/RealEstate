@@ -5,15 +5,64 @@ import { SearchOutlined, FilterOutlined } from "@ant-design/icons";
 import FilterModal from "../filters/FilterModal";
 import SearchQuickPanel from "./SearchQuickPanel";
 
+// --- CHANGED (1): Cấu trúc lại mảng trending thành mảng object ---
 const trending = [
-    "mua nhà phố bình tân dưới 7 tỷ",
-    "bán nhà tân phú",
-    "nhà tân bình 3-7 tỷ",
-    "nhà đất bình thạnh",
-    "nhà hẻm đẹp gò vấp",
-    "bán căn hộ quận 7",
-    "bán nhà đất quận 8",
+    {
+        text: "mua nhà phố bình tân dưới 7 tỷ",
+        params: {
+            q: "nhà phố bình tân",
+            type: "sell",
+            priceTo: 7000000000,
+        },
+    },
+    {
+        text: "bán nhà tân phú",
+        params: {
+            q: "nhà tân phú",
+            type: "sell",
+        },
+    },
+    {
+        text: "nhà tân bình 3-7 tỷ",
+        params: {
+            q: "nhà tân bình",
+            type: "sell",
+            priceFrom: 3000000000,
+            priceTo: 7000000000,
+        },
+    },
+    {
+        text: "nhà đất bình thạnh",
+        params: {
+            q: "nhà đất bình thạnh",
+            type: "sell",
+        },
+    },
+    {
+        text: "nhà hẻm đẹp gò vấp",
+        params: {
+            q: "nhà hẻm gò vấp", // Bỏ chữ "đẹp" để tăng khả năng tìm thấy
+            type: "sell",
+        },
+    },
+    {
+        text: "bán căn hộ quận 7",
+        params: {
+            q: "căn hộ quận 7",
+            type: "sell",
+            // Tùy chọn: Nếu hệ thống có bộ lọc theo category (loại BĐS),
+            // bạn có thể thêm: categoryId: 1 (giả sử 1 là ID của Căn hộ)
+        },
+    },
+    {
+        text: "bán nhà đất quận 8",
+        params: {
+            q: "nhà đất quận 8",
+            type: "sell",
+        },
+    },
 ];
+
 
 export default function SearchCard() {
     const navigate = useNavigate();
@@ -33,7 +82,6 @@ export default function SearchCard() {
         const row = rowRef.current;
         const inputWrap = inputWrapRef.current;
         if (!row || !inputWrap) return;
-
         const rowRect = row.getBoundingClientRect();
         const inputRect = inputWrap.getBoundingClientRect();
         const left = Math.max(0, inputRect.left - rowRect.left);
@@ -83,34 +131,50 @@ export default function SearchCard() {
         };
     }, [openQuickPanel]);
 
-    // --- Logic tìm kiếm và điều hướng ---
-    const executeSearch = (searchQuery) => {
+    // --- NEW (2): Hàm tìm kiếm mới, linh hoạt hơn, nhận vào object params ---
+    const executeSearchFromParams = (paramsObject) => {
         const params = new URLSearchParams();
-        params.append("type", mode === "buy" ? "sell" : "rent");
-        if (searchQuery.trim()) {
-            params.append("keyword", searchQuery.trim());
-        }
-        Object.entries(filters).forEach(([key, value]) => {
+
+        // Gộp các tham số từ object vào URLSearchParams
+        Object.entries(paramsObject).forEach(([key, value]) => {
             if (value !== null && value !== undefined && value !== '') {
                 params.append(key, value);
             }
         });
+
+        // Luôn đảm bảo có tham số 'type' trong URL
+        if (!params.has("type")) {
+            params.append("type", mode === "buy" ? "sell" : "rent");
+        }
+        
         navigate(`/search?${params.toString()}`);
     };
 
+    // --- CHANGED (3): Cập nhật lại các hàm xử lý sự kiện ---
     const handleSearch = () => {
-        executeSearch(query);
+        const searchParams = {
+            q: query.trim(),
+            ...filters, // Gộp các bộ lọc đã áp dụng
+        };
+        executeSearchFromParams(searchParams);
     };
 
-    const handleTrendingClick = (trendingQuery) => {
-        setQuery(trendingQuery);
-        executeSearch(trendingQuery);
+    const handleTrendingClick = (trendingItem) => {
+        // Cập nhật ô input để người dùng thấy họ vừa chọn gì
+        setQuery(trendingItem.params.q || trendingItem.text);
+        // Tìm kiếm với các tham số đã được định nghĩa sẵn
+        executeSearchFromParams(trendingItem.params);
     };
 
     const handleApplyFilters = (newFilters) => {
         setFilters(newFilters);
         setShowFilter(false);
-        // Tùy chọn: tìm kiếm ngay sau khi áp dụng bộ lọc bằng cách gọi executeSearch("")
+        // Tìm kiếm ngay với từ khóa hiện tại và bộ lọc mới
+        const searchParams = {
+            q: query.trim(),
+            ...newFilters,
+        };
+        executeSearchFromParams(searchParams);
     };
 
     return (
@@ -144,9 +208,10 @@ export default function SearchCard() {
                         <div className="mt-4">
                             <div className="text-gray-800 font-semibold mb-2">Xu hướng tìm kiếm</div>
                             <div className="flex flex-wrap gap-2">
+                                {/* --- CHANGED (4): Cập nhật logic render --- */}
                                 {trending.map((t) => (
-                                    <Tag key={t} onClick={() => handleTrendingClick(t)} className="cursor-pointer rounded-full px-3 py-1 bg-[#eef6ff] hover:bg-[#e1efff] border-none text-[#1f5fbf]">
-                                        <span className="mr-1">📈</span>{t}
+                                    <Tag key={t.text} onClick={() => handleTrendingClick(t)} className="cursor-pointer rounded-full px-3 py-1 bg-[#eef6ff] hover:bg-[#e1efff] border-none text-[#1f5fbf]">
+                                        <span className="mr-1">📈</span>{t.text}
                                     </Tag>
                                 ))}
                             </div>
