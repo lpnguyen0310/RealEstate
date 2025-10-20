@@ -9,19 +9,10 @@ import SearchFilters from "../Search/SearchFilters";
 import SearchList from "../Search/SearchList";
 import { fetchPropertiesThunk, setPage as setReduxPage } from "@/store/propertySlice"; // Chỉnh lại đường dẫn nếu cần
 
-// Các hàm helpers không cần thiết cho việc lọc/sắp xếp ở client nữa
-// bạn có thể xóa chúng nếu không dùng ở đâu khác.
-// const parsePriceToTrieu = ...
-// const normalize = ...
-// const matchKeyword = ...
-// const sortItems = ...
-
 export default function SearchResultsPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const dispatch = useDispatch();
 
-    // 1. KẾT NỐI REDUX STORE
-    // Lấy state trực tiếp từ Redux thay vì quản lý bằng useState và gọi axios
     const {
         list: pageItems,      // Dữ liệu của trang hiện tại
         loading,
@@ -33,13 +24,12 @@ export default function SearchResultsPage() {
 
     console.log("SearchResultsPage - pageItems:", pageItems, "loading:", loading, "error:", error, "currentPage:", currentPage, "currentPageSize:", currentPageSize, "total:", total);
 
-    // 2. QUẢN LÝ CÁC GIÁ TRỊ LỌC TẠI LOCAL STATE
-    // State này chỉ dùng để điều khiển các ô input, select box...
-    const [keyword, setKeyword] = useState(() => searchParams.get("q") || "");
+    const [keyword, setKeyword] = useState(() =>
+        searchParams.get("keyword") || searchParams.get("q") || ""
+    );
     const [sort, setSort] = useState("relevance");
     const [filters, setFilters] = useState(null);
 
-    // 3. EFFECT "THẦN THÁNH" - GỌI LẠI API MỖI KHI BỘ LỌC THAY ĐỔI
     useEffect(() => {
         // Xây dựng object `params` để gửi lên cho thunk
         const params = {

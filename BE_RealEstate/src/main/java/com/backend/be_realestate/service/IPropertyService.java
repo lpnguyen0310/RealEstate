@@ -10,11 +10,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 public interface IPropertyService {
     List<PropertyCardDTO> getAllPropertiesForCardView();
 
     PropertyDetailDTO getPropertyDetailById(Long id);
+
+    Page<PropertyCardDTO> searchProperties(Map<String, String> params);
 
     Page<PropertyDTO> getPropertiesByUser(Long userId, Pageable pageable);
     PropertyDTO create1(Long currentUserId, CreatePropertyRequest req, List<MultipartFile> images);

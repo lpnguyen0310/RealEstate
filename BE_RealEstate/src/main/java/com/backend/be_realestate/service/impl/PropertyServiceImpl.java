@@ -15,10 +15,14 @@ import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import com.backend.be_realestate.repository.*;
+import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,6 +31,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -58,6 +63,43 @@ public class PropertyServiceImpl implements IPropertyService {
         PropertyEntity entity = propertyRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
         return propertyMapper.toPropertyDetailDTO(entity);
+    }
+
+    @Override
+    public Page<PropertyCardDTO> searchProperties(Map<String, String> params) {
+        // --- 1. XỬ LÝ PHÂN TRANG VÀ SẮP XẾP ---
+        Pageable pageable = createPageableFromParams(params);
+
+        // --- 2. LẤY CÁC GIÁ TRỊ LỌC TỪ PARAMS ---
+        String keyword = params.get("keyword");
+        String propertyType = params.get("type");
+        String categorySlug = params.get("category");
+        Double priceFrom = params.get("priceFrom") != null ? Double.parseDouble(params.get("priceFrom")) : null;
+        Double priceTo = params.get("priceTo") != null ? Double.parseDouble(params.get("priceTo")) : null;
+        Float areaFrom = params.get("areaFrom") != null ? Float.parseFloat(params.get("areaFrom")) : null;
+        Float areaTo = params.get("areaTo") != null ? Float.parseFloat(params.get("areaTo")) : null;
+        // Thêm các tham số khác nếu cần...
+
+        // --- 3. KẾT HỢP CÁC SPECIFICATION ---
+        Specification<PropertyEntity> spec = PropertySpecification.hasKeyword(keyword)
+                .and(PropertySpecification.hasPropertyType(propertyType))
+                .and(PropertySpecification.hasCategorySlug(categorySlug))
+                .and(PropertySpecification.priceBetween(priceFrom, priceTo))
+                .and(PropertySpecification.areaBetween(areaFrom, areaTo));
+        // .and(...) thêm các điều kiện khác
+
+        // --- 4. GỌI REPOSITORY VÀ MAP KẾT QUẢ ---
+        Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
+        return resultPage.map(propertyMapper::toPropertyCardDTO);
+    }
+
+    // Phương thức phụ trợ để code gọn gàng hơn
+    private Pageable createPageableFromParams(Map<String, String> params) {
+        int page = Integer.parseInt(params.getOrDefault("page", "0"));
+        int size = Integer.parseInt(params.getOrDefault("size", "10"));
+        String[] sortParams = params.getOrDefault("sort", "postedAt,desc").split(",");
+        Sort sort = Sort.by(Sort.Direction.fromString(sortParams[1].toUpperCase()), sortParams[0]);
+        return PageRequest.of(page, size, sort);
     }
 
     @Override

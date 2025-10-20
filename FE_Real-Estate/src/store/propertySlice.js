@@ -226,7 +226,7 @@ function mapPublicPropertyToCard(p) {
         type: p.type,
         category: p.category,
 
-        listingType: p.listing_type || "normal",
+        listingType: p.listing_type,
     };
 }
 
@@ -318,16 +318,31 @@ const propertySlice = createSlice({
                 s.error = null;
             })
             .addCase(fetchPropertiesThunk.fulfilled, (s, a) => {
-                const propertiesArray = a.payload || [];
+                const pageData = a.payload || {};
+                const propertiesArray = pageData.content || [];
+                const sortOrder = { PREMIUM: 1, VIP: 2, NORMAL: 3 };
+                const DEFAULT_SORT_VALUE = 99;
 
-                // SỬA Ở ĐÂY: Gọi hàm `mapPublicPropertyToCard` mới
-                s.list = Array.isArray(propertiesArray) ? propertiesArray.map(mapPublicPropertyToCard) : [];
+                const mappedAndSortedList = (Array.isArray(propertiesArray) ? propertiesArray.map(mapPublicPropertyToCard) : [])
+                    .sort((itemA, itemB) => {
+                        // Chú ý: Dữ liệu JSON trả về là `listingType`
+                        const valueA = sortOrder[itemA.listingType?.toUpperCase()] || DEFAULT_SORT_VALUE;
+                        const valueB = sortOrder[itemB.listingType?.toUpperCase()] || DEFAULT_SORT_VALUE;
+                        return valueA - valueB;
+                    });
 
-                // Giữ nguyên logic phân trang tự suy ra
-                s.page = 0;
-                s.totalElements = propertiesArray.length;
-                s.totalPages = 1;
+                // 3. Cập nhật state với danh sách ĐÃ ĐƯỢC MAP VÀ SẮP XẾP
+                s.list = mappedAndSortedList;
+
+                // 4. LẤY THÔNG TIN PHÂN TRANG TRỰC TIẾP TỪ PAYLOAD CỦA API
+                s.page = pageData.number ?? 0; // Spring Page bắt đầu từ 0
+                s.size = pageData.size ?? 20;
+                s.totalElements = pageData.totalElements ?? 0;
+                s.totalPages = pageData.totalPages ?? 0;
+
+                // 5. Cập nhật trạng thái loading
                 s.loading = false;
+                s.error = null;
             })
             .addCase(fetchPropertiesThunk.rejected, (s, a) => {
                 s.loading = false;
