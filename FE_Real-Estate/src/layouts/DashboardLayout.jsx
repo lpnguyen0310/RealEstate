@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import Sidebar from "@/components/Dashboard/Sidebar";
 import DashboardHeader from "@/components/Dashboard/DashboardHeader";
 import { logoutThunk } from "@/store/authSlice";
-
+import AIChatWidget from "../components/aiChatBox/AIChatWidget";
 export default function DashboardLayout() {
   const nav = useNavigate();
   const dispatch = useDispatch();
@@ -30,6 +30,8 @@ export default function DashboardLayout() {
 
         <main className="flex-1 overflow-y-auto px-6 pb-6">
           <Outlet context={{ user }} />
+          <AIChatWidget user={user} size="md" />
+
         </main>
       </div>
     </div>

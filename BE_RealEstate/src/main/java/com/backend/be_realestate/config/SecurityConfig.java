@@ -42,6 +42,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/listingtype/**").permitAll()
                         .requestMatchers("/api/payments/**").permitAll()
                         .requestMatchers( "/api/admin/**").permitAll()
+                        .requestMatchers("/ws/**", "/topic/**").permitAll()
+                        .requestMatchers("/api/favorites").permitAll()
                         .requestMatchers("/api/orders/**").permitAll()
                         .anyRequest().authenticated()
                 )
