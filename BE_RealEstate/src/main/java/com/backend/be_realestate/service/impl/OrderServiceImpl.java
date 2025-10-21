@@ -4,13 +4,17 @@ import com.backend.be_realestate.converter.OrderConverter;
 import com.backend.be_realestate.entity.*;
 import com.backend.be_realestate.enums.ItemType;
 import com.backend.be_realestate.enums.OrderStatus;
+import com.backend.be_realestate.enums.TransactionStatus;
+import com.backend.be_realestate.enums.TransactionType;
 import com.backend.be_realestate.modals.dto.order.OrderDTO;
 import com.backend.be_realestate.modals.dto.order.OrderItemDTO;
 import com.backend.be_realestate.modals.request.order.CheckoutReq;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stripe.model.PaymentIntent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -38,6 +43,8 @@ public class OrderServiceImpl implements OrderService {
     private UserRepository userRepository;
 
     private final UserInventoryRepository inventoryRepository;
+
+    private final TransactionRepository transactionRepository;
 
     // ===================== CREATE ORDER =====================
     @Override
@@ -128,33 +135,6 @@ public class OrderServiceImpl implements OrderService {
     // =================================================================
     //  PHƯƠNG THỨC XỬ LÝ CHÍNH KHI ĐƠN HÀNG ĐƯỢC THANH TOÁN
     // =================================================================
-    @Override
-    @Transactional
-    public void processPaidOrder(Long orderId) {
-        // 1. Tải đơn hàng từ DB
-        OrderEntity order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + orderId));
-
-        // Kiểm tra để đảm bảo chúng ta không xử lý lại đơn hàng đã thanh toán
-        if (order.getStatus() == OrderStatus.PAID) {
-            System.out.println("Đơn hàng " + orderId + " đã được xử lý trước đó.");
-            return;
-        }
-
-        // 2. Cập nhật trạng thái đơn hàng thành PAID
-        order.setStatus(OrderStatus.PAID);
-        orderRepository.save(order);
-
-        // 3. Lấy thông tin người dùng từ đơn hàng
-        UserEntity user = order.getUser();
-
-        // 4. Lặp qua các sản phẩm trong đơn hàng để cộng vào kho
-        for (OrderItemEntity orderItem : order.getItems()) {
-            creditItemsFromOrderItem(user, orderItem);
-        }
-
-        System.out.println("Đã xử lý thành công đơn hàng " + orderId + " và cộng vật phẩm cho người dùng " + user.getEmail());
-    }
 
     @Override
     public List<Map<String, Object>> getOrdersByUserId(Long userId) {
@@ -221,4 +201,85 @@ public class OrderServiceImpl implements OrderService {
         inventoryItem.setQuantity(inventoryItem.getQuantity() + quantityToAdd);
         inventoryRepository.save(inventoryItem);
     }
+
+    @Transactional
+    public void createPendingTransaction(OrderEntity order, PaymentIntent paymentIntent) {
+        // TODO: Viết logic để xác định type dựa trên sản phẩm của order
+        // Ví dụ đơn giản:
+        TransactionType type = TransactionType.PACKAGE_PURCHASE; // Giả sử là mua gói
+
+        TransactionEntity transaction = TransactionEntity.builder()
+                .order(order)
+                .stripePaymentIntentId(paymentIntent.getId())
+                .amount(paymentIntent.getAmount())
+                .status(TransactionStatus.PENDING)
+                .type(type)
+                .build();
+        transactionRepository.save(transaction);
+        log.info("Đã tạo giao dịch PENDING cho orderId={} và pi={}", order.getId(), paymentIntent.getId());
+    }
+
+    /**
+     * Logic để hoàn tất đơn hàng và cập nhật giao dịch thành SUCCEEDED.
+     * Sẽ được gọi từ StripeWebhookController.
+     */
+    @Override
+    @Transactional
+    public void fulfillOrder(PaymentIntent paymentIntent) {
+        log.info("--- Bắt đầu FULFILL ORDER cho pi={} ---", paymentIntent.getId());
+        try {
+            String piId = paymentIntent.getId();
+
+            TransactionEntity transaction = transactionRepository.findByStripePaymentIntentId(piId)
+                    .orElseThrow(() -> new IllegalStateException("Không tìm thấy giao dịch cho payment_intent_id: " + piId));
+            log.info("Đã tìm thấy transactionId={} với trạng thái {}", transaction.getId(), transaction.getStatus());
+
+            if (transaction.getStatus() == TransactionStatus.SUCCEEDED) {
+                log.warn("Transaction đã SUCCEEDED, bỏ qua.");
+                return;
+            }
+
+            transaction.setStatus(TransactionStatus.SUCCEEDED);
+            transactionRepository.save(transaction);
+            log.info("Đã cập nhật transactionId={} thành SUCCEEDED", transaction.getId());
+
+            Long orderId = transaction.getOrder().getId();
+            log.info("Chuẩn bị gọi processPaidOrder cho orderId={}", orderId);
+            this.processPaidOrder(orderId);
+            log.info("--- Kết thúc FULFILL ORDER thành công cho pi={} ---", piId);
+        } catch (Exception e) {
+            log.error("!!! Lỗi trong quá trình fulfillOrder cho pi={}", paymentIntent.getId(), e);
+            throw new RuntimeException("Lỗi khi fulfill order", e); // Re-throw để transaction rollback
+        }
+    }
+
+    @Override
+    @Transactional
+    public void processPaidOrder(Long orderId) {
+        log.info("--- Bắt đầu PROCESS PAID ORDER cho orderId={} ---", orderId);
+        try {
+            OrderEntity order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+            if (order.getStatus() == OrderStatus.PAID) {
+                log.warn("Order {} đã ở trạng thái PAID, bỏ qua.", orderId);
+                return;
+            }
+
+            order.setStatus(OrderStatus.PAID);
+            orderRepository.save(order);
+            log.info("Đã cập nhật orderId={} thành PAID", order.getId());
+
+            UserEntity user = order.getUser();
+            for (OrderItemEntity orderItem : order.getItems()) {
+                creditItemsFromOrderItem(user, orderItem);
+            }
+            log.info("Đã cộng vật phẩm thành công cho orderId={}", orderId);
+            log.info("--- Kết thúc PROCESS PAID ORDER thành công cho orderId={} ---", orderId);
+        } catch (Exception e) {
+            log.error("!!! Lỗi trong quá trình processPaidOrder cho orderId={}", orderId, e);
+            throw new RuntimeException("Lỗi khi process paid order", e); // Re-throw để transaction rollback
+        }
+    }
+
 }

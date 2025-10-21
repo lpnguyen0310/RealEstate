@@ -1,12 +1,22 @@
 // src/pages/Dashboard/TransactionsManagement.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Stack } from "@mui/material";
 import TxTabs from "@/components/dashboard/transactionsmanagement/TxTabs";
 import TransactionTable from "@/components/dashboard/transactionsmanagement/TransactionTable";
 import TransactionDetailModal from "@/components/dashboard/transactionsmanagement/TransactionDetailModal";
-import { TRANSACTIONS } from "@/data/Dashboard/OrderManagementData";
+
+import {
+  loadTransactions,
+  selectCounts,
+  selectByTab,
+  selectLoading,
+  selectError,
+} from "@/store/transactionsSlice";
 
 export default function TransactionsManagement() {
+  const dispatch = useDispatch();
+
   const [tabKey, setTabKey] = useState("processing");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -14,21 +24,19 @@ export default function TransactionsManagement() {
   const [selectedTx, setSelectedTx] = useState(null);
   const [open, setOpen] = useState(false);
 
-  const counts = useMemo(() => ({
-    processing: TRANSACTIONS.filter(t => t.status === "Đang xử lý").length,
-    success: TRANSACTIONS.filter(t => t.status === "Thành công").length,
-    failed: TRANSACTIONS.filter(t => t.status === "Thất bại").length,
-  }), []);
+  const counts = useSelector(selectCounts);
+  const listByTab = useSelector(useMemo(() => selectByTab(tabKey), [tabKey]));
+  const loading = useSelector(selectLoading);
+  const error = useSelector(selectError);
 
-  const filtered = useMemo(() => {
-    if (tabKey === "processing") return TRANSACTIONS.filter(t => t.status === "Đang xử lý");
-    if (tabKey === "success") return TRANSACTIONS.filter(t => t.status === "Thành công");
-    return TRANSACTIONS.filter(t => t.status === "Thất bại");
-  }, [tabKey]);
+  useEffect(() => {
+    dispatch(loadTransactions());
+  }, [dispatch]);
 
-  const total = filtered.length;
+  // Phân trang client
+  const total = listByTab.length;
   const startIdx = (page - 1) * pageSize;
-  const pageData = filtered.slice(startIdx, startIdx + pageSize);
+  const pageData = listByTab.slice(startIdx, startIdx + pageSize);
 
   const handleRowClick = (tx) => {
     setSelectedTx(tx);
@@ -42,6 +50,9 @@ export default function TransactionsManagement() {
         counts={counts}
         onChange={(k) => { setTabKey(k); setPage(1); }}
       />
+
+      {loading && <div>Đang tải giao dịch…</div>}
+      {error && <div className="text-red-600">Lỗi: {error}</div>}
 
       <TransactionTable
         data={pageData}

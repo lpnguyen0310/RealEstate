@@ -84,7 +84,7 @@ export default function TransactionDetailModal({ open, onClose, tx }) {
 
                         <Box>
                             <Typography fontWeight={600} color="#5c6370">Mã giao dịch</Typography>
-                            <Typography sx={{ mt: 0.5 }}>{tx.txCode ?? "-"}</Typography>
+                            <Typography sx={{ mt: 0.5 }}>{tx.transactionCode ?? "-"}</Typography>
                         </Box>
 
                         <Box>
