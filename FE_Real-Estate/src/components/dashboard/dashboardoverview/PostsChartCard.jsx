@@ -1,24 +1,130 @@
+// src/components/dashboard/dashboardoverview/PostsChartApex.jsx
 import React, { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import Chart from "react-apexcharts";
 
+// ====== Data sources ======
+const selectMyList = (s) => s.property?.myList ?? [];
+
+// ====== Time utils ======
+const MS_DAY = 24 * 60 * 60 * 1000;
+
+function parseToDate(x) {
+    if (!x) return null;
+    try {
+        if (typeof x === "number") return new Date(x);
+        if (typeof x === "string") {
+            let s = x.replace(" ", "T");
+            if (!/Z|[+-]\d{2}:\d{2}$/.test(s)) s += "Z";
+            const t = Date.parse(s);
+            return Number.isNaN(t) ? null : new Date(t);
+        }
+        if (typeof x === "object" && "year" in x && "month" in x && "day" in x) {
+            const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } = x;
+            return new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1e6));
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+function formatDay(d) {
+    return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }); // dd/MM
+}
+
+function getISOWeek(d) {
+    // ISO week number
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+    const week = 1 + Math.round(((date - firstThursday) / MS_DAY - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+    return { week, year: date.getUTCFullYear() };
+}
+
+function formatWeekLabel(d) {
+    const { week, year } = getISOWeek(d);
+    return `W${String(week).padStart(2, "0")} ${year}`;
+}
+
+function formatMonth(d) {
+    return d.toLocaleDateString("vi-VN", { month: "2-digit", year: "numeric" }); // MM/yyyy
+}
+
+// Tạo 16 bucket trống theo mode
+function buildEmptyBuckets(mode, n = 16) {
+    const now = new Date();
+    const buckets = [];
+    if (mode === "day") {
+        for (let i = n - 1; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            d.setDate(d.getDate() - i);
+            buckets.push({ key: d.toDateString(), label: formatDay(d) });
+        }
+    } else if (mode === "week") {
+        // Lùi theo tuần ISO
+        const anchor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        for (let i = n - 1; i >= 0; i--) {
+            const d = new Date(anchor);
+            d.setDate(d.getDate() - i * 7);
+            buckets.push({ key: formatWeekLabel(d), label: formatWeekLabel(d) });
+        }
+    } else {
+        // month
+        for (let i = n - 1; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth(), 1);
+            d.setMonth(d.getMonth() - i);
+            buckets.push({ key: `${d.getFullYear()}-${d.getMonth() + 1}`, label: formatMonth(d) });
+        }
+    }
+    return buckets;
+}
+
+function keyByMode(d, mode) {
+    if (!d) return null;
+    if (mode === "day") return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString();
+    if (mode === "week") return formatWeekLabel(d);
+    return `${d.getFullYear()}-${d.getMonth() + 1}`; // month
+}
+
 export default function PostsChartApex({ data = [], defaultMode = "day" }) {
+    const myList = useSelector(selectMyList);
     const [mode, setMode] = useState(defaultMode);
     const [showSell, setShowSell] = useState(true);
     const [showRent, setShowRent] = useState(true);
 
-    // demo data nếu không truyền vào
+    // ====== Build rows: [{label, sell, rent}, ...] ======
     const rows = useMemo(() => {
-        if (data.length) return data;
-        const labels = [
-            "10/09", "12/09", "14/09", "16/09", "18/09", "20/09", "22/09",
-            "24/09", "26/09", "28/09", "30/09", "02/10", "04/10", "06/10", "08/10", "10/10"
-        ];
-        return labels.map((label, i) => ({
-            label,
-            sell: i % 5 === 0 ? 2 : i % 3 === 0 ? 1 : 0,
-            rent: i % 4 === 0 ? 1 : 0,
-        }));
-    }, [data]);
+        // Nếu truyền data thủ công -> dùng luôn
+        if (Array.isArray(data) && data.length) return data;
+
+        // Tự build từ myList
+        const buckets = buildEmptyBuckets(mode, 16);
+        const map = new Map(buckets.map(b => [b.key, { label: b.label, sell: 0, rent: 0 }]));
+
+        for (const p of myList) {
+            const t = parseToDate(p?.postedAt);
+            if (!t) continue;
+
+            const k = keyByMode(t, mode);
+            if (!k || !map.has(k)) continue;
+
+            // Xác định loại
+            // Nếu bạn có p.propertyType === "sell"/"rent" thì dùng trực tiếp:
+            // const isSell = p?.propertyType === "sell";
+            const isSell = String(p?.installmentText || "").toLowerCase().includes("bán")
+                || p?.propertyType === "sell";
+            const isRent = String(p?.installmentText || "").toLowerCase().includes("thuê")
+                || p?.propertyType === "rent";
+
+            const bucket = map.get(k);
+            if (isSell) bucket.sell += 1;
+            else if (isRent) bucket.rent += 1;
+        }
+
+        return Array.from(map.values());
+    }, [data, myList, mode]);
 
     const categories = rows.map(r => r.label);
     const sell = rows.map(r => r.sell);
@@ -94,7 +200,8 @@ export default function PostsChartApex({ data = [], defaultMode = "day" }) {
                             <button
                                 key={v}
                                 onClick={() => setMode(v)}
-                                className={`px-3 h-9 text-[13px] ${mode === v ? "bg-white" : "bg-transparent"} `}
+                                className={`px-3 h-9 text-[13px] ${mode === v ? "bg-white" : "bg-transparent"
+                                    }`}
                             >
                                 {v === "day" ? "Ngày" : v === "week" ? "Tuần" : "Tháng"}
                             </button>
@@ -105,14 +212,14 @@ export default function PostsChartApex({ data = [], defaultMode = "day" }) {
                     <button
                         onClick={() => setShowSell(s => !s)}
                         className={`h-9 px-3 rounded-lg text-[13px] border transition
-                        ${showSell ? "bg-[#eef3ff] border-[#cdd9ff] text-[#1c396a]" : "bg-white border-[#e8edf6] text-gray-500"}`}
+            ${showSell ? "bg-[#eef3ff] border-[#cdd9ff] text-[#1c396a]" : "bg-white border-[#e8edf6] text-gray-500"}`}
                     >
                         Tin bán
                     </button>
                     <button
                         onClick={() => setShowRent(s => !s)}
                         className={`h-9 px-3 rounded-lg text-[13px] border transition
-                        ${showRent ? "bg-[#fff1e8] border-[#ffd6b8] text-[#c26a00]" : "bg-white border-[#e8edf6] text-gray-500"}`}
+            ${showRent ? "bg-[#fff1e8] border-[#ffd6b8] text-[#c26a00]" : "bg-white border-[#e8edf6] text-gray-500"}`}
                     >
                         Tin thuê
                     </button>

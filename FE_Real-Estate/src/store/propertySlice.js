@@ -1,15 +1,16 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+// src/store/propertySlice.js
+import { createSlice, createAsyncThunk, createSelector } from "@reduxjs/toolkit";
 import api from "@/api/axios";
 import { uploadMany } from "@/api/cloudinary";
 
+/* ===================== THUNKS ===================== */
 
+// Lấy danh sách public (trang chủ / tìm kiếm)
 export const fetchPropertiesThunk = createAsyncThunk(
     "property/fetchAll",
-    // 1. Nhận vào một object `params` chứa tất cả bộ lọc, không giới hạn
+    // Nhận 1 object params chứa mọi bộ lọc
     async (params = {}, { rejectWithValue }) => {
         try {
-            // 2. Truyền thẳng object `params` vào request. 
-            // Axios sẽ tự động chuyển nó thành query string (ví dụ: ?keyword=abc&sort=price,asc)
             const res = await api.get("/properties", { params });
             return res?.data?.data ?? res?.data;
         } catch (e) {
@@ -18,7 +19,7 @@ export const fetchPropertiesThunk = createAsyncThunk(
     }
 );
 
-// === THUNK LẤY CHI TIẾT ===
+// Lấy chi tiết 1 tin
 export const fetchPropertyByIdThunk = createAsyncThunk(
     "property/fetchById",
     async (propertyId, { rejectWithValue }) => {
@@ -31,6 +32,7 @@ export const fetchPropertyByIdThunk = createAsyncThunk(
     }
 );
 
+// Tạo tin
 export const createPropertyThunk = createAsyncThunk(
     "property/create",
     /**
@@ -38,17 +40,17 @@ export const createPropertyThunk = createAsyncThunk(
      */
     async ({ formData, listingTypePolicyId }, { rejectWithValue }) => {
         try {
-            // 1) Ảnh: tách file & URL sẵn có
+            // 1) Ảnh: tách file & URL
             const imgs = formData.images || [];
             const files = imgs.filter((x) => x instanceof File || x instanceof Blob);
             const existedUrls = imgs.filter((x) => typeof x === "string" && x.startsWith("http"));
 
-            // 2) Upload các file lên Cloudinary
+            // 2) Upload file lên Cloudinary
             const uploaded = files.length ? await uploadMany(files, "properties") : [];
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
 
-            // 3) Build payload theo BE đang nhận
+            // 3) Build payload
             const payload = {
                 title: formData.title,
                 price: Number(formData.price) || 0,
@@ -58,7 +60,7 @@ export const createPropertyThunk = createAsyncThunk(
                 addressStreet: formData.streetName || "",
                 propertyType: formData.propertyType || "sell",
                 priceType: formData.priceType || "SELL_PRICE",
-                status: "PENDING_REVIEW", // nếu BE set default thì có thể bỏ
+                status: "PENDING_REVIEW",
 
                 legalStatus: formData.legalDocument || "",
                 direction: formData.houseDirection || "",
@@ -83,7 +85,7 @@ export const createPropertyThunk = createAsyncThunk(
             };
 
             const res = await api.post("/properties/create", payload);
-            return res?.data?.data ?? res?.data; // tuỳ API wrapper
+            return res?.data?.data ?? res?.data;
         } catch (e) {
             const msg = e?.response?.data?.message || "Đăng tin thất bại";
             return rejectWithValue(msg);
@@ -91,7 +93,7 @@ export const createPropertyThunk = createAsyncThunk(
     }
 );
 
-// Thunk: gọi BE lấy danh sách tin của chính user
+// Lấy danh sách tin của chính user (dashboard)
 export const fetchMyPropertiesThunk = createAsyncThunk(
     "property/fetchMyProperties",
     async ({ page = 0, size = 20, sort = "postedAt,desc" } = {}, { rejectWithValue }) => {
@@ -104,69 +106,11 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
         }
     }
 );
-function parseBackendDate(d) {
-    if (!d) return null;
-    if (typeof d === "number") return new Date(d);
 
-    if (typeof d === "string") {
-        let s = d.replace(" ", "T");
-        if (!/Z|[+-]\d{2}:\d{2}$/.test(s)) s += "Z";
-        const t = Date.parse(s);
-        return Number.isNaN(t) ? null : new Date(t);
-    }
+/* ===================== HELPERS ===================== */
 
-    // trường hợp Jackson trả object kiểu {year, month, day, hour,...}
-    if (d && typeof d === "object" && "year" in d && "month" in d && "day" in d) {
-        const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } = d;
-        return new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1e6));
-    }
-
-    return null;
-}
-
-function formatViDate(d) {
-    const dt = parseBackendDate(d);
-    return dt ? dt.toLocaleDateString("vi-VN") : "";
-}
-// Helper: map PropertyDTO -> dữ liệu PostCard đang dùng
-function mapDtoToPostCard(p) {
-    // p là PropertyDTO từ BE
-    const fmt = Intl.NumberFormat("vi-VN");
-    const priceText = p?.price != null ? `${fmt.format(p.price)} ₫` : "—";
-    const unitPriceText = p?.pricePerM2 != null ? `${fmt.format(p.pricePerM2)} ₫/m²` : "";
-    const addressMain =
-        p?.displayAddress ||
-        [p?.addressStreet /* + tên phường-quận-thành phố nếu bạn muốn */].filter(Boolean).join(", ");
-    const postat = p?.postedAt;
-    console.log("Postat:", postat);
-    return {
-        id: p.id,
-        // hình: ưu tiên imageUrls từ BE; fallback sang images (nếu nơi khác trả kiểu khác)
-        images: Array.isArray(p.imageUrls) && p.imageUrls.length ? p.imageUrls : p.images || [],
-        title: p.title,
-        description: p.description,
-        statusTag: toStatusTag(p?.status),  // map "active" -> "Đang Đăng" …
-        priceText,
-        unitPriceText,
-        landPriceText: "",            // nếu có công thức riêng, bạn bổ sung sau
-        installmentText: p?.propertyType === "sell" ? "Mua bán" :
-            p?.propertyType === "rent" ? "Cho thuê" : "",
-        statusKey: statusEnumToKey(p?.status),
-
-        addressMain,
-        area: p?.area,
-        bed: p?.bedrooms,
-        bath: p?.bathrooms,
-        sizeText: p?.width && p?.height ? `${p.width}m x ${p.height}m` : "",
-        note: "",                     // nếu muốn hiển thị ghi chú
-
-        createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
-        views: p?.views ?? 0,         // nếu BE có trường này
-    };
-}
 function toStatusTag(status) {
     const s = (status ?? "").toString().trim().toUpperCase();
-
     switch (s) {
         case "PUBLISHED": return "Đang Đăng";
         case "PENDING_REVIEW": return "Chờ Duyệt";
@@ -190,14 +134,54 @@ function statusEnumToKey(status) {
         case "HIDDEN": return "hidden";
         case "EXPIRED": return "expired";
         case "EXPIRINGSOON": return "expiringSoon";
-        case "ARCHIVED": return "hidden"; // hoặc làm tab riêng nếu muốn
+        case "ARCHIVED": return "hidden";
         default: return "draft";
     }
 }
 
-function mapPublicPropertyToCard(p) {
-    if (!p) return {}; // Trả về object rỗng nếu không có dữ liệu để tránh lỗi
+// Map DTO (BE -> UI Card) cho MY LIST (dashboard)
+function mapDtoToPostCard(p) {
+    const fmt = Intl.NumberFormat("vi-VN");
+    const priceText = p?.price != null ? `${fmt.format(p.price)} ₫` : "—";
+    const unitPriceText = p?.pricePerM2 != null ? `${fmt.format(p.pricePerM2)} ₫/m²` : "";
+    const addressMain =
+        p?.displayAddress || [p?.addressStreet].filter(Boolean).join(", ");
 
+    return {
+        id: p.id,
+        images: Array.isArray(p.imageUrls) && p.imageUrls.length ? p.imageUrls : p.images || [],
+        title: p.title,
+        description: p.description,
+        statusTag: toStatusTag(p?.status),
+        priceText,
+        unitPriceText,
+        landPriceText: "",
+        installmentText: p?.propertyType === "sell" ? "Mua bán" :
+            p?.propertyType === "rent" ? "Cho thuê" : "",
+        statusKey: statusEnumToKey(p?.status),
+
+        addressMain,
+        area: p?.area,
+        bed: p?.bedrooms,
+        bath: p?.bathrooms,
+        sizeText: p?.width && p?.height ? `${p.width}m x ${p.height}m` : "",
+        note: "",
+
+        createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
+        views: p?.views ?? 0,
+
+        // Thêm raw fields để thống kê
+        listingType: p?.listingType,           // "PREMIUM" | "VIP" | "NORMAL" | ...
+        postedAt: p?.postedAt ?? null,
+        expiresAt: p?.expiresAt ?? null,
+        durationDays: p?.durationDays ?? null, // nếu BE trả
+        actualDurationDays: p?.actualDurationDays ?? null,
+    };
+}
+
+// Map cho PUBLIC LIST (trang public)
+function mapPublicPropertyToCard(p) {
+    if (!p) return {};
     return {
         id: p.id,
         image: p.image,
@@ -205,39 +189,82 @@ function mapPublicPropertyToCard(p) {
         title: p.title,
         description: p.description,
 
-        // Lấy trực tiếp các trường đã được Backend định dạng sẵn
         price: p.price,
         pricePerM2: p.pricePerM2,
         postedAt: p.postedAt,
         photos: p.photos,
 
-        // Gộp địa chỉ vào một trường `addressMain` mà PropertyCard đang dùng
         addressMain: p.addressFull || p.addressShort || "",
         addressShort: p.addressShort || "",
         addressFull: p.addressFull || "",
 
         area: p.area,
-        // Dùng đúng tên thuộc tính mà API trả về
         bed: p.bed,
         bath: p.bath,
 
-        // Giữ lại các thông tin khác nếu cần
         agent: p.agent,
         type: p.type,
         category: p.category,
 
-        listingType: p.listing_type,
+        listingType: p.listing_type, // chú ý tên field public
     };
 }
 
+/* ===================== DATE UTILS ===================== */
+
+const MS_DAY = 24 * 60 * 60 * 1000;
+
+function parseToDate(x) {
+    if (!x) return null;
+    try {
+        if (typeof x === "number") return new Date(x);
+        if (typeof x === "string") {
+            let s = x.replace(" ", "T");
+            if (!/Z|[+-]\d{2}:\d{2}$/.test(s)) s += "Z";
+            const t = Date.parse(s);
+            return Number.isNaN(t) ? null : new Date(t);
+        }
+        if (typeof x === "object" && "year" in x && "month" in x && "day" in x) {
+            const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } = x;
+            return new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1e6));
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+// Quy ước: "Sắp hết hạn" nếu còn ≤ 3 ngày
+const EXP_SOON_DAYS = 3;
+
+function isExpiringSoon(post) {
+    const now = Date.now();
+    let exp = parseToDate(post?.expiresAt)?.getTime() ?? null;
+    if (!exp && post?.postedAt && post?.durationDays) {
+        const start = parseToDate(post.postedAt)?.getTime();
+        if (start && post.durationDays) exp = start + post.durationDays * MS_DAY;
+    }
+    if (!exp) return false;
+    const diff = exp - now;
+    return diff > 0 && diff <= EXP_SOON_DAYS * MS_DAY;
+}
+
+/* ===================== SLICE ===================== */
 
 const initialState = {
-    // server page
+    // Public page
     list: [],
     page: 0,
     size: 20,
     totalElements: 0,
     totalPages: 0,
+
+    // My dashboard list (tách riêng để không đè lẫn)
+    myList: [],
+    myPage: 0,
+    mySize: 20,
+    myTotalElements: 0,
+    myTotalPages: 0,
 
     // UI state
     loading: false,
@@ -247,13 +274,12 @@ const initialState = {
     loadingDetail: false,
     errorDetail: null,
 
-    // query state (để đồng bộ Pagination/Sort)
+    // query state
     sort: "postedAt,desc",
     creating: false,
     createError: null,
     lastCreated: null,
 };
-
 
 const propertySlice = createSlice({
     name: "property",
@@ -271,9 +297,13 @@ const propertySlice = createSlice({
             state.lastCreated = null;
             state.createError = null;
             state.creating = false;
+
+            state.myList = [];
+            state.myPage = 0;
+            state.mySize = 20;
+            state.myTotalElements = 0;
+            state.myTotalPages = 0;
         },
-        // === PHẦN THÊM MỚI ===
-        // Reducer để dọn dẹp state của trang chi tiết khi người dùng rời đi
         clearCurrentProperty(state) {
             state.currentProperty = null;
             state.errorDetail = null;
@@ -295,24 +325,23 @@ const propertySlice = createSlice({
                 s.createError = a.payload || "Đăng tin thất bại";
             })
 
-            // ===== lấy tin của tôi =====
+            // ===== MY LIST (dashboard) =====
             .addCase(fetchMyPropertiesThunk.pending, (s) => { s.loading = true; s.error = null; })
             .addCase(fetchMyPropertiesThunk.fulfilled, (s, a) => {
                 const d = a.payload || {};
-                s.list = Array.isArray(d.content) ? d.content.map(mapDtoToPostCard) : [];
-                s.page = d.page ?? 0;
-                s.size = d.size ?? s.size;
-                s.totalElements = d.totalElements ?? 0;
-                s.totalPages = d.totalPages ?? 0;
+                s.myList = Array.isArray(d.content) ? d.content.map(mapDtoToPostCard) : [];
+                s.myPage = d.page ?? d.number ?? 0;
+                s.mySize = d.size ?? s.mySize;
+                s.myTotalElements = d.totalElements ?? 0;
+                s.myTotalPages = d.totalPages ?? 0;
                 s.loading = false;
             })
             .addCase(fetchMyPropertiesThunk.rejected, (s, a) => {
                 s.loading = false;
-                s.error = a.payload || "Không thể tải danh sách tin đăng";
+                s.error = a.payload || "Không thể tải danh sách tin đăng của tôi";
             })
 
-            // === PHẦN THÊM MỚI ===
-            // ===== lấy danh sách public =====
+            // ===== PUBLIC LIST =====
             .addCase(fetchPropertiesThunk.pending, (s) => {
                 s.loading = true;
                 s.error = null;
@@ -325,22 +354,18 @@ const propertySlice = createSlice({
 
                 const mappedAndSortedList = (Array.isArray(propertiesArray) ? propertiesArray.map(mapPublicPropertyToCard) : [])
                     .sort((itemA, itemB) => {
-                        // Chú ý: Dữ liệu JSON trả về là `listingType`
                         const valueA = sortOrder[itemA.listingType?.toUpperCase()] || DEFAULT_SORT_VALUE;
                         const valueB = sortOrder[itemB.listingType?.toUpperCase()] || DEFAULT_SORT_VALUE;
                         return valueA - valueB;
                     });
 
-                // 3. Cập nhật state với danh sách ĐÃ ĐƯỢC MAP VÀ SẮP XẾP
                 s.list = mappedAndSortedList;
 
-                // 4. LẤY THÔNG TIN PHÂN TRANG TRỰC TIẾP TỪ PAYLOAD CỦA API
-                s.page = pageData.number ?? 0; // Spring Page bắt đầu từ 0
+                s.page = pageData.number ?? 0;
                 s.size = pageData.size ?? 20;
                 s.totalElements = pageData.totalElements ?? 0;
                 s.totalPages = pageData.totalPages ?? 0;
 
-                // 5. Cập nhật trạng thái loading
                 s.loading = false;
                 s.error = null;
             })
@@ -349,7 +374,7 @@ const propertySlice = createSlice({
                 s.error = a.payload || "Không thể tải danh sách tin đăng";
             })
 
-            // ===== lấy chi tiết 1 tin =====
+            // ===== DETAIL =====
             .addCase(fetchPropertyByIdThunk.pending, (state) => {
                 state.loadingDetail = true;
                 state.errorDetail = null;
@@ -366,5 +391,45 @@ const propertySlice = createSlice({
     },
 });
 
-export const { setPage, setSize, setSort, clearProperties } = propertySlice.actions;
+/* ===================== SELECTORS ===================== */
+
+const selectPropertyState = (s) => s.property;
+
+// Dùng cho Dashboard (my list)
+export const selectMyPosts = createSelector(
+    selectPropertyState,
+    (st) => st.myList || []
+);
+
+// Tính thống kê cho PostsReportCard
+export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
+    let active = 0, pending = 0, expiring = 0;
+    let autoTotal = 0, premium = 0, vip = 0, normal = 0;
+
+    for (const p of posts) {
+        const status = (p?.statusKey || "").toLowerCase();
+        if (status === "active" || status === "published") active++;
+        else if (status === "pending") pending++;
+        if (isExpiringSoon(p)) expiring++;
+
+        const lt = (p?.listingType || "").toUpperCase();
+        if (lt) {
+            autoTotal++;
+            if (lt === "PREMIUM") premium++;
+            else if (lt === "VIP") vip++;
+            else if (lt === "NORMAL") normal++;
+        }
+    }
+
+    return {
+        active,
+        pending,
+        expiring,
+        auto: { total: autoTotal, premium, vip, normal },
+    };
+});
+
+/* ===================== EXPORTS ===================== */
+
+export const { setPage, setSize, setSort, clearProperties, clearCurrentProperty } = propertySlice.actions;
 export default propertySlice.reducer;

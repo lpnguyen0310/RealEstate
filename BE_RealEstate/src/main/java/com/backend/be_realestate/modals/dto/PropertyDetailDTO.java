@@ -15,7 +15,7 @@ public class PropertyDetailDTO {
     private MapDTO map;
     private List<MapMetaDTO> mapMeta;
     private AgentDetailDTO agent;
-
+    private Long viewCount;
 }
 
 

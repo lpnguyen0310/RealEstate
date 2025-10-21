@@ -42,10 +42,21 @@ public class PropertyController {
         return ResponseEntity.ok(propertyPage);
     }
 
+//    @GetMapping("/{id}")
+//    public ResponseEntity<PropertyDetailDTO> getPropertyById(@PathVariable Long id) {
+//        PropertyDetailDTO propertyDetail = propertyService.getPropertyDetailById(id);
+//        return ResponseEntity.ok(propertyDetail);
+//    }
+
     @GetMapping("/{id}")
-    public ResponseEntity<PropertyDetailDTO> getPropertyById(@PathVariable Long id) {
-        PropertyDetailDTO propertyDetail = propertyService.getPropertyDetailById(id);
-        return ResponseEntity.ok(propertyDetail);
+    public ResponseEntity<PropertyDetailDTO> getPropertyById(
+            Authentication auth,
+            @PathVariable Long id,
+            @RequestParam(name = "preview", defaultValue = "false") boolean preview
+    ) {
+        Long userId = securityUtils.currentUserId(auth); // null nếu chưa đăng nhập
+        PropertyDetailDTO dto = propertyService.getPropertyDetailById(id, userId, preview);
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/me")

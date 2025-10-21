@@ -1,7 +1,9 @@
 // src/pages/UserDashboard/DashboardOverview.jsx
-import { useMemo } from "react";
-import { useOutletContext, useNavigate } from "react-router-dom";
-import useFavorites from "@/hooks/useFavorites"; // ⬅️ NEW
+import { useEffect, useMemo } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import useFavorites from "@/hooks/useFavorites";
+
 import {
   UserHeader,
   UserStats,
@@ -12,9 +14,21 @@ import {
   PostTypeSummary,
 } from "../../components/dashboard/dashboardoverview";
 
+import {
+  fetchMyPropertiesThunk,
+  selectPostsReport,
+} from "@/store/propertySlice";
+
 export default function DashboardOverview() {
   const nav = useNavigate();
+  const dispatch = useDispatch();
   const { user: reduxUser } = useOutletContext();
+
+  // ===== Load "tin của tôi" cho dashboard =====
+  useEffect(() => {
+    // Gọi 1 lần khi vào dashboard (nếu bạn đã load ở layout cha thì có thể bỏ)
+    dispatch(fetchMyPropertiesThunk({ page: 0, size: 20, sort: "postedAt,desc" }));
+  }, [dispatch]);
 
   // ===== User info =====
   const user = useMemo(() => {
@@ -35,7 +49,7 @@ export default function DashboardOverview() {
   }, [reduxUser]);
 
   // ===== Favorites (REAL DATA) =====
-  const { list: favList, count: favCount } = useFavorites(); // ⬅️ from store
+  const { list: favList, count: favCount } = useFavorites();
 
   // Convert to SavedListCard items (lấy tối đa 5 tin)
   const savedItems = useMemo(
@@ -47,7 +61,7 @@ export default function DashboardOverview() {
         subtitle: p.displayAddress || p.address || "",
         type: p.listingType || "",
         href: p.href || "",
-        price: p.priceDisplay || p.priceText || "", // nếu cần show giá trong SavedListCard
+        price: p.priceDisplay || p.priceText || "",
         savedAgo: p.savedAgo,
       })),
     [favList]
@@ -57,14 +71,17 @@ export default function DashboardOverview() {
   const stats = useMemo(
     () => ({
       saved: favCount ?? 0,
-      messages: 0, // TODO: map từ redux/messages nếu có
-      posts: 0,    // TODO: map số tin đã đăng của user
-      tours: 0,    // TODO: map lịch hẹn nếu có
+      messages: 0,
+      posts: 0,
+      tours: 0,
     }),
     [favCount]
   );
 
-  // ===== Other blocks (giữ nguyên tạm) =====
+  // ===== Report (REAL from Redux) =====
+  const report = useSelector(selectPostsReport);
+
+  // ===== Other blocks tạm =====
   const sellSummary = { views: 0, interactions: 0, potential: 0 };
   const rentSummary = { views: 0, interactions: 0, potential: 0 };
 
@@ -76,24 +93,16 @@ export default function DashboardOverview() {
     },
   ];
 
-  const report = {
-    active: 0,
-    pending: 0,
-    expiring: 0,
-    auto: { total: 0, premium: 0, vip: 0, normal: 0 },
-  };
-
   return (
     <div className="space-y-6">
       {/* Header hồ sơ (đọc từ Redux qua Outlet) */}
       <UserHeader user={user} />
 
-      {/* Thống kê tổng quan (đã đổ dữ liệu thật cho Tin đã lưu) */}
+      {/* Thống kê tổng quan */}
       <UserStats
         data={stats}
         loading={false}
         onClickCard={(key) => {
-          // điều hướng nhanh khi click thẻ stats
           if (key === "saved") nav("/tin-da-luu");
           if (key === "posts") nav("/user/posts");
           if (key === "messages") nav("/user/messages");
@@ -102,7 +111,9 @@ export default function DashboardOverview() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Báo cáo tin đăng — đã nối data thật */}
         <PostsReportCard data={report} />
+
         <SavedListCard
           items={savedItems}
           emptyHint="Bạn chưa lưu tin nào — hãy khám phá và lưu những tin bạn thích!"
@@ -110,6 +121,7 @@ export default function DashboardOverview() {
           onViewAll={() => nav("/tin-da-luu")}
           maxItems={5}
         />
+
         <NotificationsCard items={notifications} />
       </div>
 
