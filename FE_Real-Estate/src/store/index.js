@@ -8,7 +8,9 @@ import property from "./propertySlice";
 import adminPostsReducer from "./adminPostsSlice";
 import favoritesReducer, { persistFavorites } from "./favoriteSlice";
 import uiReducer from "./uiSlice";
+import transactionsSlice from "./transactionsSlice";
+
 export const store = configureStore({
-  reducer: { auth, register, pricing, property, orders, inventory: inventoryReducer, adminPosts: adminPostsReducer ,    favorites: favoritesReducer,  ui: uiReducer
+  reducer: { auth, register, pricing, property, orders, inventory: inventoryReducer, adminPosts: adminPostsReducer ,    favorites: favoritesReducer,  ui: uiReducer, transactions: transactionsSlice
 },
 });

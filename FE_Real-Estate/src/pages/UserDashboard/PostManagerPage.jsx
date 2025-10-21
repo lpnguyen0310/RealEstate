@@ -144,8 +144,8 @@ export default function PostManagerPage() {
                     </div>
                 ) : (
                     <PostList
-                        items={list}               
-                        total={totalElements}         
+                        items={filtered}               
+                        total={filtered.length}         
                         page={page + 1}              
                         pageSize={size}
                         onPageChange={(p) => dispatch(setPage(p - 1))}

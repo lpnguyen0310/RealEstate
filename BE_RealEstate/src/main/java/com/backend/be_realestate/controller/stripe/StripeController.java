@@ -3,6 +3,7 @@ package com.backend.be_realestate.controller.stripe;
 import com.backend.be_realestate.entity.OrderEntity;
 import com.backend.be_realestate.enums.OrderStatus;
 import com.backend.be_realestate.repository.OrderRepository;
+import com.backend.be_realestate.service.impl.OrderServiceImpl;
 import com.stripe.model.PaymentIntent;
 import com.stripe.param.PaymentIntentCreateParams;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.util.Map;
 public class StripeController {
 
     private final OrderRepository orderRepository;
+    private final OrderServiceImpl orderService;
 
     // Bật cái này nếu VND của bạn không render card khi dùng APM tự động
     private static final boolean FORCE_CARD_ONLY = true;
@@ -58,6 +60,8 @@ public class StripeController {
             }
 
             PaymentIntent pi = PaymentIntent.create(b.build(), opts);
+
+            orderService.createPendingTransaction(order, pi);
 
             return ResponseEntity.ok(Map.of(
                     "clientSecret", pi.getClientSecret()
