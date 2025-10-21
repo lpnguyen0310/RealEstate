@@ -12,3 +12,4 @@ export const store = configureStore({
   reducer: { auth, register, pricing, property, orders, inventory: inventoryReducer, adminPosts: adminPostsReducer ,    favorites: favoritesReducer,  ui: uiReducer
 },
 });
+persistFavorites(store);

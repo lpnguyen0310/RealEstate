@@ -1,12 +1,33 @@
+// src/components/FavoritePostList.jsx
 import React from "react";
 import { Dropdown, Tooltip, Badge } from "antd";
-import { HeartOutlined } from "@ant-design/icons";
+import {
+  HeartOutlined,
+  EnvironmentOutlined,
+  DollarCircleOutlined,
+} from "@ant-design/icons";
 import useFavorites from "@/hooks/useFavorites";
 import { useNavigate } from "react-router-dom";
 
+function money(v) {
+  if (v === null || v === undefined) return "Liên hệ";
+  try {
+    const num = typeof v === "number" ? v : Number(v);
+    if (Number.isNaN(num)) return "Liên hệ";
+    return num.toLocaleString("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    });
+  } catch {
+    return "Liên hệ";
+  }
+}
+import { formatVNDShort } from "@/utils/money";
+
 export default function FavoritePostList({ width = 340, iconSize = 25 }) {
   const nav = useNavigate();
-  const { list: savedPosts } = useFavorites(); // <-- lấy từ store
+  const { list: savedPosts } = useFavorites(); // lấy từ store
 
   return (
     <Dropdown
@@ -17,7 +38,6 @@ export default function FavoritePostList({ width = 340, iconSize = 25 }) {
       align={{ offset: [0, 10] }}
       overlayClassName="bds-saved-dropdown"
       zIndex={120}
-      // antd v5+: dùng popupRender thay vì dropdownRender
       popupRender={() => (
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden" style={{ width }}>
           <div className="animate-fade-up">
@@ -33,28 +53,56 @@ export default function FavoritePostList({ width = 340, iconSize = 25 }) {
                   Chưa có tin nào được lưu.
                 </div>
               ) : (
-                savedPosts.map((p) => (
-                  <a
-                    key={p.id}
-                    href={p.href || "#"}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (p.href) nav(p.href);
-                    }}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition no-underline"
-                  >
-                    <img
-                      src={p.thumb}
-                      alt="thumb"
-                      className="w-[70px] h-[50px] object-cover rounded-md border"
-                      onError={(e) => (e.currentTarget.src = "https://picsum.photos/140/100")}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[14px] text-gray-800 font-medium truncate">{p.title}</div>
-                      <div className="text-[12px] text-gray-500">{p.savedAgo}</div>
-                    </div>
-                  </a>
-                ))
+                savedPosts.map((p) => {
+                  const addr = p.displayAddress || p.address || "";
+                  const priceText = p.priceDisplay || formatVNDShort(p.price);
+
+                  return (
+                    <a
+                      key={p.id}
+                      href={p.href || "#"}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (p.href) nav(p.href);
+                      }}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition no-underline"
+                    >
+                      <img
+                        src={p.thumb}
+                        alt="thumb"
+                        className="w-[70px] h-[50px] object-cover rounded-md border"
+                        onError={(e) => (e.currentTarget.src = "https://picsum.photos/140/100")}
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        {/* Title */}
+                        <div className="text-[14px] text-gray-800 font-medium truncate">
+                          {p.title}
+                        </div>
+
+                        {/* Price + Address */}
+                        <div className="mt-0.5 flex items-center gap-3">
+                          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#d6402c] whitespace-nowrap">
+                            <DollarCircleOutlined />
+                            <span>{priceText}</span>
+                          </div>
+
+                          {addr && (
+                            <div className="flex items-center gap-1.5 text-[12px] text-gray-600 min-w-0">
+                              <EnvironmentOutlined className="text-gray-500" />
+                              <span className="truncate" title={addr}>{addr}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Saved time */}
+                        <div className="text-[12px] text-gray-500 mt-0.5">
+                          {p.savedAgo}
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })
               )}
             </div>
 

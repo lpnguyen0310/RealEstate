@@ -1,15 +1,25 @@
-import { ShareAltOutlined, HeartOutlined, HeartFilled, CameraOutlined, ClockCircleOutlined, EnvironmentOutlined, } from "@ant-design/icons";
-import useFavorites from "@/hooks/useFavorites";
-import { useMemo } from "react";
-import { favoriteApi } from "@/api/favoriteApi";
-import { message } from "antd";
+// src/components/PropertyCard.jsx
+import React, { useMemo } from "react";
+import {
+    ShareAltOutlined,
+    HeartOutlined,
+    HeartFilled,
+    CameraOutlined,
+    ClockCircleOutlined,
+    EnvironmentOutlined,
+} from "@ant-design/icons";
+import { message, Modal } from "antd";
 import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import useFavorites from "@/hooks/useFavorites";
+import { favoriteApi } from "@/api/favoriteApi";
+import { openLoginModal } from "@/store/uiSlice";
+import { formatVNDShort } from "@/utils/money";
+
 function stopLink(e) {
     e.preventDefault();
     e.stopPropagation();
 }
-import { Modal } from "antd";
-import { openLoginModal } from "@/store/uiSlice";
 
 export default function PropertyCard({ item }) {
     const origin = window.location.origin;
@@ -19,13 +29,44 @@ export default function PropertyCard({ item }) {
 
     const href = `/real-estate/${item.id}`;
     const thumb = imageUrl;
-    const user = useSelector(s => s.auth.user);
+    const user = useSelector((s) => s.auth.user);
     const dispatch = useDispatch();
-    // Dùng hook yêu thích
+
+    // Hook favorites
     const { isSaved, toggle } = useFavorites(item.id);
+
+    const favPayload = useMemo(
+        () => ({
+            id: item.id,
+            title: item.title,
+            thumb,
+            href,
+            price: item.price ?? null,
+            priceDisplay: item.priceDisplay || formatVNDShort(item.price), // ⬅️ thêm
+            displayAddress: item.displayAddress || item.addressMain || "",
+            pricePerM2: item.pricePerM2,                      // "210 tr/m²"
+            area: item.area,                                  // 35
+            bed: item.bedrooms ?? item.bed,                   // 3
+            bath: item.bathrooms ?? item.bath,                // 4
+            photos: item.photos ?? item?.imageUrls?.length ?? 0,
+            postedAt: item.postedAtText ?? item.postedAt,     // "Đăng hôm nay"
+            listingType: item.listingType,                    // VIP/PREMIUM/NORMAL
+        }),
+        [
+            item?.id,
+            item?.title,
+            item?.price,
+            item?.priceDisplay,
+            item?.displayAddress,
+            item?.addressMain,
+            thumb,
+            href,
+        ]
+    );
 
     const handleToggle = async (e) => {
         stopLink(e);
+
         if (!user) {
             Modal.confirm({
                 title: "Bạn cần đăng nhập để thực hiện",
@@ -37,28 +78,18 @@ export default function PropertyCard({ item }) {
             });
             return;
         }
-        // Optimistic UI
-        toggle({ id: item.id, title: item.title, thumb: imageUrl, href });
+
+        // Optimistic UI (dùng payload đã đủ field)
+        toggle(favPayload);
         try {
             await favoriteApi.toggle(item.id);
         } catch (err) {
-            // rollback
+            // Rollback (gọi toggle lại với chỉ id để remove)
             toggle({ id: item.id });
             message.error("Không thể lưu/bỏ lưu. Vui lòng thử lại!");
             Modal.error({ title: "Có lỗi xảy ra", content: "Không thể lưu/bỏ lưu. Vui lòng thử lại!" });
         }
     };
-
-    // Chuẩn hóa payload lưu
-    const favPayload = useMemo(
-        () => ({
-            id: item.id,
-            title: item.title,
-            thumb,
-            href,
-        }),
-        [item?.id, item?.title, thumb, href]
-    );
 
     // Badge loại tin
     const type = item.listingType?.toUpperCase();
@@ -76,10 +107,7 @@ export default function PropertyCard({ item }) {
         <div className="rounded-[20px] border border-gray-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
             {/* IMAGE */}
             <div className="relative p-3">
-                <div
-                    className="relative overflow-hidden rounded-[16px] ring-1 ring-black/5 bg-black/5"
-                    style={{ borderRadius: 16 }}
-                >
+                <div className="relative overflow-hidden rounded-[16px] ring-1 ring-black/5 bg-black/5">
                     <img
                         src={imageUrl}
                         alt={item.title}
@@ -115,7 +143,6 @@ export default function PropertyCard({ item }) {
                 ${isSaved ? "bg-[#fff1ef]" : "bg-white/95 hover:bg-white"}`}
                             onMouseDown={stopLink}
                             onClick={handleToggle}
-
                             aria-label={isSaved ? "Bỏ lưu" : "Lưu tin"}
                             title={isSaved ? "Bỏ lưu" : "Lưu tin"}
                         >
@@ -136,7 +163,7 @@ export default function PropertyCard({ item }) {
                     {/* BADGE: số ảnh */}
                     <div className="absolute right-4 bottom-4 flex items-center gap-1 bg-black/70 text-white text-[12px] px-2.5 py-1 rounded-full">
                         <CameraOutlined className="text-[12px]" />
-                        <span>{item.photos}</span>
+                        <span>{item.photos ?? item?.imageUrls?.length ?? 0}</span>
                     </div>
                 </div>
             </div>
@@ -147,14 +174,14 @@ export default function PropertyCard({ item }) {
                     {item.title}
                 </h3>
 
-                <div className="">
+                <div>
                     <span className="text-[#1f5fbf] font-bold text-[20px]">{item.price}</span>
                     {item.pricePerM2 && <span className="ml-2 text-gray-500 text-[13px]">({item.pricePerM2})</span>}
                 </div>
 
                 <div className="mt-2 text-gray-700 text-[14px] flex items-center gap-2">
                     <EnvironmentOutlined className="text-[#1f5fbf]" />
-                    <span className="truncate">{item.addressMain}</span>
+                    <span className="truncate">{item.displayAddress || item.addressMain}</span>
                 </div>
 
                 <div className="mt-3 flex items-center gap-6 text-gray-700 text-[14px]">
