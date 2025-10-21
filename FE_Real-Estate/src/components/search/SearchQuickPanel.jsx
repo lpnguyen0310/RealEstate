@@ -72,13 +72,13 @@ export default function SearchQuickPanel({
                             grabCursor
                         >
                             {trending.map((t) => (
-                                <SwiperSlide key={t} style={{ width: "auto" }}>
+                                <SwiperSlide key={t.text} style={{ width: "auto" }}>
                                     <Tag
                                         onClick={() => onPickTrending?.(t)}
                                         className="cursor-pointer rounded-full px-3 py-2 bg-[#e8f2fb] hover:bg-[#dff0ff] border-none text-[#174ea6] shadow-[0_2px_10px_rgba(8,54,122,0.06)]"
                                     >
                                         <span className="mr-1">📈</span>
-                                        <span className="font-medium">{t}</span>
+                                        <span className="font-medium">{t.text}</span>
                                     </Tag>
                                 </SwiperSlide>
                             ))}

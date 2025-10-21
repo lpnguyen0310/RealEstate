@@ -29,19 +29,7 @@ export const fetchMyOrders = createAsyncThunk(
     }
   }
 );
-export const getTransactionsForOrderApi = async (orderId) => {
-  if (!orderId) return [];
-  
-  const API_URL = `/orders/${orderId}/transactions`;
-  
-  try {
-    const response = await api.get(API_URL);
-    return response.data.data || [];
-  } catch (error) {
-    console.error(`Failed to fetch transactions for order ${orderId}`, error);
-    throw error;
-  }
-};
+
 const initialState = {
   myOrders: [],
   currentOrder: null, // Lưu thông tin đơn hàng vừa tạo thành công

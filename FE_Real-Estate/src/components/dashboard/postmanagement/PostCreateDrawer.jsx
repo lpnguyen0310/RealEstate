@@ -86,10 +86,10 @@ const BodyForm = React.memo(function BodyForm({
                 loadingDistricts={loadingDistricts}
                 loadingWards={loadingWards}
             />
-            <PublicImagesSection
+            {/* <PublicImagesSection
                 images={formData.images}
                 onChange={(arr) => setFormData((p) => ({ ...p, images: arr }))}
-            />
+            /> */}
             <VideoLibrarySection
                 videoUrls={formData.videoUrls}
                 onChange={(arr) => setFormData((p) => ({ ...p, videoUrls: arr }))}
@@ -136,6 +136,10 @@ const BodyType = React.memo(function BodyType({
 
     return (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 bg-[#f8faff]">
+            <PublicImagesSection
+                images={formData.images}
+                onChange={(arr) => setFormData((p) => ({ ...p, images: arr }))}
+            />
             <PostTypeSection
                 value={postTypeId ?? formData.listingTypePolicyId ?? null}
                 onChange={(id) => {

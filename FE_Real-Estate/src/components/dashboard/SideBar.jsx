@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { Tooltip } from "antd";
 import { MENUS } from "@/data/SideBar/menuDataSideBar";
 import { PushpinOutlined, PushpinFilled } from "@ant-design/icons";
@@ -11,6 +11,7 @@ export default function Sidebar({
     setHovered,
 }) {
     const collapsed = !pinned && !hovered; // logic thu gọn
+    const navigate = useNavigate();
 
     return (
         <aside
@@ -31,6 +32,7 @@ export default function Sidebar({
                         alt="radanhadat.vn"
                         className={`${collapsed ? "h-7" : "h-8"} transition-all`}
                         onError={(e) => (e.currentTarget.style.display = "none")}
+                        onClick={() => navigate("/")}
                     />
                     {!collapsed && (
                         <button
