@@ -1,302 +1,166 @@
 // src/pages/Admin/AdminPostsMUI.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
-import dayjs from "dayjs";
+import { useCallback, useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Box } from "@mui/material";
-import { fmtDate, normalizeStatuses, countByStatus, money } from "../../utils/validators";
+import { fmtDate, money } from "@/utils/validators";
 import {
     KpiGrid,
     PillBar,
     FiltersBar,
     PostsTable,
     PostDetailDrawer,
-} from "../../components/admidashboard/post";
-import { adminPropertyApi } from "../../api/adminApi/adminPropertyApi";
+} from "@/components/admidashboard/post";
+
+import {
+    // state & actions from slice
+    setQ,
+    setCategory,
+    setListingType,
+    setSelectedTab,
+    setPage,
+    setPageSize,
+    resetFilters,
+    setDecision,
+    openDetail,
+    closeDetail,
+    // thunks
+    fetchPostsThunk,
+    fetchCountsThunk,
+    approvePostThunk,
+    rejectPostThunk,
+    hidePostThunk,
+    unhidePostThunk,
+    hardDeletePostThunk,
+} from "@/store/adminPostsSlice";
+
+// Realtime (STOMP over SockJS)
+import { Client } from "@stomp/stompjs";
+import SockJS from "sockjs-client";
 
 export default function AdminPostsMUI() {
-    const [posts, setPosts] = useState([]);
-    const [counts, setCounts] = useState({});
-    const [loadingList, setLoadingList] = useState(false);
-    const [loadingCounts, setLoadingCounts] = useState(false);
-    const [actioningId, setActioningId] = useState(null);
+    const dispatch = useDispatch();
 
-    // filters
-    const [q, setQ] = useState("");
-    const [category, setCategory] = useState("");
-    const [listingType, setListingType] = useState("");
-    const [selectedTab, setSelectedTab] = useState("ALL");
-    const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const {
+        posts,
+        counts,
+        loadingList,
+        loadingCounts,
+        actioningId,
+        q,
+        category,
+        listingType,
+        selectedTab,
+        page,
+        pageSize,
+        totalItems,
+        totalPages,
+        open,
+        detail,
+        decision,
+    } = useSelector((s) => s.adminPosts);
 
-    const [totalItems, setTotalItems] = useState(0);
-    const [totalPages, setTotalPages] = useState(1);
-
-    const [open, setOpen] = useState(false);
-    const [detail, setDetail] = useState(null);
-    const [decision, setDecision] = useState({
-        durationDays: 30,
-        reason: "",
-    });
-
-    const hasCountsApi = typeof adminPropertyApi?.counts === "function";
-
-    // ================== FETCH LIST ==================
+    // ================== FETCH (debounce 250ms) ==================
     useEffect(() => {
-        let t;
-        const fetchList = async () => {
-            setLoadingList(true);
-            try {
-                const res = await adminPropertyApi.list({
-                    page: page - 1,
-                    size: pageSize,
-                    q: q || undefined,
-                    categoryId: category || undefined,
-                    listingType: listingType || undefined,
-                    status: selectedTab === "ALL" ? undefined : selectedTab,
-                    sort: "postedAt,desc",
-                });
-
-                const content = Array.isArray(res?.content) ? res.content : [];
-                const normalizedRows = (res?.content || []).map((p) => {
-                    const posted = p.postedAt ? dayjs(p.postedAt) : null;
-                    const expires = p.expiresAt ? dayjs(p.expiresAt) : null;
-
-                    const actualDurationDays =
-                        p.actualDurationDays ??
-                        (posted && expires ? expires.diff(posted, "day") : null);
-
-                    return {
-                        id: p.id,
-                        title: p.title,
-                        category: p.categoryName,
-                        listingType: p.listingType,
-                        displayAddress: p.displayAddress,
-                        description: p.description,
-                        price: p.price,
-                        status: p.status,
-                        createdAt: p.postedAt,
-                        expiresAt: p.expiresAt,
-
-                        // BẢNG dùng số ngày THỰC TẾ:
-                        durationDays: actualDurationDays,
-
-                        // Lưu riêng số ngày THEO GÓI để Drawer dùng:
-                        policyDurationDays: p.policyDurationDays ?? p.durationDays ?? null,
-
-                        author: { name: p.authorName, email: p.authorEmail },
-                        images: p.imageUrls || [],
-                    };
-                });
-
-
-                const normalized = normalizeStatuses(normalizedRows);
-                setPosts(normalized);
-                setTotalItems(res?.totalElements ?? content.length);
-                setTotalPages(res?.totalPages ?? 1);
-                if (!hasCountsApi && selectedTab === "ALL") {
-                    const newCounts = countByStatus(normalized);
-                    setCounts(newCounts);
-                }
-            } catch (e) {
-                console.error("Lỗi khi load properties:", e);
-            } finally {
-                setLoadingList(false);
-            }
-        };
-
-        t = setTimeout(fetchList, 250);
+        const t = setTimeout(() => {
+            dispatch(fetchPostsThunk());
+        }, 250);
         return () => clearTimeout(t);
-    }, [selectedTab, page, pageSize, q, category, listingType, hasCountsApi]);
+    }, [dispatch, selectedTab, page, pageSize, q, category, listingType]);
 
     useEffect(() => {
-        if (!hasCountsApi) return;
-        let t;
-        const fetchCounts = async () => {
-            setLoadingCounts(true);
-            try {
-                const res = await adminPropertyApi.counts({
-                    q: q || undefined,
-                    categoryId: category || undefined,
-                    listingType: listingType || undefined,
-                    // Không gửi status để counts luôn là toàn tập theo filter tìm kiếm
-                });
-                setCounts(res || {});
-            } catch (e) {
-                console.error("Lỗi khi load counts:", e);
-            } finally {
-                setLoadingCounts(false);
-            }
-        };
-        t = setTimeout(fetchCounts, 250);
+        const t = setTimeout(() => {
+            dispatch(fetchCountsThunk());
+        }, 250);
         return () => clearTimeout(t);
-    }, [q, category, listingType, hasCountsApi]);
+    }, [dispatch, q, category, listingType]);
 
-    const refreshCounts = useCallback(async () => {
-        if (!hasCountsApi) return;
-        try {
-            const res = await adminPropertyApi.counts({
-                q: q || undefined,
-                categoryId: category || undefined,
-                listingType: listingType || undefined,
-            });
-            setCounts(res || {});
-        } catch { }
-    }, [hasCountsApi, q, category, listingType]);
+    // ================== REALTIME WS ==================
+    // Kết nối SockJS ở /ws (relative như axios baseURL="/api")
+    useEffect(() => {
+        const client = new Client({
+            webSocketFactory: () => new SockJS("/ws"),
+            reconnectDelay: 3000,
+            onConnect: () => {
+                // Admin subscribe kênh broadcast từ BE
+                client.subscribe("/topic/admin/properties", async (msg) => {
+                    try {
+                        const ev = JSON.parse(msg.body); // { type, id, status, ... }
+                        // làm tươi KPI
+                        await dispatch(fetchCountsThunk());
+                        // tin mới tạo nằm ở PENDING_REVIEW → chỉ refetch list nếu đang ở ALL/PENDING_REVIEW
+                        const shouldReloadList =
+                            selectedTab === "ALL" || selectedTab === "PENDING_REVIEW";
+                        if (shouldReloadList) {
+                            await dispatch(fetchPostsThunk());
+                        }
+                    } catch (e) {
+                        // eslint-disable-next-line no-console
+                        console.warn("Invalid WS payload:", e);
+                    }
+                });
+            },
+        });
 
-    // ================== ACTIONS ==================
+        client.activate();
+        return () => client.deactivate();
+    }, [dispatch, selectedTab]);
+
+    // ================== ACTION HANDLERS ==================
     const approve = useCallback(
         async (id) => {
-            try {
-                setActioningId(id);
-                const res = await adminPropertyApi.approve(id, {
-                    durationDays: Number(decision.durationDays) || null,
-                    note: decision.note || "",
-                });
-
-                setPosts((prev) =>
-                    prev.map((x) =>
-                        x.id === id
-                            ? {
-                                ...x,
-                                status: res?.status ?? "PUBLISHED",
-                                postedAt: res?.postedAt ?? x.postedAt,
-                                expiresAt: res?.expiresAt ?? x.expiresAt,
-                                durationDays: res?.durationDays ?? x.durationDays,
-                            }
-                            : x
-                    )
-                );
-
-                bumpCounts("PENDING_REVIEW", "PUBLISHED");
-                await refreshCounts();
-            } catch (e) {
-                console.error("Approve failed", e);
-            } finally {
-                setActioningId(null);
-            }
+            await dispatch(approvePostThunk(id));
+            // Đồng bộ lại từ server
+            await dispatch(fetchCountsThunk());
+            await dispatch(fetchPostsThunk());
         },
-        [decision, refreshCounts]
+        [dispatch]
     );
-
-
-    const bumpCounts = useCallback((from, to, removed = false) => {
-        setCounts((prev) => {
-            const next = { ...prev };
-            if (from && next[from] != null) next[from] = Math.max(0, (next[from] || 0) - 1);
-            if (!removed && to) next[to] = (next[to] || 0) + 1;
-            return next;
-        });
-    }, []);
 
     const reject = useCallback(
         async (id) => {
             if (!window.confirm("Từ chối tin này?")) return;
-            try {
-                setActioningId(id);
-                await adminPropertyApi.reject(id, decision.reason ?? ""); // <- cho phép rỗng
-                let from = null;
-                setPosts(prev =>
-                    prev.map(x => {
-                        if (x.id === id) { from = x.status; return { ...x, status: "REJECTED" }; }
-                        return x;
-                    })
-                );
-                bumpCounts(from || "PENDING_REVIEW", "REJECTED");
-                await refreshCounts();
-            } finally {
-                setActioningId(null);
-            }
+            await dispatch(rejectPostThunk(id));
+            await dispatch(fetchCountsThunk());
+            await dispatch(fetchPostsThunk());
         },
-        [decision.reason, bumpCounts, refreshCounts]
+        [dispatch]
     );
 
-
-    // HIDE: PUBLISHED -> HIDDEN
     const hide = useCallback(
         async (id) => {
-            try {
-                setActioningId(id);
-                await adminPropertyApi.hide(id);
-
-                let from = null;
-                setPosts((prev) =>
-                    prev.map((x) => {
-                        if (x.id === id) {
-                            from = x.status;
-                            return { ...x, status: "HIDDEN" };
-                        }
-                        return x;
-                    })
-                );
-
-                bumpCounts(from || "PUBLISHED", "HIDDEN");
-                await refreshCounts();
-            } finally {
-                setActioningId(null);
-            }
+            await dispatch(hidePostThunk(id));
+            await dispatch(fetchCountsThunk());
+            await dispatch(fetchPostsThunk());
         },
-        [bumpCounts, refreshCounts]
+        [dispatch]
     );
 
     const unhide = useCallback(
         async (id) => {
-            try {
-                setActioningId(id);
-                await adminPropertyApi.unhide(id);
-
-                setPosts((prev) => prev.map((x) => (x.id === id ? { ...x, status: "PUBLISHED" } : x)));
-
-                bumpCounts("HIDDEN", "PUBLISHED");
-                await refreshCounts();
-            } finally {
-                setActioningId(null);
-            }
+            await dispatch(unhidePostThunk(id));
+            await dispatch(fetchCountsThunk());
+            await dispatch(fetchPostsThunk());
         },
-        [bumpCounts, refreshCounts]
+        [dispatch]
     );
 
-    // HARD DELETE
     const hardDelete = useCallback(
         async (id) => {
             if (!window.confirm(`Xóa tin ${id}? Hành động không thể hoàn tác.`)) return;
-            try {
-                setActioningId(id);
-                await adminPropertyApi.hardDelete(id);
-
-                let from = null;
-                setPosts((prev) => {
-                    const found = prev.find((x) => x.id === id);
-                    from = found?.status;
-                    return prev.filter((x) => x.id !== id);
-                });
-
-                bumpCounts(from || null, null, true);
-                await refreshCounts();
-            } finally {
-                setActioningId(null);
-            }
+            await dispatch(hardDeletePostThunk(id));
+            await dispatch(fetchCountsThunk());
+            await dispatch(fetchPostsThunk());
         },
-        [bumpCounts, refreshCounts]
+        [dispatch]
     );
 
-    // onOpenDetail
-    const onOpenDetail = useCallback((r) => {
-        const effectiveDuration = r.policyDurationDays ?? 30; setDetail({ ...r, priceLabel: money(r.price) });
-        setDecision({
-            listingType: r.listingType || "NORMAL",
-            durationDays: effectiveDuration,
-            note: "",
-        });
-        setOpen(true);
-    }, [money]);
-
-
-
-    const resetFilters = useCallback(() => {
-        setQ("");
-        setCategory("");
-        setListingType("");
-        setPage(1);
-    }, []);
+    const onOpenDetail = useCallback(
+        (r) => {
+            // giữ nguyên priceLabel cho Drawer
+            dispatch(openDetail({ ...r, priceLabel: money(r.price) }));
+        },
+        [dispatch]
+    );
 
     // ================== KPI ==================
     const kpi = useMemo(() => {
@@ -322,28 +186,29 @@ export default function AdminPostsMUI() {
             }}
         >
             <Box sx={{ width: "100%", maxWidth: 1440 }}>
-                <KpiGrid counts={counts} loading={loadingCounts} />
+                {/* KPI tổng quan */}
+                <KpiGrid counts={counts} loading={loadingCounts} kpi={kpi} />
 
+                {/* Tabs trạng thái (đọc chung từ counts) */}
                 <PillBar
                     selected={selectedTab}
-                    onSelect={(key) => {
-                        setSelectedTab(key);
-                        setPage(1);
-                    }}
+                    onSelect={(key) => dispatch(setSelectedTab(key))}
                     counts={counts}
                 />
 
+                {/* Bộ lọc tìm kiếm */}
                 <FiltersBar
                     q={q}
-                    setQ={setQ}
+                    setQ={(v) => dispatch(setQ(v))}
                     category={category}
-                    setCategory={setCategory}
+                    setCategory={(v) => dispatch(setCategory(v))}
                     listingType={listingType}
-                    setListingType={setListingType}
-                    onSearch={() => setPage(1)}
-                    onReset={resetFilters}
+                    setListingType={(v) => dispatch(setListingType(v))}
+                    onSearch={() => dispatch(setPage(1))}
+                    onReset={() => dispatch(resetFilters())}
                 />
 
+                {/* Bảng danh sách */}
                 <PostsTable
                     rows={posts}
                     loading={loadingList}
@@ -354,8 +219,8 @@ export default function AdminPostsMUI() {
                     end={Math.min(page * pageSize, totalItems)}
                     totalItems={totalItems}
                     pageSize={pageSize}
-                    setPage={setPage}
-                    setPageSize={setPageSize}
+                    setPage={(p) => dispatch(setPage(p))}
+                    setPageSize={(s) => dispatch(setPageSize(s))}
                     onOpenDetail={onOpenDetail}
                     onApprove={approve}
                     onReject={reject}
@@ -364,15 +229,16 @@ export default function AdminPostsMUI() {
                     onHardDelete={hardDelete}
                     money={money}
                     fmtDate={fmtDate}
-                    setDecision={setDecision}
+                    setDecision={(payload) => dispatch(setDecision(payload))}
                 />
 
+                {/* Drawer chi tiết + duyệt */}
                 <PostDetailDrawer
                     open={open}
-                    onClose={() => setOpen(false)}
+                    onClose={() => dispatch(closeDetail())}
                     detail={detail}
                     decision={decision}
-                    setDecision={setDecision}
+                    setDecision={(payload) => dispatch(setDecision(payload))}
                     money={money}
                     fmtDate={fmtDate}
                     onApprove={approve}

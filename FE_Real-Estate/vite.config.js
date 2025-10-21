@@ -17,9 +17,20 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+
+  // ✅ thêm đoạn này để fix lỗi "global is not defined"
+  define: {
+    global: {},
+  },
+
   server: {
     proxy: {
       "/api": { target: "http://localhost:8080", changeOrigin: true },
+      "/ws": {           // ✅ thêm luôn proxy cho websocket
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })

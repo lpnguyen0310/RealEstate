@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "@/api/axios";
 import { setAccessToken, clearAccessToken } from "@/utils/auth";
+import { favoriteApi } from "@/api/favoriteApi";                 // <= FE call BE
+import { hydrateFavorites, clearAll as clearFavs } from "@/store/favoriteSlice";
 const extractRoles = (profile) => {
     if (!profile) return [];
     // chấp nhận cả 3 dạng: ["ADMIN"], ["ROLE_ADMIN"], [{authority:"ROLE_ADMIN"}]
@@ -20,7 +22,7 @@ const extractRoles = (profile) => {
 // ---- Thunks ----
 export const loginThunk = createAsyncThunk(
     "auth/login",
-    async ({ username, password }, { rejectWithValue }) => {
+    async ({ username, password }, { rejectWithValue, dispatch }) => {
         try {
             const res = await api.post("/auth/login", { identifier: username, password });
             const access = res?.data?.data?.access || res?.data?.data?.accessToken;
@@ -32,7 +34,13 @@ export const loginThunk = createAsyncThunk(
 
             // Lưu profile vào sessionStorage
             if (profile) sessionStorage.setItem("profile", JSON.stringify(profile));
-
+            try {
+                const ids = await favoriteApi.getIds(); // [id1,id2,...]
+                dispatch(hydrateFavorites(ids));
+            } catch (e) {
+                // im lặng, không chặn login flow
+                console.warn("hydrate favorites failed:", e);
+            }
             // => trả kèm roles đã chuẩn hoá để điều hướng
             const roles = extractRoles(profile);
             return { access, profile, roles };
@@ -45,11 +53,17 @@ export const loginThunk = createAsyncThunk(
 
 export const getProfileThunk = createAsyncThunk(
     "auth/getProfile",
-    async (_, { rejectWithValue }) => {
+    async (_, { rejectWithValue, dispatch }) => {
         try {
             const me = await api.get("user/me");
             const profile = me?.data?.data ?? me?.data ?? null;
             if (profile) sessionStorage.setItem("profile", JSON.stringify(profile));
+            try {
+                const ids = await favoriteApi.getIds();
+                dispatch(hydrateFavorites(ids));
+            } catch (e) {
+                console.warn("hydrate favorites (getProfile) failed:", e);
+            }
             return profile;
         } catch (e) {
             return rejectWithValue(e?.response?.data?.message || "Lấy hồ sơ thất bại");
@@ -57,11 +71,21 @@ export const getProfileThunk = createAsyncThunk(
     }
 );
 
-export const logoutThunk = createAsyncThunk("auth/logout", async () => {
-    try { await api.post("/auth/logout"); } catch { }
-    clearAccessToken();
-    sessionStorage.removeItem("profile");
-});
+export const logoutThunk = createAsyncThunk(
+    "auth/logout",
+    async (_, { dispatch }) => {
+        try {
+            await api.post("/auth/logout");
+        } catch { }
+        clearAccessToken();
+        sessionStorage.removeItem("profile");
+        try {
+            localStorage.removeItem("bds_favorites_v1");
+        } catch { }
+        dispatch(clearFavs()); // từ favoriteSlice
+    }
+);
+
 
 const initialState = {
     user: null,

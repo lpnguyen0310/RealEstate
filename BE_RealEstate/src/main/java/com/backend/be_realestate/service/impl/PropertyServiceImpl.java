@@ -12,12 +12,14 @@ import com.backend.be_realestate.exceptions.ResourceNotFoundException;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
+import com.backend.be_realestate.modals.dto.propertyEvent.PropertyEvent;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -50,6 +52,7 @@ public class PropertyServiceImpl implements IPropertyService {
     private final UserRepository userRepository;
     private final ListingTypePolicyRepository policyRepo;
     private final UserInventoryRepository inventoryRepo;
+    private final ApplicationEventPublisher publisher;
 
     @Override
     public List<PropertyCardDTO> getAllPropertiesForCardView() {
@@ -203,6 +206,14 @@ public class PropertyServiceImpl implements IPropertyService {
         }
 
         var saved = propertyRepository.save(property);
+        publisher.publishEvent(new PropertyEvent(
+                saved.getId(),
+                saved.getStatus().name(),
+                saved.getCategory() != null ? saved.getCategory().getId() : null,
+                saved.getListingType() != null ? saved.getListingType().name() : null,
+                saved.getTitle()
+        ));
+
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
 

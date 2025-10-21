@@ -1,12 +1,13 @@
 import React from "react";
 import { Dropdown, Tooltip, Badge } from "antd";
 import { HeartOutlined } from "@ant-design/icons";
+import useFavorites from "@/hooks/useFavorites";
+import { useNavigate } from "react-router-dom";
 
-export default function FavoritePostList({
-  savedPosts = [],
-  width = 340,
-  iconSize = 25,
-}) {
+export default function FavoritePostList({ width = 340, iconSize = 25 }) {
+  const nav = useNavigate();
+  const { list: savedPosts } = useFavorites(); // <-- lấy từ store
+
   return (
     <Dropdown
       trigger={["click"]}
@@ -16,11 +17,9 @@ export default function FavoritePostList({
       align={{ offset: [0, 10] }}
       overlayClassName="bds-saved-dropdown"
       zIndex={120}
-      dropdownRender={() => (
-        <div
-          className="bg-white rounded-2xl shadow-xl overflow-hidden"
-          style={{ width }}
-        >
+      // antd v5+: dùng popupRender thay vì dropdownRender
+      popupRender={() => (
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden" style={{ width }}>
           <div className="animate-fade-up">
             {/* Header */}
             <div className="text-center font-semibold text-[15px] text-gray-800 py-3 border-b border-gray-100">
@@ -38,17 +37,20 @@ export default function FavoritePostList({
                   <a
                     key={p.id}
                     href={p.href || "#"}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (p.href) nav(p.href);
+                    }}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition no-underline"
                   >
                     <img
                       src={p.thumb}
                       alt="thumb"
                       className="w-[70px] h-[50px] object-cover rounded-md border"
+                      onError={(e) => (e.currentTarget.src = "https://picsum.photos/140/100")}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[14px] text-gray-800 font-medium truncate">
-                        {p.title}
-                      </div>
+                      <div className="text-[14px] text-gray-800 font-medium truncate">{p.title}</div>
                       <div className="text-[12px] text-gray-500">{p.savedAgo}</div>
                     </div>
                   </a>
@@ -60,6 +62,10 @@ export default function FavoritePostList({
             <div className="border-t border-gray-100 text-center py-2">
               <a
                 href="/tin-da-luu"
+                onClick={(e) => {
+                  e.preventDefault();
+                  nav("/tin-da-luu");
+                }}
                 className="text-[#d6402c] text-[14px] font-medium hover:underline"
               >
                 Xem tất cả →

@@ -123,8 +123,23 @@ export const normalizeStatuses = (posts) => {
   });
 };
 
-export const countByStatus = (list) => {
-  const map = { PUBLISHED: 0, PENDING: 0, DRAFT: 0, REJECTED: 0, EXPIRED: 0, EXPIRING_SOON: 0, HIDDEN: 0 };
-  list.forEach((p) => (map[p.status] = (map[p.status] || 0) + 1));
+export const countByStatus = (list = []) => {
+  const map = {
+    PUBLISHED: 0,
+    PENDING_REVIEW: 0,
+    DRAFT: 0,
+    REJECTED: 0,
+    EXPIRED: 0,
+    EXPIRING_SOON: 0,
+    HIDDEN: 0,
+  };
+
+  list.forEach((p) => {
+    const key = (p.status || "").toUpperCase();
+    if (map[key] !== undefined) {
+      map[key]++;
+    }
+  });
+
   return map;
 };

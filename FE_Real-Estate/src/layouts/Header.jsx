@@ -1,12 +1,11 @@
-// src/components/layout/Header.jsx
-import { useState } from "react";
+import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Flex, Badge, Dropdown, Button, message } from "antd";
 import { BellOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import React from "react";
 
 import { NAVS } from "@/data/header_submenu";
-import { SAVED_POSTS } from "@/data/SavedPost";
 
 import UserDropDownHeader from "@/components/menu/UserDropDownHeader";
 import FavoritePostList from "@/components/menu/FavoritePostList";
@@ -14,19 +13,26 @@ import LoginModal from "@/pages/Login/LoginModal";
 import RegisterModal from "@/pages/Signup/RegisterModal";
 
 import { logoutThunk } from "@/store/authSlice";
+import {
+  openLoginModal,
+  closeLoginModal,
+  openRegisterModal,
+  closeRegisterModal,
+  switchToRegister,
+  switchToLogin,
+} from "@/store/uiSlice";
 
 export default function Header() {
   const nav = useNavigate();
   const dispatch = useDispatch();
 
   const { user, status } = useSelector((s) => s.auth);
-  const loadingAuth = status === "loading"; // đang hydrate/getProfile/login
+  const loginOpen = useSelector((s) => s.ui.loginModalOpen);
+  const registerOpen = useSelector((s) => s.ui.registerModalOpen);
+  const loadingAuth = status === "loading";
 
-  // UI state
-  const [hoverKey, setHoverKey] = useState(null);
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [registerOpen, setRegisterOpen] = useState(false);
-  const [authUiLoading, setAuthUiLoading] = useState(false); // Skeleton khi panel "Đang đăng nhập"
+  const [hoverKey, setHoverKey] = React.useState(null);
+  const [authUiLoading, setAuthUiLoading] = React.useState(false);
 
   const handleLogout = async () => {
     try {
@@ -50,7 +56,8 @@ export default function Header() {
           }}
           className="flex items-center justify-between px-4 py-2.5 rounded-lg text-[14px] font-medium
                      hover:bg-gray-50 no-underline
-                     !text-gray-800 hover:!text-[#d6402c] visited:!text-gray-800 focus:!text-[#d6402c]">
+                     !text-gray-800 hover:!text-[#d6402c] visited:!text-gray-800 focus:!text-[#d6402c]"
+        >
           <span>{it.text}</span>
           {it.badge && (
             <span className="ml-3 text-[12px] px-1.5 py-0.5 rounded bg-[#fdece7] text-[#d6402c] border border-[#f7c7be]">
@@ -66,8 +73,8 @@ export default function Header() {
     <>
       <header className="sticky top-0 z-50 mx-auto bg-white border-b border-gray-200 w-full px-4 py-2">
         <Flex align="center" justify="space-between" className="mx-auto w-full h-[72px] px-4">
+          {/* --- LEFT: Logo + Nav --- */}
           <Flex align="center" gap={32}>
-            {/* Logo */}
             <a href="/" className="flex items-center h-full cursor-pointer px-4 py-3">
               <img
                 src="/src/assets/logo2.svg"
@@ -91,9 +98,13 @@ export default function Header() {
                       placement="bottomLeft"
                       align={{ offset: [0, 10] }}
                       getPopupContainer={(node) => node?.parentElement || document.body}
-                      dropdownRender={() => renderSubmenu(navItem.items || [], navItem.key)}
+                      dropdownRender={() =>
+                        renderSubmenu(navItem.items || [], navItem.key)
+                      }
                       arrow={{ pointAtCenter: false }}
-                      onOpenChange={(open) => setHoverKey(open ? navItem.label : null)}
+                      onOpenChange={(open) =>
+                        setHoverKey(open ? navItem.label : null)
+                      }
                     >
                       <button
                         key={navItem.key}
@@ -114,14 +125,14 @@ export default function Header() {
             </div>
           </Flex>
 
-          {/* RIGHT: Actions */}
+          {/* --- RIGHT: Actions --- */}
           <Flex
             align="center"
             className="px-2 w-[520px] max-w-[460px] min-w-[420px]"
             gap={0}
             justify="space-evenly"
           >
-            <FavoritePostList savedPosts={SAVED_POSTS} />
+            <FavoritePostList />
 
             <Badge count={2} size="small" offset={[-2, 6]}>
               <BellOutlined className="text-[25px] text-gray-800 cursor-pointer hover:text-[#d6402c]" />
@@ -130,8 +141,8 @@ export default function Header() {
             <UserDropDownHeader
               user={user}
               loadingUser={loadingAuth || authUiLoading}
-              onLoginClick={() => setLoginOpen(true)}
-              onRegisterClick={() => setRegisterOpen(true)}
+              onLoginClick={() => dispatch(openLoginModal())}
+              onRegisterClick={() => dispatch(openRegisterModal())}
               onLogout={handleLogout}
             />
 
@@ -139,7 +150,7 @@ export default function Header() {
               className="!h-12 !px-6 !rounded-lg border-gray-200 hover:!border-gray-300 hover:!bg-gray-50 font-medium text-[#d6402c] bg-[#fff1ef]"
               onClick={() => {
                 if (user) nav("/dashboard/posts");
-                else setLoginOpen(true);
+                else dispatch(openLoginModal());
               }}
               disabled={loadingAuth}
             >
@@ -149,32 +160,22 @@ export default function Header() {
         </Flex>
       </header>
 
-      {/* Modals */}
+      {/* --- Modals --- */}
       <LoginModal
         open={loginOpen}
-        onClose={() => {
-          setLoginOpen(false);
-          setAuthUiLoading(false);
-        }}
-        onRegisterClick={() => {
-          setLoginOpen(false);
-          setRegisterOpen(true);
-          setAuthUiLoading(false);
-        }}
-        onBeginLogging={() => setAuthUiLoading(true)} // bật Skeleton khi panel "Đang đăng nhập" chạy
+        onClose={() => dispatch(closeLoginModal())}
+        onRegisterClick={() => dispatch(switchToRegister())}
+        onBeginLogging={() => setAuthUiLoading(true)}
         onSuccess={() => {
-          setAuthUiLoading(false); // tắt Skeleton khi panel xong
-          setLoginOpen(false);
+          setAuthUiLoading(false);
+          dispatch(closeLoginModal());
         }}
       />
 
       <RegisterModal
         open={registerOpen}
-        onClose={() => setRegisterOpen(false)}
-        onBackToLogin={() => {
-          setRegisterOpen(false);
-          setLoginOpen(true);
-        }}
+        onClose={() => dispatch(closeRegisterModal())}
+        onBackToLogin={() => dispatch(switchToLogin())}
       />
     </>
   );
