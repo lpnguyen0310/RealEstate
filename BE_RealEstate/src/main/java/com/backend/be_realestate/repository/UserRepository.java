@@ -19,5 +19,5 @@ import java.util.Optional;
 
         @Query("SELECT u FROM UserEntity u JOIN u.roles r WHERE r.name = :roleName")
         List<UserEntity> findByRoleName(@Param("roleName") String roleName);
-
+        List<UserEntity> findAllByRoles_Code(String code);
     }

@@ -32,7 +32,7 @@ public class NotificationEntity { // Bạn có thể cho extends BaseEntity nế
 
     // Dùng Enum để code sạch hơn
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false,length = 50)
     private NotificationType type;
 
     @CreationTimestamp

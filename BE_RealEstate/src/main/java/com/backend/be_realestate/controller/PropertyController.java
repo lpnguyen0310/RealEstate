@@ -53,7 +53,8 @@ public class PropertyController {
             Authentication auth,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "postedAt,desc") String sort
+            @RequestParam(defaultValue = "postedAt,desc") String sort,
+            @RequestParam(required = false) String status // <-- THÊM THAM SỐ NÀY
     ) {
         Long userId = securityUtils.currentUserId(auth);
         if (userId == null) return ResponseEntity.status(401).build();
@@ -62,7 +63,10 @@ public class PropertyController {
         var dir = (s.length>1 && s[1].equalsIgnoreCase("asc")) ? Sort.Direction.ASC : Sort.Direction.DESC;
         var pageable = PageRequest.of(page, size, Sort.by(dir, s[0]));
 
-        var pageDto = propertyService.getPropertiesByUser(userId, pageable);
+        // === GỌI HÀM SERVICE MỚI ===
+        // Truyền 'status' (có thể là null) vào service
+        var pageDto = propertyService.getPropertiesByUser(userId, status, pageable);
+
         return ResponseEntity.ok(PageResponse.from(pageDto));
     }
 
@@ -79,6 +83,15 @@ public class PropertyController {
 
         var res = propertyService.create(userId, req);
         return ResponseEntity.status(HttpStatus.CREATED).body(res);
+    }
+
+    @GetMapping("/my-counts")
+    public ResponseEntity<Map<String, Long>> getMyPropertyCounts(Authentication auth) {
+        Long userId = securityUtils.currentUserId(auth);
+        if (userId == null) return ResponseEntity.status(401).build();
+
+        Map<String, Long> counts = propertyService.getPropertyCountsByStatus(userId);
+        return ResponseEntity.ok(counts);
     }
 
 }

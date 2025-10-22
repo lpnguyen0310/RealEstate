@@ -8,15 +8,8 @@ import java.util.List;
 
 public interface NotificationService {
 
-    /**
-     * Tạo một thông báo mới cho người dùng.
-     *
-     * @param user    Người nhận thông báo
-     * @param type    Loại thông báo (Enum)
-     * @param message Nội dung
-     * @param link    Đường dẫn khi click
-     */
-    void createNotification(UserEntity user, NotificationType type, String message, String link);
+
+    void createNotification(UserEntity userId, NotificationType type, String message, String link);
 
     /**
      * Lấy danh sách thông báo của một người dùng.

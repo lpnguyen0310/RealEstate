@@ -8,6 +8,8 @@ public enum NotificationType {
     PACKAGE_PURCHASED,  // Mua gói thành công
     PACKAGE_EXPIRED,    // Gói sắp hết hạn
 
+    LISTING_PENDING_USER,
+
     // Dành cho Admin
     NEW_LISTING_PENDING, // Có tin mới chờ duyệt
     NEW_USER_REGISTERED, // Có user mới

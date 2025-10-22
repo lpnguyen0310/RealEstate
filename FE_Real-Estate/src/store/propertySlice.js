@@ -94,9 +94,20 @@ export const createPropertyThunk = createAsyncThunk(
 // Thunk: gọi BE lấy danh sách tin của chính user
 export const fetchMyPropertiesThunk = createAsyncThunk(
     "property/fetchMyProperties",
-    async ({ page = 0, size = 20, sort = "postedAt,desc" } = {}, { rejectWithValue }) => {
+    // 1. Thêm 'status' vào danh sách tham số
+    async ({ page = 0, size = 20, sort = "postedAt,desc", status } = {}, { rejectWithValue }) => {
         try {
-            const res = await api.get("/properties/me", { params: { page, size, sort } });
+            // 2. Build object params một cách linh hoạt
+            const params = { page, size, sort };
+
+            // 3. Thêm 'status' vào params CHỈ KHI nó tồn tại
+            if (status) {
+                params.status = status;
+            }
+
+            // 4. Truyền object params đã build vào request
+            // Axios sẽ tự động tạo URL, ví dụ: /properties/me?page=0&size=20&status=pending
+            const res = await api.get("/properties/me", { params });
             return res.data;
         } catch (e) {
             const msg = e?.response?.data?.message || "Không thể tải danh sách tin đăng của tôi";
@@ -104,6 +115,20 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
         }
     }
 );
+
+// +++ THUNK MỚI: LẤY SỐ ĐẾM +++
+export const fetchMyPropertyCountsThunk = createAsyncThunk(
+    "property/fetchMyCounts",
+    async (_, { rejectWithValue }) => {
+        try {
+            const res = await api.get("/properties/my-counts");
+            return res.data; // API trả về Map<String, Long> { active: 1, pending: 9, ... }
+        } catch (e) {
+            return rejectWithValue("Không thể tải số đếm tin đăng");
+        }
+    }
+);
+
 function parseBackendDate(d) {
     if (!d) return null;
     if (typeof d === "number") return new Date(d);
@@ -247,6 +272,17 @@ const initialState = {
     loadingDetail: false,
     errorDetail: null,
 
+    counts: { // Initialize counts
+        active: 0,
+        pending: 0,
+        draft: 0,
+        rejected: 0,
+        hidden: 0,
+        expired: 0,
+        expiringSoon: 0,
+    },
+    loadingCounts: false,
+
     // query state (để đồng bộ Pagination/Sort)
     sort: "postedAt,desc",
     creating: false,
@@ -362,6 +398,21 @@ const propertySlice = createSlice({
             .addCase(fetchPropertyByIdThunk.rejected, (state, action) => {
                 state.loadingDetail = false;
                 state.errorDetail = action.payload;
+            })
+            // +++ BỔ SUNG LOGIC REDUCER CHO COUNTS +++
+            .addCase(fetchMyPropertyCountsThunk.pending, (state) => {
+                state.loadingCounts = true; // Bật loading
+            })
+            .addCase(fetchMyPropertyCountsThunk.fulfilled, (state, action) => {
+                state.loadingCounts = false; // Tắt loading
+                // Gộp kết quả counts từ API vào state, giữ nguyên key nếu API không trả về
+                state.counts = { ...initialState.counts, ...(action.payload || {}) };
+            })
+            .addCase(fetchMyPropertyCountsThunk.rejected, (state, action) => {
+                state.loadingCounts = false; // Tắt loading
+                console.error("Failed to fetch property counts:", action.payload);
+                // Reset về 0 nếu lỗi
+                state.counts = { ...initialState.counts };
             });
     },
 });

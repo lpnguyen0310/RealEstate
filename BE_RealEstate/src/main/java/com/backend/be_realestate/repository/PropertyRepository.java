@@ -3,6 +3,7 @@ package com.backend.be_realestate.repository;
 import com.backend.be_realestate.entity.CityEntity;
 import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.entity.UserInventoryEntity;
+import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -10,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, JpaSpecificationExecutor<PropertyEntity> {
@@ -34,7 +36,8 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     @Query("select i from UserInventoryEntity i where i.user.userId = :userId and i.itemType = :type")
     Optional<UserInventoryEntity> lockByUserAndType(@Param("userId") Long userId, @Param("type") String type);
 
-
+    @Query("SELECT p.status as status, COUNT(p.id) as count FROM PropertyEntity p WHERE p.user.userId = :userId GROUP BY p.status")
+    List<IPropertyCount> countByStatus(@Param("userId") Long userId);
 
 }
 

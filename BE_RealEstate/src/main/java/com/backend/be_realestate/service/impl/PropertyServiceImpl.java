@@ -3,10 +3,7 @@ package com.backend.be_realestate.service.impl;
 import com.backend.be_realestate.converter.PropertyConverter;
 import com.backend.be_realestate.converter.PropertyMapper;
 import com.backend.be_realestate.entity.*;
-import com.backend.be_realestate.enums.ListingType;
-import com.backend.be_realestate.enums.PriceType;
-import com.backend.be_realestate.enums.PropertyStatus;
-import com.backend.be_realestate.enums.PropertyType;
+import com.backend.be_realestate.enums.*;
 import com.backend.be_realestate.exceptions.OutOfStockException;
 import com.backend.be_realestate.exceptions.ResourceNotFoundException;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
@@ -19,6 +16,7 @@ import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -32,12 +30,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PropertyServiceImpl implements IPropertyService {
 
     private final PropertyRepository propertyRepository;
@@ -53,6 +53,7 @@ public class PropertyServiceImpl implements IPropertyService {
     private final ListingTypePolicyRepository policyRepo;
     private final UserInventoryRepository inventoryRepo;
     private final ApplicationEventPublisher publisher;
+    private final NotificationServiceImpl notificationService;
 
     @Override
     public List<PropertyCardDTO> getAllPropertiesForCardView() {
@@ -140,10 +141,14 @@ public class PropertyServiceImpl implements IPropertyService {
 //            inventoryRepo.save(inv);
 //        }
 
-        // Map các quan hệ
         var property = new PropertyEntity();
-        var user = new UserEntity(); user.setUserId(userId);
+
+        // --- SỬA LẠI CHỖ NÀY ---
+        // Chúng ta cần UserEntity THẬT, không phải proxy
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid user ID: " + userId));
         property.setUser(user);
+        // --- KẾT THÚC SỬA ---
 
         if (req.getCategoryId() != null) {
             property.setCategory(categoryRepository.findById(req.getCategoryId())
@@ -153,12 +158,12 @@ public class PropertyServiceImpl implements IPropertyService {
         if (req.getDistrictId() != null) property.setDistrict(districtRepository.findById(req.getDistrictId()).orElse(null));
         if (req.getWardId() != null) property.setWard(wardRepository.findById(req.getWardId()).orElse(null));
         property.setListingTypePolicy(policy);
-        // Gán policy
         property.setListingType(policy.getListingType());
 
         // Trường cơ bản
         property.setTitle(req.getTitle());
         property.setPrice(req.getPrice());
+        // ... (Tất cả các trường .set... khác của bạn giữ nguyên) ...
         property.setArea(req.getArea());
         property.setLandArea(req.getLandArea());
         property.setBedrooms(req.getBedrooms());
@@ -173,6 +178,7 @@ public class PropertyServiceImpl implements IPropertyService {
         property.setWidth(req.getWidth());
         property.setHeight(req.getHeight());
 
+
         // Enum nếu FE gửi string
         if (req.getPropertyType() != null) {
             property.setPropertyType(PropertyType.valueOf(req.getPropertyType().name()));
@@ -181,14 +187,10 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setPriceType(PriceType.valueOf(req.getPriceType().name()));
         }
 
-        // Status + thời hạn
-//        var now = Instant.now();
-//        property.setPostedAt(Timestamp.from(now)); // có @CreationTimestamp cũng ok
-//        property.setExpiresAt(Timestamp.from(now.plus(policy.getDurationDays(), ChronoUnit.DAYS)));
-        property.setStatus(PropertyStatus.PENDING_REVIEW); // hoặc ACTIVE tuỳ quy trình duyệt
+        // Status
+        property.setStatus(PropertyStatus.PENDING_REVIEW);
 
-        // Ảnh: nếu dùng bảng con PropertyImageEntity
-        // vì bạn đã có: @OneToMany(mappedBy="property", cascade=ALL, orphanRemoval=true)
+        // Ảnh
         if (req.getImageUrls() != null && !req.getImageUrls().isEmpty()) {
             var imgs = req.getImageUrls().stream().map(url -> {
                 var img = new PropertyImageEntity();
@@ -205,18 +207,187 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setAmenities(amenities);
         }
 
+        // === LƯU PROPERTY ===
         var saved = propertyRepository.save(property);
-        publisher.publishEvent(new PropertyEvent(
-                saved.getId(),
-                saved.getStatus().name(),
-                saved.getCategory() != null ? saved.getCategory().getId() : null,
-                saved.getListingType() != null ? saved.getListingType().name() : null,
-                saved.getTitle()
-        ));
+
+        // === BỎ EVENT LISTENER ===
+        // publisher.publishEvent(new PropertyEvent( ... )); // <-- BỎ DÒNG NÀY
+
+        // +++ THÊM LOGIC NOTIFICATION TRỰC TIẾP VÀO ĐÂY +++
+
+        // Chỉ gửi thông báo nếu tin ở trạng thái PENDING_REVIEW
+        if (saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
+            log.info("[PropertyService] Tin đăng {} đã lưu, đang gửi thông báo...", saved.getId());
+            try {
+                String title = saved.getTitle() != null ? saved.getTitle() : "không có tiêu đề";
+
+                // --- 1. GỬI THÔNG BÁO CHO ADMIN ---
+                List<UserEntity> admins = userRepository.findAllByRoles_Code("ADMIN");
+                if (admins.isEmpty()) {
+                    log.warn("[PropertyService] Không tìm thấy ADMIN để gửi thông báo.");
+                } else {
+                    String adminMessage = String.format("Tin đăng mới '%s' (ID: %d) đang chờ duyệt.", title, saved.getId());
+                    String adminLink = "/dashboard/posts?tab=pending";
+
+                    for (UserEntity admin : admins) {
+                        notificationService.createNotification(
+                                admin,
+                                NotificationType.NEW_LISTING_PENDING,
+                                adminMessage,
+                                adminLink
+                        );
+                    }
+                    log.info("[PropertyService] Đã gửi thông báo NEW_LISTING_PENDING cho {} admin.", admins.size());
+                }
+
+                // --- 2. GỬI THÔNG BÁO CHO NGƯỜI ĐĂNG (AUTHOR) ---
+                String userMessage = String.format("Tin đăng '%s' của bạn đã được gửi và đang chờ duyệt.", title);
+                String userLink = "/dashboard/posts?tab=pending";
+
+                notificationService.createNotification(
+                        saved.getUser(), // Lấy user ID từ property đã lưu
+                        NotificationType.LISTING_PENDING_USER,
+                        userMessage,
+                        userLink
+                );
+                log.info("[PropertyService] Đã gửi thông báo LISTING_PENDING_USER cho user {}.", saved.getUser().getUserId());
+
+            } catch (Exception e) {
+                // Rất quan trọng: Bắt lỗi để nếu gửi noti lỗi, nó KHÔNG làm rollback việc tạo tin đăng
+                log.error("!!!!!!!!!!!! LỖI NGHIÊM TRỌNG KHI GỬI NOTIFICATION (nhưng tin đăng đã tạo thành công): {}", e.getMessage(), e);
+            }
+        }
+        // +++ KẾT THÚC PHẦN THÊM MỚI +++
 
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
 
+    @Override
+    public Page<PropertyDTO> getPropertiesByUser(Long userId, String status, Pageable pageable) {
 
+        // 1. Luôn lọc theo user ID
+        Specification<PropertyEntity> userSpec = (root, query, cb) ->
+                cb.equal(root.get("user").get("userId"), userId);
+
+        Specification<PropertyEntity> statusSpec;
+
+        // 2. Lọc status dựa trên logic map (ánh xạ) của frontend
+        if (status != null) {
+            String statusKey = status.toLowerCase();
+
+            if (statusKey.equals("active")) {
+                // Frontend key "active" = PUBLISHED của BE
+                statusSpec = (root, query, cb) -> cb.equal(root.get("status"), PropertyStatus.PUBLISHED);
+
+            } else if (statusKey.equals("pending")) {
+                statusSpec = (root, query, cb) -> cb.equal(root.get("status"), PropertyStatus.PENDING_REVIEW);
+
+            } else if (statusKey.equals("draft")) {
+                // Frontend key "draft" = DRAFT HOẶC ACTIVE của BE
+                statusSpec = (root, query, cb) -> cb.or(
+                        cb.equal(root.get("status"), PropertyStatus.DRAFT),
+                        cb.equal(root.get("status"), PropertyStatus.ACTIVE)
+                );
+
+            } else if (statusKey.equals("hidden")) {
+                // Frontend key "hidden" = HIDDEN HOẶC ARCHIVED của BE
+                statusSpec = (root, query, cb) -> cb.or(
+                        cb.equal(root.get("status"), PropertyStatus.HIDDEN),
+                        cb.equal(root.get("status"), PropertyStatus.ARCHIVED)
+                );
+
+            } else {
+                // Các trường hợp 1-1 còn lại (REJECTED, EXPIRED, v.v.)
+                PropertyStatus mappedStatus = mapFrontendStatus(statusKey);
+                if (mappedStatus != null) {
+                    statusSpec = (root, query, cb) -> cb.equal(root.get("status"), mappedStatus);
+                } else {
+                    statusSpec = (root, query, cb) -> cb.conjunction(); // Không lọc nếu key lạ
+                }
+            }
+
+        } else {
+            // Không lọc status nếu status = null (cho API cũ)
+            statusSpec = (root, query, cb) -> cb.conjunction(); // (Điều kiện luôn đúng)
+        }
+
+        // 3. Kết hợp điều kiện
+        Specification<PropertyEntity> finalSpec = userSpec.and(statusSpec);
+
+        // 4. Gọi Repository và trả về
+        return propertyRepository.findAll(finalSpec, pageable)
+                .map(propertyConverter::toDto);
+    }
+
+    @Override
+    public Map<String, Long> getPropertyCountsByStatus(Long userId) {
+        // 1. Khởi tạo Map kết quả với tất cả các key = 0
+        Map<String, Long> counts = new HashMap<>();
+        counts.put("active", 0L);
+        counts.put("pending", 0L);
+        counts.put("draft", 0L);
+        counts.put("rejected", 0L);
+        counts.put("hidden", 0L);
+        counts.put("expired", 0L);
+        counts.put("expiringSoon", 0L);
+
+        // 2. Gọi query GROUP BY từ Repository
+        List<IPropertyCount> results = propertyRepository.countByStatus(userId);
+
+        // 3. Duyệt qua kết quả từ CSDL và map vào Map
+        for (IPropertyCount item : results) {
+            String frontendKey = mapBackendStatusToFrontendKey(item.getStatus());
+            if (frontendKey != null) {
+                // Ghi đè số 0 bằng số đếm thật
+                counts.put(frontendKey, item.getCount());
+            }
+        }
+
+        return counts;
+    }
+
+    // +++ THÊM HÀM TRỢ GIÚP ÁNH XẠ NGƯỢC +++
+    private String mapBackendStatusToFrontendKey(PropertyStatus beStatus) {
+        if (beStatus == null) return null;
+
+        switch (beStatus) {
+            case PUBLISHED:
+                return "active";
+            case PENDING_REVIEW:
+                return "pending";
+            case DRAFT:
+            case ACTIVE: // Gộp cả ACTIVE (nếu có) vào "draft" theo logic slice
+                return "draft";
+            case REJECTED:
+                return "rejected";
+            case HIDDEN:
+            case ARCHIVED: // Gộp cả ARCHIVED vào "hidden" theo logic slice
+                return "hidden";
+            case EXPIRED:
+                return "expired";
+            case EXPIRINGSOON:
+                return "expiringSoon";
+            default:
+                return null;
+        }
+    }
+
+    // =============================================================
+    // +++ HÀM TRỢ GIÚP (ĐÃ SỬA) +++
+    // =============================================================
+    private PropertyStatus mapFrontendStatus(String statusKey) {
+        // Chỉ map các trường 1-1 đơn giản
+        // (Các trường phức tạp 'active', 'draft', 'hidden' đã được xử lý ở trên)
+        switch (statusKey) {
+            case "rejected":
+                return PropertyStatus.REJECTED;
+            case "expired":
+                return PropertyStatus.EXPIRED;
+            case "expiringsoon":
+                return PropertyStatus.EXPIRINGSOON;
+            default:
+                return null;
+        }
+    }
 
 }
