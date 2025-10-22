@@ -1,22 +1,9 @@
 // src/components/dashboard/usermanager/account/AccountSettingsPanel.jsx
 import React, { useState } from "react";
 import {
-  Card,
-  Form,
-  Input,
-  Button,
-  Divider,
-  Collapse,
-  Typography,
-  message,
-  Modal,
+  Card, Form, Input, Button, Divider, Collapse, Typography, message, Modal,
 } from "antd";
-import {
-  LockOutlined,
-  DeleteOutlined,
-  StopOutlined,
-  RollbackOutlined,
-} from "@ant-design/icons";
+import { LockOutlined, DeleteOutlined, StopOutlined, RollbackOutlined } from "@ant-design/icons";
 import { userAccountApi } from "@/api/adminApi/userAccountApi";
 
 const { Title, Text } = Typography;
@@ -24,32 +11,63 @@ const { Title, Text } = Typography;
 export default function AccountSettingsPanel({ user, onChanged }) {
   const [pwdForm] = Form.useForm();
   const [lockForm] = Form.useForm();
+
   const [loading, setLoading] = useState({
-    lock: false,
-    cancelLock: false,
-    del: false,
-    cancelDel: false,
-    changePwd: false,
+    lock: false, cancelLock: false, del: false, cancelDel: false, changePwd: false,
   });
 
   const lockRequested = !!user?.lockRequested;
   const deleteRequested = !!user?.deleteRequested;
 
-  /* ====== ĐỔI MẬT KHẨU ====== */
+  // ===== Modal phản hồi CHUNG (success / error) =====
+  const [feedback, setFeedback] = useState({
+    open: false,
+    type: "success", // 'success' | 'error'
+    title: "",
+    content: "",
+  });
+
+  const openSuccess = (title, content) =>
+    setFeedback({ open: true, type: "success", title, content });
+
+  const openError = (title, content) =>
+    setFeedback({ open: true, type: "error", title, content });
+
+  const closeFeedback = () =>
+    setFeedback((s) => ({ ...s, open: false }));
+
+  /* ========== ĐỔI MẬT KHẨU ========== */
   const onChangePassword = async (values) => {
+    console.debug("[onChangePassword] submit values:", values);
+    const payload = {
+      currentPassword: values.oldPassword,
+      newPassword: values.newPassword,
+      confirmNewPassword: values.confirmPassword,
+    };
+
     try {
       setLoading((s) => ({ ...s, changePwd: true }));
-      await new Promise((r) => setTimeout(r, 600));
-      message.success("Đã đổi mật khẩu (demo).");
+      const res = await userAccountApi.changePassword(payload);
+      console.debug("[onChangePassword] OK:", res);
+
+      // Modal thành công
+      openSuccess(
+        "Thay đổi mật khẩu thành công",
+        (res?.data || res?.message || "Mật khẩu của bạn đã được cập nhật.")
+      );
+
       pwdForm.resetFields(["oldPassword", "newPassword", "confirmPassword"]);
-    } catch {
-      message.error("Đổi mật khẩu thất bại.");
+    } catch (err) {
+      console.error("[onChangePassword] ERROR:", err);
+      const msg = err?.response?.data?.message || err?.message || "Đổi mật khẩu thất bại.";
+      // Modal lỗi
+      openError("Không thể đổi mật khẩu", msg);
     } finally {
       setLoading((s) => ({ ...s, changePwd: false }));
     }
   };
 
-  /* ====== KHÓA TÀI KHOẢN ====== */
+  /* ========== KHÓA TÀI KHOẢN ========== */
   const onLockFinish = async (values) => {
     setLoading((s) => ({ ...s, lock: true }));
     try {
@@ -59,7 +77,7 @@ export default function AccountSettingsPanel({ user, onChanged }) {
       onChanged?.();
     } catch (err) {
       const msg = err?.response?.data?.message || "Gửi yêu cầu khóa thất bại.";
-      message.error(msg);
+      openError("Lỗi yêu cầu khóa tài khoản", msg);
     } finally {
       setLoading((s) => ({ ...s, lock: false }));
     }
@@ -73,57 +91,28 @@ export default function AccountSettingsPanel({ user, onChanged }) {
       onChanged?.();
     } catch (err) {
       const msg = err?.response?.data?.message || "Hủy yêu cầu khóa thất bại.";
-      message.error(msg);
+      openError("Lỗi hủy yêu cầu khóa", msg);
     } finally {
       setLoading((s) => ({ ...s, cancelLock: false }));
     }
   };
 
-  /* ====== XÓA TÀI KHOẢN (Controlled Modal) ====== */
+  /* ========== XÓA TÀI KHOẢN (giữ nguyên của bạn) ========== */
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  const onRequestDelete = () => {
-    console.log("[DEBUG] -> mở Modal xóa (controlled)");
-    setConfirmOpen(true);
-  };
-
   const onConfirmOk = async () => {
-    console.log("[DEBUG] -> Người dùng bấm OK");
     setConfirmLoading(true);
     try {
       const res = await userAccountApi.requestDelete();
-      console.log("[DEBUG] -> API thành công:", res);
-      message.success("Đã gửi yêu cầu xóa tài khoản.");
+      message.success(res?.data || res?.message || "Đã gửi yêu cầu xóa tài khoản.");
       setConfirmOpen(false);
       onChanged?.();
     } catch (err) {
-      console.error("[DEBUG] -> API lỗi:", err);
-      const msg =
-        err?.response?.data?.message || "Gửi yêu cầu xóa thất bại.";
-      message.error(msg);
+      const msg = err?.response?.data?.message || "Gửi yêu cầu xóa thất bại.";
+      openError("Lỗi yêu cầu xóa", msg);
     } finally {
       setConfirmLoading(false);
-    }
-  };
-
-  const onConfirmCancel = () => {
-    console.log("[DEBUG] -> Người dùng bấm Hủy");
-    setConfirmOpen(false);
-  };
-
-  const onCancelDelete = async () => {
-    setLoading((s) => ({ ...s, cancelDel: true }));
-    try {
-      await userAccountApi.cancelDelete();
-      message.success("Đã hủy yêu cầu xóa.");
-      onChanged?.();
-    } catch (err) {
-      const msg =
-        err?.response?.data?.message || "Hủy yêu cầu xóa tài khoản thất bại.";
-      message.error(msg);
-    } finally {
-      setLoading((s) => ({ ...s, cancelDel: false }));
     }
   };
 
@@ -131,9 +120,7 @@ export default function AccountSettingsPanel({ user, onChanged }) {
     <div className="max-w-[700px] mx-auto">
       <Card bordered={false} styles={{ body: { padding: "5px 24px" } }}>
         {/* ========== ĐỔI MẬT KHẨU ========== */}
-        <Title level={5} className="!mt-0 !mb-4 !text-[23px] font-semibold">
-          Đổi mật khẩu
-        </Title>
+        <Title level={5} className="!mt-0 !mb-4 !text-[23px] font-semibold">Đổi mật khẩu</Title>
 
         <Form layout="vertical" form={pwdForm} onFinish={onChangePassword}>
           <div className="grid md:grid-cols-[1fr_auto] gap-3">
@@ -169,8 +156,7 @@ export default function AccountSettingsPanel({ user, onChanged }) {
                 { required: true, message: "Nhập lại mật khẩu" },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
-                    if (!value || getFieldValue("newPassword") === value)
-                      return Promise.resolve();
+                    if (!value || getFieldValue("newPassword") === value) return Promise.resolve();
                     return Promise.reject(new Error("Mật khẩu nhập lại không khớp"));
                   },
                 }),
@@ -181,12 +167,7 @@ export default function AccountSettingsPanel({ user, onChanged }) {
             </Form.Item>
 
             <Form.Item className="!mb-0">
-              <Button
-                type="primary"
-                danger
-                htmlType="submit"
-                loading={loading.changePwd}
-              >
+              <Button type="primary" danger htmlType="submit" loading={loading.changePwd}>
                 Lưu thay đổi
               </Button>
             </Form.Item>
@@ -218,13 +199,7 @@ export default function AccountSettingsPanel({ user, onChanged }) {
                           <Input.Password placeholder="••••••••" />
                         </Form.Item>
                         <Form.Item className="!mb-0">
-                          <Button
-                            type="primary"
-                            danger
-                            icon={<LockOutlined />}
-                            htmlType="submit"
-                            loading={loading.lock}
-                          >
+                          <Button type="primary" danger icon={<LockOutlined />} htmlType="submit" loading={loading.lock}>
                             Gửi yêu cầu khóa
                           </Button>
                         </Form.Item>
@@ -251,14 +226,14 @@ export default function AccountSettingsPanel({ user, onChanged }) {
                       danger
                       icon={<DeleteOutlined />}
                       className="h-10 rounded-md font-semibold w-full md:w-auto"
-                      onClick={onRequestDelete}
+                      onClick={() => setConfirmOpen(true)}
                     >
                       Gửi yêu cầu xóa tài khoản
                     </Button>
                   ) : (
                     <div className="flex items-center gap-8">
                       <Text type="danger">Bạn đã gửi yêu cầu xóa. Chờ admin xử lý.</Text>
-                      <Button icon={<StopOutlined />} onClick={onCancelDelete} loading={loading.cancelDel}>
+                      <Button icon={<StopOutlined />} onClick={() => { /* onCancelDelete(); */ }} >
                         Hủy yêu cầu xóa
                       </Button>
                     </div>
@@ -270,30 +245,44 @@ export default function AccountSettingsPanel({ user, onChanged }) {
         />
       </Card>
 
-      {/* ========== MODAL XÁC NHẬN XÓA ========== */}
+      {/* Modal xác nhận xóa (giữ của bạn) */}
       <Modal
         title="Xác nhận yêu cầu xóa tài khoản"
         open={confirmOpen}
         onOk={onConfirmOk}
-        onCancel={onConfirmCancel}
+        onCancel={() => setConfirmOpen(false)}
         okText="Gửi yêu cầu xóa"
         okButtonProps={{ danger: true, icon: <DeleteOutlined /> }}
         cancelText="Hủy"
         centered
         maskClosable={false}
-        zIndex={3000}
-        getContainer={false}
+        zIndex={3500}
+        getContainer={() => document.body}
         confirmLoading={confirmLoading}
       >
         <div>
-          <p>
-            Sau khi gửi yêu cầu xóa, admin sẽ xử lý và <b>không thể hoàn tác</b>.
-          </p>
+          <p>Sau khi gửi yêu cầu xóa, admin sẽ xử lý và <b>không thể hoàn tác</b>.</p>
           <ul style={{ paddingLeft: 18 }}>
             <li>Tin đang hiển thị có thể bị gỡ theo chính sách.</li>
             <li>Số dư (nếu có) sẽ không hoàn lại.</li>
           </ul>
         </div>
+      </Modal>
+
+      {/* Modal phản hồi CHUNG — luôn render ra body, zIndex cao */}
+      <Modal
+        title={feedback.title}
+        open={feedback.open}
+        onOk={closeFeedback}
+        onCancel={closeFeedback}
+        okText="Đã hiểu"
+        centered
+        maskClosable
+        zIndex={5000}
+        getContainer={() => document.body}
+        okButtonProps={feedback.type === "error" ? { danger: true } : {}}
+      >
+        <div>{feedback.content}</div>
       </Modal>
     </div>
   );

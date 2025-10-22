@@ -1,10 +1,13 @@
 package com.backend.be_realestate.controller;
 
 import com.backend.be_realestate.modals.dto.UserDTO;
+import com.backend.be_realestate.modals.request.ChangePasswordRequest;
 import com.backend.be_realestate.modals.response.ApiResponse;
 import com.backend.be_realestate.service.UserService;
 import com.backend.be_realestate.utils.SecurityUtils;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -54,6 +57,22 @@ public class UserController {
     @Data
     public static class LockRequest {
         private String password;
+    }
+
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<?>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest req,
+            Authentication auth
+    ) {
+        Long userId = securityUtils.currentUserId(auth); // GIỮ NGUYÊN HÀM NÀY
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.fail(401, "Chưa đăng nhập", null));
+        }
+
+        userService.changePassword(userId, req);
+        return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu thành công"));
     }
 
 }

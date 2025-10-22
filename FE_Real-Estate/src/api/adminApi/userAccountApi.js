@@ -20,4 +20,7 @@ export const userAccountApi = {
   // Hủy yêu cầu xóa tài khoản
   cancelDelete: () =>
     api.post(`${BASE}/cancel-delete`).then((r) => r.data),
+
+  changePassword: (payload) => api.post(`${BASE}/change-password`, payload).then((r) => r.data),
+
 };

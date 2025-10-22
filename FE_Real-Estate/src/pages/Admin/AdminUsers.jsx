@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect, useCallback, useRef, useTransition } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Box, Stack, CircularProgress, LinearProgress } from "@mui/material";
 import {
     UsersTable,
@@ -18,20 +19,70 @@ import { message } from "antd";
 const fmtDate = fmtDateUtil;
 
 export default function AdminUsersMUI() {
-    /* ========== FILTERS / PAGING ========== */
-    const [q, setQ] = useState("");
-    const [role, setRole] = useState("ALL");
-    const [status, setStatus] = useState("ALL");
-    const [page, setPage] = useState(1); // UI 1-based
-    const [pageSize, setPageSize] = useState(10);
+    /* ================= URL <-> STATE ================= */
+    const [searchParams, setSearchParams] = useSearchParams();
 
-    /* ========== DATA ========== */
+    // State khởi tạo từ URL
+    const [q, setQ] = useState(searchParams.get("q") || "");
+    const [role, setRole] = useState(searchParams.get("role") || "ALL");
+    const [status, setStatus] = useState(searchParams.get("status") || "ALL");
+    const [page, setPage] = useState(Number(searchParams.get("page") || 1));
+    const [pageSize, setPageSize] = useState(Number(searchParams.get("size") || 10));
+
+    // Viết lại URL gọn gàng (bỏ param mặc định/trống)
+    const writeURL = useCallback(
+        (next = {}) => {
+            const sp = new URLSearchParams();
+            const kv = {
+                q: next.q ?? q,
+                role: next.role ?? role,
+                status: next.status ?? status,
+                page: next.page ?? page,
+                size: next.size ?? pageSize,
+            };
+            if (kv.q) sp.set("q", kv.q);
+            if (kv.role && kv.role !== "ALL") sp.set("role", kv.role);
+            if (kv.status && kv.status !== "ALL") sp.set("status", kv.status);
+            if (kv.page && kv.page !== 1) sp.set("page", String(kv.page));
+            if (kv.size && kv.size !== 10) sp.set("size", String(kv.size));
+            setSearchParams(sp, { replace: true });
+        },
+        [q, role, status, page, pageSize, setSearchParams]
+    );
+
+    // Debounce ghi URL khi state đổi (tránh spam khi gõ)
+    const urlDebounceRef = useRef();
+    useEffect(() => {
+        if (urlDebounceRef.current) clearTimeout(urlDebounceRef.current);
+        urlDebounceRef.current = setTimeout(() => writeURL(), 200);
+        return () => clearTimeout(urlDebounceRef.current);
+    }, [q, role, status, page, pageSize, writeURL]);
+
+    // Khi Back/Forward làm URL đổi -> sync ngược vào state
+    useEffect(() => {
+        const sp = searchParams;
+        const nq = sp.get("q") || "";
+        const nr = sp.get("role") || "ALL";
+        const ns = sp.get("status") || "ALL";
+        const np = Number(sp.get("page") || 1);
+        const nz = Number(sp.get("size") || 10);
+
+        // chỉ set khi khác để tránh loop không cần thiết
+        if (nq !== q) setQ(nq);
+        if (nr !== role) setRole(nr);
+        if (ns !== status) setStatus(ns);
+        if (np !== page) setPage(np);
+        if (nz !== pageSize) setPageSize(nz);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
+    /* ================= DATA ================= */
     const [rows, setRows] = useState([]);
     const [totalItems, setTotalItems] = useState(0);
 
     // 2 mức loading
-    const [initialLoading, setInitialLoading] = useState(true); // chỉ lần đầu
-    const [softLoading, setSoftLoading] = useState(false); // cho lọc/trang/hành động
+    const [initialLoading, setInitialLoading] = useState(true);
+    const [softLoading, setSoftLoading] = useState(false);
     const firstLoadRef = useRef(true);
     const debounceRef = useRef(null);
 
@@ -67,19 +118,15 @@ export default function AdminUsersMUI() {
     /* ========== LOAD LIST FROM API (2 chế độ) ========== */
     const fetchList = useCallback(
         async ({ soft = false } = {}) => {
-            // Lần đầu: show spinner; các lần sau: overlay mảnh, KHÔNG clear rows
-            if (firstLoadRef.current && !soft) {
-                setInitialLoading(true);
-            } else {
-                setSoftLoading(true);
-            }
+            if (firstLoadRef.current && !soft) setInitialLoading(true);
+            else setSoftLoading(true);
 
             try {
                 const res = await adminUsersApi.list({
                     q: q || undefined,
                     role,
                     status,
-                    page: Math.max(0, page - 1), // 0-based cho BE
+                    page: Math.max(0, page - 1),
                     size: pageSize,
                 });
 
@@ -107,8 +154,8 @@ export default function AdminUsersMUI() {
                         email: u.email,
                         phone: u.phone,
                         role: (Array.isArray(u.roles) && u.roles[0]) || u.role || "USER",
-                        status: beStatus, // ACTIVE | LOCKED (thực)
-                        displayStatus, // ACTIVE | LOCKED | PENDING (hiển thị)
+                        status: beStatus,
+                        displayStatus,
                         lockRequested,
                         deleteRequested,
                         postsCount: u.postsCount ?? 0,
@@ -118,13 +165,11 @@ export default function AdminUsersMUI() {
                     };
                 });
 
-                // Không bao giờ setRows([]) trong lúc loading để tránh giật
-                setRows(mapped);
+                setRows(mapped);                // KHÔNG clear để tránh giật
                 setTotalItems(total);
             } catch (err) {
                 console.error(err);
                 message.error(err?.response?.data?.message || "Không tải được danh sách người dùng.");
-                // Giữ nguyên dữ liệu cũ nếu lỗi => tránh flash
             } finally {
                 firstLoadRef.current = false;
                 setInitialLoading(false);
@@ -140,13 +185,11 @@ export default function AdminUsersMUI() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Debounce cho mọi thay đổi filter/paging sau lần đầu
+    // Debounce fetch khi filter/paging đổi sau lần đầu
     useEffect(() => {
         if (firstLoadRef.current) return;
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
-            fetchList({ soft: true });
-        }, 250); // chỉnh 200-400ms tùy cảm giác
+        debounceRef.current = setTimeout(() => fetchList({ soft: true }), 250);
         return () => clearTimeout(debounceRef.current);
     }, [q, role, status, page, pageSize, fetchList]);
 
@@ -183,7 +226,7 @@ export default function AdminUsersMUI() {
     const INFO_FILTER_MSG =
         "Đang lọc ACTIVE nên tài khoản vừa khóa có thể không còn hiển thị trong danh sách.";
 
-    /* ========== ACTIONS (API + optimistic + soft refetch) ========== */
+    /* ========== ACTIONS ========== */
     const confirmLock = (rowOrId) => {
         const row = typeof rowOrId === "object" ? rowOrId : rows.find((x) => x.id === rowOrId);
         if (!row) return;
@@ -197,11 +240,10 @@ export default function AdminUsersMUI() {
             confirmText: isApprove ? "Duyệt khóa" : "Khóa",
             severity: "warning",
             onConfirm: async () => {
-                await adminUsersApi.lock(row.id); // BE gộp lock & approve-lock
+                await adminUsersApi.lock(row.id);
                 updateRowLocal(row.id, { status: "LOCKED", lockRequested: false, deleteRequested: false });
                 message.success(isApprove ? "Đã duyệt khóa tài khoản." : "Đã khóa tài khoản.");
                 if (!isApprove && status === "ACTIVE") message.info(INFO_FILTER_MSG);
-                // Soft refetch để đồng bộ lại tổng/trang mà không giật bảng
                 fetchList({ soft: true });
             },
         });
@@ -242,7 +284,7 @@ export default function AdminUsersMUI() {
             confirmText: "Xóa vĩnh viễn",
             severity: "error",
             onConfirm: async () => {
-                await adminUsersApi.hardDelete(id); // ✅ xoá thật
+                await adminUsersApi.hardDelete(id);
                 message.success("Đã xóa vĩnh viễn tài khoản.");
                 fetchList({ soft: true });
             },
@@ -277,6 +319,8 @@ export default function AdminUsersMUI() {
         setRole("ALL");
         setStatus("ALL");
         setPage(1);
+        setPageSize(10);
+        writeURL({ q: "", role: "ALL", status: "ALL", page: 1, size: 10 });
     };
 
     /* ========== RENDER ========== */
@@ -285,7 +329,7 @@ export default function AdminUsersMUI() {
     return (
         <Box sx={{ width: "100%", display: "flex", justifyContent: "center", bgcolor: "#f8f9fc", p: 3 }}>
             <Box sx={{ width: "100%", maxWidth: 1440, position: "relative" }}>
-                {/* Soft loading overlay — không làm giật layout */}
+                {/* Soft loading overlay */}
                 {softLoading && (
                     <Box sx={{ position: "sticky", top: 0, left: 0, right: 0, zIndex: 5 }}>
                         <LinearProgress />
@@ -294,48 +338,28 @@ export default function AdminUsersMUI() {
 
                 {/* KPI Cards */}
                 <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap mb={2}>
-                    <StatCard
-                        title="Tổng người dùng"
-                        value={kpis.total}
-                        img={IMG_USERS}
-                        bg="linear-gradient(135deg,#eaf1ff 0%,#f7fbff 100%)"
-                        tint="#2b59ff"
-                    />
-                    <StatCard
-                        title="Số môi giới (AGENT)"
-                        value={kpis.agents}
-                        img={IMG_AGENTS}
-                        bg="linear-gradient(135deg,#f3e9ff 0%,#fbf7ff 100%)"
-                        tint="#7a33ff"
-                    />
-                    <StatCard
-                        title="Đang hoạt động"
-                        value={kpis.active}
-                        img={IMG_ACTIVE}
-                        bg="linear-gradient(135deg,#eaffe9 0%,#f8fff7 100%)"
-                        tint="#0ea85f"
-                    />
-                    <StatCard
-                        title="Bị khóa"
-                        value={kpis.locked}
-                        img={IMG_LOCKED}
-                        bg="linear-gradient(135deg,#ffeaea 0%,#fff7f7 100%)"
-                        tint="#e03434"
-                    />
+                    <StatCard title="Tổng người dùng" value={kpis.total} img={IMG_USERS}
+                        bg="linear-gradient(135deg,#eaf1ff 0%,#f7fbff 100%)" tint="#2b59ff" />
+                    <StatCard title="Số môi giới (AGENT)" value={kpis.agents} img={IMG_AGENTS}
+                        bg="linear-gradient(135deg,#f3e9ff 0%,#fbf7ff 100%)" tint="#7a33ff" />
+                    <StatCard title="Đang hoạt động" value={kpis.active} img={IMG_ACTIVE}
+                        bg="linear-gradient(135deg,#eaffe9 0%,#f8fff7 100%)" tint="#0ea85f" />
+                    <StatCard title="Bị khóa" value={kpis.locked} img={IMG_LOCKED}
+                        bg="linear-gradient(135deg,#ffeaea 0%,#fff7f7 100%)" tint="#e03434" />
                 </Stack>
 
                 {/* Filters */}
                 <FiltersBar
                     q={q}
-                    setQ={setQ}
+                    setQ={(v) => { setQ(v); setPage(1); }}
                     role={role}
-                    setRole={setRole}
+                    setRole={(v) => { setRole(v); setPage(1); }}
                     status={status}
-                    setStatus={setStatus}
+                    setStatus={(v) => { setStatus(v); setPage(1); }}
                     onReset={resetFilters}
                 />
 
-                {/* Initial Loading (toàn trang, chỉ lần đầu) */}
+                {/* Initial Loading (lần đầu) */}
                 {showInitialSpinner && (
                     <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                         <CircularProgress size={28} />
@@ -353,16 +377,12 @@ export default function AdminUsersMUI() {
                     pageSize={pageSize}
                     setPage={setPage}
                     setPageSize={setPageSize}
-                    onOpenDetail={(r) => {
-                        setDetail(r);
-                        setOpen(true);
-                    }}
-                    onLock={confirmLock} // nhận row hoặc id
+                    onOpenDetail={(r) => { setDetail(r); setOpen(true); }}
+                    onLock={confirmLock}
                     onUnlock={confirmUnlock}
                     onRejectLock={confirmRejectLock}
                     onRejectDelete={confirmRejectDelete}
                     onApproveDelete={confirmApproveDelete}
-                    // Không truyền loading mạnh vào Table để tránh skeleton giật
                     loading={false}
                 />
 
@@ -378,7 +398,7 @@ export default function AdminUsersMUI() {
                     onRejectDelete={(id) => confirmRejectDelete(id)}
                 />
 
-                {/* Modal xác nhận dùng chung */}
+                {/* Modal xác nhận */}
                 <ConfirmModal
                     open={confirmCfg.open}
                     title={confirmCfg.title}

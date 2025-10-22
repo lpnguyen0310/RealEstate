@@ -58,7 +58,9 @@ function StatCard({
             </div>
 
             <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+                <p className="text-[15px] font-semibold text-[#1c396a] mb-2 tracking-wide">
+                    {title}
+                </p>
                 <p className="text-3xl font-bold text-gray-900 leading-tight">{value}</p>
 
                 <div className="mt-3">
@@ -84,26 +86,23 @@ function StatCard({
     );
 }
 
-/* ========== Recent Transactions Card ========== */
 function RecentTransactionsCard({ items = [] }) {
     const signClass = (amountStr = "") =>
         amountStr.trim().startsWith("-") ? "text-red-600" : "text-emerald-600";
 
     const chipClass = (desc = "") => {
-        const s = desc.toLowerCase();
-        if (s.includes("vip") || s.includes("đặc biệt") || s.includes("top")) {
+        const s = (desc || "").toLowerCase();
+        if (s.includes("vip") || s.includes("đặc biệt") || s.includes("top"))
             return "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100";
-        }
-        if (s.includes("đăng tin") || s.includes("đơn")) {
+        if (s.includes("đăng tin") || s.includes("đơn"))
             return "bg-amber-50 text-amber-700 ring-1 ring-amber-100";
-        }
         return "bg-slate-50 text-slate-700 ring-1 ring-slate-100";
     };
 
     const displayItems = items.slice(0, 4);
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] flex flex-col">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Giao dịch gần đây</h3>
@@ -116,64 +115,66 @@ function RecentTransactionsCard({ items = [] }) {
             </div>
 
             {/* List */}
-            <div className="flex-grow">
-                <ul className="divide-y divide-gray-100">
-                    {displayItems.map((t, i) => (
-                        <li
-                            key={i}
-                            className="group flex items-center gap-3 py-3 rounded-xl hover:bg-gray-50/70 px-2 -mx-2 transition-colors"
-                        >
-                            {/* Avatar initials */}
-                            <div
-                                className={`shrink-0 w-10 h-10 rounded-full ${t.iniBg} flex items-center justify-center ring-1 ring-black/5`}
-                            >
+            <ul className="divide-y divide-gray-100">
+                {displayItems.map((t, i) => (
+                    <li
+                        key={i}
+                        className="
+              grid items-center gap-4 py-3 px-2 -mx-2 rounded-xl hover:bg-gray-50/70 transition-colors
+              [grid-template-columns:minmax(0,1fr)_150px_110px]  /* trái co giãn, giữa 150px, phải 110px */
+              min-h-[56px]                                      /* cao đồng nhất giữa các hàng */
+            "
+                    >
+                        {/* LEFT: avatar + tên + time */}
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className={`shrink-0 w-10 h-10 rounded-full ${t.iniBg} flex items-center justify-center ring-1 ring-black/5`}>
                                 <span className={`font-bold ${t.iniText} text-sm tracking-wide`}>{t.ini}</span>
                             </div>
-
-                            {/* Main text */}
-                            <div className="min-w-0 flex-1">
-                                {/* Dòng 1: Tên */}
-                                <p className="font-medium text-sm text-gray-900 truncate">{t.name}</p>
-
-                                {/* Dòng 2: Thời gian + Chip */}
-                                <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5 leading-none">
-                                    <p className="leading-none">vừa xong · ví MoMo</p>
-                                    <span
-                                        className={`inline-flex items-center h-5 px-2 rounded-full whitespace-nowrap align-middle ${chipClass(
-                                            t.desc
-                                        )}`}
-                                    >
-                                        {t.desc}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Amount + chevron */}
-                            <div className="flex items-center gap-2">
-                                <p className={`font-semibold text-sm tabular-nums ${signClass(t.amount)}`}>
-                                    {t.amount}
+                            <div className="min-w-0">
+                                <p className="font-medium text-sm text-gray-900 truncate leading-tight">{t.name}</p>
+                                <p className="text-xs text-gray-500 leading-none mt-1">
+                                    {t.time || "vừa xong"} · {t.wallet || "ví MoMo"}
                                 </p>
-                                <svg
-                                    className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                >
-                                    <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
                             </div>
-                        </li>
-                    ))}
+                        </div>
 
-                    {items.length === 0 && (
-                        <li className="py-6 text-center text-sm text-gray-500">Chưa có giao dịch</li>
-                    )}
-                </ul>
-            </div>
+                        {/* MIDDLE: chip mô tả (căn giữa tuyệt đối theo hàng) */}
+                        <div className="flex justify-center">
+                            <span
+                                className={`inline-flex items-center h-6 px-2.5 rounded-full ${chipClass(t.desc)}`}
+                                title={t.desc}
+                            >
+                                <span className="text-[12px] font-medium leading-none">{t.desc}</span>
+                            </span>
+                        </div>
+
+                        {/* RIGHT: số tiền + chevron (cột cố định, tabular-nums để thẳng cột) */}
+                        <div className="flex items-center justify-end gap-2 ">
+                            <p
+                                className={`font-semibold text-sm tabular-nums leading-none ${signClass(t.amount)}`}
+                                style={{ marginBottom: 0 }}
+                            >
+                                {t.amount}
+                            </p>
+                            <svg
+                                className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                            >
+                                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+                    </li>
+                ))}
+
+                {items.length === 0 && (
+                    <li className="py-6 text-center text-sm text-gray-500">Chưa có giao dịch</li>
+                )}
+            </ul>
         </div>
     );
 }
+
+
 
 /* ========== MAIN COMPONENT ========== */
 export default function AdminDashboard() {
@@ -183,11 +184,36 @@ export default function AdminDashboard() {
     const chartRef = useRef(null);
 
     const kpis = {
-        newUsers: { value: "1,250", hint: "+15.3% so với tháng trước", trend: "up", spark: [15, 20, 25, 24, 28, 30, 34, 38, 40] },
-        revenue: { value: "150.000.000đ", hint: "+8.2% so với tháng trước", trend: "up", spark: [60, 63, 66, 70, 73, 75, 80, 84, 90] },
-        newPosts: { value: "3,420", hint: "12 tin đang chờ duyệt", trend: "up", spark: [3000, 3100, 3150, 3200, 3300, 3400] },
-        newOrders: { value: "56", hint: "-2.1% so với hôm qua", trend: "down", spark: [58, 57, 56, 55, 56, 54, 55] },
+        newUsers: {
+            title: "Người dùng mới",
+            value: "1,250",
+            hint: "+15.3% so với tháng trước",
+            trend: "up",
+            spark: [15, 20, 25, 24, 28, 30, 34, 38, 40],
+        },
+        revenue: {
+            title: "Doanh thu",
+            value: "150.000.000đ",
+            hint: "+8.2% so với tháng trước",
+            trend: "up",
+            spark: [60, 63, 66, 70, 73, 75, 80, 84, 90],
+        },
+        newPosts: {
+            title: "Tin đăng mới",
+            value: "3,420",
+            hint: "12 tin đang chờ duyệt",
+            trend: "up",
+            spark: [3000, 3100, 3150, 3200, 3300, 3400],
+        },
+        newOrders: {
+            title: "Đơn hàng mới",
+            value: "56",
+            hint: "-2.1% so với hôm qua",
+            trend: "down",
+            spark: [58, 57, 56, 55, 56, 54, 55],
+        },
     };
+
 
     // Chart doanh thu
     const chart = useMemo(() => {
