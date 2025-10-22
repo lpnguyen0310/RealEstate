@@ -58,6 +58,12 @@ public class UserEntity extends BaseEntity {
     )
     private List<RoleEntity> roles;
 
+    @Column(name="delete_requested", nullable=false)
+    private Boolean deleteRequested = false;
+
+    @Column(name = "lock_requested", nullable = false)
+    private Boolean lockRequested = false;
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private AuthProviderEntity authProvider;
 

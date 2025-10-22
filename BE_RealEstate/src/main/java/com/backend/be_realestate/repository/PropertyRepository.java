@@ -30,14 +30,14 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     Optional<PropertyEntity> lockById(@Param("id") Long id);
 
     // UserInventoryRepository.java
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select i from UserInventoryEntity i where i.user.userId = :userId and i.itemType = :type")
-    Optional<UserInventoryEntity> lockByUserAndType(@Param("userId") Long userId, @Param("type") String type);
+
 
 
     @Modifying
     @Query("UPDATE PropertyEntity p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
     int bumpView(@Param("id") Long id);
+
+    int countByUser_UserId(Long userId);
 }
 
 

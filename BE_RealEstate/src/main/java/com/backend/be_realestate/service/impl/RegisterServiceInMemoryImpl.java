@@ -153,6 +153,8 @@ public class RegisterServiceInMemoryImpl implements RegisterService {
                 .passwordHash(encoder.encode(req.getPassword()))
                 .firstName("Nguyễn Văn")
                 .lastName("A")
+                .lockRequested(false)
+                .deleteRequested(false)
                 .phone("090000000")
                 .avatar(null)
                 .isActive(true)

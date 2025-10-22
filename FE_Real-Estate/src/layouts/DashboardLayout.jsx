@@ -1,16 +1,27 @@
 // src/layouts/DashboardLayout.jsx
 import { Outlet, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Sidebar from "@/components/Dashboard/Sidebar";
 import DashboardHeader from "@/components/Dashboard/DashboardHeader";
-import { logoutThunk } from "@/store/authSlice";
+import { logoutThunk, getProfileThunk } from "@/store/authSlice";
 import AIChatWidget from "../components/aiChatBox/AIChatWidget";
 export default function DashboardLayout() {
   const nav = useNavigate();
   const dispatch = useDispatch();
 
   const user = useSelector((s) => s.auth.user);
+
+  // Hàm refetch user dùng thunk sẵn có trong authSlice
+  const refetchUser = useCallback(async () => {
+    try { await dispatch(getProfileThunk()).unwrap(); } catch { }
+  }, [dispatch]);
+
+  // (tuỳ chọn) auto load profile nếu user đang null
+  useEffect(() => {
+    if (!user) refetchUser();
+  }, [user, refetchUser]);
+
 
   const handleLogout = async () => {
     try { await dispatch(logoutThunk()).unwrap(); nav("/", { replace: true }); } catch { }
@@ -29,7 +40,8 @@ export default function DashboardLayout() {
         </div>
 
         <main className="flex-1 overflow-y-auto px-6 pb-6">
-          <Outlet context={{ user }} />
+          <Outlet context={{ user, refetchUser }} />
+
           <AIChatWidget user={user} size="md" />
 
         </main>

@@ -34,6 +34,8 @@ public class SeedData implements CommandLineRunner {
                     .phone("0900000000")
                     .passwordHash(encoder.encode("123456"))
                     .firstName("Admin")
+                    .deleteRequested(false)
+                    .lockRequested(false)
                     .lastName("System")
                     .isActive(true)
                     .roles(roles)

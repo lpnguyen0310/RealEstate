@@ -3,8 +3,10 @@ package com.backend.be_realestate.controller;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
+import com.backend.be_realestate.modals.response.AdminUserResponse;
 import com.backend.be_realestate.modals.response.PropertyShortResponse;
 import com.backend.be_realestate.service.AdminPropertyService;
+import com.backend.be_realestate.service.IAdminUserService;
 import com.backend.be_realestate.service.OrderService;
 import com.backend.be_realestate.utils.SecurityUtils;
 import lombok.AllArgsConstructor;
@@ -23,6 +25,8 @@ public class AdminController {
     private OrderService orderService;
     private final AdminPropertyService adminPropertyService;
     private final SecurityUtils securityUtils;
+    private final IAdminUserService adminUserService;
+
     // Endpoint này chỉ bạn hoặc admin mới biết để dùng cho việc test
     @PostMapping("/orders/{id}/process-payment")
     public String triggerProcessPaidOrder(@PathVariable Long id) {
@@ -86,4 +90,52 @@ public class AdminController {
     ) {
         return adminPropertyService.search(page, size, q, categoryId, listingType, status);
     }
+
+
+    // admin user management endpoints
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/users")
+    public Page<AdminUserResponse> listUsers(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "ALL") String role,
+            @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(defaultValue = "1") int page,      // FE đang 1-based
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return adminUserService.search(q, role, status, page, size);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/users/{id}/lock")
+    public void lockUser(@PathVariable Long id) {
+        adminUserService.lockUser(id);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/users/{id}/unlock")
+    public void unlockUser(@PathVariable Long id) {
+        adminUserService.unlockUser(id);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/users/{id}/reject-delete")
+    public void rejectDeleteRequest(@PathVariable Long id) {
+        adminUserService.rejectDelete(id);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/users/{id}")
+    public void deleteUserHard(@PathVariable Long id,
+                               @RequestParam(defaultValue = "true") boolean hard) {
+        // hiện tại chỉ hỗ trợ hard=true
+        adminUserService.deleteHard(id);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/users/{id}/reject-lock")
+    public void rejectLockRequest(@PathVariable Long id) {
+        adminUserService.rejectLock(id);
+    }
+
+    
 }

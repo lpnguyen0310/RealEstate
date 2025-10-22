@@ -8,39 +8,36 @@ import AccountSummaryCard from "@/components/dashboard/usermanager/AccountSummar
 import EditInfoForm from "@/components/dashboard/usermanager/account/EditInfoForm";
 import AccountSettingsPanel from "@/components/dashboard/usermanager/account/AccountSettingsPanel";
 import ProBrokerBlank from "@/components/dashboard/usermanager/account/ProBrokerBlank";
-
-// ✨ import TopUpForm
 import TopUpForm from "@/components/payments/TopUpForm";
 
 const { Title } = Typography;
 
 export default function AccountManagement() {
-  // 👉 Lấy user từ DashboardLayout qua Outlet context
-  const { user: reduxUser } = useOutletContext();
-  // Chuẩn hoá dữ liệu summary bên trái
+  // Lấy user & refetchUser từ DashboardLayout (Outlet context)
+  const { user, refetchUser } = useOutletContext() || {};
+
+  // Chuẩn hoá dữ liệu hiển thị thẻ tóm tắt
   const summary = useMemo(() => {
     const username =
-      reduxUser?.username ||
-      reduxUser?.fullName ||
-      `${reduxUser?.firstName ?? ""} ${reduxUser?.lastName ?? ""}`.trim() ||
-      reduxUser?.email ||
+      user?.username ||
+      user?.fullName ||
+      `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() ||
+      user?.email ||
       "Người dùng";
 
-    // Các số dư/điểm — chỉnh theo schema BE của bạn:
-    const points = reduxUser?.points ?? reduxUser?.wallet?.points ?? 0;
-    const postBalance = reduxUser?.wallet?.postBalance ?? 0;
-    const promoBalance = reduxUser?.wallet?.promoBalance ?? 0;
+    const points = user?.points ?? user?.wallet?.points ?? 0;
+    const postBalance = user?.wallet?.postBalance ?? 0;
+    const promoBalance = user?.wallet?.promoBalance ?? 0;
 
-    // Mã định danh tài khoản — tuỳ theo BE
     const identityAccount =
-      reduxUser?.identityCode ||
-      reduxUser?.accountCode ||
-      `BDS${(reduxUser?.id ?? "USER").toString().padStart(8, "0")}`;
+      user?.identityCode ||
+      user?.accountCode ||
+      `BDS${(user?.id ?? "USER").toString().padStart(8, "0")}`;
 
-    const isNewIdentity = !reduxUser?.identityCode; // ví dụ: chưa có mã chính thức
+    const isNewIdentity = !user?.identityCode;
 
     return { username, points, postBalance, promoBalance, identityAccount, isNewIdentity };
-  }, [reduxUser]);
+  }, [user]);
 
   // Tabs & Right panel
   const [activeTab, setActiveTab] = useState("edit");
@@ -65,7 +62,7 @@ export default function AccountManagement() {
               promoBalance={summary.promoBalance}
               identityAccount={summary.identityAccount}
               isNewIdentity={summary.isNewIdentity}
-              onTopUp={openTopUp}              // ✨ bấm "Nạp tiền" → mở panel TopUp
+              onTopUp={openTopUp}
             />
           </Affix>
         </div>
@@ -83,13 +80,14 @@ export default function AccountManagement() {
                     {
                       key: "edit",
                       label: "Chỉnh sửa thông tin",
-                      // (tuỳ) truyền initial data cho form nếu component của bạn hỗ trợ
-                      children: <EditInfoForm initialData={reduxUser} />,
+                      // Nếu EditInfoForm có lưu BE, truyền onChanged để refetch user sau khi lưu
+                      children: <EditInfoForm initialData={user} onChanged={refetchUser} />,
                     },
                     {
                       key: "settings",
                       label: "Cài đặt tài khoản",
-                      children: <AccountSettingsPanel user={reduxUser} />,
+                      // Truyền onChanged để sau khi gửi/hủy yêu cầu khóa/xóa -> refetch user
+                      children: <AccountSettingsPanel user={user} onChanged={refetchUser} />,
                     },
                     {
                       key: "pro",
@@ -113,7 +111,7 @@ export default function AccountManagement() {
                       size="large"
                       icon={<SaveOutlined />}
                       onClick={() => message.success("Đã lưu thay đổi (demo).")}
-                      // onClick={() => document.getElementById("edit-info-submit")?.click()}
+                    // onClick={() => document.getElementById("edit-info-submit")?.click()}
                     >
                       Lưu thay đổi
                     </Button>
@@ -130,12 +128,11 @@ export default function AccountManagement() {
               </div>
 
               <TopUpForm
-                user={reduxUser}  // (tuỳ) truyền user cho form
+                user={user}
                 onContinue={(amount, method) => {
                   message.success(`Tiếp tục nạp ${amount?.toLocaleString("vi-VN")}đ qua ${method}`);
                   // TODO: điều hướng bước thanh toán
                 }}
-              // invoiceContent={...}  // (tuỳ) nếu cần dữ liệu xuất hoá đơn
               />
             </div>
           )}
