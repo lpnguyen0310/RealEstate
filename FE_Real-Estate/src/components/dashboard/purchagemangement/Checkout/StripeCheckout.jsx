@@ -10,6 +10,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import { createPaymentIntent } from "@/api/paymentApi";
 
+import { useDispatch } from "react-redux";
+import { notificationApi } from "@/services/notificationApi";
+
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK);
 const BACK_HREF = "/dashboard/purchage"; // đổi nếu route khác
 
@@ -47,6 +50,7 @@ function Inner({ orderId, amount, onPaid }) {
     const stripe = useStripe();
     const elements = useElements();
     const navigate = useNavigate();
+    const dispatch = useDispatch();
 
     const [loading, setLoading] = useState(false);
     const [info, setInfo] = useState(""); // small note under button
@@ -109,6 +113,9 @@ function Inner({ orderId, amount, onPaid }) {
             setOpenProcessing(false);
             setOpenSuccess(true);
             onPaid?.();
+            dispatch(
+                notificationApi.util.invalidateTags(['UnreadCount', 'Notifications'])
+            );
             return;
         }
 
@@ -122,6 +129,9 @@ function Inner({ orderId, amount, onPaid }) {
         if (ok) {
             setOpenSuccess(true);
             onPaid?.();
+            dispatch(
+                notificationApi.util.invalidateTags(['UnreadCount', 'Notifications'])
+            );
         } else {
             setErrorMsg("Chưa xác thực xong. Vui lòng kiểm tra lại giao dịch.");
             setOpenError(true);

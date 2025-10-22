@@ -1,12 +1,19 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { createOrderApi, getMyOrdersApi } from "@/services/orderApi";
 
+import { notificationApi } from "@/services/notificationApi";
+
 // AsyncThunk để xử lý việc gọi API tạo đơn hàng một cách bất đồng bộ
 export const createOrder = createAsyncThunk(
   "orders/create",
-  async (itemsPayload, { rejectWithValue }) => {
+  async (itemsPayload, { rejectWithValue, dispatch }) => {
     try {
       const newOrderData = await createOrderApi(itemsPayload);
+
+      dispatch(
+        notificationApi.util.invalidateTags(['UnreadCount', 'Notifications'])
+      );
+
       return newOrderData; // Dữ liệu này sẽ là `action.payload` khi thành công
     } catch (error) {
       // Trả về lỗi để xử lý trong `rejected`

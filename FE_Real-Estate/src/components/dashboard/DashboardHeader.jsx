@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { BellOutlined, CreditCardOutlined, UserOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Avatar, Badge, Button, Dropdown } from "antd";
 import { Link, useNavigate } from "react-router-dom";
+import NotificationBell from "@/components/menu/NotificationBell";
 
 export default function DashboardHeader({
   title = "Tổng quan",
@@ -86,13 +87,14 @@ export default function DashboardHeader({
           Mua Tin
         </Button>
 
-        <Badge count={notifyCount} size="small" color="#e74c3c">
+        {/* <Badge count={notifyCount} size="small" color="#e74c3c">
           <Button
             type="text"
             shape="circle"
             icon={<BellOutlined className="text-[18px] text-gray-600" />}
           />
-        </Badge>
+        </Badge> */}
+        <NotificationBell />
 
         <Dropdown
           open={open}
