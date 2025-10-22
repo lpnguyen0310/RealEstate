@@ -2,14 +2,12 @@ package com.backend.be_realestate.service.impl;
 
 import com.backend.be_realestate.converter.OrderConverter;
 import com.backend.be_realestate.entity.*;
-import com.backend.be_realestate.enums.ItemType;
-import com.backend.be_realestate.enums.OrderStatus;
-import com.backend.be_realestate.enums.TransactionStatus;
-import com.backend.be_realestate.enums.TransactionType;
+import com.backend.be_realestate.enums.*;
 import com.backend.be_realestate.modals.dto.order.OrderDTO;
 import com.backend.be_realestate.modals.dto.order.OrderItemDTO;
 import com.backend.be_realestate.modals.request.order.CheckoutReq;
 import com.backend.be_realestate.repository.*;
+import com.backend.be_realestate.service.NotificationService;
 import com.backend.be_realestate.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stripe.model.PaymentIntent;
@@ -39,12 +37,12 @@ public class OrderServiceImpl implements OrderService {
     private final OrderConverter orderConverter;
     private final ObjectMapper objectMapper;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
     private final UserInventoryRepository inventoryRepository;
 
     private final TransactionRepository transactionRepository;
+    private final NotificationService notificationService;
 
     // ===================== CREATE ORDER =====================
     @Override
@@ -106,6 +104,13 @@ public class OrderServiceImpl implements OrderService {
         order.setTotal(calculatedSubtotal); // Giả sử total = subtotal
 
         OrderEntity savedOrder = orderRepository.save(order);
+
+        notificationService.createNotification(
+                currentUser,
+                NotificationType.ORDER_PENDING,
+                "Đơn hàng #" + savedOrder.getId() + " của bạn đã được tạo, vui lòng thanh toán.",
+                "/dashboard/orders?order_id=" + savedOrder.getId() // Link cho user
+        );
 
         // 6. Trả về DTO
         return orderConverter.toDto(savedOrder, savedOrder.getItems());
@@ -266,6 +271,7 @@ public class OrderServiceImpl implements OrderService {
                 return;
             }
 
+            // ----- Logic nghiệp vụ chính (giữ nguyên) -----
             order.setStatus(OrderStatus.PAID);
             orderRepository.save(order);
             log.info("Đã cập nhật orderId={} thành PAID", order.getId());
@@ -275,6 +281,45 @@ public class OrderServiceImpl implements OrderService {
                 creditItemsFromOrderItem(user, orderItem);
             }
             log.info("Đã cộng vật phẩm thành công cho orderId={}", orderId);
+            // ----- Kết thúc logic nghiệp vụ chính -----
+
+
+            // ===== BẮT ĐẦU THÊM MỚI: LOGIC NOTIFICATION =====
+            // Đặt trong try-catch riêng để nếu gửi noti lỗi cũng KHÔNG rollback nghiệp vụ chính
+            try {
+                // 1. Gửi thông báo cho NGƯỜI DÙNG
+                notificationService.createNotification(
+                        user,
+                        NotificationType.PACKAGE_PURCHASED, // (Enum bạn đã tạo)
+                        "Thanh toán thành công cho đơn hàng #" + order.getId() + ". Gói tin đã được cộng vào tài khoản.",
+                        "/dashboard/transactions?order_id=" + order.getId()
+                );
+
+                // 2. Gửi thông báo cho TẤT CẢ ADMIN
+                List<UserEntity> admins = userRepository.findByRoleName("ADMIN"); // (Sửa "ADMIN" nếu tên Role của bạn khác)
+
+                String messageToAdmin = "Đơn hàng #" + order.getId() +
+                        " vừa được thanh toán thành công bởi " + user.getEmail() +
+                        " với tổng tiền " + order.getTotal() + " VND."; // Dùng order.getTotal() như bạn nói
+                String linkToAdmin = "/admin/orders/" + order.getId();
+
+                for (UserEntity admin : admins) {
+                    notificationService.createNotification(
+                            admin,
+                            NotificationType.NEW_ORDER_PAID, // (Enum bạn đã tạo)
+                            messageToAdmin,
+                            linkToAdmin
+                    );
+                }
+                log.info("Đã gửi thông báo thanh toán thành công cho user và admin.");
+
+            } catch (Exception e) {
+                // Rất quan trọng: Bắt lỗi để không ảnh hưởng luồng chính
+                log.error("!!! Lỗi khi gửi notification cho orderId={}. Lỗi: {}", orderId, e.getMessage());
+            }
+            // ===== KẾT THÚC LOGIC NOTIFICATION =====
+
+
             log.info("--- Kết thúc PROCESS PAID ORDER thành công cho orderId={} ---", orderId);
         } catch (Exception e) {
             log.error("!!! Lỗi trong quá trình processPaidOrder cho orderId={}", orderId, e);

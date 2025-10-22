@@ -9,6 +9,7 @@ import { NAVS } from "@/data/header_submenu";
 
 import UserDropDownHeader from "@/components/menu/UserDropDownHeader";
 import FavoritePostList from "@/components/menu/FavoritePostList";
+import NotificationBell from "@/components/menu/NotificationBell";
 import LoginModal from "@/pages/Login/LoginModal";
 import RegisterModal from "@/pages/Signup/RegisterModal";
 
@@ -134,10 +135,11 @@ export default function Header() {
           >
             <FavoritePostList />
 
-            <Badge count={2} size="small" offset={[-2, 6]}>
+            {/* <Badge count={2} size="small" offset={[-2, 6]}>
               <BellOutlined className="text-[25px] text-gray-800 cursor-pointer hover:text-[#d6402c]" />
-            </Badge>
-
+            </Badge> */}
+            <NotificationBell />
+            
             <UserDropDownHeader
               user={user}
               loadingUser={loadingAuth || authUiLoading}
