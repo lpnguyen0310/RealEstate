@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
 import { Carousel, Modal } from "antd";
+
 import FeatureTools from "../../components/button/FeatureTools";
 import FeaturedList from "../../components/cards/FeaturedList";
 import FeaturedProjects from "../../components/sections/FeaturedProjects";
 import FirstTimeBuyerGuide from "../../components/sections/FirstTimeBuyerGuide";
 import BannerCta from "../../components/sections/BannerCta";
+
 import bannerPlanning from "../../assets/home-section4-image-bg.png";
 import bannerResearch from "../../assets/home-section6-image-bg.png";
 import bannerPosting from "../../assets/home-section7-image-bg.png";
 import bannerContact from "../../assets/home-section8-image-bg.png";
-import MetroSearchPanel from "../../components/search/MetroModal";
+
+import MetroModal from "../../components/search/MetroModal";
 import SearchCard from "../../components/search/SearchCard";
 
 export default function Home() {
     const [showMetro, setShowMetro] = useState(false);
+    const [mapKey, setMapKey] = useState(0); // key để re-mount MapContainer
 
     useEffect(() => {
         const handleOpen = () => setShowMetro(true);
@@ -34,10 +38,10 @@ export default function Home() {
                                 Thoải mái an cư
                             </h1>
                             <p className="mt-4 text-white/85 text-[15px] lg:text-[17px] max-w-[560px]">
-                                Nền tảng bất động sản đầu tiên tối ưu trải nghiệm tìm bất động sản theo tiêu chí nâng cao.
-                                Hàng ngàn bất động sản phù hợp{" "}
-                                <span className="font-semibold">dành riêng cho bạn</span>.
-                                Bắt đầu tìm kiếm ngay!
+                                Nền tảng bất động sản đầu tiên tối ưu trải nghiệm tìm bất động
+                                sản theo tiêu chí nâng cao. Hàng ngàn bất động sản phù hợp{" "}
+                                <span className="font-semibold">dành riêng cho bạn</span>. Bắt đầu
+                                tìm kiếm ngay!
                             </p>
                         </div>
                         <div className="w-full">
@@ -67,13 +71,10 @@ export default function Home() {
                 <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
                     <FeatureTools />
                     <FeaturedList />
+
                     <BannerCta
                         title="Tra cứu quy hoạch"
-                        description={
-                            <>
-                                Kiểm tra quy hoạch online theo: số tờ, số thửa, tọa độ… với độ chính xác cao và dữ liệu mới nhất.
-                            </>
-                        }
+                        description={<>Kiểm tra quy hoạch online theo: số tờ, số thửa, tọa độ… với độ chính xác cao và dữ liệu mới nhất.</>}
                         buttonLabel="Khám phá ngay"
                         href="/tra-cuu-quy-hoach"
                         bg={bannerPlanning}
@@ -81,15 +82,13 @@ export default function Home() {
                         tone="light"
                         minH={300}
                     />
+
                     <FeaturedProjects />
                     <FirstTimeBuyerGuide />
+
                     <BannerCta
                         title="Tra cứu kế hoạch"
-                        description={
-                            <>
-                                Kiểm tra quy hoạch online theo: số tờ, số thửa, toạ độ... với độ chính xác cao và dữ liệu mới nhất
-                            </>
-                        }
+                        description={<>Kiểm tra quy hoạch online theo: số tờ, số thửa, toạ độ... với độ chính xác cao và dữ liệu mới nhất</>}
                         buttonLabel="Khám phá ngay"
                         href="/dang-tin"
                         bg={bannerResearch}
@@ -97,13 +96,11 @@ export default function Home() {
                         tone="dark"
                         minH={320}
                     />
+
                     <BannerCta
                         title="Đăng tin chuyên nghiệp"
                         description={
-                            <>
-                                Muốn tìm khách hàng chất lượng? Khám phá giải pháp đăng tin toàn diện tại Radanhadat.vn
-                                với cực nhiều ưu đãi trong giai đoạn ra mắt nền tảng
-                            </>
+                            <>Muốn tìm khách hàng chất lượng? Khám phá giải pháp đăng tin toàn diện tại Radanhadat.vn với cực nhiều ưu đãi trong giai đoạn ra mắt nền tảng</>
                         }
                         buttonLabel="Đăng tin ngay"
                         href="/dang-tin"
@@ -112,6 +109,7 @@ export default function Home() {
                         tone="dark"
                         minH={320}
                     />
+
                     <BannerCta
                         title="“Làm” nội thất đẹp mê say"
                         description={<>Giảm ngay 5% khi làm nội thất cùng dg home</>}
@@ -126,15 +124,16 @@ export default function Home() {
             </section>
 
             {/* ================= MODAL METRO ================= */}
-            <Modal
+            <MetroModal
                 open={showMetro}
-                onCancel={() => setShowMetro(false)}
-                width="90%"
-                footer={null}
-                bodyStyle={{ padding: 0 }}
-            >
-                <MetroSearchPanel visible={showMetro} />
-            </Modal>
+                onClose={() => setShowMetro(false)}
+                mapKey={mapKey}
+                onSearch={(stations) => {
+                    // TODO: convert stations -> filter param & trigger search
+                    console.log("Selected metro stations:", stations);
+                }}
+            />
+
         </div>
     );
 }

@@ -1,15 +1,15 @@
-// src/pages/admin/AdminDashboard.jsx
-import { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 
 /* ========== UTILITIES ========== */
+// Hàm định dạng số (Không thay đổi)
 const fmtNumber = (n) =>
     new Intl.NumberFormat("vi-VN").format(
         typeof n === "string" ? Number(n.replace(/[^0-9.-]/g, "")) : n
     );
 
-/* ========== Mini sparkline trong thẻ KPI ========== */
+/* ========== Sparkline (Không thay đổi) ========== */
 function Sparkline({ points = [], color = "#3b82f6" }) {
     const width = 90;
     const height = 28;
@@ -34,7 +34,7 @@ function Sparkline({ points = [], color = "#3b82f6" }) {
     );
 }
 
-/* ========== KPI Card ========== */
+/* ========== KPI Card (Không thay đổi) ========== */
 function StatCard({
     title,
     value,
@@ -86,6 +86,7 @@ function StatCard({
     );
 }
 
+/* ========== Recent Transactions Card (Không thay đổi) ========== */
 function RecentTransactionsCard({ items = [] }) {
     const signClass = (amountStr = "") =>
         amountStr.trim().startsWith("-") ? "text-red-600" : "text-emerald-600";
@@ -102,7 +103,7 @@ function RecentTransactionsCard({ items = [] }) {
     const displayItems = items.slice(0, 4);
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Giao dịch gần đây</h3>
@@ -122,7 +123,7 @@ function RecentTransactionsCard({ items = [] }) {
                         className="
               grid items-center gap-4 py-3 px-2 -mx-2 rounded-xl hover:bg-gray-50/70 transition-colors
               [grid-template-columns:minmax(0,1fr)_150px_110px]  /* trái co giãn, giữa 150px, phải 110px */
-              min-h-[56px]                                      /* cao đồng nhất giữa các hàng */
+              min-h-[56px]                                  /* cao đồng nhất giữa các hàng */
             "
                     >
                         {/* LEFT: avatar + tên + time */}
@@ -175,8 +176,83 @@ function RecentTransactionsCard({ items = [] }) {
 }
 
 
+/* ========== Notifications Card (Không thay đổi) ========== */
+function NotificationsCard({ items = [] }) {
+    const displayItems = items.slice(0, 4); // Hiển thị 4 thông báo mới nhất
 
-/* ========== MAIN COMPONENT ========== */
+    // Hàm helper để lấy icon dựa trên loại thông báo
+    const getIcon = (type) => {
+        switch (type) {
+            case 'report':
+                return (
+                    <div className="shrink-0 w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center ring-1 ring-red-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                );
+            case 'new_user':
+                return (
+                    <div className="shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center ring-1 ring-blue-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 21a8 8 0 0 0-16 0" />
+                            <circle cx="10" cy="8" r="4" />
+                        </svg>
+                    </div>
+                );
+            case 'comment':
+            default:
+                return (
+                    <div className="shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center ring-1 ring-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                    </div>
+                );
+        }
+    }
+
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Thông báo mới</h3>
+                <button
+                    className="text-sm px-3 h-8 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
+                    type="button"
+                >
+                    Xem tất cả
+                </button>
+            </div>
+
+            {/* List */}
+            <ul className="divide-y divide-gray-100">
+                {displayItems.map((item, i) => (
+                    <li
+                        key={i}
+                        className="flex items-start gap-3 py-3 px-2 -mx-2 rounded-xl hover:bg-gray-50/70 transition-colors"
+                    >
+                        {getIcon(item.type)}
+                        <div className="min-w-0">
+                            {/* Dùng dangerouslySetInnerHTML để render tên in đậm */}
+                            <p className="font-medium text-sm text-gray-900 leading-snug" dangerouslySetInnerHTML={{ __html: item.text }} />
+                            <p className="text-xs text-gray-500 leading-none mt-1.5">
+                                {item.time}
+                            </p>
+                        </div>
+                    </li>
+                ))}
+
+                {items.length === 0 && (
+                    <li className="py-6 text-center text-sm text-gray-500">Chưa có thông báo mới</li>
+                )}
+            </ul>
+        </div>
+    );
+}
+
+
+/* ========== MAIN COMPONENT (LAYOUT ĐÃ CẬP NHẬT) ========== */
 export default function AdminDashboard() {
     const [range, setRange] = useState("last_30d");
     const [postSearch, setPostSearch] = useState("");
@@ -213,7 +289,6 @@ export default function AdminDashboard() {
             spark: [58, 57, 56, 55, 56, 54, 55],
         },
     };
-
 
     // Chart doanh thu
     const chart = useMemo(() => {
@@ -259,6 +334,14 @@ export default function AdminDashboard() {
         { code: "#ORD-0123", customer: "Lê Văn Cường", total: "1.200.000đ", status: "Chờ xử lý", badge: "yellow" },
     ];
 
+    // Mock data cho thông báo
+    const notifications = [
+        { type: "report", text: "<strong>Nguyễn Văn An</strong> đã gửi một báo cáo cho tin đăng 'Bán nhà quận 1...'", time: "5 phút trước" },
+        { type: "new_user", text: "<strong>Trần Thị Bình</strong> vừa đăng ký tài khoản mới.", time: "1 giờ trước" },
+        { type: "comment", text: "<strong>Lê Văn Cường</strong> đã bình luận về một tin đăng.", time: "3 giờ trước" },
+        { type: "report", text: "Tin đăng 'Cho thuê chung cư...' đã nhận được <strong>3 báo cáo</strong>.", time: "1 ngày trước" },
+    ];
+
     // Filter FE-only
     const filteredPosts = pendingPosts.filter(
         (p) =>
@@ -272,7 +355,7 @@ export default function AdminDashboard() {
     );
 
     return (
-        <div className="bg-[#f5f7fb] min-h-[calc(100vh-120px)]">
+        <div className="bg-[#f5f7fb] min-h-screen p-6 md:p-8"> {/* Thêm padding cho toàn bộ trang */}
             {/* KPI Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCard
@@ -332,11 +415,28 @@ export default function AdminDashboard() {
                 />
             </div>
 
-            {/* Middle Section: Chart + Transactions */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                {/* Biểu đồ Doanh thu */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
-                    <div className="flex items-center justify-between mb-2">
+            {/* === START: UPDATED & COMBINED LAYOUT SECTION === */}
+            {/* Bố cục mới sử dụng grid 4 cột để sắp xếp linh hoạt */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+                {/* 1. Thông báo mới (chiếm 2/4 cột) -- ĐÃ DI CHUYỂN LÊN ĐẦU */}
+                <div className="lg:col-span-2">
+                    <NotificationsCard items={notifications} />
+                </div>
+
+                {/* 2. Giao dịch gần đây (chiếm 2/4 cột) -- ĐÃ DI CHUYỂN LÊN ĐẦU */}
+                <div className="lg:col-span-2">
+                    <RecentTransactionsCard items={recentOrders.length ? [
+                        { ini: "AV", iniBg: "bg-blue-100", iniText: "text-blue-600", name: "Nguyễn Văn An", desc: "Mua gói tin VIP", amount: "+500.000đ" },
+                        { ini: "TB", iniBg: "bg-indigo-100", iniText: "text-indigo-600", name: "Trần Thị Bình", desc: "Đăng tin thường", amount: "+50.000đ" },
+                        { ini: "LC", iniBg: "bg-amber-100", iniText: "text-amber-600", name: "Lê Văn Cường", desc: "Mua gói tin đặc biệt", amount: "+1.200.000đ" },
+                        { ini: "HD", iniBg: "bg-pink-100", iniText: "text-pink-600", name: "Hồ Thị Dung", desc: "Up tin lên top", amount: "+100.000đ" },
+                    ] : []} />
+                </div>
+
+                {/* 3. Biểu đồ Doanh thu (chiếm trọn 4 cột) */}
+                <div className="lg:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-2"> {/* Thêm 'flex-wrap' và 'gap-4' */}
                         <h3 className="text-lg font-semibold text-gray-800">Phân tích doanh thu</h3>
                         <select
                             value={range}
@@ -356,165 +456,118 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* Giao dịch gần đây */}
-                <RecentTransactionsCard items={recentOrders.length ? [
-                    { ini: "AV", iniBg: "bg-blue-100", iniText: "text-blue-600", name: "Nguyễn Văn An", desc: "Mua gói tin VIP", amount: "+500.000đ" },
-                    { ini: "TB", iniBg: "bg-indigo-100", iniText: "text-indigo-600", name: "Trần Thị Bình", desc: "Đăng tin thường", amount: "+50.000đ" },
-                    { ini: "LC", iniBg: "bg-amber-100", iniText: "text-amber-600", name: "Lê Văn Cường", desc: "Mua gói tin đặc biệt", amount: "+1.200.000đ" },
-                    { ini: "HD", iniBg: "bg-pink-100", iniText: "text-pink-600", name: "Hồ Thị Dung", desc: "Up tin lên top", amount: "+100.000đ" },
-                ] : []} />
-            </div>
-
-            {/* Tables — nâng cấp UI & bỏ cột hành động */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {/* Tin cần duyệt */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Tin đăng mới cần duyệt</h3>
-                        <div className="relative">
-                            <input
-                                value={postSearch}
-                                onChange={(e) => setPostSearch(e.target.value)}
-                                placeholder="Tìm tiêu đề/người đăng…"
-                                className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <svg
-                                className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                            >
-                                <circle cx="11" cy="11" r="7" />
-                                <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
-                            </svg>
+                {/* 4. Tin cần duyệt (chiếm 2/4 cột) */}
+                <div className="lg:col-span-2">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4"> {/* Thêm 'flex-wrap' và 'gap-4' */}
+                            <h3 className="text-lg font-semibold text-gray-800">Tin đăng mới cần duyệt</h3>
+                            <div className="relative">
+                                <input
+                                    value={postSearch}
+                                    onChange={(e) => setPostSearch(e.target.value)}
+                                    placeholder="Tìm tiêu đề/người đăng…"
+                                    className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto" // Responsive width
+                                />
+                                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="11" cy="11" r="7" />
+                                    <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+                                </svg>
+                            </div>
                         </div>
-                    </div>
-
-                    <div className="relative overflow-x-auto rounded-xl ring-1 ring-gray-200">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
-                                <tr>
-                                    <th className="py-3 px-4">Tiêu đề</th>
-                                    <th className="py-3 px-4">Người đăng</th>
-                                    <th className="py-3 px-4">Ngày đăng</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredPosts.map((p, i) => (
-                                    <tr
-                                        key={i}
-                                        className={`
-                      bg-white hover:bg-slate-50 transition-colors
-                      ${i % 2 === 1 ? "bg-slate-50/40" : ""}
-                    `}
-                                    >
-                                        <td className="py-3 px-4 font-medium text-gray-900">
-                                            <div className="max-w-[320px] truncate">{p.title}</div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="inline-flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">
-                                                    {p.user.split(" ").map((x) => x[0]).join("").slice(0, 2)}
-                                                </div>
-                                                <span className="text-gray-700">{p.user}</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4 text-gray-700">{p.date}</td>
-                                    </tr>
-                                ))}
-                                {filteredPosts.length === 0 && (
+                        <div className="relative overflow-x-auto rounded-xl ring-1 ring-gray-200">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
                                     <tr>
-                                        <td colSpan={3} className="py-8 text-center text-gray-500">
-                                            Không có tin phù hợp
-                                        </td>
+                                        <th className="py-3 px-4">Tiêu đề</th>
+                                        <th className="py-3 px-4">Người đăng</th>
+                                        <th className="py-3 px-4">Ngày đăng</th>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredPosts.map((p, i) => (
+                                        <tr key={i} className={`bg-white hover:bg-slate-50 transition-colors ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}>
+                                            <td className="py-3 px-4 font-medium text-gray-900">
+                                                <div className="max-w-xs truncate" title={p.title}>{p.title}</div> {/* Giới hạn chiều rộng và thêm tooltip */}
+                                            </td>
+                                            <td className="py-3 px-4">
+                                                <div className="inline-flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0"> {/* Thêm shrink-0 */}
+                                                        {p.user.split(" ").map((x) => x[0]).join("").slice(0, 2)}
+                                                    </div>
+                                                    <span className="text-gray-700 truncate" title={p.user}>{p.user}</span> {/* Thêm truncate */}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{p.date}</td> {/* Thêm whitespace-nowrap */}
+                                        </tr>
+                                    ))}
+                                    {filteredPosts.length === 0 && (
+                                        <tr><td colSpan={3} className="py-8 text-center text-gray-500">Không có tin phù hợp</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                {/* Đơn hàng mới nhất */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Đơn hàng mới nhất</h3>
-                        <div className="relative">
-                            <input
-                                value={orderSearch}
-                                onChange={(e) => setOrderSearch(e.target.value)}
-                                placeholder="Tìm mã đơn/khách hàng…"
-                                className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <svg
-                                className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                            >
-                                <circle cx="11" cy="11" r="7" />
-                                <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
-                            </svg>
+                {/* 5. Đơn hàng mới nhất (chiếm 2/4 cột) */}
+                <div className="lg:col-span-2">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4"> {/* Thêm 'flex-wrap' và 'gap-4' */}
+                            <h3 className="text-lg font-semibold text-gray-800">Đơn hàng mới nhất</h3>
+                            <div className="relative">
+                                <input
+                                    value={orderSearch}
+                                    onChange={(e) => setOrderSearch(e.target.value)}
+                                    placeholder="Tìm mã đơn/khách hàng…"
+                                    className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto" // Responsive width
+                                />
+                                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="11" cy="11" r="7" />
+                                    <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+                                </svg>
+                            </div>
                         </div>
-                    </div>
-
-                    <div className="relative overflow-x-auto rounded-xl ring-1 ring-gray-200">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
-                                <tr>
-                                    <th className="py-3 px-4">Mã đơn</th>
-                                    <th className="py-3 px-4">Khách hàng</th>
-                                    <th className="py-3 px-4">Tổng tiền</th>
-                                    <th className="py-3 px-4">Trạng thái</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredOrders.map((o, i) => (
-                                    <tr
-                                        key={i}
-                                        className={`
-                      bg-white hover:bg-slate-50 transition-colors
-                      ${i % 2 === 1 ? "bg-slate-50/40" : ""}
-                    `}
-                                    >
-                                        <td className="py-3 px-4 font-semibold text-gray-900">{o.code}</td>
-                                        <td className="py-3 px-4">
-                                            <div className="inline-flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold">
-                                                    {o.customer.split(" ").map((x) => x[0]).join("").slice(0, 2)}
-                                                </div>
-                                                <span className="text-gray-700">{o.customer}</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4 font-medium text-gray-900 tabular-nums">{o.total}</td>
-                                        <td className="py-3 px-4">
-                                            <span
-                                                className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1
-                          ${o.badge === "green"
-                                                        ? "bg-green-50 text-green-700 ring-green-100"
-                                                        : o.badge === "yellow"
-                                                            ? "bg-amber-50 text-amber-700 ring-amber-100"
-                                                            : "bg-gray-50 text-gray-700 ring-gray-100"
-                                                    }`}
-                                            >
-                                                {o.status}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {filteredOrders.length === 0 && (
+                        <div className="relative overflow-x-auto rounded-xl ring-1 ring-gray-200">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
                                     <tr>
-                                        <td colSpan={4} className="py-8 text-center text-gray-500">
-                                            Không có đơn hàng phù hợp
-                                        </td>
+                                        <th className="py-3 px-4">Mã đơn</th>
+                                        <th className="py-3 px-4">Khách hàng</th>
+                                        <th className="py-3 px-4">Tổng tiền</th>
+                                        <th className="py-3 px-4">Trạng thái</th>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredOrders.map((o, i) => (
+                                        <tr key={i} className={`bg-white hover:bg-slate-50 transition-colors ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}>
+                                            <td className="py-3 px-4 font-semibold text-gray-900 whitespace-nowrap">{o.code}</td> {/* Thêm whitespace-nowrap */}
+                                            <td className="py-3 px-4">
+                                                <div className="inline-flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold shrink-0"> {/* Thêm shrink-0 */}
+                                                        {o.customer.split(" ").map((x) => x[0]).join("").slice(0, 2)}
+                                                    </div>
+                                                    <span className="text-gray-700 truncate" title={o.customer}>{o.customer}</span> {/* Thêm truncate */}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-4 font-medium text-gray-900 tabular-nums whitespace-nowrap">{o.total}</td> {/* Thêm whitespace-nowrap */}
+                                            <td className="py-3 px-4">
+                                                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${o.badge === "green" ? "bg-green-50 text-green-700 ring-green-100" : o.badge === "yellow" ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-gray-50 text-gray-700 ring-gray-100"}`}> {/* Thêm whitespace-nowrap */}
+                                                    {o.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {filteredOrders.length === 0 && (
+                                        <tr><td colSpan={4} className="py-8 text-center text-gray-500">Không có đơn hàng phù hợp</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
+            {/* === END: UPDATED & COMBINED LAYOUT SECTION === */}
         </div>
     );
 }
+
