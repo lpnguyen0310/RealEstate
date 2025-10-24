@@ -15,7 +15,14 @@ import java.util.Map;
 public interface IPropertyService {
     List<PropertyCardDTO> getAllPropertiesForCardView();
 
-    PropertyDetailDTO getPropertyDetailById(Long id);
+
+    // NEW: method có userId + preview
+    PropertyDetailDTO getPropertyDetailById(Long id, Long currentUserId, boolean preview);
+
+    // Giữ API cũ để không phải sửa chỗ khác (default gọi sang hàm mới)
+    default PropertyDetailDTO getPropertyDetailById(Long id) {
+        return getPropertyDetailById(id, null, false);
+    }
 
     Page<PropertyCardDTO> searchProperties(Map<String, String> params);
 

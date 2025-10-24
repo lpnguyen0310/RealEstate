@@ -15,4 +15,6 @@ public class UserDTO {
     private String avatar;
     private List<String> roles;
     private AuthProviderDTO authProvider;
+    private boolean lockRequested;
+    private boolean deleteRequested;
 }

@@ -143,3 +143,16 @@ export const countByStatus = (list = []) => {
 
   return map;
 };
+
+// Example: countByStatus(posts).PUBLISHED
+export const fmtVND = (n) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" })
+    .format(Number(n || 0));
+
+export const fmtDateOrder = (iso) =>
+  iso
+    ? new Date(iso).toLocaleString("vi-VN", {
+        hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit",
+      })
+    : "";

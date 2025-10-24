@@ -63,6 +63,23 @@ public class PropertyServiceImpl implements IPropertyService {
     }
 
     @Override
+    @Transactional
+    public PropertyDetailDTO getPropertyDetailById(Long id, Long currentUserId, boolean preview) {
+        PropertyEntity entity = propertyRepository.findByIdWithDetails(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
+
+        if (!preview) {
+            Long authorId = (entity.getUser() != null) ? entity.getUser().getUserId() : null;
+            if (currentUserId == null || !currentUserId.equals(authorId)) {
+                propertyRepository.bumpView(id);                // UPDATE view_count = view_count + 1
+                entity.setViewCount(entity.getViewCount() + 1); // đồng bộ giá trị trả về (tuỳ chọn)
+            }
+        }
+        return propertyMapper.toPropertyDetailDTO(entity);
+    }
+
+    @Override
+    @Transactional
     public PropertyDetailDTO getPropertyDetailById(Long id) {
         PropertyEntity entity = propertyRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));

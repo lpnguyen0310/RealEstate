@@ -41,6 +41,7 @@ public class PropertyMapper {
         dto.setListing_type(entity.getListingType().name());
         dto.setBed(entity.getBedrooms() != null ? entity.getBedrooms() : 0);
         dto.setBath(entity.getBathrooms() != null ? entity.getBathrooms() : 0);
+        dto.setViewCount(entity.getViewCount() != null ? entity.getViewCount() : 0);
 
         // === THAY ĐỔI 1: Thêm trường price đã được định dạng ===
         if (entity.getPrice() != null) {
@@ -108,6 +109,7 @@ public class PropertyMapper {
 
         dto.setPostInfo(buildPostInfo(entity));
         dto.setFeatures(buildFeatures(entity));
+        dto.setViewCount(entity.getViewCount() == null ? 0 : entity.getViewCount());
 
         MapDTO mapDTO = new MapDTO();
         dto.setMap(mapDTO);
@@ -186,7 +188,9 @@ public class PropertyMapper {
                 new MapMetaDTO("Ngày đăng", entity.getPostedAt().toLocalDateTime().format(formatter)),
                 new MapMetaDTO("Ngày hết hạn", entity.getExpiresAt() != null ? entity.getExpiresAt().toLocalDateTime().format(formatter) : "N/A"),
                 new MapMetaDTO("Loại tin", entity.getListingTypePolicy().getListingType().name()),
-                new MapMetaDTO("Mã tin", entity.getId().toString())
+                new MapMetaDTO("Mã tin", entity.getId().toString()),
+                new MapMetaDTO("Lượt xem", String.valueOf(entity.getViewCount() == null ? 0 : entity.getViewCount()))
+
         );
     }
 

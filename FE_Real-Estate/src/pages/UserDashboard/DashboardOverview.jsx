@@ -1,6 +1,9 @@
 // src/pages/UserDashboard/DashboardOverview.jsx
-import { useMemo } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useEffect, useMemo } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import useFavorites from "@/hooks/useFavorites";
+
 import {
   UserHeader,
   UserStats,
@@ -11,8 +14,23 @@ import {
   PostTypeSummary,
 } from "../../components/dashboard/dashboardoverview";
 
+import {
+  fetchMyPropertiesThunk,
+  selectPostsReport,
+} from "@/store/propertySlice";
+
 export default function DashboardOverview() {
+  const nav = useNavigate();
+  const dispatch = useDispatch();
   const { user: reduxUser } = useOutletContext();
+
+  // ===== Load "tin của tôi" cho dashboard =====
+  useEffect(() => {
+    // Gọi 1 lần khi vào dashboard (nếu bạn đã load ở layout cha thì có thể bỏ)
+    dispatch(fetchMyPropertiesThunk({ page: 0, size: 20, sort: "postedAt,desc" }));
+  }, [dispatch]);
+
+  // ===== User info =====
   const user = useMemo(() => {
     if (!reduxUser) {
       return { name: "Người dùng", email: "", phone: "", avatarUrl: "" };
@@ -30,37 +48,42 @@ export default function DashboardOverview() {
     };
   }, [reduxUser]);
 
-  const stats = { saved: 8, messages: 3, posts: 0, tours: 1 };
+  // ===== Favorites (REAL DATA) =====
+  const { list: favList, count: favCount } = useFavorites();
 
+  // Convert to SavedListCard items (lấy tối đa 5 tin)
+  const savedItems = useMemo(
+    () =>
+      (favList || []).slice(0, 5).map((p) => ({
+        id: p.id,
+        image: p.thumb,
+        title: p.title,
+        subtitle: p.displayAddress || p.address || "",
+        type: p.listingType || "",
+        href: p.href || "",
+        price: p.priceDisplay || p.priceText || "",
+        savedAgo: p.savedAgo,
+      })),
+    [favList]
+  );
+
+  // ===== Stats (REAL saved count) =====
+  const stats = useMemo(
+    () => ({
+      saved: favCount ?? 0,
+      messages: 0,
+      posts: 0,
+      tours: 0,
+    }),
+    [favCount]
+  );
+
+  // ===== Report (REAL from Redux) =====
+  const report = useSelector(selectPostsReport);
+
+  // ===== Other blocks tạm =====
   const sellSummary = { views: 0, interactions: 0, potential: 0 };
   const rentSummary = { views: 0, interactions: 0, potential: 0 };
-
-  const savedItems = [
-    {
-      id: 1,
-      image:
-        "https://images.unsplash.com/photo-1505691723518-36a5ac3b2d52?q=80&w=600",
-      title: "123 Main St",
-      subtitle: "Los Angeles, CA",
-      type: "Nhà riêng",
-    },
-    {
-      id: 2,
-      image:
-        "https://images.unsplash.com/photo-1501183638710-841dd1904471?q=80&w=600",
-      title: "456 Ean St",
-      subtitle: "San Francisco, CA",
-      type: "Căn hộ",
-    },
-    {
-      id: 3,
-      image:
-        "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?q=80&w=600",
-      title: "709 Cak St",
-      subtitle: "Austin, TX",
-      type: "Nhà phố",
-    },
-  ];
 
   const notifications = [
     {
@@ -69,13 +92,6 @@ export default function DashboardOverview() {
       text: "Bạn đã cập nhật tất cả thông tin của ngày hôm nay 👏",
     },
   ];
-
-  const report = {
-    active: 0,
-    pending: 0,
-    expiring: 0,
-    auto: { total: 0, premium: 0, vip: 0, normal: 0 },
-  };
 
   return (
     <div className="space-y-6">
@@ -86,12 +102,26 @@ export default function DashboardOverview() {
       <UserStats
         data={stats}
         loading={false}
-        onPostClick={() => console.log("Đi đến trang đăng tin")}
+        onClickCard={(key) => {
+          if (key === "saved") nav("/tin-da-luu");
+          if (key === "posts") nav("/user/posts");
+          if (key === "messages") nav("/user/messages");
+          if (key === "tours") nav("/user/tours");
+        }}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Báo cáo tin đăng — đã nối data thật */}
         <PostsReportCard data={report} />
-        <SavedListCard items={savedItems} />
+
+        <SavedListCard
+          items={savedItems}
+          emptyHint="Bạn chưa lưu tin nào — hãy khám phá và lưu những tin bạn thích!"
+          onItemClick={(it) => it.href && nav(it.href)}
+          onViewAll={() => nav("/tin-da-luu")}
+          maxItems={5}
+        />
+
         <NotificationsCard items={notifications} />
       </div>
 

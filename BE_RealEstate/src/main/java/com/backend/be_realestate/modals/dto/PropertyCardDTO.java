@@ -25,4 +25,5 @@ public class PropertyCardDTO {
     private String description;
     private List<String> images;
     private String listing_type;
+    private Long viewCount;
 }

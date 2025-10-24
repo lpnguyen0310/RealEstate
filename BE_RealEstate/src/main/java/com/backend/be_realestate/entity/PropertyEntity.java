@@ -20,7 +20,8 @@ import java.util.List;
             @Index(name = "idx_properties_location", columnList = "city_id, district_id, ward_id"),
             @Index(name = "idx_properties_price", columnList = "price"),
             @Index(name = "idx_properties_user", columnList = "user_id"),
-            @Index(name = "idx_properties_area", columnList = "area")
+            @Index(name = "idx_properties_area", columnList = "area"),
+            @Index(name = "idx_properties_views", columnList = "view_count")
     })
     @Getter
     @Setter
@@ -90,6 +91,9 @@ import java.util.List;
         @Column(name = "display_address", length = 500)
         private String displayAddress;
 
+
+        @Column(name = "view_count")
+        private Long viewCount;
 
         @Column(name = "landarea")
         private Double landArea; // Diện tích đất

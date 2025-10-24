@@ -1,4 +1,3 @@
-// src/pages/Admin/AdminPostsMUI.jsx
 import { useCallback, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Box } from "@mui/material";
@@ -12,7 +11,6 @@ import {
 } from "@/components/admidashboard/post";
 
 import {
-    // state & actions from slice
     setQ,
     setCategory,
     setListingType,
@@ -23,7 +21,6 @@ import {
     setDecision,
     openDetail,
     closeDetail,
-    // thunks
     fetchPostsThunk,
     fetchCountsThunk,
     approvePostThunk,
@@ -33,12 +30,15 @@ import {
     hardDeletePostThunk,
 } from "@/store/adminPostsSlice";
 
-// Realtime (STOMP over SockJS)
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
+// URL query sync
+import { useSearchParams } from "react-router-dom";
+
 export default function AdminPostsMUI() {
     const dispatch = useDispatch();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const {
         posts,
@@ -46,11 +46,11 @@ export default function AdminPostsMUI() {
         loadingList,
         loadingCounts,
         actioningId,
-        q,
-        category,
+        q,                // FE keyword (applied)
+        category,         // categoryId (nên là id)
         listingType,
         selectedTab,
-        page,
+        page,             // 1-based ở UI
         pageSize,
         totalItems,
         totalPages,
@@ -59,14 +59,58 @@ export default function AdminPostsMUI() {
         decision,
     } = useSelector((s) => s.adminPosts);
 
-    // ================== FETCH (debounce 250ms) ==================
+    /* =============== URL -> STORE (hydrate) =============== */
+    useEffect(() => {
+        const qp = Object.fromEntries(searchParams.entries());
+        const urlTab = qp.tab || "ALL";
+        const urlPage = Math.max(1, parseInt(qp.page || "1", 10) || 1);
+        const urlSize = Math.max(1, parseInt(qp.size || "10", 10) || 10);
+        const urlQ = qp.q || "";
+        const urlCategoryId = qp.categoryId ? Number(qp.categoryId) : "";
+        const urlListingType = qp.listingType || "";
+
+        if (selectedTab !== urlTab) dispatch(setSelectedTab(urlTab));
+        if (page !== urlPage) dispatch(setPage(urlPage));
+        if (pageSize !== urlSize) dispatch(setPageSize(urlSize));
+        if ((q || "") !== urlQ) dispatch(setQ(urlQ));
+        if ((category ?? "") !== (urlCategoryId === 0 ? "" : urlCategoryId)) {
+            dispatch(setCategory(urlCategoryId || ""));
+        }
+        if ((listingType || "") !== urlListingType) dispatch(setListingType(urlListingType));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
+    /* =============== STORE -> URL (debounced) =============== */
+    useEffect(() => {
+        const t = setTimeout(() => {
+            const qp = new URLSearchParams();
+
+            if (selectedTab && selectedTab !== "ALL") qp.set("tab", selectedTab);
+            if (q && q.trim()) qp.set("q", q.trim());
+            if (category !== "" && category !== null && category !== undefined) {
+                qp.set("categoryId", String(category));
+            }
+            if (listingType && listingType.trim()) qp.set("listingType", listingType.trim());
+
+            qp.set("page", String(page || 1));
+            qp.set("size", String(pageSize || 10));
+
+            const current = searchParams.toString();
+            const next = qp.toString();
+            if (current !== next) setSearchParams(qp);
+        }, 250);
+        return () => clearTimeout(t);
+    }, [selectedTab, q, category, listingType, page, pageSize, searchParams, setSearchParams]);
+
+    /* =============== FETCH LIST (debounce, LIVE SEARCH) =============== */
     useEffect(() => {
         const t = setTimeout(() => {
             dispatch(fetchPostsThunk());
-        }, 250);
+        }, 250); // gõ sẽ fetch sau 250ms
         return () => clearTimeout(t);
     }, [dispatch, selectedTab, page, pageSize, q, category, listingType]);
 
+    /* =============== FETCH COUNTS (debounce) =============== */
     useEffect(() => {
         const t = setTimeout(() => {
             dispatch(fetchCountsThunk());
@@ -74,48 +118,37 @@ export default function AdminPostsMUI() {
         return () => clearTimeout(t);
     }, [dispatch, q, category, listingType]);
 
-    // ================== REALTIME WS ==================
-    // Kết nối SockJS ở /ws (relative như axios baseURL="/api")
+    /* =============== REALTIME WS =============== */
     useEffect(() => {
         const client = new Client({
             webSocketFactory: () => new SockJS("/ws"),
             reconnectDelay: 3000,
             onConnect: () => {
-                // Admin subscribe kênh broadcast từ BE
                 client.subscribe("/topic/admin/properties", async (msg) => {
                     try {
-                        const ev = JSON.parse(msg.body); // { type, id, status, ... }
-                        // làm tươi KPI
+                        JSON.parse(msg.body);
                         await dispatch(fetchCountsThunk());
-                        // tin mới tạo nằm ở PENDING_REVIEW → chỉ refetch list nếu đang ở ALL/PENDING_REVIEW
-                        const shouldReloadList =
-                            selectedTab === "ALL" || selectedTab === "PENDING_REVIEW";
-                        if (shouldReloadList) {
-                            await dispatch(fetchPostsThunk());
-                        }
+                        const shouldReloadList = selectedTab === "ALL" || selectedTab === "PENDING_REVIEW";
+                        if (shouldReloadList) await dispatch(fetchPostsThunk());
                     } catch (e) {
-                        // eslint-disable-next-line no-console
                         console.warn("Invalid WS payload:", e);
                     }
                 });
             },
         });
-
         client.activate();
         return () => client.deactivate();
     }, [dispatch, selectedTab]);
 
-    // ================== ACTION HANDLERS ==================
+    /* =============== ACTIONS =============== */
     const approve = useCallback(
         async (id) => {
             await dispatch(approvePostThunk(id));
-            // Đồng bộ lại từ server
             await dispatch(fetchCountsThunk());
             await dispatch(fetchPostsThunk());
         },
         [dispatch]
     );
-
     const reject = useCallback(
         async (id) => {
             if (!window.confirm("Từ chối tin này?")) return;
@@ -125,7 +158,6 @@ export default function AdminPostsMUI() {
         },
         [dispatch]
     );
-
     const hide = useCallback(
         async (id) => {
             await dispatch(hidePostThunk(id));
@@ -134,7 +166,6 @@ export default function AdminPostsMUI() {
         },
         [dispatch]
     );
-
     const unhide = useCallback(
         async (id) => {
             await dispatch(unhidePostThunk(id));
@@ -143,7 +174,6 @@ export default function AdminPostsMUI() {
         },
         [dispatch]
     );
-
     const hardDelete = useCallback(
         async (id) => {
             if (!window.confirm(`Xóa tin ${id}? Hành động không thể hoàn tác.`)) return;
@@ -153,16 +183,14 @@ export default function AdminPostsMUI() {
         },
         [dispatch]
     );
-
     const onOpenDetail = useCallback(
         (r) => {
-            // giữ nguyên priceLabel cho Drawer
             dispatch(openDetail({ ...r, priceLabel: money(r.price) }));
         },
         [dispatch]
     );
 
-    // ================== KPI ==================
+    /* =============== KPI calc =============== */
     const kpi = useMemo(() => {
         const pending = counts.PENDING_REVIEW || 0;
         const published = counts.PUBLISHED || 0;
@@ -186,29 +214,43 @@ export default function AdminPostsMUI() {
             }}
         >
             <Box sx={{ width: "100%", maxWidth: 1440 }}>
-                {/* KPI tổng quan */}
                 <KpiGrid counts={counts} loading={loadingCounts} kpi={kpi} />
 
-                {/* Tabs trạng thái (đọc chung từ counts) */}
                 <PillBar
                     selected={selectedTab}
-                    onSelect={(key) => dispatch(setSelectedTab(key))}
+                    onSelect={(key) => {
+                        if (page !== 1) dispatch(setPage(1));
+                        dispatch(setSelectedTab(key));
+                    }}
                     counts={counts}
                 />
 
-                {/* Bộ lọc tìm kiếm */}
                 <FiltersBar
                     q={q}
-                    setQ={(v) => dispatch(setQ(v))}
+                    setQ={(v) => {
+                        // live search: khi đổi q → về trang 1 để kết quả chuẩn
+                        if (page !== 1) dispatch(setPage(1));
+                        dispatch(setQ(v));
+                    }}
                     category={category}
-                    setCategory={(v) => dispatch(setCategory(v))}
+                    setCategory={(v) => {
+                        if (page !== 1) dispatch(setPage(1));
+                        dispatch(setCategory(v));
+                    }}
                     listingType={listingType}
-                    setListingType={(v) => dispatch(setListingType(v))}
+                    setListingType={(v) => {
+                        if (page !== 1) dispatch(setPage(1));
+                        dispatch(setListingType(v));
+                    }}
+                    // Các prop onSearch/onReset giữ lại để tái sử dụng nếu cần nút
                     onSearch={() => dispatch(setPage(1))}
-                    onReset={() => dispatch(resetFilters())}
+                    onReset={() => {
+                        dispatch(resetFilters());
+                        dispatch(setPage(1));
+                        dispatch(setPageSize(10));
+                    }}
                 />
 
-                {/* Bảng danh sách */}
                 <PostsTable
                     rows={posts}
                     loading={loadingList}
@@ -220,7 +262,10 @@ export default function AdminPostsMUI() {
                     totalItems={totalItems}
                     pageSize={pageSize}
                     setPage={(p) => dispatch(setPage(p))}
-                    setPageSize={(s) => dispatch(setPageSize(s))}
+                    setPageSize={(s) => {
+                        if (page !== 1) dispatch(setPage(1));
+                        dispatch(setPageSize(s));
+                    }}
                     onOpenDetail={onOpenDetail}
                     onApprove={approve}
                     onReject={reject}
@@ -232,7 +277,6 @@ export default function AdminPostsMUI() {
                     setDecision={(payload) => dispatch(setDecision(payload))}
                 />
 
-                {/* Drawer chi tiết + duyệt */}
                 <PostDetailDrawer
                     open={open}
                     onClose={() => dispatch(closeDetail())}

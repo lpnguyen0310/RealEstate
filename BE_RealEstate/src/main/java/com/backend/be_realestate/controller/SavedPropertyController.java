@@ -14,12 +14,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SavedPropertyController {
     private final SavedPropertyService service;
-    private final SecurityUtils securityUtils; // 👈 thêm dòng này
-
+    private final SecurityUtils securityUtils;
     // === Toggle ===
     @PostMapping("/{propertyId}/toggle")
     public Map<String, Object> toggle(@PathVariable Long propertyId, Authentication auth) {
-        Long userId = securityUtils.currentUserId(auth); // 👈 gọi hàm có sẵn
+        Long userId = securityUtils.currentUserId(auth);
         boolean saved = service.toggle(userId, propertyId);
         return Map.of("saved", saved);
     }
@@ -32,7 +31,6 @@ public class SavedPropertyController {
         return Map.of("saved", saved);
     }
 
-    // === Lấy danh sách ID tin đã lưu ===
     @GetMapping("/ids")
     public List<Long> ids(Authentication auth) {
         Long userId = securityUtils.currentUserId(auth);

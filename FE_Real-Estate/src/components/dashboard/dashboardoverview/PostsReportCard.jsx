@@ -27,7 +27,7 @@ export default function PostsReportCard({ data }) {
                     Báo cáo tin đăng
                 </h3>
                 <span className="text-[13px] text-[#3b7cff] leading-none">
-                    Tổng số {d.active + d.pending + d.expiring + d.auto.total} tin đăng
+                    Tổng số {d.active + d.pending + d.expiring} tin đăng
                 </span>
             </div>
 

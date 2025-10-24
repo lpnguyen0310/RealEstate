@@ -1,6 +1,17 @@
 export const HOVER_BG = "#dbe7ff";
-export const STATUS_COLOR = { ACTIVE: "success", LOCKED: "error", PENDING: "warning" };
-export const ROLE_COLOR = { USER: "primary", AGENT: "secondary", ADMIN: "warning" };
+// src/components/admidashboard/user/constants.js
+export const STATUS_COLOR = {
+    ACTIVE: "success",
+    LOCKED: "error",
+    PENDING: "warning",
+};
+
+export const ROLE_COLOR = {
+    USER: "default",
+    AGENT: "info",
+    ADMIN: "secondary",
+};
+
 
 export const styles = {
     headCell: { fontWeight: 700, fontSize: 14, color: "#1a3b7c" },
