@@ -244,7 +244,7 @@ public class PropertyServiceImpl implements IPropertyService {
                     log.warn("[PropertyService] Không tìm thấy ADMIN để gửi thông báo.");
                 } else {
                     String adminMessage = String.format("Tin đăng mới '%s' (ID: %d) đang chờ duyệt.", title, saved.getId());
-                    String adminLink = "/dashboard/posts?tab=pending";
+                    String adminLink = "/admin/posts";
 
                     for (UserEntity admin : admins) {
                         notificationService.createNotification(

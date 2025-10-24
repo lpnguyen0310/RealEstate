@@ -8,7 +8,6 @@ import { uploadMany } from "@/api/cloudinary";
 // Lấy danh sách public (trang chủ / tìm kiếm)
 export const fetchPropertiesThunk = createAsyncThunk(
     "property/fetchAll",
-    // Nhận 1 object params chứa mọi bộ lọc
     async (params = {}, { rejectWithValue }) => {
         try {
             const res = await api.get("/properties", { params });
@@ -96,19 +95,10 @@ export const createPropertyThunk = createAsyncThunk(
 // Lấy danh sách tin của chính user (dashboard)
 export const fetchMyPropertiesThunk = createAsyncThunk(
     "property/fetchMyProperties",
-    // 1. Thêm 'status' vào danh sách tham số
     async ({ page = 0, size = 20, sort = "postedAt,desc", status } = {}, { rejectWithValue }) => {
         try {
-            // 2. Build object params một cách linh hoạt
             const params = { page, size, sort };
-
-            // 3. Thêm 'status' vào params CHỈ KHI nó tồn tại
-            if (status) {
-                params.status = status;
-            }
-
-            // 4. Truyền object params đã build vào request
-            // Axios sẽ tự động tạo URL, ví dụ: /properties/me?page=0&size=20&status=pending
+            if (status) params.status = status;
             const res = await api.get("/properties/me", { params });
             return res.data;
         } catch (e) {
@@ -125,72 +115,53 @@ export const fetchMyPropertyCountsThunk = createAsyncThunk(
         try {
             const res = await api.get("/properties/my-counts");
             return res.data; // API trả về Map<String, Long> { active: 1, pending: 9, ... }
-        } catch (e) {
+        } catch {
             return rejectWithValue("Không thể tải số đếm tin đăng");
         }
     }
 );
 
-function parseBackendDate(d) {
-    if (!d) return null;
-    if (typeof d === "number") return new Date(d);
+/* ===================== DATE UTILS ===================== */
 
-    if (typeof d === "string") {
-        let s = d.replace(" ", "T");
-        if (!/Z|[+-]\d{2}:\d{2}$/.test(s)) s += "Z";
-        const t = Date.parse(s);
-        return Number.isNaN(t) ? null : new Date(t);
+const MS_DAY = 24 * 60 * 60 * 1000;
+
+function parseToDate(x) {
+    if (!x) return null;
+    try {
+        if (typeof x === "number") return new Date(x);
+        if (typeof x === "string") {
+            let s = x.replace(" ", "T");
+            if (!/Z|[+-]\d{2}:\d{2}$/.test(s)) s += "Z";
+            const t = Date.parse(s);
+            return Number.isNaN(t) ? null : new Date(t);
+        }
+        if (typeof x === "object" && "year" in x && "month" in x && "day" in x) {
+            const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } = x;
+            return new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1e6));
+        }
+        return null;
+    } catch {
+        return null;
     }
+}
 
-    // trường hợp Jackson trả object kiểu {year, month, day, hour,...}
-    if (d && typeof d === "object" && "year" in d && "month" in d && "day" in d) {
-        const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } = d;
-        return new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1e6));
+// Quy ước: "Sắp hết hạn" nếu còn ≤ 3 ngày
+const EXP_SOON_DAYS = 3;
+function isExpiringSoon(post) {
+    const now = Date.now();
+    let exp = parseToDate(post?.expiresAt)?.getTime() ?? null;
+    if (!exp && post?.postedAt && post?.durationDays) {
+        const start = parseToDate(post.postedAt)?.getTime();
+        if (start && post.durationDays) exp = start + post.durationDays * MS_DAY;
     }
-
-    return null;
+    if (!exp) return false;
+    const diff = exp - now;
+    return diff > 0 && diff <= EXP_SOON_DAYS * MS_DAY;
 }
 
-function formatViDate(d) {
-    const dt = parseBackendDate(d);
-    return dt ? dt.toLocaleDateString("vi-VN") : "";
-}
-// Helper: map PropertyDTO -> dữ liệu PostCard đang dùng
-function mapDtoToPostCard(p) {
-    // p là PropertyDTO từ BE
-    const fmt = Intl.NumberFormat("vi-VN");
-    const priceText = p?.price != null ? `${fmt.format(p.price)} ₫` : "—";
-    const unitPriceText = p?.pricePerM2 != null ? `${fmt.format(p.pricePerM2)} ₫/m²` : "";
-    const addressMain =
-        p?.displayAddress ||
-        [p?.addressStreet /* + tên phường-quận-thành phố nếu bạn muốn */].filter(Boolean).join(", ");
-    const postat = p?.postedAt;
-    console.log("Postat:", postat);
-    return {
-        id: p.id,
-        // hình: ưu tiên imageUrls từ BE; fallback sang images (nếu nơi khác trả kiểu khác)
-        images: Array.isArray(p.imageUrls) && p.imageUrls.length ? p.imageUrls : p.images || [],
-        title: p.title,
-        description: p.description,
-        statusTag: toStatusTag(p?.status),  // map "active" -> "Đang Đăng" …
-        priceText,
-        unitPriceText,
-        landPriceText: "",            // nếu có công thức riêng, bạn bổ sung sau
-        installmentText: p?.propertyType === "sell" ? "Mua bán" :
-            p?.propertyType === "rent" ? "Cho thuê" : "",
-        statusKey: statusEnumToKey(p?.status),
+/* ===================== MAPPERS ===================== */
 
-        addressMain,
-        area: p?.area,
-        bed: p?.bedrooms,
-        bath: p?.bathrooms,
-        sizeText: p?.width && p?.height ? `${p.width}m x ${p.height}m` : "",
-        note: "",                     // nếu muốn hiển thị ghi chú
-
-        createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
-        views: p?.views ?? 0,         // nếu BE có trường này
-    };
-}
+// Map DTO (BE -> UI Card) cho MY LIST (dashboard)
 function toStatusTag(status) {
     const s = (status ?? "").toString().trim().toUpperCase();
     switch (s) {
@@ -205,7 +176,6 @@ function toStatusTag(status) {
         default: return "Nháp";
     }
 }
-
 function statusEnumToKey(status) {
     const s = (status ?? "").toString().trim().toUpperCase();
     switch (s) {
@@ -221,13 +191,11 @@ function statusEnumToKey(status) {
     }
 }
 
-// Map DTO (BE -> UI Card) cho MY LIST (dashboard)
 function mapDtoToPostCard(p) {
     const fmt = Intl.NumberFormat("vi-VN");
     const priceText = p?.price != null ? `${fmt.format(p.price)} ₫` : "—";
     const unitPriceText = p?.pricePerM2 != null ? `${fmt.format(p.pricePerM2)} ₫/m²` : "";
-    const addressMain =
-        p?.displayAddress || [p?.addressStreet].filter(Boolean).join(", ");
+    const addressMain = p?.displayAddress || [p?.addressStreet].filter(Boolean).join(", ");
 
     return {
         id: p.id,
@@ -238,8 +206,7 @@ function mapDtoToPostCard(p) {
         priceText,
         unitPriceText,
         landPriceText: "",
-        installmentText: p?.propertyType === "sell" ? "Mua bán" :
-            p?.propertyType === "rent" ? "Cho thuê" : "",
+        installmentText: p?.propertyType === "sell" ? "Mua bán" : p?.propertyType === "rent" ? "Cho thuê" : "",
         statusKey: statusEnumToKey(p?.status),
 
         addressMain,
@@ -252,11 +219,11 @@ function mapDtoToPostCard(p) {
         createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
         views: p?.views ?? 0,
 
-        // Thêm raw fields để thống kê
+        // raw fields cho thống kê
         listingType: p?.listingType,           // "PREMIUM" | "VIP" | "NORMAL" | ...
         postedAt: p?.postedAt ?? null,
         expiresAt: p?.expiresAt ?? null,
-        durationDays: p?.durationDays ?? null, // nếu BE trả
+        durationDays: p?.durationDays ?? null,
         actualDurationDays: p?.actualDurationDays ?? null,
     };
 }
@@ -292,45 +259,6 @@ function mapPublicPropertyToCard(p) {
     };
 }
 
-/* ===================== DATE UTILS ===================== */
-
-const MS_DAY = 24 * 60 * 60 * 1000;
-
-function parseToDate(x) {
-    if (!x) return null;
-    try {
-        if (typeof x === "number") return new Date(x);
-        if (typeof x === "string") {
-            let s = x.replace(" ", "T");
-            if (!/Z|[+-]\d{2}:\d{2}$/.test(s)) s += "Z";
-            const t = Date.parse(s);
-            return Number.isNaN(t) ? null : new Date(t);
-        }
-        if (typeof x === "object" && "year" in x && "month" in x && "day" in x) {
-            const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } = x;
-            return new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1e6));
-        }
-        return null;
-    } catch {
-        return null;
-    }
-}
-
-// Quy ước: "Sắp hết hạn" nếu còn ≤ 3 ngày
-const EXP_SOON_DAYS = 3;
-
-function isExpiringSoon(post) {
-    const now = Date.now();
-    let exp = parseToDate(post?.expiresAt)?.getTime() ?? null;
-    if (!exp && post?.postedAt && post?.durationDays) {
-        const start = parseToDate(post.postedAt)?.getTime();
-        if (start && post.durationDays) exp = start + post.durationDays * MS_DAY;
-    }
-    if (!exp) return false;
-    const diff = exp - now;
-    return diff > 0 && diff <= EXP_SOON_DAYS * MS_DAY;
-}
-
 /* ===================== SLICE ===================== */
 
 const initialState = {
@@ -341,7 +269,7 @@ const initialState = {
     totalElements: 0,
     totalPages: 0,
 
-    // My dashboard list (tách riêng để không đè lẫn)
+    // My dashboard list
     myList: [],
     myPage: 0,
     mySize: 20,
@@ -356,18 +284,7 @@ const initialState = {
     loadingDetail: false,
     errorDetail: null,
 
-    counts: { // Initialize counts
-        active: 0,
-        pending: 0,
-        draft: 0,
-        rejected: 0,
-        hidden: 0,
-        expired: 0,
-        expiringSoon: 0,
-    },
-    loadingCounts: false,
-
-    counts: { // Initialize counts
+    counts: {            // <<— chỉ còn 1 lần
         active: 0,
         pending: 0,
         draft: 0,
@@ -464,7 +381,6 @@ const propertySlice = createSlice({
                     });
 
                 s.list = mappedAndSortedList;
-
                 s.page = pageData.number ?? 0;
                 s.size = pageData.size ?? 20;
                 s.totalElements = pageData.totalElements ?? 0;
@@ -492,19 +408,17 @@ const propertySlice = createSlice({
                 state.loadingDetail = false;
                 state.errorDetail = action.payload;
             })
-            // +++ BỔ SUNG LOGIC REDUCER CHO COUNTS +++
+
+            // ===== COUNTS =====
             .addCase(fetchMyPropertyCountsThunk.pending, (state) => {
-                state.loadingCounts = true; // Bật loading
+                state.loadingCounts = true;
             })
             .addCase(fetchMyPropertyCountsThunk.fulfilled, (state, action) => {
-                state.loadingCounts = false; // Tắt loading
-                // Gộp kết quả counts từ API vào state, giữ nguyên key nếu API không trả về
+                state.loadingCounts = false;
                 state.counts = { ...initialState.counts, ...(action.payload || {}) };
             })
-            .addCase(fetchMyPropertyCountsThunk.rejected, (state, action) => {
-                state.loadingCounts = false; // Tắt loading
-                console.error("Failed to fetch property counts:", action.payload);
-                // Reset về 0 nếu lỗi
+            .addCase(fetchMyPropertyCountsThunk.rejected, (state) => {
+                state.loadingCounts = false;
                 state.counts = { ...initialState.counts };
             });
     },
