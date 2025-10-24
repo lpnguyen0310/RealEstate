@@ -155,7 +155,7 @@ public class RegisterServiceInMemoryImpl implements RegisterService {
                 .lastName("A")
                 .lockRequested(false)
                 .deleteRequested(false)
-                .phone("090000000")
+                .phone(null)
                 .avatar(null)
                 .isActive(true)
                 .roles(List.of(userRole))

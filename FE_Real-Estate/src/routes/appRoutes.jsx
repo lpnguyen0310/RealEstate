@@ -28,6 +28,7 @@ import AdminLayout from "@/layouts/AdminLayout";              // <-- mới
 import AdminDashboard from "@/pages/Admin/AdminDashboard";
 import AdminUsers from "@/pages/Admin/AdminUsers";
 import AdminPostsMUI from "@/pages/Admin/AdminPost";
+import AdminOrders from "@/pages/Admin/AdminOrder";
 export default function AppRoutes() {
   return (
     <Routes>
@@ -59,6 +60,7 @@ export default function AppRoutes() {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="posts" element={<AdminPostsMUI />} />
+          <Route path="orders" element={<AdminOrders />} />
           {/* <Route path="users" element={<AdminUsers />} /> */}
         </Route>
       </Route>

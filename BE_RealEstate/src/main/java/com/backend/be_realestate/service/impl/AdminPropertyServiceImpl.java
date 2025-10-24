@@ -12,6 +12,7 @@ import com.backend.be_realestate.modals.property.RejectPropertyRequest;
 import com.backend.be_realestate.modals.response.PropertyShortResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.AdminPropertyService;
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -151,21 +152,37 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "postedAt"));
         Specification<PropertyEntity> spec = (root, query, cb) -> cb.conjunction();
 
-        // --- Keyword ---
+        // ====== KEYWORD (tokenized) ======
         if (q != null && !q.isBlank()) {
-            String kw = "%" + q.trim().toLowerCase() + "%";
-            spec = spec.and((root, cq, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("title")), kw),
-                    cb.like(cb.lower(root.join("user", JoinType.LEFT).get("fullName")), kw)
-            ));
+            String[] tokens = q.trim().toLowerCase().split("\\s+");
+            for (String token : tokens) {
+                String kw = "%" + token + "%";
+                spec = spec.and((root, cq, cb) -> {
+                    Join<PropertyEntity, ?> userJoin = root.join("user", JoinType.LEFT);
+                    Join<PropertyEntity, ?> catJoin = root.join("category", JoinType.LEFT);
+
+                    return cb.or(
+                            cb.like(cb.lower(root.get("title")), kw),
+                            cb.like(cb.lower(root.get("description")), kw),
+                            cb.like(cb.lower(root.get("displayAddress")), kw),
+                            cb.like(cb.lower(root.get("addressStreet")), kw),
+                            cb.like(cb.lower(root.get("position")), kw),
+                            cb.like(cb.lower(catJoin.get("name")), kw),
+                            cb.like(cb.lower(userJoin.get("firstName")), kw),
+                            cb.like(cb.lower(userJoin.get("lastName")), kw)
+                    );
+                });
+            }
         }
 
-        // --- Filter by Category ---
+        // ====== FILTER: Category ======
         if (categoryId != null) {
-            spec = spec.and((root, cq, cb) -> cb.equal(root.join("category", JoinType.LEFT).get("id"), categoryId));
+            spec = spec.and((root, cq, cb) ->
+                    cb.equal(root.join("category", JoinType.LEFT).get("id"), categoryId)
+            );
         }
 
-        // --- Filter by Listing Type ---
+        // ====== FILTER: Listing Type ======
         if (listingType != null && !listingType.isBlank()) {
             try {
                 ListingType listingEnum = ListingType.valueOf(listingType);
@@ -175,7 +192,7 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             }
         }
 
-        // --- Filter by Status ---
+        // ====== FILTER: Status ======
         if (status != null && !status.isBlank()) {
             try {
                 PropertyStatus statusEnum = PropertyStatus.valueOf(status);
@@ -185,10 +202,10 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             }
         }
 
-        // --- Query DB ---
+        // ====== QUERY DB ======
         Page<PropertyEntity> pageData = propertyRepository.findAll(spec, pageable);
 
-        // --- Batch load images ---
+        // ====== BATCH LOAD IMAGES ======
         List<Long> ids = pageData.getContent().stream().map(PropertyEntity::getId).toList();
         Map<Long, List<String>> imageMap = new HashMap<>();
         if (!ids.isEmpty()) {
@@ -198,13 +215,13 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             }
         }
 
-        // --- Convert to DTO ---
         return pageData.map(e -> {
             PropertyDTO dto = propertyConverter.toDto(e);
             dto.setImageUrls(imageMap.getOrDefault(e.getId(), List.of()));
             return dto;
         });
     }
+
     private void saveAudit(PropertyEntity p, Long adminId, String type, String message) {
         if (auditRepo == null) return; // nếu chưa có bảng audit
         PropertyAuditEntity a = new PropertyAuditEntity();

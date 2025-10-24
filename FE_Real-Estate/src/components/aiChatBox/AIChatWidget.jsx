@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+// src/components/ai/AIChatWidget.jsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import api from "@/api/axios";
+import PropertyMiniCard from "./PropertyMiniCard";
 
 /* ================== CONFIG ================== */
-const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_KEY; // key từ .env.local
+const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_KEY;
 const MODEL = import.meta.env.VITE_OPENROUTER_MODEL || "openai/gpt-3.5-turbo";
 const PROJECT_NAME = "RealEstateX";
 
@@ -26,13 +29,12 @@ function timeAgoVi(ts) {
     if (h < 24) return `${h}g trước`;
     const d = Math.floor(h / 24);
     if (d < 7) return `${d} ngày trước`;
-    // fallback dạng dd/mm hh:mm
     const dt = new Date(ts);
     return dt.toLocaleString("vi-VN", { hour12: false });
 }
 
-/* ================== Call OpenRouter ================== */
-async function callAI(messages) {
+/* ================== Call OpenRouter (đã sanitize) ================== */
+async function callAI(historyMsgs) {
     if (!OPENROUTER_KEY) return "⚠️ Thiếu VITE_OPENROUTER_KEY trong .env.local";
 
     const sys = {
@@ -42,11 +44,12 @@ async function callAI(messages) {
             "Hỗ trợ: /search (lọc tin), /mortgage (tính vay), /estimate (định giá), /amenities (tiện ích).",
     };
 
-    const payload = {
-        model: MODEL,
-        messages: [sys].concat(messages.map((m) => ({ role: m.role, content: m.content }))),
-        temperature: 0.6,
-    };
+    // Chỉ gửi những message có content là string
+    const cleaned = (historyMsgs || [])
+        .filter((m) => typeof m?.content === "string" && m.content.trim().length > 0)
+        .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.content }));
+
+    const payload = { model: MODEL, messages: [sys, ...cleaned], temperature: 0.6 };
 
     try {
         const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -54,7 +57,7 @@ async function callAI(messages) {
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${OPENROUTER_KEY}`,
-                "HTTP-Referer": window.location.origin, // bắt buộc cho OpenRouter
+                "HTTP-Referer": window.location.origin,
                 "X-Title": PROJECT_NAME,
             },
             body: JSON.stringify(payload),
@@ -73,6 +76,215 @@ async function callAI(messages) {
     }
 }
 
+/* ============== Helpers cho /search DSL ============== */
+
+// "10m", "2tỷ", "150k", "12000000" -> number (VND)
+function parseMoneyVN(s) {
+    if (!s) return null;
+    const raw = s.toString().trim().toLowerCase();
+    const x = raw.replace(/\./g, "").replace(/,/g, "");
+    if (x.endsWith("k")) return Number(x.replace("k", "")) * 1_000;
+    if (/(ng|nghìn|nghin)$/.test(x)) return Number(x.replace(/[^\d]/g, "")) * 1_000;
+    if (x.endsWith("m")) return Number(x.replace("m", "")) * 1_000_000;
+    if (x.endsWith("tr")) return Number(x.replace("tr", "")) * 1_000_000;
+    if (/(ty|tỷ|tỷ)$/.test(x)) return Number(x.replace(/[^\d]/g, "")) * 1_000_000_000;
+    const n = Number(x.replace(/[^\d]/g, ""));
+    return Number.isFinite(n) ? n : null;
+}
+
+// "75m2" | "75" -> 75 (m²)
+function parseArea(s) {
+    if (!s) return null;
+    const n = Number(String(s).toLowerCase().replace(/m2|m²/g, "").replace(/[^\d.]/g, ""));
+    return Number.isFinite(n) ? n : null;
+}
+
+// Parse DSL "/search key=val key2<=val ..." -> params backend
+function parseSearchDSL(text) {
+    const m = text.trim().match(/^\/search\s+(.+)$/i);
+    if (!m) return null;
+
+    const tokens = m[1]
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+    const params = {};
+
+    for (const t of tokens) {
+        const rel = t.match(/^([^=<>:]+)\s*(<=|>=|=|:)\s*(.+)$/);
+        if (!rel) continue;
+        const key = rel[1].toLowerCase();
+        const op = rel[2];
+        const val = rel[3];
+
+        if (key === "type") {
+            params.type = val.toLowerCase().includes("rent") ? "rent" : "sell";
+        } else if (key === "category") {
+            params.category = val; // slug
+        } else if (key === "keyword" || key === "q") {
+            params.keyword = val;
+        } else if (key === "area") {
+            params.keyword = (params.keyword ? params.keyword + " " : "") + val;
+        } else if (key === "price") {
+            const v = parseMoneyVN(val);
+            if (v != null) {
+                if (op === "<=") params.priceTo = v;
+                else if (op === ">=") params.priceFrom = v;
+                else params.priceFrom = params.priceTo = v;
+            }
+        } else if (key === "beds" || key === "bedrooms") {
+            const n = Number(val.replace(/[^\d]/g, ""));
+            if (Number.isFinite(n)) {
+                // Nếu BE có spec bedroomsBetween, có thể thêm:
+                // params.bedroomsFrom = (op === ">=" || op === "=" || op === ":") ? n : undefined;
+                // params.bedroomsTo = (op === "<=") ? n : undefined;
+                params.keyword = (params.keyword ? params.keyword + " " : "") + `${n} phòng ngủ`;
+            }
+        } else if (key === "areasize" || key === "size" || key === "area") {
+            const a = parseArea(val);
+            if (a != null) {
+                if (op === "<=") params.areaTo = a;
+                else if (op === ">=") params.areaFrom = a;
+                else params.areaFrom = params.areaTo = a;
+            }
+        }
+    }
+
+    return params;
+}
+
+// ép số an toàn
+function toNum(v) {
+    if (v == null) return null;
+    const n = typeof v === "string" ? Number(v.replace(/[^\d.-]/g, "")) : Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+
+// Map BE -> UI card thống nhất với public list mapper
+function mapPublicPropertyToCard(p) {
+    if (!p) return {};
+    return {
+        id: p.id,
+        image: p.image,
+        images: Array.isArray(p.images) ? p.images : [],
+        title: p.title,
+        description: p.description,
+
+        price: toNum(p.price),
+        pricePerM2: toNum(p.pricePerM2),
+        postedAt: p.postedAt,
+        photos: p.photos,
+
+        addressMain: p.addressFull || p.addressShort || "",
+        addressShort: p.addressShort || "",
+        addressFull: p.addressFull || "",
+
+        area: p.area,
+        bed: p.bed,
+        bath: p.bath,
+
+        agent: p.agent,
+        type: p.type,
+        category: p.category,
+
+        listingType: p.listing_type,
+    };
+}
+
+// Gọi API /properties với params đã parse
+async function searchPropertiesAPI(params) {
+    const res = await api.get("/properties", { params });
+    const page = res?.data?.data ?? res?.data;
+    const arr = Array.isArray(page?.content) ? page.content : [];
+    return {
+        items: arr.map(mapPublicPropertyToCard),
+        total: page?.totalElements ?? arr.length,
+        page: page?.number ?? 0,
+        pages: page?.totalPages ?? 1,
+    };
+}
+function buildSearchSummary({ total, page, pages, shownCount, params }) {
+    const pn = (n) => new Intl.NumberFormat("vi-VN").format(n);
+    const pageText = pages > 1 ? ` (trang ${page + 1}/${pages})` : "";
+
+    if (!total || total === 0) {
+        return "Chưa thấy tin nào khớp tiêu chí 😥. Bạn thử:\n• Đổi từ khóa (ví dụ: tên đường/địa danh gần đó)\n• Nới khoảng giá hoặc diện tích\n• Chọn lại loại tin (mua/thuê)";
+    }
+    if (total === 1) {
+        return "Mình tìm được 1 tin đúng yêu cầu, bạn xem ngay bên dưới nhé.";
+    }
+    // tổng > 1
+    const head = `Mình tìm được ${pn(total)} tin phù hợp${pageText}.`;
+    const tail = shownCount && shownCount < total
+        ? ` Mình hiển thị ${shownCount} tin đầu tiên trước, cần mình tải thêm không?`
+        : "";
+    return head + tail;
+}
+
+
+/* ============== Natural-language → /search auto-convert ============== */
+function tryAutoConvertToSearch(nlText) {
+    if (!nlText) return null;
+    const text = nlText.trim();
+
+    // Chỉ auto khi câu bắt đầu bằng các động từ yêu cầu
+    const verbRe = /^(tìm|cho tôi xem|hiển thị|tôi muốn xem|liệt kê)\b/i;
+    if (!verbRe.test(text)) return null;
+
+    // Loại bỏ các từ đệm
+    let body = text
+        .replace(verbRe, "")
+        .replace(/\b(các|những|bất động sản|tin|nhà|căn hộ|chung cư|bài đăng)\b/gi, "")
+        .trim();
+
+    // type = rent|sell
+    let type = "";
+    if (/\bthuê\b/i.test(body)) type = "type=rent";
+    if (/\b(mua|bán)\b/i.test(body)) type = "type=buy";
+
+    // price: "dưới 10 tỷ", "trên 12tr", "từ 5tr", ">= 8 triệu", "khoảng 15 triệu"
+    // bắt cụm (dir) (value)(unit)
+    const priceRe = /(dưới|<=|<|trên|>=|>|từ|khoảng)\s*(\d+[.,]?\d*)\s*(tỷ|ty|triệu|tr|nghìn|nghin|k)?/i;
+    let priceClause = "";
+    const pm = body.match(priceRe);
+    if (pm) {
+        const dir = pm[1].toLowerCase();
+        const val = pm[2];
+        const unit = pm[3] || "";
+        let sign = "=";
+        if (dir.includes("dưới") || dir === "<=" || dir === "<" || dir.includes("khoảng")) sign = "<=";
+        if (dir.includes("trên") || dir === ">=" || dir === ">" || dir.includes("từ")) sign = sign === "<=" ? "<=" : ">=";
+        priceClause = ` price${sign}${val}${unit}`;
+        body = body.replace(priceRe, "").trim();
+    }
+
+    // keyword theo "ở|tại" …, nếu không có thì lấy phần còn lại
+    let keyword = "";
+    const locRe = /(ở|tại)\s+(.+)$/i;
+    const lm = body.match(locRe);
+    if (lm && lm[2]) {
+        keyword = lm[2].trim();
+    } else {
+        keyword = body
+            .replace(/\b(ở|tại|quận|huyện|thành phố|tp\.?)\b/gi, "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+    // dọn keyword rỗng
+    if (keyword) {
+        // remove dấu phẩy/thừa ở cuối
+        keyword = keyword.replace(/[,.;\-–—]+$/, "").trim();
+    }
+
+    const parts = ["/search"];
+    if (type) parts.push(type);
+    if (keyword) parts.push(`keyword=${keyword}`);
+    if (priceClause) parts.push(priceClause.trim());
+    const generated = parts.join(" ");
+    return generated.length > "/search".length ? generated : null;
+}
+
 /* ================== WIDGET ================== */
 export default function AIChatWidget({ user, size = "xs" }) {
     const SZ = SIZES[size] ?? SIZES.xs;
@@ -82,6 +294,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
     const [input, setInput] = useState("");
     const [busy, setBusy] = useState(false);
     const [lastError, setLastError] = useState(null);
+
     const [messages, setMessages] = useState(() => {
         const raw = localStorage.getItem("aiw_msgs");
         if (raw) {
@@ -98,8 +311,11 @@ export default function AIChatWidget({ user, size = "xs" }) {
             },
         ];
     });
+
     const panelRef = useRef(null);
     const toggleRef = useRef(null);
+    const listRef = useRef(null);
+    const inputRef = useRef(null);
 
     // Đóng khi bấm ra ngoài
     useEffect(() => {
@@ -109,7 +325,9 @@ export default function AIChatWidget({ user, size = "xs" }) {
             const inToggle = toggleRef.current?.contains(e.target);
             if (!inPanel && !inToggle) setOpen(false);
         };
-        const onEsc = (e) => { if (e.key === "Escape") setOpen(false); };
+        const onEsc = (e) => {
+            if (e.key === "Escape") setOpen(false);
+        };
 
         document.addEventListener("mousedown", onDown);
         document.addEventListener("touchstart", onDown, { passive: true });
@@ -120,8 +338,6 @@ export default function AIChatWidget({ user, size = "xs" }) {
             document.removeEventListener("keydown", onEsc);
         };
     }, [open]);
-    const listRef = useRef(null);
-    const inputRef = useRef(null);
 
     useEffect(() => localStorage.setItem("aiw_open", open ? "1" : "0"), [open]);
     useEffect(() => localStorage.setItem("aiw_msgs", JSON.stringify(messages)), [messages]);
@@ -144,7 +360,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
     const quickChips = useMemo(
         () => [
             { k: "r1", label: "Thuê Q.7 ≤10tr", text: "/search type=rent area=Q7 price<=10m beds>=2" },
-            { k: "b1", label: "Nhà phố Q.9", text: "/search type=buy area=ThuDuc property=nhàphố budget<=5tỷ" },
+            { k: "b1", label: "Nhà phố Q.9", text: "/search type=buy area=ThuDuc price<=5ty areasize>=60m2" },
             { k: "m1", label: "Vay 2 tỷ", text: "/mortgage price=2tỷ down=20% rate=9.5% term=20y" },
             { k: "e1", label: "Ước tính theo m²", text: "/estimate area=75m2 district=Q1 bedrooms=2 legal=Sổ hồng" },
         ],
@@ -152,14 +368,21 @@ export default function AIChatWidget({ user, size = "xs" }) {
     );
 
     async function handleSend(text) {
-        const content = (text ?? input).trim();
-        if (!content) return;
+        const original = (text ?? input).trim();
+        if (!original) return;
         setInput("");
 
-        const userMsg = { id: uid(), role: "user", content, ts: Date.now() };
+        // Push message người dùng
+        const userMsg = { id: uid(), role: "user", content: original, ts: Date.now() };
         setMessages((p) => [...p, userMsg]);
         setLastError(null);
 
+        // Tự động hiểu ngôn ngữ tự nhiên → /search
+        let content = original;
+        const auto = tryAutoConvertToSearch(original);
+        if (auto) content = auto;
+
+        // /help
         if (/^\/help/i.test(content)) {
             setMessages((p) => [
                 ...p,
@@ -174,6 +397,69 @@ export default function AIChatWidget({ user, size = "xs" }) {
             return;
         }
 
+        // /search -> gọi API và render cards
+        if (/^\/search\s+/i.test(content)) {
+            const parsed = parseSearchDSL(content);
+            if (!parsed) {
+                setMessages((p) => [
+                    ...p,
+                    { id: uid(), role: "assistant", ts: Date.now(), content: "Cú pháp chưa đúng. Thử `/help` nhé." },
+                ]);
+                return;
+            }
+
+            // hiển thị "đang tìm"
+            const pendingId = uid();
+            setMessages((p) => [
+                ...p,
+                { id: pendingId, role: "assistant", ts: Date.now(), content: "Đang tìm tin phù hợp…" },
+            ]);
+
+            try {
+                setBusy(true);
+                const { items, total, page, pages } = await searchPropertiesAPI(parsed);
+                setBusy(false);
+                const shown = Math.min(8, items.length); // số card render
+                const summary = buildSearchSummary({
+                    total,
+                    page,
+                    pages,
+                    shownCount: shown,
+                    params: parsed, // optional: có thể dùng nếu muốn chèn mô tả tiêu chí
+                });
+                // thay message pending bằng kết quả cards
+                setMessages((p) => {
+                    const next = p.slice();
+                    const idx = next.findIndex((m) => m.id === pendingId);
+                    if (idx !== -1) next.splice(idx, 1);
+                    return [
+                        ...next,
+                        {
+                            id: uid(),
+                            role: "assistant",
+                            ts: Date.now(),
+                            content: summary, // <<< dùng câu tự nhiên
+                        },
+                        {
+                            id: uid(),
+                            role: "assistant",
+                            ts: Date.now(),
+                            kind: "cards",
+                            cards: items.slice(0, shown),
+                        },
+                    ];
+                });
+            } catch (err) {
+                setBusy(false);
+                setMessages((p) => [
+                    ...p,
+                    { id: uid(), role: "assistant", ts: Date.now(), content: "⚠️ Lỗi khi tìm kiếm tin." },
+                ]);
+            }
+            return;
+        }
+
+        // fallback: gọi AI như cũ (đã sanitize)
         setBusy(true);
         const lastN = (messages || []).concat(userMsg).slice(-12);
         const reply = await callAI(lastN);
@@ -185,7 +471,9 @@ export default function AIChatWidget({ user, size = "xs" }) {
 
     function clearChat() {
         if (!confirm("Xóa hội thoại hiện tại?")) return;
-        setMessages([{ id: uid(), role: "assistant", ts: Date.now(), content: `Đã tạo hội thoại mới cho ${PROJECT_NAME}.` }]);
+        setMessages([
+            { id: uid(), role: "assistant", ts: Date.now(), content: `Đã tạo hội thoại mới cho ${PROJECT_NAME}.` },
+        ]);
         setLastError(null);
     }
 
@@ -221,12 +509,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
                     open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
                 )}
             >
-                <div
-                    className={cn(
-                        "overflow-hidden rounded-2xl backdrop-blur-xl",
-                        "bg-white/90 ring-1 ring-black/10 shadow-2xl flex flex-col"
-                    )}
-                >
+                <div className={cn("overflow-hidden rounded-2xl backdrop-blur-xl", "bg-white/90 ring-1 ring-black/10 shadow-2xl flex flex-col")}>
                     {/* Header */}
                     <div className="relative px-3 py-2 text-white">
                         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600" />
@@ -239,9 +522,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
                             <span
                                 className={cn(
                                     "inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border",
-                                    busy
-                                        ? "bg-yellow-50/90 text-yellow-900 border-yellow-200"
-                                        : "bg-emerald-50/90 text-emerald-900 border-emerald-200"
+                                    busy ? "bg-yellow-50/90 text-yellow-900 border-yellow-200" : "bg-emerald-50/90 text-emerald-900 border-emerald-200"
                                 )}
                             >
                                 {busy ? "Đang trả lời" : lastError ? "Lỗi" : "Sẵn sàng"}
@@ -255,13 +536,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
                     </div>
 
                     {/* Messages */}
-                    <div
-                        ref={listRef}
-                        className={cn(
-                            `${SZ.msgH} overflow-y-auto px-3 py-3`,
-                            "bg-gradient-to-b from-zinc-50 via-white to-white"
-                        )}
-                    >
+                    <div ref={listRef} className={cn(`${SZ.msgH} overflow-y-auto px-3 py-3`, "bg-gradient-to-b from-zinc-50 via-white to-white")}>
                         {messages.map((m, i) => (
                             <Bubble key={m.id} msg={m} prev={messages[i - 1]} />
                         ))}
@@ -321,7 +596,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
                                 rows={1}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Nhập câu hỏi hoặc /help…"
+                                placeholder="Nhập câu hỏi tự nhiên (VD: 'Tìm căn hộ ở The Sun Avenue dưới 10 tỷ') hoặc /help…"
                                 className="w-full resize-none rounded-2xl border border-black/10 px-3 py-2 text-[13px] leading-5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter" && !e.shiftKey) {
@@ -339,9 +614,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
                             disabled={!input.trim() || busy}
                             className={cn(
                                 "shrink-0 rounded-2xl px-3 py-2 text-[13px] font-medium shadow-md transition",
-                                busy || !input.trim()
-                                    ? "bg-zinc-200 text-zinc-400"
-                                    : "bg-indigo-600 text-white hover:brightness-110"
+                                busy || !input.trim() ? "bg-zinc-200 text-zinc-400" : "bg-indigo-600 text-white hover:brightness-110"
                             )}
                             title="Gửi"
                         >
@@ -367,54 +640,51 @@ export default function AIChatWidget({ user, size = "xs" }) {
 }
 
 /* ============= Subcomponents ============= */
-/** Bubble căn thẳng hàng (avatar + tin + thời gian), bo góc nối khi cùng người gửi */
 function Bubble({ msg, prev }) {
     const isUser = msg.role === "user";
     const sameAsPrev = prev && prev.role === msg.role;
 
+    const contentView =
+        msg.kind === "cards" ? (
+            <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1">
+                {Array.isArray(msg.cards) && msg.cards.length ? (
+                    msg.cards.map((it) => <PropertyMiniCard key={it.id} item={it} />)
+                ) : (
+                    <div className="text-[12px] text-zinc-500">Không có kết quả.</div>
+                )}
+            </div>
+        ) : (
+            <div
+                className={
+                    isUser
+                        ? "px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap shadow-sm bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-2xl rounded-br-sm"
+                        : "px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap shadow-sm bg-white text-zinc-900 border border-black/5 rounded-2xl rounded-bl-sm"
+                }
+                style={{
+                    borderTopLeftRadius: !isUser && sameAsPrev ? "8px" : "16px",
+                    borderTopRightRadius: isUser && sameAsPrev ? "8px" : "16px",
+                }}
+            >
+                {msg.content}
+            </div>
+        );
+
     return (
-        <div className={cn("mb-2 flex", isUser ? "justify-end" : "justify-start")}>
-            {/* Avatar (ẩn khi cùng người gửi liên tiếp) */}
+        <div className={`mb-2 flex ${isUser ? "justify-end" : "justify-start"}`}>
             {!isUser && (
-                <div className={cn("mr-2 transition-all", sameAsPrev ? "opacity-0 w-6" : "opacity-100 w-6")}>
-                    <div className="h-6 w-6 rounded-full bg-indigo-600 text-white grid place-items-center text-[11px] shadow-inner">
-                        🏠
-                    </div>
+                <div className={`mr-2 transition-all ${sameAsPrev ? "opacity-0 w-6" : "opacity-100 w-6"}`}>
+                    <div className="h-6 w-6 rounded-full bg-indigo-600 text-white grid place-items-center text-[11px] shadow-inner">🏠</div>
                 </div>
             )}
 
-            <div className={cn("max-w-[84%] flex flex-col items-start", isUser && "items-end")}>
-                <div
-                    className={cn(
-                        "px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap shadow-sm",
-                        isUser
-                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-2xl rounded-br-sm"
-                            : "bg-white text-zinc-900 border border-black/5 rounded-2xl rounded-bl-sm"
-                    )}
-                    style={{
-                        borderTopLeftRadius: !isUser && sameAsPrev ? "8px" : "16px",
-                        borderTopRightRadius: isUser && sameAsPrev ? "8px" : "16px",
-                    }}
-                >
-                    {msg.content}
-                </div>
-                {/* Thời gian nằm dưới, canh theo bubble */}
-                <div
-                    className={cn(
-                        "mt-1 text-[10px] text-zinc-400",
-                        isUser ? "text-right pr-1" : "text-left pl-1"
-                    )}
-                >
-                    {timeAgoVi(msg.ts)}
-                </div>
+            <div className={`max-w-[84%] flex flex-col items-start ${isUser ? "items-end" : ""}`}>
+                {contentView}
+                <div className={`mt-1 text-[10px] text-zinc-400 ${isUser ? "text-right pr-1" : "text-left pl-1"}`}>{timeAgoVi(msg.ts)}</div>
             </div>
 
-            {/* Avatar bên phải cho user (ẩn khi cùng người gửi) */}
             {isUser && (
-                <div className={cn("ml-2 transition-all", sameAsPrev ? "opacity-0 w-6" : "opacity-100 w-6")}>
-                    <div className="h-6 w-6 rounded-full bg-fuchsia-600 text-white grid place-items-center text-[11px] shadow-inner">
-                        🙋
-                    </div>
+                <div className={`ml-2 transition-all ${sameAsPrev ? "opacity-0 w-6" : "opacity-100 w-6"}`}>
+                    <div className="h-6 w-6 rounded-full bg-fuchsia-600 text-white grid place-items-center text-[11px] shadow-inner">🙋</div>
                 </div>
             )}
         </div>
