@@ -88,28 +88,30 @@ public class PropertyServiceImpl implements IPropertyService {
 
     @Override
     public Page<PropertyCardDTO> searchProperties(Map<String, String> params) {
-        // --- 1. XỬ LÝ PHÂN TRANG VÀ SẮP XẾP ---
         Pageable pageable = createPageableFromParams(params);
 
-        // --- 2. LẤY CÁC GIÁ TRỊ LỌC TỪ PARAMS ---
-        String keyword = params.get("keyword");
+        // 2) Lấy filter
+        String keyword      = params.get("keyword");
         String propertyType = params.get("type");
         String categorySlug = params.get("category");
-        Double priceFrom = params.get("priceFrom") != null ? Double.parseDouble(params.get("priceFrom")) : null;
-        Double priceTo = params.get("priceTo") != null ? Double.parseDouble(params.get("priceTo")) : null;
-        Float areaFrom = params.get("areaFrom") != null ? Float.parseFloat(params.get("areaFrom")) : null;
-        Float areaTo = params.get("areaTo") != null ? Float.parseFloat(params.get("areaTo")) : null;
-        // Thêm các tham số khác nếu cần...
+        Double priceFrom    = params.get("priceFrom") != null ? Double.parseDouble(params.get("priceFrom")) : null;
+        Double priceTo      = params.get("priceTo")   != null ? Double.parseDouble(params.get("priceTo"))   : null;
+        Float areaFrom      = params.get("areaFrom")  != null ? Float.parseFloat(params.get("areaFrom"))    : null;
+        Float areaTo        = params.get("areaTo")    != null ? Float.parseFloat(params.get("areaTo"))      : null;
 
-        // --- 3. KẾT HỢP CÁC SPECIFICATION ---
-        Specification<PropertyEntity> spec = PropertySpecification.hasKeyword(keyword)
-                .and(PropertySpecification.hasPropertyType(propertyType))
-                .and(PropertySpecification.hasCategorySlug(categorySlug))
-                .and(PropertySpecification.priceBetween(priceFrom, priceTo))
-                .and(PropertySpecification.areaBetween(areaFrom, areaTo));
-        // .and(...) thêm các điều kiện khác
+        // 2b) Quyết định ALL/ANY cho keyword
+        // UI Metro Modal nên gửi kwMode=any khi chọn nhiều ga
+        boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
 
-        // --- 4. GỌI REPOSITORY VÀ MAP KẾT QUẢ ---
+        // 3) Kết hợp Spec
+        Specification<PropertyEntity> spec =
+                PropertySpecification.hasKeyword(keyword, matchAll)
+                        .and(PropertySpecification.hasPropertyType(propertyType))
+                        .and(PropertySpecification.hasCategorySlug(categorySlug))
+                        .and(PropertySpecification.priceBetween(priceFrom, priceTo))
+                        .and(PropertySpecification.areaBetween(areaFrom, areaTo));
+
+        // 4) Query & map
         Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
         return resultPage.map(propertyMapper::toPropertyCardDTO);
     }
