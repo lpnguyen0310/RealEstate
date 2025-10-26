@@ -1,6 +1,8 @@
-import React, { useMemo, useRef, useState } from "react";
+// src/pages/admin/AdminDashboard.jsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
+import { kpiApi } from "@/api/adminApi/kpiApi";
 
 import {
     StatCard,
@@ -8,20 +10,79 @@ import {
     RecentTransactionsCard,
 } from "@/components/admidashboard/layoutadmin";
 
+const nfmt = (n) => new Intl.NumberFormat("vi-VN").format(n);
+
 export default function AdminDashboard() {
     const [range, setRange] = useState("last_30d");
     const [postSearch, setPostSearch] = useState("");
     const [orderSearch, setOrderSearch] = useState("");
     const chartRef = useRef(null);
 
-    const kpis = {
-        newUsers: {
+    // ----- KPI New Users state -----
+    const [newUsers, setNewUsers] = useState({
+        total: 0,
+        compareToPrev: 0, // 0.153 = +15.3%
+        series: [],       // [{date,count}]
+        loading: false,
+        error: null,
+    });
+
+    // Fetch KPI mỗi khi đổi range
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                if (mounted) setNewUsers((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getNewUsers(range); // gửi đúng case đang chọn
+                if (!mounted) return;
+
+                setNewUsers({
+                    total: data?.summary?.total ?? 0,
+                    compareToPrev: data?.summary?.compareToPrev ?? 0,
+                    series: Array.isArray(data?.series) ? data.series : [],
+                    loading: false,
+                    error: null,
+                });
+            } catch (e) {
+                if (!mounted) return;
+                setNewUsers((s) => ({
+                    ...s,
+                    loading: false,
+                    error: e?.response?.data?.message || e?.message || "Không tải được KPI",
+                }));
+            }
+        })();
+        return () => { mounted = false; };
+    }, [range]);
+
+    // Build props cho StatCard “Người dùng mới”
+    const newUsersCard = useMemo(() => {
+        const total = newUsers.total ?? 0;
+        const pct = Number(newUsers.compareToPrev ?? 0);
+        const trend = pct < 0 ? "down" : "up";
+        const pctText =
+            pct === 0 && total === 0
+                ? "—"
+                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
+        const spark = (newUsers.series || []).map((p) => p.count);
+
+        const hint = newUsers.error
+            ? `Lỗi: ${newUsers.error}`
+            : newUsers.loading
+                ? "Đang tải…"
+                : pctText;
+
+        return {
             title: "Người dùng mới",
-            value: "1,250",
-            hint: "+15.3% so với tháng trước",
-            trend: "up",
-            spark: [15, 20, 25, 24, 28, 30, 34, 38, 40],
-        },
+            value: newUsers.loading ? "…" : nfmt(total),
+            hint,
+            trend,
+            spark: spark.length ? spark : [1, 2, 1, 3, 2, 4, 5],
+        };
+    }, [newUsers]);
+
+    // === Các KPI demo khác (giữ nguyên) ===
+    const kpis = {
         revenue: {
             title: "Doanh thu",
             value: "150.000.000đ",
@@ -100,7 +161,6 @@ export default function AdminDashboard() {
         { type: "report", text: "Tin đăng 'Cho thuê chung cư...' đã nhận được <strong>3 báo cáo</strong>.", time: "1 ngày trước" },
     ];
 
-    // Filter FE-only
     const filteredPosts = pendingPosts.filter(
         (p) =>
             p.title.toLowerCase().includes(postSearch.toLowerCase()) ||
@@ -114,10 +174,26 @@ export default function AdminDashboard() {
 
     return (
         <div className="bg-[#f5f7fb] min-h-screen">
+
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6 px-1">
+                <select
+                    value={range}
+                    onChange={(e) => setRange(e.target.value)}
+                    className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700
+             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ring-inset transition"
+                >
+                    <option value="today">Hôm nay</option>
+                    <option value="last_7d">7 ngày qua</option>
+                    <option value="last_30d">30 ngày qua</option>
+                    <option value="this_month">Tháng này</option>
+                </select>
+
+            </div>
+
             {/* KPI Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCard
-                    {...kpis.newUsers}
+                    {...newUsersCard}
                     iconBg="bg-blue-100 text-blue-600"
                     lineColor="#3b82f6"
                     gradientFrom="from-blue-50"
@@ -175,12 +251,10 @@ export default function AdminDashboard() {
 
             {/* Layout chính */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Thông báo mới */}
                 <div className="lg:col-span-2">
                     <NotificationsCard items={notifications} />
                 </div>
 
-                {/* Giao dịch gần đây */}
                 <div className="lg:col-span-2">
                     <RecentTransactionsCard
                         items={
@@ -200,17 +274,7 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
                     <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
                         <h3 className="text-lg font-semibold text-gray-800">Phân tích doanh thu</h3>
-                        <select
-                            value={range}
-                            onChange={(e) => setRange(e.target.value)}
-                            className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="today">Hôm nay</option>
-                            <option value="last_7d">7 ngày qua</option>
-                            <option value="last_30d">30 ngày qua</option>
-                            <option value="this_month">Tháng này</option>
-                            <option value="last_month">Tháng trước</option>
-                        </select>
+                        {/* ĐÃ bỏ select tại đây để dùng select chung phía trên */}
                     </div>
                     <p className="text-sm text-gray-500 mb-4">Dữ liệu trong 12 tháng gần nhất</p>
                     <div className="h-80 w-full">
@@ -315,10 +379,10 @@ export default function AdminDashboard() {
                                             <td className="py-3 px-4">
                                                 <span
                                                     className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${o.badge === "green"
-                                                            ? "bg-green-50 text-green-700 ring-green-100"
-                                                            : o.badge === "yellow"
-                                                                ? "bg-amber-50 text-amber-700 ring-amber-100"
-                                                                : "bg-gray-50 text-gray-700 ring-gray-100"
+                                                        ? "bg-green-50 text-green-700 ring-green-100"
+                                                        : o.badge === "yellow"
+                                                            ? "bg-amber-50 text-amber-700 ring-amber-100"
+                                                            : "bg-gray-50 text-gray-700 ring-gray-100"
                                                         }`}
                                                 >
                                                     {o.status}

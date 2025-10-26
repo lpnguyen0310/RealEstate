@@ -5,13 +5,16 @@ import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
 import com.backend.be_realestate.modals.response.AdminUserResponse;
 import com.backend.be_realestate.modals.response.PropertyShortResponse;
+import com.backend.be_realestate.modals.response.admin.NewUsersKpiResponse;
 import com.backend.be_realestate.service.AdminPropertyService;
 import com.backend.be_realestate.service.IAdminUserService;
 import com.backend.be_realestate.service.OrderService;
+import com.backend.be_realestate.service.UserService;
 import com.backend.be_realestate.utils.SecurityUtils;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +29,7 @@ public class AdminController {
     private final AdminPropertyService adminPropertyService;
     private final SecurityUtils securityUtils;
     private final IAdminUserService adminUserService;
-
+    private final UserService userService;
     // Endpoint này chỉ bạn hoặc admin mới biết để dùng cho việc test
     @PostMapping("/orders/{id}/process-payment")
     public String triggerProcessPaidOrder(@PathVariable Long id) {
@@ -137,5 +140,6 @@ public class AdminController {
         adminUserService.rejectLock(id);
     }
 
-    
+
+
 }

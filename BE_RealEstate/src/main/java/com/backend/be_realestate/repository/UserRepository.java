@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,4 +40,25 @@ import java.util.Optional;
                                      @Param("role") String role,
                                      @Param("status") String status,
                                      Pageable pageable);
+
+
+
+        @Query(value = """
+        SELECT COUNT(*)
+        FROM users u
+        WHERE u.created_at >= :startUtc AND u.created_at < :endUtc
+        """, nativeQuery = true)
+        long countNewUsersBetween(@Param("startUtc") Instant startUtc,
+                                  @Param("endUtc") Instant endUtc);
+
+        @Query(value = """
+        SELECT DATE(CONVERT_TZ(u.created_at, '+00:00', :tz)) AS d, COUNT(*) AS c
+        FROM users u
+        WHERE u.created_at >= :startUtc AND u.created_at < :endUtc
+        GROUP BY d
+        ORDER BY d
+        """, nativeQuery = true)
+        List<Object[]> dailyNewUsersSeries(@Param("startUtc") Instant startUtc,
+                                           @Param("endUtc") Instant endUtc,
+                                           @Param("tz") String tz);
     }
