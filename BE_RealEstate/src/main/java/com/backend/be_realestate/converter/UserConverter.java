@@ -2,6 +2,7 @@ package com.backend.be_realestate.converter;
 
 import com.backend.be_realestate.entity.UserEntity;
 import com.backend.be_realestate.modals.dto.UserDTO;
+import com.backend.be_realestate.modals.dto.UserFavoriteDTO;
 import com.backend.be_realestate.modals.response.AdminUserResponse;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
@@ -64,4 +65,24 @@ public class UserConverter {
         return modelMapper.map(dto, UserEntity.class);
     }
 
+    public UserFavoriteDTO toFavoriteDto(UserEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        // Tạo fullName tương tự như convertToAdminResponse
+        String fullName = ((Objects.toString(entity.getLastName(),"") + " " +
+                Objects.toString(entity.getFirstName(),"")).trim());
+        if (fullName.isEmpty()) {
+            fullName = "(Chưa đặt tên)";
+        }
+
+        return UserFavoriteDTO.builder()
+                .id(entity.getUserId())
+                .fullName(fullName)
+                .email(entity.getEmail())
+                .phone(entity.getPhone())
+                // .avatarUrl(entity.getAvatarUrl()) // <-- Thêm dòng này nếu bạn có avatar
+                .build();
+    }
 }

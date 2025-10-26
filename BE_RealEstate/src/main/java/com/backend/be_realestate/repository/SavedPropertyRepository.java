@@ -13,4 +13,6 @@ public interface SavedPropertyRepository extends JpaRepository<SavedPropertyEnti
 
     @Query("select sp.property.id from SavedPropertyEntity sp where sp.user.userId = :uid order by sp.createdAt desc")
     List<Long> findPropertyIdsByUser(@Param("uid") Long userId);
+
+    List<SavedPropertyEntity> findByProperty_Id(Long propertyId);
 }

@@ -7,6 +7,7 @@ import com.backend.be_realestate.enums.PropertyType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -94,6 +95,9 @@ import java.util.List;
 
         @Column(name = "view_count")
         private Long viewCount = 0L;
+
+        @Formula("(SELECT COALESCE(COUNT(*), 0) FROM saved_properties sp WHERE sp.property_id = id)")
+        private Long favoriteCount;
 
         @Column(name = "landarea")
         private Double landArea; // Diện tích đất

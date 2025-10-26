@@ -3,6 +3,7 @@ package com.backend.be_realestate.service;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO; // Import DTO chi tiết
+import com.backend.be_realestate.modals.dto.UserFavoriteDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import org.springframework.data.domain.Page;
@@ -33,4 +34,6 @@ public interface IPropertyService {
     Page<PropertyDTO> getPropertiesByUser(Long userId, String status, Pageable pageable);
 
     Map<String, Long> getPropertyCountsByStatus(Long userId);
+
+    List<UserFavoriteDTO> getUsersWhoFavorited(Long propertyId, Long currentUserId);
 }

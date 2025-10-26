@@ -59,6 +59,7 @@ public class PropertyConverter {
         // thêm bảo hiểm null để rõ ràng)
         dto.setPostedAt(entity.getPostedAt() == null ? null : entity.getPostedAt());
         dto.setExpiresAt(entity.getExpiresAt() == null ? null : entity.getExpiresAt());
+        dto.setFavoriteCount(entity.getFavoriteCount());
 
         // listingType trong DTO là String: chắc chắn hoá theo enum của entity
         if (entity.getListingType() != null) {

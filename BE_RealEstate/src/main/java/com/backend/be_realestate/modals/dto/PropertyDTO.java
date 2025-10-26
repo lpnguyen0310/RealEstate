@@ -58,4 +58,5 @@ public class PropertyDTO {
     private String authorEmail;
     private Long durationDays;
     private Long viewCount;
+    private Long favoriteCount;
 }
