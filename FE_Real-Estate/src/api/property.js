@@ -9,3 +9,12 @@ export async function createProperty(payload) {
     const { data } = await api.post("/properties", payload);
     return data;
 }
+
+
+export async function getRecommendations({ userId, limit = 8 }) {
+    // BE: GET /api/properties/recommendations?userId=&limit=
+    const { data } = await api.get("/properties/recommendations", {
+        params: { userId, limit },
+    });
+    return data; // List<PropertyCardDTO>
+}

@@ -5,11 +5,34 @@ import { uploadMany } from "@/api/cloudinary";
 
 /* ===================== THUNKS ===================== */
 
-// Lấy danh sách public (trang chủ / tìm kiếm)
+// Lấy danh sách public (trang chủ / tìm kiếm) + For You
 export const fetchPropertiesThunk = createAsyncThunk(
     "property/fetchAll",
-    async (params = {}, { rejectWithValue }) => {
+    async (params = {}, thunkApi) => {
+        const { rejectWithValue, getState } = thunkApi;
         try {
+            // === Route: For You (recommendations) ===
+            if (params?.type === "forYou") {
+                const state = getState();
+                const userId = state?.auth?.user?.id || state?.auth?.user?.userId || params?.userId;
+                const limit = params?.limit ?? params?.size ?? 8;
+                // if (!userId) {
+                //     // chưa đăng nhập → lấy danh sách phổ biến (hoặc trống)
+                //     const res = await api.get("/properties/popular", { params: { limit } }); // nếu đã có endpoint
+                //     const arr = res?.data?.data ?? res?.data ?? [];
+                //     return { content: Array.isArray(arr) ? arr : [], _source: "popular", _forYou: true };
+                // }
+                if (!userId) return { content: [], _source: "popular", _forYou: true };
+                const res = await api.get("/properties/recommendations", {
+                    params: { userId, limit },
+                });
+
+                const arr = res?.data?.data ?? res?.data ?? [];
+                const source = res?.headers?.["x-reco-source"] || null; // optional nếu BE có set
+                return { content: Array.isArray(arr) ? arr : [], _source: source, _forYou: true };
+            }
+
+            // === Mặc định: list public / search ===
             const res = await api.get("/properties", { params });
             return res?.data?.data ?? res?.data;
         } catch (e) {
@@ -108,13 +131,13 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
     }
 );
 
-// +++ THUNK MỚI: LẤY SỐ ĐẾM +++
+// Lấy số đếm dashboard
 export const fetchMyPropertyCountsThunk = createAsyncThunk(
     "property/fetchMyCounts",
     async (_, { rejectWithValue }) => {
         try {
             const res = await api.get("/properties/my-counts");
-            return res.data; // API trả về Map<String, Long> { active: 1, pending: 9, ... }
+            return res.data;
         } catch {
             return rejectWithValue("Không thể tải số đếm tin đăng");
         }
@@ -145,7 +168,6 @@ function parseToDate(x) {
     }
 }
 
-// Quy ước: "Sắp hết hạn" nếu còn ≤ 3 ngày
 const EXP_SOON_DAYS = 3;
 function isExpiringSoon(post) {
     const now = Date.now();
@@ -161,7 +183,6 @@ function isExpiringSoon(post) {
 
 /* ===================== MAPPERS ===================== */
 
-// Map DTO (BE -> UI Card) cho MY LIST (dashboard)
 function toStatusTag(status) {
     const s = (status ?? "").toString().trim().toUpperCase();
     switch (s) {
@@ -219,8 +240,7 @@ function mapDtoToPostCard(p) {
         createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
         views: p?.views ?? 0,
 
-        // raw fields cho thống kê
-        listingType: p?.listingType,           // "PREMIUM" | "VIP" | "NORMAL" | ...
+        listingType: p?.listingType,
         postedAt: p?.postedAt ?? null,
         expiresAt: p?.expiresAt ?? null,
         durationDays: p?.durationDays ?? null,
@@ -228,7 +248,7 @@ function mapDtoToPostCard(p) {
     };
 }
 
-// Map cho PUBLIC LIST (trang public)
+// Map cho PUBLIC LIST / RECOMMEND payload
 function mapPublicPropertyToCard(p) {
     if (!p) return {};
     return {
@@ -243,7 +263,7 @@ function mapPublicPropertyToCard(p) {
         postedAt: p.postedAt,
         photos: p.photos,
 
-        addressMain: p.addressFull || p.addressShort || "",
+        addressMain: p.addressFull || p.addressShort || p.displayAddress || "",
         addressShort: p.addressShort || "",
         addressFull: p.addressFull || "",
 
@@ -255,7 +275,8 @@ function mapPublicPropertyToCard(p) {
         type: p.type,
         category: p.category,
 
-        listingType: p.listing_type, // chú ý tên field public
+        // BE /recommendations có thể trả listingType (camelCase)
+        listingType: p.listing_type || p.listingType,
     };
 }
 
@@ -268,6 +289,12 @@ const initialState = {
     size: 20,
     totalElements: 0,
     totalPages: 0,
+
+    // For You (recommend)
+    forYouList: [],
+    forYouLoading: false,
+    forYouError: null,
+    forYouSource: null, // 'personalized' | 'popular' | null
 
     // My dashboard list
     myList: [],
@@ -284,7 +311,7 @@ const initialState = {
     loadingDetail: false,
     errorDetail: null,
 
-    counts: {            // <<— chỉ còn 1 lần
+    counts: {
         active: 0,
         pending: 0,
         draft: 0,
@@ -319,6 +346,13 @@ const propertySlice = createSlice({
             state.createError = null;
             state.creating = false;
 
+            // Clear For You
+            state.forYouList = [];
+            state.forYouLoading = false;
+            state.forYouError = null;
+            state.forYouSource = null;
+
+            // Clear my list
             state.myList = [];
             state.myPage = 0;
             state.mySize = 20;
@@ -332,7 +366,7 @@ const propertySlice = createSlice({
     },
     extraReducers: (b) => {
         b
-            // ===== tạo tin =====
+            // ===== CREATE =====
             .addCase(createPropertyThunk.pending, (s) => {
                 s.creating = true;
                 s.createError = null;
@@ -362,34 +396,54 @@ const propertySlice = createSlice({
                 s.error = a.payload || "Không thể tải danh sách tin đăng của tôi";
             })
 
-            // ===== PUBLIC LIST =====
-            .addCase(fetchPropertiesThunk.pending, (s) => {
+            // ===== PUBLIC LIST + FOR YOU (branch theo meta.arg.type) =====
+            .addCase(fetchPropertiesThunk.pending, (s, a) => {
+                if (a.meta?.arg?.type === "forYou") {
+                    s.forYouLoading = true;
+                    s.forYouError = null;
+                    return;
+                }
                 s.loading = true;
                 s.error = null;
             })
             .addCase(fetchPropertiesThunk.fulfilled, (s, a) => {
                 const pageData = a.payload || {};
-                const propertiesArray = pageData.content || [];
+                const arr = pageData.content || [];
+                const mapped = Array.isArray(arr) ? arr.map(mapPublicPropertyToCard) : [];
+
+                // sort theo loại tin (tuỳ chọn)
                 const sortOrder = { PREMIUM: 1, VIP: 2, NORMAL: 3 };
                 const DEFAULT_SORT_VALUE = 99;
+                const sorted = mapped.sort((A, B) => {
+                    const aT = (A.listingType || "").toUpperCase();
+                    const bT = (B.listingType || "").toUpperCase();
+                    const va = sortOrder[aT] || DEFAULT_SORT_VALUE;
+                    const vb = sortOrder[bT] || DEFAULT_SORT_VALUE;
+                    return va - vb;
+                });
 
-                const mappedAndSortedList = (Array.isArray(propertiesArray) ? propertiesArray.map(mapPublicPropertyToCard) : [])
-                    .sort((itemA, itemB) => {
-                        const valueA = sortOrder[itemA.listingType?.toUpperCase()] || DEFAULT_SORT_VALUE;
-                        const valueB = sortOrder[itemB.listingType?.toUpperCase()] || DEFAULT_SORT_VALUE;
-                        return valueA - valueB;
-                    });
+                if (a.meta?.arg?.type === "forYou" || pageData._forYou) {
+                    s.forYouList = sorted;
+                    s.forYouLoading = false;
+                    if (pageData._source) s.forYouSource = pageData._source; // personalized | popular
+                    return;
+                }
 
-                s.list = mappedAndSortedList;
+                // Public list
+                s.list = sorted;
                 s.page = pageData.number ?? 0;
                 s.size = pageData.size ?? 20;
                 s.totalElements = pageData.totalElements ?? 0;
                 s.totalPages = pageData.totalPages ?? 0;
-
                 s.loading = false;
                 s.error = null;
             })
             .addCase(fetchPropertiesThunk.rejected, (s, a) => {
+                if (a.meta?.arg?.type === "forYou") {
+                    s.forYouLoading = false;
+                    s.forYouError = a.payload || "Không thể tải gợi ý";
+                    return;
+                }
                 s.loading = false;
                 s.error = a.payload || "Không thể tải danh sách tin đăng";
             })
@@ -428,13 +482,10 @@ const propertySlice = createSlice({
 
 const selectPropertyState = (s) => s.property;
 
-// Dùng cho Dashboard (my list)
-export const selectMyPosts = createSelector(
-    selectPropertyState,
-    (st) => st.myList || []
-);
+// Dashboard (my list)
+export const selectMyPosts = createSelector(selectPropertyState, (st) => st.myList || []);
 
-// Tính thống kê cho PostsReportCard
+// Báo cáo nhanh cho dashboard
 export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
     let active = 0, pending = 0, expiring = 0;
     let autoTotal = 0, premium = 0, vip = 0, normal = 0;

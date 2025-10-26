@@ -33,4 +33,6 @@ public interface IPropertyService {
     Page<PropertyDTO> getPropertiesByUser(Long userId, String status, Pageable pageable);
 
     Map<String, Long> getPropertyCountsByStatus(Long userId);
+
+    List<PropertyCardDTO> getRecommendations(Long userId, int limit);
 }

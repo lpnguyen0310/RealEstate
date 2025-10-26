@@ -136,9 +136,6 @@ function parseSearchDSL(text) {
         } else if (key === "beds" || key === "bedrooms") {
             const n = Number(val.replace(/[^\d]/g, ""));
             if (Number.isFinite(n)) {
-                // Nếu BE có spec bedroomsBetween, có thể thêm:
-                // params.bedroomsFrom = (op === ">=" || op === "=" || op === ":") ? n : undefined;
-                // params.bedroomsTo = (op === "<=") ? n : undefined;
                 params.keyword = (params.keyword ? params.keyword + " " : "") + `${n} phòng ngủ`;
             }
         } else if (key === "areasize" || key === "size" || key === "area") {
@@ -204,7 +201,8 @@ async function searchPropertiesAPI(params) {
         pages: page?.totalPages ?? 1,
     };
 }
-function buildSearchSummary({ total, page, pages, shownCount, params }) {
+
+function buildSearchSummary({ total, page, pages, shownCount /*, params*/ }) {
     const pn = (n) => new Intl.NumberFormat("vi-VN").format(n);
     const pageText = pages > 1 ? ` (trang ${page + 1}/${pages})` : "";
 
@@ -214,14 +212,10 @@ function buildSearchSummary({ total, page, pages, shownCount, params }) {
     if (total === 1) {
         return "Mình tìm được 1 tin đúng yêu cầu, bạn xem ngay bên dưới nhé.";
     }
-    // tổng > 1
     const head = `Mình tìm được ${pn(total)} tin phù hợp${pageText}.`;
-    const tail = shownCount && shownCount < total
-        ? ` Mình hiển thị ${shownCount} tin đầu tiên trước, cần mình tải thêm không?`
-        : "";
+    const tail = shownCount && shownCount < total ? ` Mình hiển thị ${shownCount} tin đầu tiên trước, cần mình tải thêm không?` : "";
     return head + tail;
 }
-
 
 /* ============== Natural-language → /search auto-convert ============== */
 function tryAutoConvertToSearch(nlText) {
@@ -243,8 +237,7 @@ function tryAutoConvertToSearch(nlText) {
     if (/\bthuê\b/i.test(body)) type = "type=rent";
     if (/\b(mua|bán)\b/i.test(body)) type = "type=buy";
 
-    // price: "dưới 10 tỷ", "trên 12tr", "từ 5tr", ">= 8 triệu", "khoảng 15 triệu"
-    // bắt cụm (dir) (value)(unit)
+    // price: "dưới 10 tỷ", ...
     const priceRe = /(dưới|<=|<|trên|>=|>|từ|khoảng)\s*(\d+[.,]?\d*)\s*(tỷ|ty|triệu|tr|nghìn|nghin|k)?/i;
     let priceClause = "";
     const pm = body.match(priceRe);
@@ -271,11 +264,7 @@ function tryAutoConvertToSearch(nlText) {
             .replace(/\s+/g, " ")
             .trim();
     }
-    // dọn keyword rỗng
-    if (keyword) {
-        // remove dấu phẩy/thừa ở cuối
-        keyword = keyword.replace(/[,.;\-–—]+$/, "").trim();
-    }
+    if (keyword) keyword = keyword.replace(/[,.;\-–—]+$/, "").trim();
 
     const parts = ["/search"];
     if (type) parts.push(type);
@@ -425,7 +414,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
                     page,
                     pages,
                     shownCount: shown,
-                    params: parsed, // optional: có thể dùng nếu muốn chèn mô tả tiêu chí
+                    params: parsed,
                 });
                 // thay message pending bằng kết quả cards
                 setMessages((p) => {
@@ -438,7 +427,7 @@ export default function AIChatWidget({ user, size = "xs" }) {
                             id: uid(),
                             role: "assistant",
                             ts: Date.now(),
-                            content: summary, // <<< dùng câu tự nhiên
+                            content: summary,
                         },
                         {
                             id: uid(),
@@ -646,12 +635,23 @@ function Bubble({ msg, prev }) {
 
     const contentView =
         msg.kind === "cards" ? (
-            <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1">
-                {Array.isArray(msg.cards) && msg.cards.length ? (
-                    msg.cards.map((it) => <PropertyMiniCard key={it.id} item={it} />)
-                ) : (
-                    <div className="text-[12px] text-zinc-500">Không có kết quả.</div>
-                )}
+            // ====== KHUNG SCROLLER NGANG CỐ ĐỊNH (đã fix) ======
+            <div className="w-full max-w-full overflow-hidden">
+                 <div
+                    className="flex gap-[70px] overflow-x-auto overscroll-x-contain snap-x snap-mandatory scrollbar-thin pb-1 -mx-[5px] px-[5px]"
+                    style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}
+                >
+                    {Array.isArray(msg.cards) && msg.cards.length ? (
+                        msg.cards.map((it) => (
+                            // Mỗi card có độ rộng cố định & không co giãn
+                            <div key={it.id} className="shrink-0 snap-start w-[220px]">
+                                <PropertyMiniCard item={it} />
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-[12px] text-zinc-500">Không có kết quả.</div>
+                    )}
+                </div>
             </div>
         ) : (
             <div
@@ -677,7 +677,8 @@ function Bubble({ msg, prev }) {
                 </div>
             )}
 
-            <div className={`max-w-[84%] flex flex-col items-start ${isUser ? "items-end" : ""}`}>
+            {/* THÊM min-w-0 để con không làm nở rộng bubble */}
+            <div className={`max-w-[84%] min-w-0 flex flex-col items-start ${isUser ? "items-end" : ""}`}>
                 {contentView}
                 <div className={`mt-1 text-[10px] text-zinc-400 ${isUser ? "text-right pr-1" : "text-left pl-1"}`}>{timeAgoVi(msg.ts)}</div>
             </div>

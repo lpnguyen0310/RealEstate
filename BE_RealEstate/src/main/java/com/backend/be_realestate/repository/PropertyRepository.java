@@ -41,6 +41,15 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     int bumpView(@Param("id") Long id);
 
     int countByUser_UserId(Long userId);
+
+    @Query("""
+           select p
+           from PropertyEntity p
+           where p.status = com.backend.be_realestate.enums.PropertyStatus.PUBLISHED
+             and p.listingType in (com.backend.be_realestate.enums.ListingType.VIP, com.backend.be_realestate.enums.ListingType.PREMIUM)
+           order by p.postedAt desc
+           """)
+    List<PropertyEntity> findPopular(Pageable pageable);
 }
 
 

@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 import FeatureTools from "../../components/button/FeatureTools";
 import FeaturedList from "../../components/cards/FeaturedList";
+import ForYouList from "../../components/cards/ForYouList";
+
 import FeaturedProjects from "../../components/sections/FeaturedProjects";
 import FirstTimeBuyerGuide from "../../components/sections/FirstTimeBuyerGuide";
 import BannerCta from "../../components/sections/BannerCta";
@@ -86,6 +88,7 @@ export default function Home() {
             <section className="bg-[#f7fafc] pt-12 lg:pt-16 pb-24">
                 <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
                     <FeatureTools />
+                    <ForYouList />
                     <FeaturedList />
 
                     <BannerCta
