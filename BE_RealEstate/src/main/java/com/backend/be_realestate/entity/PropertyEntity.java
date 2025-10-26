@@ -93,7 +93,7 @@ import java.util.List;
 
 
         @Column(name = "view_count")
-        private Long viewCount;
+        private Long viewCount = 0L;
 
         @Column(name = "landarea")
         private Double landArea; // Diện tích đất

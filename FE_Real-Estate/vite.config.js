@@ -27,7 +27,7 @@ export default defineConfig({
     proxy: {
       "/api": { target: "http://localhost:8080", changeOrigin: true },
       "/ws": {           // ✅ thêm luôn proxy cho websocket
-        target: "http://localhost:8080",
+        target: "ws://localhost:8080",
         changeOrigin: true,
         ws: true,
       },

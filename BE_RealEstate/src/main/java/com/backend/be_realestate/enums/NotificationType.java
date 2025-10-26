@@ -9,6 +9,7 @@ public enum NotificationType {
     PACKAGE_EXPIRED,    // Gói sắp hết hạn
 
     LISTING_PENDING_USER,
+    LISTING_FAVORITED,
 
     // Dành cho Admin
     NEW_LISTING_PENDING, // Có tin mới chờ duyệt

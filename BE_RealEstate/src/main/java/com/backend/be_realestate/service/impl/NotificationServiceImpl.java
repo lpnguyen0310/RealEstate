@@ -1,24 +1,30 @@
 package com.backend.be_realestate.service.impl; // Giả sử bạn có package impl
 
+import com.backend.be_realestate.converter.NotificationConverter;
 import com.backend.be_realestate.entity.NotificationEntity;
 import com.backend.be_realestate.entity.UserEntity;
 import com.backend.be_realestate.enums.NotificationType;
+import com.backend.be_realestate.modals.dto.NotificationDTO;
 import com.backend.be_realestate.repository.NotificationRepository; // Import repository
 import com.backend.be_realestate.service.NotificationService; // Import interface
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-@Service // Đánh dấu đây là một Spring Bean
-@RequiredArgsConstructor // Tự động inject các dependency (NotificationRepository)
-@Transactional // Mặc định tất cả phương thức là transactional
+@Service
+@RequiredArgsConstructor
+@Transactional
+@Slf4j
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
-    // Nếu bạn cần WebSocket, bạn cũng inject nó ở đây
-    // private final SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    private final NotificationConverter notificationConverter; // ⭐️ INJECT CONVERTER
 
     @Override
     public void createNotification(UserEntity user, NotificationType type, String message, String link) {
@@ -28,17 +34,41 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setMessage(message);
         notification.setLink(link);
         notification.setRead(false);
+        // Giả sử @PrePersist tự động thêm createdAt
 
         NotificationEntity savedNotification = notificationRepository.save(notification);
 
-        // TODO Nâng cao (WebSocket):
-        // Gửi thông báo real-time tới client
-        // Ví dụ: messagingTemplate.convertAndSendToUser(
-        //     user.getUsername(), // Hoặc user.getId().toString()
-        //     "/queue/notifications", // Kênh riêng của user
-        //     convertToDTO(savedNotification) // Gửi DTO thay vì Entity
-        // );
+        // ⭐️ SỬA ĐỔI QUAN TRỌNG: Chuyển đổi sang DTO trước khi gửi
+        try {
+            String destinationUser = user.getEmail();
+            if (destinationUser == null) {
+                // Nếu user đăng nhập bằng SĐT, dùng SĐT làm destination
+                destinationUser = user.getPhone();
+            }
+
+            if (destinationUser == null) {
+                log.error("Không thể gửi WS notification: User {} không có email hoặc SĐT.", user.getUserId());
+                return;
+            }
+
+            // 1. Chuyển đổi Entity sang DTO
+            NotificationDTO dto = notificationConverter.toDTO(savedNotification);
+
+            String channel = "/queue/notifications";
+
+            // 2. Gửi DTO (đã an toàn) thay vì Entity
+            messagingTemplate.convertAndSendToUser(
+                    destinationUser,
+                    channel,
+                    dto // ⭐️ GỬI DTO
+            );
+            log.info("Đã gửi thông báo WebSocket tới user: {}", destinationUser);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi thông báo WebSocket cho user {}: {}", user.getUserId(), e.getMessage(), e);
+        }
     }
+
 
     @Override
     @Transactional(readOnly = true) // Tối ưu cho các tác vụ chỉ đọc
