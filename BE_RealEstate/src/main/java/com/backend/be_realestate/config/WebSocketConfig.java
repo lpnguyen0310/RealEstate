@@ -26,11 +26,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // ⭐️ SỬA ĐỔI: Thêm CORS configuration
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("http://localhost:5173", "http://127.0.0.1:5173")
-                .withSockJS(); // <--- DÒNG NÀY RẤT QUAN TRỌNG
-    }
+                .setAllowedOriginPatterns("http://localhost:5173", "http://127.0.0.1:5173");}
+
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
