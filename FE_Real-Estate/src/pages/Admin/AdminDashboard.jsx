@@ -2,257 +2,12 @@ import React, { useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 
-/* ========== UTILITIES ========== */
-// Hàm định dạng số (Không thay đổi)
-const fmtNumber = (n) =>
-    new Intl.NumberFormat("vi-VN").format(
-        typeof n === "string" ? Number(n.replace(/[^0-9.-]/g, "")) : n
-    );
+import {
+    StatCard,
+    NotificationsCard,
+    RecentTransactionsCard,
+} from "@/components/admidashboard/layoutadmin";
 
-/* ========== Sparkline (Không thay đổi) ========== */
-function Sparkline({ points = [], color = "#3b82f6" }) {
-    const width = 90;
-    const height = 28;
-    if (points.length === 0) return null;
-    const max = Math.max(...points);
-    const min = Math.min(...points);
-    const norm = points.map((v, i) => {
-        const x = (i / (points.length - 1)) * width;
-        const y = height - ((v - min) / (max - min || 1)) * height;
-        return `${x},${y}`;
-    });
-    return (
-        <svg width={width} height={height}>
-            <polyline
-                points={norm.join(" ")}
-                fill="none"
-                stroke={color}
-                strokeWidth="2"
-                strokeLinecap="round"
-            />
-        </svg>
-    );
-}
-
-/* ========== KPI Card (Không thay đổi) ========== */
-function StatCard({
-    title,
-    value,
-    hint,
-    trend,
-    spark = [],
-    iconBg,
-    icon,
-    trendColor = "text-green-600",
-    lineColor = "#3b82f6",
-    gradientFrom = "from-blue-50",
-    gradientTo = "to-white",
-}) {
-    return (
-        <div
-            className={`relative p-6 rounded-2xl shadow-md border border-[#e5ebf5] flex flex-col justify-between
-      bg-gradient-to-br ${gradientFrom} ${gradientTo} hover:shadow-lg transition-all duration-200`}
-        >
-            <div className="absolute right-4 top-4">
-                <div className={`${iconBg} rounded-full p-3 shadow-inner`}>{icon}</div>
-            </div>
-
-            <div>
-                <p className="text-[15px] font-semibold text-[#1c396a] mb-2 tracking-wide">
-                    {title}
-                </p>
-                <p className="text-3xl font-bold text-gray-900 leading-tight">{value}</p>
-
-                <div className="mt-3">
-                    <Sparkline points={spark} color={lineColor} />
-                </div>
-
-                {hint && (
-                    <p className={`text-xs flex items-center mt-2 font-medium ${trendColor}`}>
-                        {trend === "down" ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                            </svg>
-                        ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                            </svg>
-                        )}
-                        {hint}
-                    </p>
-                )}
-            </div>
-        </div>
-    );
-}
-
-/* ========== Recent Transactions Card (Không thay đổi) ========== */
-function RecentTransactionsCard({ items = [] }) {
-    const signClass = (amountStr = "") =>
-        amountStr.trim().startsWith("-") ? "text-red-600" : "text-emerald-600";
-
-    const chipClass = (desc = "") => {
-        const s = (desc || "").toLowerCase();
-        if (s.includes("vip") || s.includes("đặc biệt") || s.includes("top"))
-            return "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100";
-        if (s.includes("đăng tin") || s.includes("đơn"))
-            return "bg-amber-50 text-amber-700 ring-1 ring-amber-100";
-        return "bg-slate-50 text-slate-700 ring-1 ring-slate-100";
-    };
-
-    const displayItems = items.slice(0, 4);
-
-    return (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Giao dịch gần đây</h3>
-                <button
-                    className="text-sm px-3 h-8 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
-                    type="button"
-                >
-                    Xem tất cả
-                </button>
-            </div>
-
-            {/* List */}
-            <ul className="divide-y divide-gray-100">
-                {displayItems.map((t, i) => (
-                    <li
-                        key={i}
-                        className="
-              grid items-center gap-4 py-3 px-2 -mx-2 rounded-xl hover:bg-gray-50/70 transition-colors
-              [grid-template-columns:minmax(0,1fr)_150px_110px]  /* trái co giãn, giữa 150px, phải 110px */
-              min-h-[56px]                                  /* cao đồng nhất giữa các hàng */
-            "
-                    >
-                        {/* LEFT: avatar + tên + time */}
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className={`shrink-0 w-10 h-10 rounded-full ${t.iniBg} flex items-center justify-center ring-1 ring-black/5`}>
-                                <span className={`font-bold ${t.iniText} text-sm tracking-wide`}>{t.ini}</span>
-                            </div>
-                            <div className="min-w-0">
-                                <p className="font-medium text-sm text-gray-900 truncate leading-tight">{t.name}</p>
-                                <p className="text-xs text-gray-500 leading-none mt-1">
-                                    {t.time || "vừa xong"} · {t.wallet || "ví MoMo"}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* MIDDLE: chip mô tả (căn giữa tuyệt đối theo hàng) */}
-                        <div className="flex justify-center">
-                            <span
-                                className={`inline-flex items-center h-6 px-2.5 rounded-full ${chipClass(t.desc)}`}
-                                title={t.desc}
-                            >
-                                <span className="text-[12px] font-medium leading-none">{t.desc}</span>
-                            </span>
-                        </div>
-
-                        {/* RIGHT: số tiền + chevron (cột cố định, tabular-nums để thẳng cột) */}
-                        <div className="flex items-center justify-end gap-2 ">
-                            <p
-                                className={`font-semibold text-sm tabular-nums leading-none ${signClass(t.amount)}`}
-                                style={{ marginBottom: 0 }}
-                            >
-                                {t.amount}
-                            </p>
-                            <svg
-                                className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition"
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                            >
-                                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </div>
-                    </li>
-                ))}
-
-                {items.length === 0 && (
-                    <li className="py-6 text-center text-sm text-gray-500">Chưa có giao dịch</li>
-                )}
-            </ul>
-        </div>
-    );
-}
-
-
-/* ========== Notifications Card (Không thay đổi) ========== */
-function NotificationsCard({ items = [] }) {
-    const displayItems = items.slice(0, 4); // Hiển thị 4 thông báo mới nhất
-
-    // Hàm helper để lấy icon dựa trên loại thông báo
-    const getIcon = (type) => {
-        switch (type) {
-            case 'report':
-                return (
-                    <div className="shrink-0 w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center ring-1 ring-red-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                );
-            case 'new_user':
-                return (
-                    <div className="shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center ring-1 ring-blue-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M18 21a8 8 0 0 0-16 0" />
-                            <circle cx="10" cy="8" r="4" />
-                        </svg>
-                    </div>
-                );
-            case 'comment':
-            default:
-                return (
-                    <div className="shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center ring-1 ring-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                    </div>
-                );
-        }
-    }
-
-    return (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Thông báo mới</h3>
-                <button
-                    className="text-sm px-3 h-8 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
-                    type="button"
-                >
-                    Xem tất cả
-                </button>
-            </div>
-
-            {/* List */}
-            <ul className="divide-y divide-gray-100">
-                {displayItems.map((item, i) => (
-                    <li
-                        key={i}
-                        className="flex items-start gap-3 py-3 px-2 -mx-2 rounded-xl hover:bg-gray-50/70 transition-colors"
-                    >
-                        {getIcon(item.type)}
-                        <div className="min-w-0">
-                            {/* Dùng dangerouslySetInnerHTML để render tên in đậm */}
-                            <p className="font-medium text-sm text-gray-900 leading-snug" dangerouslySetInnerHTML={{ __html: item.text }} />
-                            <p className="text-xs text-gray-500 leading-none mt-1.5">
-                                {item.time}
-                            </p>
-                        </div>
-                    </li>
-                ))}
-
-                {items.length === 0 && (
-                    <li className="py-6 text-center text-sm text-gray-500">Chưa có thông báo mới</li>
-                )}
-            </ul>
-        </div>
-    );
-}
-
-
-/* ========== MAIN COMPONENT (LAYOUT ĐÃ CẬP NHẬT) ========== */
 export default function AdminDashboard() {
     const [range, setRange] = useState("last_30d");
     const [postSearch, setPostSearch] = useState("");
@@ -290,10 +45,14 @@ export default function AdminDashboard() {
         },
     };
 
-    // Chart doanh thu
+    // Chart doanh thu (demo)
     const chart = useMemo(() => {
-        const labels = ["Thg 1", "Thg 2", "Thg 3", "Thg 4", "Thg 5", "Thg 6", "Thg 7", "Thg 8", "Thg 9", "Thg 10", "Thg 11", "Thg 12"];
+        const labels = [
+            "Thg 1", "Thg 2", "Thg 3", "Thg 4", "Thg 5", "Thg 6",
+            "Thg 7", "Thg 8", "Thg 9", "Thg 10", "Thg 11", "Thg 12"
+        ];
         const data = [65, 59, 80, 81, 56, 55, 40, 60, 75, 90, 110, 120];
+
         return {
             data: {
                 labels,
@@ -334,7 +93,6 @@ export default function AdminDashboard() {
         { code: "#ORD-0123", customer: "Lê Văn Cường", total: "1.200.000đ", status: "Chờ xử lý", badge: "yellow" },
     ];
 
-    // Mock data cho thông báo
     const notifications = [
         { type: "report", text: "<strong>Nguyễn Văn An</strong> đã gửi một báo cáo cho tin đăng 'Bán nhà quận 1...'", time: "5 phút trước" },
         { type: "new_user", text: "<strong>Trần Thị Bình</strong> vừa đăng ký tài khoản mới.", time: "1 giờ trước" },
@@ -355,7 +113,7 @@ export default function AdminDashboard() {
     );
 
     return (
-        <div className="bg-[#f5f7fb] min-h-screen p-6 md:p-8"> {/* Thêm padding cho toàn bộ trang */}
+        <div className="bg-[#f5f7fb] min-h-screen">
             {/* KPI Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCard
@@ -415,28 +173,32 @@ export default function AdminDashboard() {
                 />
             </div>
 
-            {/* === START: UPDATED & COMBINED LAYOUT SECTION === */}
-            {/* Bố cục mới sử dụng grid 4 cột để sắp xếp linh hoạt */}
+            {/* Layout chính */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-                {/* 1. Thông báo mới (chiếm 2/4 cột) -- ĐÃ DI CHUYỂN LÊN ĐẦU */}
+                {/* Thông báo mới */}
                 <div className="lg:col-span-2">
                     <NotificationsCard items={notifications} />
                 </div>
 
-                {/* 2. Giao dịch gần đây (chiếm 2/4 cột) -- ĐÃ DI CHUYỂN LÊN ĐẦU */}
+                {/* Giao dịch gần đây */}
                 <div className="lg:col-span-2">
-                    <RecentTransactionsCard items={recentOrders.length ? [
-                        { ini: "AV", iniBg: "bg-blue-100", iniText: "text-blue-600", name: "Nguyễn Văn An", desc: "Mua gói tin VIP", amount: "+500.000đ" },
-                        { ini: "TB", iniBg: "bg-indigo-100", iniText: "text-indigo-600", name: "Trần Thị Bình", desc: "Đăng tin thường", amount: "+50.000đ" },
-                        { ini: "LC", iniBg: "bg-amber-100", iniText: "text-amber-600", name: "Lê Văn Cường", desc: "Mua gói tin đặc biệt", amount: "+1.200.000đ" },
-                        { ini: "HD", iniBg: "bg-pink-100", iniText: "text-pink-600", name: "Hồ Thị Dung", desc: "Up tin lên top", amount: "+100.000đ" },
-                    ] : []} />
+                    <RecentTransactionsCard
+                        items={
+                            recentOrders.length
+                                ? [
+                                    { ini: "AV", iniBg: "bg-blue-100", iniText: "text-blue-600", name: "Nguyễn Văn An", desc: "Mua gói tin VIP", amount: "+500.000đ" },
+                                    { ini: "TB", iniBg: "bg-indigo-100", iniText: "text-indigo-600", name: "Trần Thị Bình", desc: "Đăng tin thường", amount: "+50.000đ" },
+                                    { ini: "LC", iniBg: "bg-amber-100", iniText: "text-amber-600", name: "Lê Văn Cường", desc: "Mua gói tin đặc biệt", amount: "+1.200.000đ" },
+                                    { ini: "HD", iniBg: "bg-pink-100", iniText: "text-pink-600", name: "Hồ Thị Dung", desc: "Up tin lên top", amount: "+100.000đ" },
+                                ]
+                                : []
+                        }
+                    />
                 </div>
 
-                {/* 3. Biểu đồ Doanh thu (chiếm trọn 4 cột) */}
+                {/* Biểu đồ doanh thu */}
                 <div className="lg:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
-                    <div className="flex flex-wrap items-center justify-between gap-4 mb-2"> {/* Thêm 'flex-wrap' và 'gap-4' */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
                         <h3 className="text-lg font-semibold text-gray-800">Phân tích doanh thu</h3>
                         <select
                             value={range}
@@ -456,17 +218,17 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* 4. Tin cần duyệt (chiếm 2/4 cột) */}
+                {/* Tin cần duyệt */}
                 <div className="lg:col-span-2">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
-                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4"> {/* Thêm 'flex-wrap' và 'gap-4' */}
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                             <h3 className="text-lg font-semibold text-gray-800">Tin đăng mới cần duyệt</h3>
                             <div className="relative">
                                 <input
                                     value={postSearch}
                                     onChange={(e) => setPostSearch(e.target.value)}
                                     placeholder="Tìm tiêu đề/người đăng…"
-                                    className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto" // Responsive width
+                                    className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
                                 />
                                 <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <circle cx="11" cy="11" r="7" />
@@ -487,17 +249,17 @@ export default function AdminDashboard() {
                                     {filteredPosts.map((p, i) => (
                                         <tr key={i} className={`bg-white hover:bg-slate-50 transition-colors ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}>
                                             <td className="py-3 px-4 font-medium text-gray-900">
-                                                <div className="max-w-xs truncate" title={p.title}>{p.title}</div> {/* Giới hạn chiều rộng và thêm tooltip */}
+                                                <div className="max-w-xs truncate" title={p.title}>{p.title}</div>
                                             </td>
                                             <td className="py-3 px-4">
                                                 <div className="inline-flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0"> {/* Thêm shrink-0 */}
+                                                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">
                                                         {p.user.split(" ").map((x) => x[0]).join("").slice(0, 2)}
                                                     </div>
-                                                    <span className="text-gray-700 truncate" title={p.user}>{p.user}</span> {/* Thêm truncate */}
+                                                    <span className="text-gray-700 truncate" title={p.user}>{p.user}</span>
                                                 </div>
                                             </td>
-                                            <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{p.date}</td> {/* Thêm whitespace-nowrap */}
+                                            <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{p.date}</td>
                                         </tr>
                                     ))}
                                     {filteredPosts.length === 0 && (
@@ -509,17 +271,17 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* 5. Đơn hàng mới nhất (chiếm 2/4 cột) */}
+                {/* Đơn hàng mới nhất */}
                 <div className="lg:col-span-2">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
-                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4"> {/* Thêm 'flex-wrap' và 'gap-4' */}
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                             <h3 className="text-lg font-semibold text-gray-800">Đơn hàng mới nhất</h3>
                             <div className="relative">
                                 <input
                                     value={orderSearch}
                                     onChange={(e) => setOrderSearch(e.target.value)}
                                     placeholder="Tìm mã đơn/khách hàng…"
-                                    className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto" // Responsive width
+                                    className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
                                 />
                                 <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <circle cx="11" cy="11" r="7" />
@@ -540,18 +302,25 @@ export default function AdminDashboard() {
                                 <tbody className="divide-y divide-gray-100">
                                     {filteredOrders.map((o, i) => (
                                         <tr key={i} className={`bg-white hover:bg-slate-50 transition-colors ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}>
-                                            <td className="py-3 px-4 font-semibold text-gray-900 whitespace-nowrap">{o.code}</td> {/* Thêm whitespace-nowrap */}
+                                            <td className="py-3 px-4 font-semibold text-gray-900 whitespace-nowrap">{o.code}</td>
                                             <td className="py-3 px-4">
                                                 <div className="inline-flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold shrink-0"> {/* Thêm shrink-0 */}
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold shrink-0">
                                                         {o.customer.split(" ").map((x) => x[0]).join("").slice(0, 2)}
                                                     </div>
-                                                    <span className="text-gray-700 truncate" title={o.customer}>{o.customer}</span> {/* Thêm truncate */}
+                                                    <span className="text-gray-700 truncate" title={o.customer}>{o.customer}</span>
                                                 </div>
                                             </td>
-                                            <td className="py-3 px-4 font-medium text-gray-900 tabular-nums whitespace-nowrap">{o.total}</td> {/* Thêm whitespace-nowrap */}
+                                            <td className="py-3 px-4 font-medium text-gray-900 tabular-nums whitespace-nowrap">{o.total}</td>
                                             <td className="py-3 px-4">
-                                                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${o.badge === "green" ? "bg-green-50 text-green-700 ring-green-100" : o.badge === "yellow" ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-gray-50 text-gray-700 ring-gray-100"}`}> {/* Thêm whitespace-nowrap */}
+                                                <span
+                                                    className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${o.badge === "green"
+                                                            ? "bg-green-50 text-green-700 ring-green-100"
+                                                            : o.badge === "yellow"
+                                                                ? "bg-amber-50 text-amber-700 ring-amber-100"
+                                                                : "bg-gray-50 text-gray-700 ring-gray-100"
+                                                        }`}
+                                                >
                                                     {o.status}
                                                 </span>
                                             </td>
@@ -565,9 +334,8 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 </div>
+
             </div>
-            {/* === END: UPDATED & COMBINED LAYOUT SECTION === */}
         </div>
     );
 }
-

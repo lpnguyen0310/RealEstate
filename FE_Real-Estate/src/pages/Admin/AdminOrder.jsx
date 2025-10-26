@@ -69,7 +69,7 @@ export default function AdminOrder() {
     };
 
     return (
-        <Box sx={{ display: "grid", gap: 2 }}>
+        <Box sx={{ display: "grid", gap: 2}}>
             {/* Header */}
         
 

@@ -327,7 +327,7 @@ export default function AdminUsersMUI() {
     const showInitialSpinner = initialLoading && rows.length === 0;
 
     return (
-        <Box sx={{ width: "100%", display: "flex", justifyContent: "center", bgcolor: "#f8f9fc", p: 3 }}>
+        <Box sx={{ width: "100%", display: "flex", justifyContent: "center", bgcolor: "#f8f9fc"}}>
             <Box sx={{ width: "100%", maxWidth: 1440, position: "relative" }}>
                 {/* Soft loading overlay */}
                 {softLoading && (
