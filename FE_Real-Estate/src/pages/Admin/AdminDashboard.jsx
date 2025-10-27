@@ -3,15 +3,28 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 import NotificationsCard from "@/components/admidashboard/dashboard/NotificationsCard";
+import { kpiApi } from "@/api/adminApi/kpiApi";
 
 /* ========== UTILITIES ========== */
-// Hàm định dạng số (Không thay đổi)
+// Định dạng số (có xử lý chuỗi có ký tự khác số)
 const fmtNumber = (n) =>
     new Intl.NumberFormat("vi-VN").format(
         typeof n === "string" ? Number(n.replace(/[^0-9.-]/g, "")) : n
     );
 
-/* ========== Sparkline (Không thay đổi) ========== */
+const nfmt = (n) => new Intl.NumberFormat("vi-VN").format(n);
+const vnd = (n) => `${new Intl.NumberFormat("vi-VN").format(n)}đ`;
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
+const initials = (fullName = "") =>
+    fullName
+        .trim()
+        .split(/\s+/)
+        .map((x) => x[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+
+/* ========== Sparkline ========== */
 function Sparkline({ points = [], color = "#3b82f6" }) {
     const width = 90;
     const height = 28;
@@ -36,7 +49,7 @@ function Sparkline({ points = [], color = "#3b82f6" }) {
     );
 }
 
-/* ========== KPI Card (Không thay đổi) ========== */
+/* ========== KPI Card ========== */
 function StatCard({
     title,
     value,
@@ -60,9 +73,7 @@ function StatCard({
             </div>
 
             <div>
-                <p className="text-[15px] font-semibold text-[#1c396a] mb-2 tracking-wide">
-                    {title}
-                </p>
+                <p className="text-[15px] font-semibold text-[#1c396a] mb-2 tracking-wide">{title}</p>
                 <p className="text-3xl font-bold text-gray-900 leading-tight">{value}</p>
 
                 <div className="mt-3">
@@ -88,7 +99,7 @@ function StatCard({
     );
 }
 
-/* ========== Recent Transactions Card (Không thay đổi) ========== */
+/* ========== Recent Transactions Card ========== */
 function RecentTransactionsCard({ items = [] }) {
     const signClass = (amountStr = "") =>
         amountStr.trim().startsWith("-") ? "text-red-600" : "text-emerald-600";
@@ -124,11 +135,11 @@ function RecentTransactionsCard({ items = [] }) {
                         key={i}
                         className="
               grid items-center gap-4 py-3 px-2 -mx-2 rounded-xl hover:bg-gray-50/70 transition-colors
-              [grid-template-columns:minmax(0,1fr)_150px_110px]  /* trái co giãn, giữa 150px, phải 110px */
-              min-h-[56px]                                  /* cao đồng nhất giữa các hàng */
+              [grid-template-columns:minmax(0,1fr)_150px_110px]
+              min-h-[56px]
             "
                     >
-                        {/* LEFT: avatar + tên + time */}
+                        {/* LEFT */}
                         <div className="flex items-center gap-3 min-w-0">
                             <div className={`shrink-0 w-10 h-10 rounded-full ${t.iniBg} flex items-center justify-center ring-1 ring-black/5`}>
                                 <span className={`font-bold ${t.iniText} text-sm tracking-wide`}>{t.ini}</span>
@@ -141,28 +152,19 @@ function RecentTransactionsCard({ items = [] }) {
                             </div>
                         </div>
 
-                        {/* MIDDLE: chip mô tả (căn giữa tuyệt đối theo hàng) */}
+                        {/* MIDDLE */}
                         <div className="flex justify-center">
-                            <span
-                                className={`inline-flex items-center h-6 px-2.5 rounded-full ${chipClass(t.desc)}`}
-                                title={t.desc}
-                            >
+                            <span className={`inline-flex items-center h-6 px-2.5 rounded-full ${chipClass(t.desc)}`} title={t.desc}>
                                 <span className="text-[12px] font-medium leading-none">{t.desc}</span>
                             </span>
                         </div>
 
-                        {/* RIGHT: số tiền + chevron (cột cố định, tabular-nums để thẳng cột) */}
+                        {/* RIGHT */}
                         <div className="flex items-center justify-end gap-2 ">
-                            <p
-                                className={`font-semibold text-sm tabular-nums leading-none ${signClass(t.amount)}`}
-                                style={{ marginBottom: 0 }}
-                            >
+                            <p className={`font-semibold text-sm tabular-nums leading-none ${signClass(t.amount)}`} style={{ marginBottom: 0 }}>
                                 {t.amount}
                             </p>
-                            <svg
-                                className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition"
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                            >
+                            <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </div>
@@ -177,22 +179,7 @@ function RecentTransactionsCard({ items = [] }) {
     );
 }
 
-
-/* ========== MAIN COMPONENT (LAYOUT ĐÃ CẬP NHẬT) ========== */
-import { kpiApi } from "@/api/adminApi/kpiApi";
-
-import {
-    StatCard,
-    NotificationsCard,
-    RecentTransactionsCard,
-} from "@/components/admidashboard/layoutadmin";
-
-const nfmt = (n) => new Intl.NumberFormat("vi-VN").format(n);
-const vnd = (n) => `${new Intl.NumberFormat("vi-VN").format(n)}đ`;
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
-const initials = (fullName = "") =>
-    fullName.trim().split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase();
-
+/* ========== MAIN COMPONENT ========== */
 export default function AdminDashboard() {
     const [range, setRange] = useState("last_30d");
     const [orderSearch, setOrderSearch] = useState("");
@@ -514,8 +501,7 @@ export default function AdminDashboard() {
         };
     }, [orderSearch]);
 
-
-    // ---- state: recent transactions (from BE) ----
+    /* ===================== Recent Transactions (BE) ===================== */
     const [recentTx, setRecentTx] = useState({ rows: [], loading: false, error: null });
 
     useEffect(() => {
@@ -526,10 +512,7 @@ export default function AdminDashboard() {
                 const { data } = await kpiApi.getRecentTransactions({ status: "PAID", page: 0, size: 4 });
                 if (!mounted) return;
 
-                // data = List<RecentTransactionDto>
                 const rows = Array.isArray(data) ? data : [];
-
-                // map về format RecentTransactionsCard
                 const items = rows.map((r) => ({
                     ini: initials(r.userName || r.email || "U"),
                     iniBg: "bg-indigo-100",
@@ -538,7 +521,7 @@ export default function AdminDashboard() {
                     desc: r.title || "Giao dịch",
                     amount: `+${vnd(r.amount || 0)}`,
                     time: new Date(r.createdAt).toLocaleString("vi-VN"),
-                    wallet: "ví MoMo", // nếu BE có cổng thanh toán thì thay ở đây
+                    wallet: "ví MoMo",
                 }));
 
                 setRecentTx({ rows: items, loading: false, error: null });
@@ -551,7 +534,9 @@ export default function AdminDashboard() {
                 });
             }
         })();
-        return () => { mounted = false; };
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     return (
@@ -644,16 +629,8 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="lg:col-span-2">
-                    <RecentTransactionsCard
-                        items={
-                            recentTx.loading
-                                ? [] // card có skeleton nhẹ: bạn có thể thay bằng 4 item “Đang tải…”
-                                : recentTx.rows
-                        }
-                    />
-                    {recentTx.error && (
-                        <div className="mt-2 text-sm text-red-600">{recentTx.error}</div>
-                    )}
+                    <RecentTransactionsCard items={recentTx.loading ? [] : recentTx.rows} />
+                    {recentTx.error && <div className="mt-2 text-sm text-red-600">{recentTx.error}</div>}
                 </div>
 
                 {/* Biểu đồ Doanh thu */}
@@ -812,13 +789,17 @@ export default function AdminDashboard() {
                                                     <td className="py-3 px-4">
                                                         <span
                                                             className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${o.status === "PAID"
-                                                                ? "bg-green-50 text-green-700 ring-green-100"
-                                                                : o.status?.startsWith("PENDING")
-                                                                    ? "bg-amber-50 text-amber-700 ring-amber-100"
-                                                                    : "bg-gray-50 text-gray-700 ring-gray-100"
+                                                                    ? "bg-green-50 text-green-700 ring-green-100"
+                                                                    : o.status?.startsWith("PENDING")
+                                                                        ? "bg-amber-50 text-amber-700 ring-amber-100"
+                                                                        : "bg-gray-50 text-gray-700 ring-gray-100"
                                                                 }`}
                                                         >
-                                                            {o.status === "PAID" ? "Hoàn thành" : o.status?.startsWith("PENDING") ? "Chờ xử lý" : (o.status || "—")}
+                                                            {o.status === "PAID"
+                                                                ? "Hoàn thành"
+                                                                : o.status?.startsWith("PENDING")
+                                                                    ? "Chờ xử lý"
+                                                                    : o.status || "—"}
                                                         </span>
                                                     </td>
                                                     <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{fmtDate(o.createdAt)}</td>
