@@ -106,6 +106,14 @@ public class PropertyController {
         return ResponseEntity.ok(counts);
     }
 
+
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<PropertyCardDTO>> recommendations(
+            @RequestParam Long userId,
+            @RequestParam(defaultValue = "8") int limit
+    ) {
+        return ResponseEntity.ok(propertyService.getRecommendations(userId, limit));
+    }
     @GetMapping("/{id}/favorites")
     public ResponseEntity<List<UserFavoriteDTO>> getPropertyFavorites( // Sửa ResponseEntity<?>
                                                                        @PathVariable Long id,

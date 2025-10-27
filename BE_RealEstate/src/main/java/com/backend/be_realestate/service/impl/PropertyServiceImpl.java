@@ -12,12 +12,16 @@ import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
 import com.backend.be_realestate.modals.dto.UserFavoriteDTO;
 import com.backend.be_realestate.modals.dto.propertyEvent.PropertyEvent;
+import com.backend.be_realestate.modals.dto.propertydashboard.PendingPropertyDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
+import com.backend.be_realestate.modals.response.PageResponse;
+import com.backend.be_realestate.modals.response.admin.PropertyKpiResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
 import jakarta.persistence.EntityNotFoundException;
+import com.backend.be_realestate.utils.RecommendationSpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,11 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.sql.Timestamp;
-import java.time.Instant;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -62,6 +64,8 @@ public class PropertyServiceImpl implements IPropertyService {
 
     private final UserConverter userConverter;
 
+    private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final String TZ_OFFSET = "+07:00";
     @Override
     public List<PropertyCardDTO> getAllPropertiesForCardView() {
         return propertyRepository.findAll().stream()
@@ -95,28 +99,30 @@ public class PropertyServiceImpl implements IPropertyService {
 
     @Override
     public Page<PropertyCardDTO> searchProperties(Map<String, String> params) {
-        // --- 1. XỬ LÝ PHÂN TRANG VÀ SẮP XẾP ---
         Pageable pageable = createPageableFromParams(params);
 
-        // --- 2. LẤY CÁC GIÁ TRỊ LỌC TỪ PARAMS ---
-        String keyword = params.get("keyword");
+        // 2) Lấy filter
+        String keyword      = params.get("keyword");
         String propertyType = params.get("type");
         String categorySlug = params.get("category");
-        Double priceFrom = params.get("priceFrom") != null ? Double.parseDouble(params.get("priceFrom")) : null;
-        Double priceTo = params.get("priceTo") != null ? Double.parseDouble(params.get("priceTo")) : null;
-        Float areaFrom = params.get("areaFrom") != null ? Float.parseFloat(params.get("areaFrom")) : null;
-        Float areaTo = params.get("areaTo") != null ? Float.parseFloat(params.get("areaTo")) : null;
-        // Thêm các tham số khác nếu cần...
+        Double priceFrom    = params.get("priceFrom") != null ? Double.parseDouble(params.get("priceFrom")) : null;
+        Double priceTo      = params.get("priceTo")   != null ? Double.parseDouble(params.get("priceTo"))   : null;
+        Float areaFrom      = params.get("areaFrom")  != null ? Float.parseFloat(params.get("areaFrom"))    : null;
+        Float areaTo        = params.get("areaTo")    != null ? Float.parseFloat(params.get("areaTo"))      : null;
 
-        // --- 3. KẾT HỢP CÁC SPECIFICATION ---
-        Specification<PropertyEntity> spec = PropertySpecification.hasKeyword(keyword)
-                .and(PropertySpecification.hasPropertyType(propertyType))
-                .and(PropertySpecification.hasCategorySlug(categorySlug))
-                .and(PropertySpecification.priceBetween(priceFrom, priceTo))
-                .and(PropertySpecification.areaBetween(areaFrom, areaTo));
-        // .and(...) thêm các điều kiện khác
+        // 2b) Quyết định ALL/ANY cho keyword
+        // UI Metro Modal nên gửi kwMode=any khi chọn nhiều ga
+        boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
 
-        // --- 4. GỌI REPOSITORY VÀ MAP KẾT QUẢ ---
+        // 3) Kết hợp Spec
+        Specification<PropertyEntity> spec =
+                PropertySpecification.hasKeyword(keyword, matchAll)
+                        .and(PropertySpecification.hasPropertyType(propertyType))
+                        .and(PropertySpecification.hasCategorySlug(categorySlug))
+                        .and(PropertySpecification.priceBetween(priceFrom, priceTo))
+                        .and(PropertySpecification.areaBetween(areaFrom, areaTo));
+
+        // 4) Query & map
         Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
         return resultPage.map(propertyMapper::toPropertyCardDTO);
     }
@@ -391,6 +397,205 @@ public class PropertyServiceImpl implements IPropertyService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public List<PropertyCardDTO> getRecommendations(Long userId, int limit) {
+        // 1) Tín hiệu Saved
+        List<Long> savedIds = savedPropertyRepository.findPropertyIdsByUser(userId);
+
+        List<Long> favDistrictIds = savedPropertyRepository.topDistrictIds(userId).stream()
+                .map(r -> (Long) r[0]).limit(3).toList();
+
+        List<PropertyType> favTypes = savedPropertyRepository.topPropertyTypes(userId).stream()
+                .map(r -> (PropertyType) r[0]).limit(3).toList();
+
+        Double avgPrice = null, stdPrice = null, avgArea = null, stdArea = null;
+        Object[] stats = savedPropertyRepository.priceAreaStats(userId);
+        if (stats != null && stats.length == 4) {
+            avgPrice = toD(stats[0]); stdPrice = toD(stats[1]);
+            avgArea  = toD(stats[2]); stdArea  = toD(stats[3]);
+        }
+
+        boolean noSignal = favDistrictIds.isEmpty() && favTypes.isEmpty()
+                && (avgPrice == null || avgPrice <= 0) && (avgArea == null || avgArea <= 0);
+
+        if (noSignal) {
+            return propertyRepository.findPopular(PageRequest.of(0, limit)).stream()
+                    .map(propertyMapper::toPropertyCardDTO).toList();
+        }
+
+        // 2) Build “biên” lọc quanh trung bình (nếu có)
+        Double priceFrom = null, priceTo = null;
+        if (avgPrice != null && avgPrice > 0) {
+            double band = Math.max(n0(stdPrice), avgPrice * 0.2); // ±max(σ, 20%)
+            priceFrom = Math.max(0, avgPrice - band);
+            priceTo   = avgPrice + band;
+        }
+        Float areaFrom = null, areaTo = null;
+        if (avgArea != null && avgArea > 0) {
+            double band = Math.max(n0(stdArea), avgArea * 0.2);
+            areaFrom = (float) Math.max(0, avgArea - band);
+            areaTo   = (float) (avgArea + band);
+        }
+
+        // 3) Gộp spec
+        Specification<PropertyEntity> spec = Specification.where(RecommendationSpec.statusPublished());
+        spec = and(spec, RecommendationSpec.inDistrictIds(favDistrictIds));
+        spec = and(spec, RecommendationSpec.inPropertyTypes(favTypes));
+        spec = and(spec, RecommendationSpec.priceBetween(priceFrom, priceTo));
+        spec = and(spec, RecommendationSpec.areaBetween(areaFrom, areaTo));
+        spec = and(spec, RecommendationSpec.notInIds(savedIds));
+
+        // 4) Lấy candidates (nhiều hơn limit để scoring)
+        int pageSize = Math.max(limit * 3, 24);
+        List<PropertyEntity> candidates = propertyRepository
+                .findAll(spec, PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "postedAt")))
+                .getContent();
+
+        if (candidates.isEmpty()) {
+            return propertyRepository.findPopular(PageRequest.of(0, limit)).stream()
+                    .map(propertyMapper::toPropertyCardDTO).toList();
+        }
+
+        // 5) Scoring
+        final double pAvg = avgPrice != null ? avgPrice : 0d;
+        final double aAvg = avgArea  != null ? avgArea  : 0d;
+
+        List<PropertyEntity> ranked = candidates.stream()
+                .sorted((x, y) -> Double.compare(
+                        score(y, favDistrictIds, favTypes, pAvg, aAvg),
+                        score(x, favDistrictIds, favTypes, pAvg, aAvg)
+                ))
+                .limit(limit)
+                .toList();
+
+        return ranked.stream().map(propertyMapper::toPropertyCardDTO).toList();
+    }
+
+    @Override
+    public PropertyKpiResponse propertiesKpi(String range, String status, String pendingStatus) {
+        String st = (status == null || status.isBlank()) ? "PUBLISHED" : status.toUpperCase();
+        String pend = (pendingStatus == null || pendingStatus.isBlank()) ? "PENDING_REVIEW" : pendingStatus.toUpperCase();
+
+        LocalDate today = LocalDate.now(ZONE_VN);
+        Range cur = resolveRange(range, today);
+        Range prev = previousRange(cur);
+
+        Instant cs = cur.start.atZone(ZONE_VN).toInstant();
+        Instant ce = cur.end.atZone(ZONE_VN).toInstant();
+        Instant ps = prev.start.atZone(ZONE_VN).toInstant();
+        Instant pe = prev.end.atZone(ZONE_VN).toInstant();
+
+        long totalCur  = propertyRepository.countPostedBetween(cs, ce, st);
+        long totalPrev = propertyRepository.countPostedBetween(ps, pe, st);
+        double pct = (totalPrev == 0) ? (totalCur > 0 ? 1.0 : 0.0) : (double) (totalCur - totalPrev) / totalPrev;
+
+        // series
+        List<Object[]> rows = propertyRepository.dailyPostedSeries(cs, ce, TZ_OFFSET, st);
+        Map<LocalDate, Long> map = new LinkedHashMap<>();
+        for (LocalDate d = cur.start.toLocalDate(); !d.isAfter(cur.end.toLocalDate().minusDays(1)); d = d.plusDays(1)) {
+            map.put(d, 0L);
+        }
+        for (Object[] r : rows) {
+            LocalDate day = LocalDate.parse(String.valueOf(r[0]));
+            long c = ((Number) r[1]).longValue();
+            map.put(day, c);
+        }
+        List<PropertyKpiResponse.SeriesPoint> series = new ArrayList<>();
+        map.forEach((d, c) -> series.add(
+                PropertyKpiResponse.SeriesPoint.builder().date(d.toString()).count(c).build()
+        ));
+
+        long pending = propertyRepository.countPending(pend);
+
+        return PropertyKpiResponse.builder()
+                .summary(PropertyKpiResponse.Summary.builder()
+                        .total(totalCur)
+                        .compareToPrev(pct)
+                        .pending(pending)
+                        .build())
+                .series(series)
+                .range(PropertyKpiResponse.RangeDto.builder()
+                        .start(cur.start.toString()).end(cur.end.toString()).build())
+                .build();
+    }
+
+    @Override
+    public PageResponse<PendingPropertyDTO> findPending(String q, int page, int size) {
+        final String query = (q == null || q.isBlank()) ? null : q.trim();
+        final var pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+
+        final var rows = propertyRepository.findPending(PropertyStatus.PENDING_REVIEW, query, pageable);
+
+        // map Page<PendingPropertyRow> -> Page<PendingPropertyDto> bằng Page.map(...)
+        final var dtoPage = rows.map(r -> PendingPropertyDTO.builder()
+                .id(r.getId())
+                .title(r.getTitle())
+                .author(r.getAuthor())
+                .postedDate(
+                        r.getPostedAt() == null ? null :
+                                r.getPostedAt().toInstant().atZone(ZONE_VN).toLocalDate().toString()
+                )
+                .build()
+        );
+
+        return PageResponse.from(dtoPage);
+    }
+
+
+    private static Specification<PropertyEntity> and(Specification<PropertyEntity> base, Specification<PropertyEntity> next) {
+        return next == null ? base : base.and(next);
+    }
+    private static Double toD(Object o) {
+        if (o == null) return null;
+        if (o instanceof Number n) return n.doubleValue();
+        try { return Double.parseDouble(o.toString()); } catch (Exception e) { return null; }
+    }
+    private static double n0(Double d) { return d == null ? 0d : d; }
+
+    // điểm đơn giản, dễ chỉnh
+    private double score(PropertyEntity p,
+                         List<Long> favDistrictIds,
+                         List<PropertyType> favTypes,
+                         double avgPrice,
+                         double avgArea) {
+        double s = 0;
+
+        // 1) Khớp khu vực / loại
+        if (p.getDistrict() != null && p.getDistrict().getId() != null
+                && favDistrictIds.contains(p.getDistrict().getId())) s += 3.0;
+        if (p.getPropertyType() != null && favTypes.contains(p.getPropertyType())) s += 2.0;
+
+        // 2) Gần trung bình giá / diện tích
+        if (avgPrice > 0 && p.getPrice() != null && p.getPrice() > 0) {
+            double denom = avgPrice * 0.5;
+            double close = Math.max(0, 1 - Math.abs(p.getPrice() - avgPrice) / denom);
+            s += close * 2.0;
+        }
+        if (avgArea > 0 && p.getArea() > 0) { // area là primitive float → >0
+            double denom = avgArea * 0.5;
+            double close = Math.max(0, 1 - Math.abs(p.getArea() - avgArea) / denom);
+            s += close * 1.5;
+        }
+
+        // 3) Ưu tiên VIP/PREMIUM nhẹ
+        if (p.getListingType() != null) {
+            switch (p.getListingType()) {
+                case VIP -> s += 0.8;
+                case PREMIUM -> s += 1.0;
+                default -> {}
+            }
+        }
+
+        // 4) Bonus độ mới
+        if (p.getPostedAt() != null) {
+            long days = Math.max(0, java.time.Duration.between(p.getPostedAt().toInstant(), java.time.Instant.now()).toDays());
+            double recency = Math.max(0, 1 - (days / 30.0)); // trong 30 ngày gần nhất
+            s += recency * 0.2;
+        }
+        return s;
+    }
+
     // +++ THÊM HÀM TRỢ GIÚP ÁNH XẠ NGƯỢC +++
     private String mapBackendStatusToFrontendKey(PropertyStatus beStatus) {
         if (beStatus == null) return null;
@@ -435,4 +640,41 @@ public class PropertyServiceImpl implements IPropertyService {
         }
     }
 
+    private static class Range { LocalDateTime start, end;
+        Range(LocalDateTime s, LocalDateTime e) { this.start = s; this.end = e; } }
+
+
+    private Range resolveRange(String key, LocalDate today) {
+        String k = key == null ? "" : key;
+        switch (k) {
+            case "today": {
+                LocalDateTime start = today.atStartOfDay();
+                return new Range(start, start.plusDays(1));
+            }
+            case "last_7d": {
+                LocalDate endDay = today.plusDays(1);
+                return new Range(endDay.minusDays(7).atStartOfDay(), endDay.atStartOfDay());
+            }
+            case "this_month" : {
+                LocalDate first = today.withDayOfMonth(1);
+                return new Range(first.atStartOfDay(), first.plusMonths(1).atStartOfDay());
+            }
+            case "last_month": {
+                LocalDate firstPrev = today.withDayOfMonth(1).minusMonths(1);
+                return new Range(firstPrev.atStartOfDay(), firstPrev.plusMonths(1).atStartOfDay());
+            }
+            case "last_30d":
+            default: {
+                    LocalDate endDay = today.plusDays(1);
+                    return new Range(endDay.minusDays(30).atStartOfDay(), endDay.atStartOfDay());
+                }
+        }
+    }
+
+    private Range previousRange(Range cur) {
+        Duration len = Duration.between(cur.start, cur.end);
+        LocalDateTime prevEnd = cur.start;
+        LocalDateTime prevStart = prevEnd.minus(len);
+        return new Range(prevStart, prevEnd);
+    }
 }

@@ -54,7 +54,7 @@ export default function PostsTable({
                           <ArticleOutlinedIcon fontSize="small" />
                         </Avatar>
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography fontWeight={700} noWrap>{r.title}</Typography>
+                          <Typography fontWeight={700}>{r.title}</Typography>
                           <Typography fontSize={12} color="#718198" >
                             {r.author?.name} • {r.author?.email}
                           </Typography>

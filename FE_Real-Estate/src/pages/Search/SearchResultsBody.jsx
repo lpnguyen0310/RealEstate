@@ -59,7 +59,8 @@ export default function SearchResultsPage() {
         // Lấy các tham số từ URL
         const type = searchParams.get("type");
         const category = searchParams.get("category");
-
+        const kwMode = searchParams.get("kwMode");
+        if (kwMode) params.kwMode = kwMode;
         // Thêm các bộ lọc vào params nếu chúng tồn tại
         if (keyword) params.keyword = keyword;
         if (type) params.type = type;
@@ -69,7 +70,7 @@ export default function SearchResultsPage() {
         if (filters?.areaFrom) params.areaFrom = filters.areaFrom;
         if (filters?.areaTo) params.areaTo = filters.areaTo;
         // ... thêm các filter khác cho phòng ngủ, phòng tắm nếu có
-        
+
         // GỌI API với các tham số đã tổng hợp
         dispatch(fetchPropertiesThunk(params));
 
@@ -119,7 +120,7 @@ export default function SearchResultsPage() {
                     const newSearchParams = new URLSearchParams(searchParams);
                     // Xóa các filter cũ để tránh trùng lặp
                     ['priceFrom', 'priceTo', 'areaFrom', 'areaTo'].forEach(key => newSearchParams.delete(key));
-                    
+
                     // Ghi các filter mới vào URL
                     Object.entries(newFilters).forEach(([key, value]) => {
                         if (value) { // Chỉ thêm vào nếu có giá trị

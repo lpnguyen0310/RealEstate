@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,6 +42,85 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     int bumpView(@Param("id") Long id);
 
     int countByUser_UserId(Long userId);
+
+    @Query("""
+           select p
+           from PropertyEntity p
+           where p.status = com.backend.be_realestate.enums.PropertyStatus.PUBLISHED
+             and p.listingType in (com.backend.be_realestate.enums.ListingType.VIP, com.backend.be_realestate.enums.ListingType.PREMIUM)
+           order by p.postedAt desc
+           """)
+    List<PropertyEntity> findPopular(Pageable pageable);
+
+    @Query(value = """
+        SELECT COUNT(*)
+        FROM properties p
+        WHERE p.posted_at >= :start AND p.posted_at < :end
+          AND (:status IS NULL OR p.status = :status)
+        """, nativeQuery = true)
+    long countPostedBetween(@Param("start") Instant start,
+                            @Param("end") Instant end,
+                            @Param("status") String status);
+
+    // Series theo ngày (theo VN timezone)
+    @Query(value = """
+        SELECT DATE(CONVERT_TZ(p.posted_at,'+00:00', :tz)) AS d,
+               COUNT(*) AS c
+        FROM properties p
+        WHERE p.posted_at >= :start AND p.posted_at < :end
+          AND (:status IS NULL OR p.status = :status)
+        GROUP BY d
+        ORDER BY d
+        """, nativeQuery = true)
+    List<Object[]> dailyPostedSeries(@Param("start") Instant start,
+                                     @Param("end") Instant end,
+                                     @Param("tz") String tz,
+                                     @Param("status") String status);
+
+    // Số tin đang chờ duyệt (toàn cục hoặc theo pendingStatus)
+    @Query(value = """
+        SELECT COUNT(*) FROM properties p
+        WHERE (:pendingStatus IS NULL OR p.status = :pendingStatus)
+        """, nativeQuery = true)
+    long countPending(@Param("pendingStatus") String pendingStatus);
+
+
+    interface PendingPropertyRow {
+        Long getId();
+        String getTitle();
+        String getAuthor();     // CONCAT firstName + ' ' + lastName
+        java.sql.Timestamp getPostedAt();
+    }
+
+    @Query("""
+        SELECT p.id AS id,
+               p.title AS title,
+               CONCAT(COALESCE(u.firstName,''),' ',COALESCE(u.lastName,'')) AS author,
+               p.postedAt AS postedAt
+        FROM PropertyEntity p
+        JOIN p.user u
+        WHERE p.status = :status
+          AND (
+               :q IS NULL
+               OR LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%'))
+               OR LOWER(u.firstName) LIKE LOWER(CONCAT('%', :q, '%'))
+               OR LOWER(u.lastName)  LIKE LOWER(CONCAT('%', :q, '%'))
+          )
+        ORDER BY p.postedAt DESC
+    """)
+    Page<PendingPropertyRow> findPending(
+            @Param("status") PropertyStatus status,
+            @Param("q") String q,
+            Pageable pageable
+    );
+
+
+
 }
+
+
+
+
+
 
 

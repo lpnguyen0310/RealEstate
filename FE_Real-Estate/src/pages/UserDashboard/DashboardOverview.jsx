@@ -2,7 +2,6 @@
 import { useEffect, useMemo } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import useFavorites from "@/hooks/useFavorites";
 
 import {
   UserHeader,
@@ -19,6 +18,9 @@ import {
   selectPostsReport,
 } from "@/store/propertySlice";
 
+// === Favorites (đọc trực tiếp từ favoriteSlice) ===
+import { selectList as selectFavList, selectIds as selectFavIds } from "@/store/favoriteSlice";
+
 export default function DashboardOverview() {
   const nav = useNavigate();
   const dispatch = useDispatch();
@@ -26,7 +28,6 @@ export default function DashboardOverview() {
 
   // ===== Load "tin của tôi" cho dashboard =====
   useEffect(() => {
-    // Gọi 1 lần khi vào dashboard (nếu bạn đã load ở layout cha thì có thể bỏ)
     dispatch(fetchMyPropertiesThunk({ page: 0, size: 20, sort: "postedAt,desc" }));
   }, [dispatch]);
 
@@ -48,8 +49,9 @@ export default function DashboardOverview() {
     };
   }, [reduxUser]);
 
-  // ===== Favorites (REAL DATA) =====
-  const { list: favList, count: favCount } = useFavorites();
+  // ===== Favorites (REAL DATA từ Redux) =====
+  const favList = useSelector(selectFavList); // [{ id, title, thumb, href, priceDisplay, displayAddress, savedAgo, listingType, ...}]
+  const favCount = useSelector(selectFavIds).length;
 
   // Convert to SavedListCard items (lấy tối đa 5 tin)
   const savedItems = useMemo(

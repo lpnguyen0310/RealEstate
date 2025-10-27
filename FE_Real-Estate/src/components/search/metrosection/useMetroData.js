@@ -1,6 +1,11 @@
-// src/components/search/metrosection/useMetroData.js
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { buildOverpassUrl, HCM_CENTER, LINES, normalize, guessLineId } from "./constants";
+
+const RECENT_KEY = "metro_search_recent_v1";
+
+function uniq(arr) {
+    return Array.from(new Set(arr));
+}
 
 export default function useMetroData() {
     const [allStations, setAllStations] = useState([]);
@@ -8,6 +13,32 @@ export default function useMetroData() {
     const [expanded, setExpanded] = useState(new Set(["M1", "M2"]));
     const [selectedByLine, setSelectedByLine] = useState({ M1: new Set(), M2: new Set() });
 
+    // ==== recent searches (localStorage) ====
+    const [recents, setRecents] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+        } catch {
+            return [];
+        }
+    });
+
+    const addRecent = (term) => {
+        const t = term.trim();
+        if (!t) return;
+        const next = [t, ...recents].slice(0, 8);
+        setRecents(next);
+        try {
+            localStorage.setItem(RECENT_KEY, JSON.stringify(uniq(next)));
+        } catch { }
+    };
+    const clearRecents = () => {
+        setRecents([]);
+        try {
+            localStorage.removeItem(RECENT_KEY);
+        } catch { }
+    };
+
+    // ==== fetch OSM ====
     useEffect(() => {
         (async () => {
             try {
@@ -19,10 +50,16 @@ export default function useMetroData() {
                         const tags = el.tags ?? {};
                         const name = tags["name:vi"] || tags.name || tags["name:en"] || "Unnamed station";
                         const address =
-                            tags["addr:full:vi"] || tags["addr:full"] || tags["addr:street:vi"] || tags["addr:street"] || tags.description || "";
+                            tags["addr:full:vi"] ||
+                            tags["addr:full"] ||
+                            tags["addr:street:vi"] ||
+                            tags["addr:street"] ||
+                            tags.description ||
+                            "";
                         return { id: el.id, name, address, lat: el.lat, lng: el.lon, tags, lineId: guessLineId(name) };
                     });
 
+                // dedupe (name ~≈ & near)
                 const unique = list.reduce((acc, cur) => {
                     const exists = acc.find(
                         (x) =>
@@ -40,12 +77,28 @@ export default function useMetroData() {
         })();
     }, []);
 
+    // OSM lookup
     const stationLookup = useMemo(() => {
         const map = new Map();
         for (const s of allStations) map.set(normalize(s.name), s);
         return map;
     }, [allStations]);
 
+    // Suggestions: tên ga chuẩn trong LINES + tên từ OSM + recents (ưu tiên theo từ khóa)
+    const suggestions = useMemo(() => {
+        const base = [
+            ...LINES.flatMap((ln) => ln.stations.map((n) => n.replace(/^Ga\s+/i, ""))),
+            ...allStations.map((s) => s.name.replace(/^Ga\s+/i, "")),
+        ];
+        const q = normalize(search);
+        const filtered = q
+            ? base.filter((x) => normalize(x).includes(q))
+            : base.slice(0, 50);
+        const merged = uniq([...recents, ...filtered]).slice(0, 12);
+        return merged.map((label) => ({ value: label, label }));
+    }, [search, allStations, recents]);
+
+    // UI list per line (map tên chuẩn → OSM; nếu chưa có, disabled)
     const filteredByLine = useMemo(() => {
         const kw = normalize(search);
         const result = { M1: [], M2: [] };
@@ -94,9 +147,10 @@ export default function useMetroData() {
         return result;
     }, [search, stationLookup]);
 
+    // markers
     const markers = useMemo(() => {
         const list = [];
-        for (const lnId of Object.keys(LINES.reduce((m, l) => ((m[l.id] = true), m), {}))) {
+        for (const lnId of ["M1", "M2"]) {
             for (const id of (selectedByLine[lnId] || [])) {
                 const st = filteredByLine[lnId].find((x) => x.id === id);
                 if (st && st.lat != null) list.push(st);
@@ -104,7 +158,9 @@ export default function useMetroData() {
         }
         return list;
     }, [selectedByLine, filteredByLine]);
+    const getSelectedMarkers = () => markers;
 
+    // actions
     const toggleExpand = (lineId) =>
         setExpanded((prev) => {
             const next = new Set(prev);
@@ -122,20 +178,29 @@ export default function useMetroData() {
         });
     };
 
-    const getSelectedMarkers = (filteredByLine) => {
-        const out = [];
-        for (const lnId of ["M1", "M2"]) {
-            for (const id of (selectedByLine[lnId] || [])) {
-                const st = filteredByLine[lnId].find(x => x.id === id);
-                if (st && st.lat != null) out.push(st);
-            }
-        }
-        return out;
-    };
+    const clearSelection = () => setSelectedByLine({ M1: new Set(), M2: new Set() });
 
-    const clearSelection = () => {
-        setSelectedByLine({ M1: new Set(), M2: new Set() });
-    };
+    return {
+        // search
+        search,
+        setSearch,
+        suggestions,
+        recents,
+        addRecent,
+        clearRecents,
 
-    return { search, setSearch, clearSelection,expanded, toggleExpand, selectedByLine, toggleStation, filteredByLine, markers };
+        // list & selection
+        expanded,
+        toggleExpand,
+        selectedByLine,
+        toggleStation,
+        filteredByLine,
+
+        // map
+        markers,
+
+        // utils
+        clearSelection,
+        getSelectedMarkers,
+    };
 }

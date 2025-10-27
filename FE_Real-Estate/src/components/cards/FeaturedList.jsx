@@ -10,7 +10,7 @@ import { fetchPropertiesThunk } from "@/store/propertySlice";
 
 import { FEATURED_PROPERTIES } from "../../data/featuredProperties";
 
-export default function SimilarNews() {
+export default function   SimilarNews() {
   const prevRef = useRef(null);
   const nextRef = useRef(null);
 

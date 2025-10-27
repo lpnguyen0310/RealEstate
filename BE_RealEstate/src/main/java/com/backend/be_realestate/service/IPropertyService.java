@@ -4,8 +4,11 @@ import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO; // Import DTO chi tiết
 import com.backend.be_realestate.modals.dto.UserFavoriteDTO;
+import com.backend.be_realestate.modals.dto.propertydashboard.PendingPropertyDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
+import com.backend.be_realestate.modals.response.PageResponse;
+import com.backend.be_realestate.modals.response.admin.PropertyKpiResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,4 +39,10 @@ public interface IPropertyService {
     Map<String, Long> getPropertyCountsByStatus(Long userId);
 
     List<UserFavoriteDTO> getUsersWhoFavorited(Long propertyId, Long currentUserId);
+
+    List<PropertyCardDTO> getRecommendations(Long userId, int limit);
+
+    PropertyKpiResponse propertiesKpi(String range, String status, String pendingStatus);
+    PageResponse<PendingPropertyDTO> findPending(String q, int page, int size);
+
 }

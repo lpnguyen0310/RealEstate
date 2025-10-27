@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { Carousel, Modal } from "antd";
+import { Carousel } from "antd";
+import { useNavigate } from "react-router-dom";
 
 import FeatureTools from "../../components/button/FeatureTools";
 import FeaturedList from "../../components/cards/FeaturedList";
+import ForYouList from "../../components/cards/ForYouList";
+
 import FeaturedProjects from "../../components/sections/FeaturedProjects";
 import FirstTimeBuyerGuide from "../../components/sections/FirstTimeBuyerGuide";
 import BannerCta from "../../components/sections/BannerCta";
@@ -17,13 +20,32 @@ import SearchCard from "../../components/search/SearchCard";
 
 export default function Home() {
     const [showMetro, setShowMetro] = useState(false);
-    const [mapKey, setMapKey] = useState(0); // key để re-mount MapContainer
+    const [mapKey, setMapKey] = useState(0);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const handleOpen = () => setShowMetro(true);
         window.addEventListener("open-metro-panel", handleOpen);
         return () => window.removeEventListener("open-metro-panel", handleOpen);
     }, []);
+
+    const executeSearchFromParams = (paramsObject = {}) => {
+        const mode = "buy";
+        const final = { ...paramsObject };
+        if (!final.type) final.type = mode === "buy" ? "sell" : "rent";
+
+        if (final.q) final.q = String(final.q).trim();
+        delete final.keyword;
+
+        const params = new URLSearchParams();
+        Object.entries(final).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && String(v).length) {
+                params.set(k, String(v));
+            }
+        });
+
+        navigate(`/search?${params.toString()}`);
+    };
 
     return (
         <div className="w-full">
@@ -62,19 +84,18 @@ export default function Home() {
                     </div>
                 </div>
             </section>
-
-            {/* ================= SEARCH ================= */}
             <SearchCard />
-
-            {/* ================= CONTENT ================= */}
             <section className="bg-[#f7fafc] pt-12 lg:pt-16 pb-24">
                 <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
                     <FeatureTools />
+                    <ForYouList />
                     <FeaturedList />
 
                     <BannerCta
                         title="Tra cứu quy hoạch"
-                        description={<>Kiểm tra quy hoạch online theo: số tờ, số thửa, tọa độ… với độ chính xác cao và dữ liệu mới nhất.</>}
+                        description={
+                            <>Kiểm tra quy hoạch online theo: số tờ, số thửa, tọa độ… với độ chính xác cao và dữ liệu mới nhất.</>
+                        }
                         buttonLabel="Khám phá ngay"
                         href="/tra-cuu-quy-hoach"
                         bg={bannerPlanning}
@@ -88,7 +109,9 @@ export default function Home() {
 
                     <BannerCta
                         title="Tra cứu kế hoạch"
-                        description={<>Kiểm tra quy hoạch online theo: số tờ, số thửa, toạ độ... với độ chính xác cao và dữ liệu mới nhất</>}
+                        description={
+                            <>Kiểm tra quy hoạch online theo: số tờ, số thửa, toạ độ... với độ chính xác cao và dữ liệu mới nhất</>
+                        }
                         buttonLabel="Khám phá ngay"
                         href="/dang-tin"
                         bg={bannerResearch}
@@ -100,7 +123,10 @@ export default function Home() {
                     <BannerCta
                         title="Đăng tin chuyên nghiệp"
                         description={
-                            <>Muốn tìm khách hàng chất lượng? Khám phá giải pháp đăng tin toàn diện tại Radanhadat.vn với cực nhiều ưu đãi trong giai đoạn ra mắt nền tảng</>
+                            <>
+                                Muốn tìm khách hàng chất lượng? Khám phá giải pháp đăng tin toàn diện tại
+                                Radanhadat.vn với cực nhiều ưu đãi trong giai đoạn ra mắt nền tảng
+                            </>
                         }
                         buttonLabel="Đăng tin ngay"
                         href="/dang-tin"
@@ -129,11 +155,20 @@ export default function Home() {
                 onClose={() => setShowMetro(false)}
                 mapKey={mapKey}
                 onSearch={(stations) => {
-                    // TODO: convert stations -> filter param & trigger search
-                    console.log("Selected metro stations:", stations);
+                    // stations: [{ id, name, lat, lng, ... }]
+                    const names = (stations || [])
+                        .map(s => s?.name?.trim())
+                        .filter(Boolean);
+                    const keyword = names.join(" ");
+                    executeSearchFromParams({
+                        q: keyword,
+                        type: "sell", 
+                        kwMode: names.length > 1 ? "any" : "all",
+                    });
+
+                    setShowMetro(false);
                 }}
             />
-
         </div>
     );
 }

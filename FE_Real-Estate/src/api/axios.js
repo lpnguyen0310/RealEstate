@@ -5,14 +5,14 @@ import { getAccessToken, setAccessToken, clearAccessToken } from "@/utils/auth";
 const api = axios.create({ baseURL: "/api", withCredentials: true });
 const refreshClient = axios.create({ baseURL: "/api", withCredentials: true });
 
-// helper set header an toàn cho Axios v1
+// an toàn với Axios v1
 const setAuthHeader = (cfg, token) => {
   if (!cfg.headers) cfg.headers = {};
   if (typeof cfg.headers.set === "function") cfg.headers.set("Authorization", `Bearer ${token}`);
   else cfg.headers = { ...cfg.headers, Authorization: `Bearer ${token}` };
 };
 
-// chuẩn hoá path để skip refresh cho /auth/*
+// bỏ qua refresh cho các endpoint auth
 const skipAuth = (url = "") => {
   const path = url.replace(/^https?:\/\/[^/]+/, "");
   return (
@@ -25,6 +25,7 @@ const skipAuth = (url = "") => {
 
 const isUnauth = (s) => s === 401 || s === 403;
 
+// attach token mỗi request
 api.interceptors.request.use((cfg) => {
   const t = getAccessToken();
   if (t) setAuthHeader(cfg, t);
@@ -50,19 +51,19 @@ api.interceptors.response.use(
     if (response && isUnauth(response.status) && !config?._retry && !skipAuth(url)) {
       config._retry = true;
 
-      // đang refresh → chờ token rồi retry
+      // Nếu đang refresh thì xếp hàng đợi
       if (isRefreshing) {
         return new Promise((resolve) => {
           queued.push((newToken) => {
-            const cfg = { ...config };                   
-            if (newToken) setAuthHeader(cfg, newToken); 
+            const cfg = { ...config };
+            if (newToken) setAuthHeader(cfg, newToken);
             if (!cfg.baseURL) cfg.baseURL = api.defaults.baseURL;
-            resolve(api.request(cfg));                 
+            resolve(api.request(cfg));
           });
         });
       }
 
-      // bắt đầu refresh
+      // Bắt đầu refresh
       isRefreshing = true;
       try {
         const { data } = await refreshClient.post("/auth/refresh");
@@ -73,9 +74,9 @@ api.interceptors.response.use(
         setAccessToken(access);
         notifySubscribers(access);
 
-        // retry request hiện tại
+        // Retry request gốc
         const cfg = { ...config };
-        setAuthHeader(cfg, access);                      // ✅ gắn header đúng cách
+        setAuthHeader(cfg, access);
         if (!cfg.baseURL) cfg.baseURL = api.defaults.baseURL;
         return api.request(cfg);
       } catch (e) {
