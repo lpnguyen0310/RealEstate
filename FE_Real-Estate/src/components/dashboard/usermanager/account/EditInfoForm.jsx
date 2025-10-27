@@ -1,122 +1,138 @@
-import React, { useMemo, useState } from "react";
-import { Card, Form, Input, Button, Upload, Space, Typography, Divider, Select, message, } from "antd";
-import { PlusOutlined, UploadOutlined } from "@ant-design/icons";
+import React, { useMemo, useState, useEffect } from "react";
+import { Card, Form, Input, Button, Upload, Space, Typography, Divider, Select, message } from "antd";
+import { PlusOutlined, UploadOutlined, LoadingOutlined } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
 const { Item } = Form;
 const MAX_PHONES = 5;
 
+// Bỏ onChanged vì không cần nữa
 export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) {
   const [form] = Form.useForm();
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(false); // State để quản lý loading của Upload
 
-  // Map dữ liệu user -> initialValues cho Form
+  // (useMemo tính initialValues giữ nguyên)
   const initialValues = useMemo(() => {
-    const fullName =
-      initialData?.fullName ||
-      `${initialData?.firstName ?? ""} ${initialData?.lastName ?? ""}`.trim() ||
-      initialData?.username ||
-      initialData?.email ||
-      "Người dùng";
-
-    const email = initialData?.email || "";
-    const mainPhone =
-      initialData?.phone || initialData?.phoneNumber || initialData?.mobile || "";
-
-    const phones =
-      initialData?.additionalPhones || initialData?.otherPhones || [];
-
-    return {
-      fullName,
-      personalTaxCode: initialData?.personalTaxCode,
-      email,
-      __mainPhone: mainPhone,         // chỉ để hiển thị (disabled)
-      phones,                         // Form.List
-      // invoice
-      buyerName: fullName,
-      invoiceEmail: email,
-      companyName: initialData?.invoice?.companyName,
-      companyTaxCode: initialData?.invoice?.companyTaxCode,
-      cccd: initialData?.identity?.cccd,
-      dvqhns: initialData?.invoice?.dvqhns,
-      passport: initialData?.identity?.passport,
-      address: initialData?.invoice?.addressCode || "VN",
-    };
+     if (!initialData) return {};
+     const profile = initialData; // Dữ liệu profile nằm ngay cấp đầu
+     return {
+       fullName: initialData.fullName,
+       personalTaxCode: profile?.personalTaxCode,
+       email: initialData.email,
+       __mainPhone: initialData.phone,
+       phones: profile?.additionalPhones || [],
+       buyerName: profile?.buyerName || initialData.fullName,
+       invoiceEmail: profile?.invoiceEmail || initialData.email,
+       companyName: profile?.companyName,
+       companyTaxCode: profile?.companyTaxCode,
+       cccd: profile?.citizenId,
+       dvqhns: profile?.dvqhns,
+       passport: profile?.passport,
+       address: profile?.address || "VN",
+     };
   }, [initialData]);
 
-  const handleUploadChange = async ({ file }) => {
-    if (!file) return;
-    setUploading(true);
+  // useEffect để cập nhật form khi data tải xong (giữ nguyên)
+  useEffect(() => {
+    if (initialData) {
+      form.resetFields(); // Reset trước khi set
+      form.setFieldsValue(initialValues);
+    }
+  }, [initialValues, initialData, form]);
+
+
+  // --- HÀM TRUNG GIAN ĐỂ GỌI UPLOAD TỪ CHA ---
+  // customRequest của antd Upload sẽ gọi hàm này
+  const customUploadRequest = async ({ file, onSuccess, onError }) => {
+    setUploading(true); // Bắt đầu loading (cho UI của Upload)
     try {
-      // Nếu có API upload thật, gọi onUploadAvatar(file) ở đây
-      // await onUploadAvatar?.(file);
-      await new Promise((r) => setTimeout(r, 600)); // mock
-      message.success("Tải ảnh thành công (demo).");
-    } catch {
-      message.error("Tải ảnh thất bại.");
+      // Gọi hàm onUploadAvatar (từ AccountManagement)
+      await onUploadAvatar?.(file);
+      onSuccess?.("ok"); // Báo cho antd Upload là thành công
+    } catch (error) {
+      // Lỗi đã được AccountManagement báo message.error
+      onError?.(error); // Báo cho antd Upload là thất bại
     } finally {
-      setUploading(false);
+      setUploading(false); // Kết thúc loading (cho UI của Upload)
     }
   };
 
-  const UploadAvatar = (
-    <Upload
-      name="avatar"
-      showUploadList={false}
-      beforeUpload={() => false} // không upload tự động
-      onChange={handleUploadChange}
-      className="mx-auto"
-    >
-      <div
-        className="mx-auto rounded-full border border-dashed border-gray-300 w-[140px] h-[140px] grid place-items-center cursor-pointer"
-        style={{ background: "#fafafa" }}
+  // --- COMPONENT UPLOAD AVATAR (HIỂN THỊ ẢNH) ---
+  // (Component này không thay đổi nhiều, chỉ sửa lại cách gọi upload)
+  const RenderUploadAvatar = () => { // Đổi tên thành RenderUploadAvatar để tránh trùng tên biến Upload của antd
+    const currentAvatarUrl = initialData?.avatar; // Lấy URL avatar từ Redux data
+
+    return (
+      <Upload
+        name="avatar"
+        listType="picture-circle"
+        className="avatar-uploader" // Thêm class để dễ style
+        showUploadList={false}
+        customRequest={customUploadRequest} // <-- DÙNG HÀM TRUNG GIAN Ở TRÊN
+        // Bỏ onChange vì customRequest đã xử lý loading
+        disabled={uploading} // Vô hiệu hóa khi đang tải
       >
-        <Space direction="vertical" align="center" size={6}>
-          <UploadOutlined />
-          <Text type="secondary">{uploading ? "Đang tải..." : "Tải ảnh"}</Text>
-        </Space>
-      </div>
-    </Upload>
-  );
-
-  const handleFinish = (values) => {
-    // Chuẩn hoá payload theo BE của bạn
-    const payload = {
-      fullName: values.fullName,
-      personalTaxCode: values.personalTaxCode,
-      email: values.email,
-      mainPhone: initialValues.__mainPhone, // số chính đang để readonly
-      additionalPhones: (values.phones || []).filter(Boolean),
-      invoice: {
-        buyerName: values.buyerName,
-        invoiceEmail: values.invoiceEmail,
-        companyName: values.companyName,
-        companyTaxCode: values.companyTaxCode,
-        addressCode: values.address,
-        dvqhns: values.dvqhns,
-      },
-      identity: {
-        cccd: values.cccd,
-        passport: values.passport,
-      },
-    };
-
-    onSubmit?.(payload);
-    message.success("Đã lưu thay đổi (demo).");
+        {currentAvatarUrl ? (
+          <img
+            src={currentAvatarUrl}
+            alt="Avatar"
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%', // Đảm bảo ảnh tròn
+              objectFit: 'cover',   // Crop ảnh cho vừa
+            }}
+          />
+        ) : (
+          // Placeholder nếu chưa có ảnh
+          <div style={{ textAlign: 'center' }}>
+            {uploading ? <LoadingOutlined /> : <PlusOutlined />}
+            <div style={{ marginTop: 8 }}>{uploading ? "Đang tải..." : "Tải ảnh"}</div>
+          </div>
+        )}
+      </Upload>
+    );
   };
+
+
+  // Hàm submit form (text) (giữ nguyên)
+  const handleFinish = (values) => {
+     // ... (logic payload giữ nguyên) ...
+     const payload = {
+       fullName: values.fullName,
+       email: values.email,
+       personalTaxCode: values.personalTaxCode,
+       additionalPhones: (values.phones || []).filter(Boolean),
+       buyerName: values.buyerName,
+       invoiceEmail: values.invoiceEmail,
+       companyName: values.companyName,
+       companyTaxCode: values.companyTaxCode,
+       address: values.address,
+       dvqhns: values.dvqhns,
+       citizenId: values.cccd,
+       passport: values.passport,
+     };
+     return onSubmit?.(payload);
+  };
+
 
   return (
     <div className="max-w-[700px]">
-      <Card bordered={false}>
+      {/* SỬA CẢNH BÁO: Thay bordered={false} bằng variant="outlined" */}
+      {/* Mặc định của Card là có border nhẹ, dùng "borderless" nếu muốn bỏ hẳn */}
+      <Card variant="borderless">
         <Title level={5} className="!mt-0">Thông tin cá nhân</Title>
-        <div className="my-4">{UploadAvatar}</div>
+        {/* SỬA LỖI: Gọi component RenderUploadAvatar */}
+        <div className="my-4 flex justify-center"><RenderUploadAvatar /></div>
 
         <Form
           layout="vertical"
           form={form}
-          initialValues={initialValues}
+          // Bỏ initialValues vì đã dùng useEffect
           onFinish={handleFinish}
         >
+          {/* ... (Toàn bộ Form.Item giữ nguyên y hệt) ... */}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Item
               label="Họ và tên"
@@ -248,10 +264,12 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
             <div>• Thắc mắc hoá đơn: 1900 1881 (trước 18h).</div>
           </div>
 
-          {/* Submit ẩn để nút "Lưu thay đổi" bên ngoài có thể trigger */}
+
+          {/* Submit ẩn */}
           <button type="submit" id="edit-info-submit" style={{ display: "none" }} />
         </Form>
       </Card>
     </div>
   );
 }
+

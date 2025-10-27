@@ -9,6 +9,7 @@ import adminPostsReducer from "./adminPostsSlice";
 import favoritesReducer, { persistFavorites } from "./favoriteSlice";
 import uiReducer from "./uiSlice";
 import transactionsSlice from "./transactionsSlice";
+import profileReducer from "./profileSlice";
 
 // Import file API của bạn (đã đúng)
 import { notificationApi } from "@/services/notificationApi";
@@ -26,6 +27,7 @@ export const store = configureStore({
     favorites: favoritesReducer,
     ui: uiReducer, 
     transactions: transactionsSlice,
+    profile: profileReducer,
     
     // 1. THÊM DÒNG NÀY (Reducer):
     // Để Redux biết cách lưu trữ data của notificationApi (cache, loading, error)

@@ -24,11 +24,11 @@ setOnUnauthorized(() => {
 });
 
 createRoot(document.getElementById("root")).render(
-  // <StrictMode>
+  <StrictMode>
     <Router>
       <Provider store={store}>
         <App />
       </Provider>
     </Router>
-  // </StrictMode>
+  </StrictMode>
 );
