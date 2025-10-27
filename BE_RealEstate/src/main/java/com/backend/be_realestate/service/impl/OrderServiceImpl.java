@@ -5,7 +5,10 @@ import com.backend.be_realestate.entity.*;
 import com.backend.be_realestate.enums.*;
 import com.backend.be_realestate.modals.dto.order.OrderDTO;
 import com.backend.be_realestate.modals.dto.order.OrderItemDTO;
+import com.backend.be_realestate.modals.dto.order.OrderSimpleDTO;
 import com.backend.be_realestate.modals.request.order.CheckoutReq;
+import com.backend.be_realestate.modals.response.PageResponse;
+import com.backend.be_realestate.modals.response.admin.OrderKpiResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.NotificationService;
 import com.backend.be_realestate.service.OrderService;
@@ -14,16 +17,18 @@ import com.stripe.model.PaymentIntent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -43,7 +48,8 @@ public class OrderServiceImpl implements OrderService {
 
     private final TransactionRepository transactionRepository;
     private final NotificationService notificationService;
-
+    private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final String TZ_OFFSET = "+07:00";
     // ===================== CREATE ORDER =====================
     @Override
     @Transactional
@@ -258,6 +264,126 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    @Override
+    public OrderKpiResponse ordersKpi(String range, String status) {
+        LocalDate today = LocalDate.now(ZONE_VN);
+        Range cur = resolveRange(range, today);
+        Range prev = previousRange(cur);
+
+        Instant cs = cur.start.atZone(ZONE_VN).toInstant();
+        Instant ce = cur.end.atZone(ZONE_VN).toInstant();
+        Instant ps = prev.start.atZone(ZONE_VN).toInstant();
+        Instant pe = prev.end.atZone(ZONE_VN).toInstant();
+
+        String st = (status == null || status.isBlank()) ? "PAID" : status.toUpperCase();
+
+        long curOrders = orderRepository.countOrdersBetween(cs, ce, st);
+        long prevOrders = orderRepository.countOrdersBetween(ps, pe, st);
+        long curRevenue = Optional.ofNullable(orderRepository.sumRevenueBetween(cs, ce, st)).orElse(0L);
+        long prevRevenue = Optional.ofNullable(orderRepository.sumRevenueBetween(ps, pe, st)).orElse(0L);
+
+        double cmpOrders = (prevOrders == 0) ? (curOrders > 0 ? 1.0 : 0.0) : (double) (curOrders - prevOrders) / prevOrders;
+        double cmpRevenue = (prevRevenue == 0) ? (curRevenue > 0 ? 1.0 : 0.0) : (double) (curRevenue - prevRevenue) / prevRevenue;
+
+        List<Object[]> rows = orderRepository.dailyOrderSeries(cs, ce, TZ_OFFSET, st);
+        Map<LocalDate, SeriesRow> map = new LinkedHashMap<>();
+        for (LocalDate d = cur.start.toLocalDate(); !d.isAfter(cur.end.toLocalDate().minusDays(1)); d = d.plusDays(1)) {
+            map.put(d, new SeriesRow(0L, 0L));
+        }
+        for (Object[] r : rows) {
+            LocalDate day = LocalDate.parse(String.valueOf(r[0]));
+            long orders = ((Number) r[1]).longValue();
+            long revenue = ((Number) r[2]).longValue();
+            map.put(day, new SeriesRow(orders, revenue));
+        }
+
+        List<OrderKpiResponse.SeriesPoint> series = new ArrayList<>();
+        map.forEach((d, val) -> series.add(
+                OrderKpiResponse.SeriesPoint.builder()
+                        .date(d.toString()).orders(val.orders).revenue(val.revenue).build()
+        ));
+
+        return OrderKpiResponse.builder()
+                .summary(OrderKpiResponse.Summary.builder()
+                        .orders(curOrders)
+                        .revenue(curRevenue)
+                        .compareOrders(cmpOrders)
+                        .compareRevenue(cmpRevenue)
+                        .build())
+                .series(series)
+                .range(OrderKpiResponse.RangeDto.builder()
+                        .start(cur.start.toString()).end(cur.end.toString()).build())
+                .build();
+    }
+
+    @Override
+    public PageResponse<OrderSimpleDTO> getRecentOrders(String keyword, Pageable pageable) {
+        Page<OrderEntity> page;
+
+        if (StringUtils.hasText(keyword)) {
+            String kw = keyword.trim();
+
+            // Nếu keyword là số → coi như tìm theo id (mã đơn)
+            Long id = parseLongOrNull(kw);
+            if (id != null) {
+                Optional<OrderEntity> one = orderRepository.findById(id);
+                List<OrderEntity> list = one.map(List::of).orElseGet(List::of);
+                page = new PageImpl<>(list, pageable, list.size());
+            } else {
+                page = orderRepository.findRecentByCustomerName(kw, pageable);
+            }
+        } else {
+            page = orderRepository.findRecent(pageable);
+        }
+
+        return PageResponse.from(page.map(OrderSimpleDTO::fromEntity));
+    }
+    private Long parseLongOrNull(String s) {
+        try { return Long.parseLong(s); } catch (Exception e) { return null; }
+    }
+
+    private static class SeriesRow {
+        long orders; long revenue;
+        SeriesRow(long o, long r) { this.orders = o; this.revenue = r; }
+    }
+
+    private static class Range { LocalDateTime start; LocalDateTime end;
+        Range(LocalDateTime s, LocalDateTime e) { this.start = s; this.end = e; }
+    }
+
+    private Range resolveRange(String key, LocalDate today) {
+        String k = key == null ? "" : key;
+        switch (k) {
+            case "today": {
+                LocalDateTime start = today.atStartOfDay();
+                return new Range(start, start.plusDays(1));
+            }
+            case "last_7d": {
+                LocalDate endDay = today.plusDays(1);
+                return new Range(endDay.minusDays(7).atStartOfDay(), endDay.atStartOfDay());
+            }
+            case "this_month": {
+                LocalDate first = today.withDayOfMonth(1);
+                return new Range(first.atStartOfDay(), first.plusMonths(1).atStartOfDay());
+            }
+            case "last_month": {
+                LocalDate firstPrev = today.withDayOfMonth(1).minusMonths(1);
+                return new Range(firstPrev.atStartOfDay(), firstPrev.plusMonths(1).atStartOfDay());
+            }
+            case "last_30d":
+            default: {
+                LocalDate endDay = today.plusDays(1);
+                return new Range(endDay.minusDays(30).atStartOfDay(), endDay.atStartOfDay());
+            }
+        }
+    }
+
+    private Range previousRange(Range cur) {
+        Duration len = Duration.between(cur.start, cur.end);
+        LocalDateTime prevEnd = cur.start;
+        LocalDateTime prevStart = prevEnd.minus(len);
+        return new Range(prevStart, prevEnd);
+    }
     @Override
     @Transactional
     public void processPaidOrder(Long orderId) {

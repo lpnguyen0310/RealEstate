@@ -10,8 +10,11 @@ import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
 import com.backend.be_realestate.modals.dto.propertyEvent.PropertyEvent;
+import com.backend.be_realestate.modals.dto.propertydashboard.PendingPropertyDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
+import com.backend.be_realestate.modals.response.PageResponse;
+import com.backend.be_realestate.modals.response.admin.PropertyKpiResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
@@ -29,11 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.sql.Timestamp;
-import java.time.Instant;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,6 +58,8 @@ public class PropertyServiceImpl implements IPropertyService {
     private final NotificationServiceImpl notificationService;
     private final SavedPropertyRepository savedRepo;
 
+    private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final String TZ_OFFSET = "+07:00";
     @Override
     public List<PropertyCardDTO> getAllPropertiesForCardView() {
         return propertyRepository.findAll().stream()
@@ -442,6 +445,75 @@ public class PropertyServiceImpl implements IPropertyService {
         return ranked.stream().map(propertyMapper::toPropertyCardDTO).toList();
     }
 
+    @Override
+    public PropertyKpiResponse propertiesKpi(String range, String status, String pendingStatus) {
+        String st = (status == null || status.isBlank()) ? "PUBLISHED" : status.toUpperCase();
+        String pend = (pendingStatus == null || pendingStatus.isBlank()) ? "PENDING_REVIEW" : pendingStatus.toUpperCase();
+
+        LocalDate today = LocalDate.now(ZONE_VN);
+        Range cur = resolveRange(range, today);
+        Range prev = previousRange(cur);
+
+        Instant cs = cur.start.atZone(ZONE_VN).toInstant();
+        Instant ce = cur.end.atZone(ZONE_VN).toInstant();
+        Instant ps = prev.start.atZone(ZONE_VN).toInstant();
+        Instant pe = prev.end.atZone(ZONE_VN).toInstant();
+
+        long totalCur  = propertyRepository.countPostedBetween(cs, ce, st);
+        long totalPrev = propertyRepository.countPostedBetween(ps, pe, st);
+        double pct = (totalPrev == 0) ? (totalCur > 0 ? 1.0 : 0.0) : (double) (totalCur - totalPrev) / totalPrev;
+
+        // series
+        List<Object[]> rows = propertyRepository.dailyPostedSeries(cs, ce, TZ_OFFSET, st);
+        Map<LocalDate, Long> map = new LinkedHashMap<>();
+        for (LocalDate d = cur.start.toLocalDate(); !d.isAfter(cur.end.toLocalDate().minusDays(1)); d = d.plusDays(1)) {
+            map.put(d, 0L);
+        }
+        for (Object[] r : rows) {
+            LocalDate day = LocalDate.parse(String.valueOf(r[0]));
+            long c = ((Number) r[1]).longValue();
+            map.put(day, c);
+        }
+        List<PropertyKpiResponse.SeriesPoint> series = new ArrayList<>();
+        map.forEach((d, c) -> series.add(
+                PropertyKpiResponse.SeriesPoint.builder().date(d.toString()).count(c).build()
+        ));
+
+        long pending = propertyRepository.countPending(pend);
+
+        return PropertyKpiResponse.builder()
+                .summary(PropertyKpiResponse.Summary.builder()
+                        .total(totalCur)
+                        .compareToPrev(pct)
+                        .pending(pending)
+                        .build())
+                .series(series)
+                .range(PropertyKpiResponse.RangeDto.builder()
+                        .start(cur.start.toString()).end(cur.end.toString()).build())
+                .build();
+    }
+
+    @Override
+    public PageResponse<PendingPropertyDTO> findPending(String q, int page, int size) {
+        final String query = (q == null || q.isBlank()) ? null : q.trim();
+        final var pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+
+        final var rows = propertyRepository.findPending(PropertyStatus.PENDING_REVIEW, query, pageable);
+
+        // map Page<PendingPropertyRow> -> Page<PendingPropertyDto> bằng Page.map(...)
+        final var dtoPage = rows.map(r -> PendingPropertyDTO.builder()
+                .id(r.getId())
+                .title(r.getTitle())
+                .author(r.getAuthor())
+                .postedDate(
+                        r.getPostedAt() == null ? null :
+                                r.getPostedAt().toInstant().atZone(ZONE_VN).toLocalDate().toString()
+                )
+                .build()
+        );
+
+        return PageResponse.from(dtoPage);
+    }
 
 
     private static Specification<PropertyEntity> and(Specification<PropertyEntity> base, Specification<PropertyEntity> next) {
@@ -541,4 +613,41 @@ public class PropertyServiceImpl implements IPropertyService {
         }
     }
 
+    private static class Range { LocalDateTime start, end;
+        Range(LocalDateTime s, LocalDateTime e) { this.start = s; this.end = e; } }
+
+
+    private Range resolveRange(String key, LocalDate today) {
+        String k = key == null ? "" : key;
+        switch (k) {
+            case "today": {
+                LocalDateTime start = today.atStartOfDay();
+                return new Range(start, start.plusDays(1));
+            }
+            case "last_7d": {
+                LocalDate endDay = today.plusDays(1);
+                return new Range(endDay.minusDays(7).atStartOfDay(), endDay.atStartOfDay());
+            }
+            case "this_month" : {
+                LocalDate first = today.withDayOfMonth(1);
+                return new Range(first.atStartOfDay(), first.plusMonths(1).atStartOfDay());
+            }
+            case "last_month": {
+                LocalDate firstPrev = today.withDayOfMonth(1).minusMonths(1);
+                return new Range(firstPrev.atStartOfDay(), firstPrev.plusMonths(1).atStartOfDay());
+            }
+            case "last_30d":
+            default: {
+                    LocalDate endDay = today.plusDays(1);
+                    return new Range(endDay.minusDays(30).atStartOfDay(), endDay.atStartOfDay());
+                }
+        }
+    }
+
+    private Range previousRange(Range cur) {
+        Duration len = Duration.between(cur.start, cur.end);
+        LocalDateTime prevEnd = cur.start;
+        LocalDateTime prevStart = prevEnd.minus(len);
+        return new Range(prevStart, prevEnd);
+    }
 }

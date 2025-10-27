@@ -1,13 +1,15 @@
 // src/layouts/AdminLayout.jsx
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useMemo, useState } from "react";
 import { logoutThunk } from "@/store/authSlice";
 import AdminSidebar from "../components/admidashboard/AdminSidebar.jsx";
 import { LogOut, Home } from "lucide-react";
+import { ADMIN_MENUS } from "@/data/SideBar/menuDataAdmin";
 
 export default function AdminLayout() {
     const nav = useNavigate();
+    const location = useLocation();
     const dispatch = useDispatch();
     const user = useSelector((s) => s.auth.user);
 
@@ -24,6 +26,28 @@ export default function AdminLayout() {
                 : (parts[0][0] || "") + (parts[parts.length - 1][0] || "");
         return chars.toUpperCase();
     }, [user]);
+
+    // === Tính mục menu hiện tại theo URL ===
+    const { pageTitle, crumbLabel } = useMemo(() => {
+        const pathname = location.pathname.replace(/\/+$/, ""); // bỏ dấu "/" cuối nếu có
+        // Cho điểm khớp: 3 = bằng nhau, 2 = prefix + '/', 1 = prefix thường
+        const scored = ADMIN_MENUS.map((m) => {
+            const to = m.to?.replace(/\/+$/, "") || "";
+            let rank = 0;
+            if (pathname === to) rank = 3;
+            else if (to && pathname.startsWith(`${to}/`)) rank = 2;
+            else if (to && pathname.startsWith(to)) rank = 1;
+            return { ...m, rank, len: to.length };
+        })
+            .filter((m) => m.rank > 0)
+            .sort((a, b) => b.rank - a.rank || b.len - a.len);
+
+        const current = scored[0] || null;
+
+        const label = current?.breadcrumb || current?.text || "Dashboard";
+        // Bạn có thể tùy chọn title khác ở đây, tạm dùng cùng 1 nhãn
+        return { pageTitle: label, crumbLabel: label };
+    }, [location.pathname]);
 
     const handleLogout = async () => {
         try {
@@ -57,16 +81,24 @@ export default function AdminLayout() {
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2 text-[#0f2f63]">
                                         <h1 className="truncate text-lg lg:text-xl font-semibold">
-                                            Bảng điều khiển (Admin)
+                                            {pageTitle}
                                         </h1>
                                         <span className="hidden sm:inline-block rounded-md bg-[#e9f0ff] text-[#31507a] text-[11px] font-semibold px-2 py-0.5">
                                             LIVE
                                         </span>
                                     </div>
                                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[#607aa6]">
-                                        <span className="truncate">Trang chủ</span>
+                                        <button
+                                            onClick={handleGoHome}
+                                            className="truncate hover:underline"
+                                            title="Trang chính"
+                                        >
+                                            Trang chủ
+                                        </button>
                                         <span>/</span>
-                                        <span className="truncate text-[#0f2f63] font-medium">Dashboard</span>
+                                        <span className="truncate text-[#0f2f63] font-medium">
+                                            {crumbLabel}
+                                        </span>
                                     </div>
                                 </div>
 

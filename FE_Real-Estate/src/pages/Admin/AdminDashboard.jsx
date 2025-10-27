@@ -11,31 +11,32 @@ import {
 } from "@/components/admidashboard/layoutadmin";
 
 const nfmt = (n) => new Intl.NumberFormat("vi-VN").format(n);
+const vnd = (n) => `${new Intl.NumberFormat("vi-VN").format(n)}đ`;
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
+const initials = (fullName = "") =>
+    fullName.trim().split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase();
 
 export default function AdminDashboard() {
     const [range, setRange] = useState("last_30d");
-    const [postSearch, setPostSearch] = useState("");
     const [orderSearch, setOrderSearch] = useState("");
     const chartRef = useRef(null);
 
-    // ----- KPI New Users state -----
+    /* ===================== KPI: NEW USERS ===================== */
     const [newUsers, setNewUsers] = useState({
         total: 0,
-        compareToPrev: 0, // 0.153 = +15.3%
-        series: [],       // [{date,count}]
+        compareToPrev: 0,
+        series: [],
         loading: false,
         error: null,
     });
 
-    // Fetch KPI mỗi khi đổi range
     useEffect(() => {
         let mounted = true;
         (async () => {
             try {
                 if (mounted) setNewUsers((s) => ({ ...s, loading: true, error: null }));
-                const { data } = await kpiApi.getNewUsers(range); // gửi đúng case đang chọn
+                const { data } = await kpiApi.getNewUsers(range);
                 if (!mounted) return;
-
                 setNewUsers({
                     total: data?.summary?.total ?? 0,
                     compareToPrev: data?.summary?.compareToPrev ?? 0,
@@ -52,10 +53,11 @@ export default function AdminDashboard() {
                 }));
             }
         })();
-        return () => { mounted = false; };
+        return () => {
+            mounted = false;
+        };
     }, [range]);
 
-    // Build props cho StatCard “Người dùng mới”
     const newUsersCard = useMemo(() => {
         const total = newUsers.total ?? 0;
         const pct = Number(newUsers.compareToPrev ?? 0);
@@ -65,13 +67,7 @@ export default function AdminDashboard() {
                 ? "—"
                 : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
         const spark = (newUsers.series || []).map((p) => p.count);
-
-        const hint = newUsers.error
-            ? `Lỗi: ${newUsers.error}`
-            : newUsers.loading
-                ? "Đang tải…"
-                : pctText;
-
+        const hint = newUsers.error ? `Lỗi: ${newUsers.error}` : newUsers.loading ? "Đang tải…" : pctText;
         return {
             title: "Người dùng mới",
             value: newUsers.loading ? "…" : nfmt(total),
@@ -81,52 +77,170 @@ export default function AdminDashboard() {
         };
     }, [newUsers]);
 
-    // === Các KPI demo khác (giữ nguyên) ===
-    const kpis = {
-        revenue: {
-            title: "Doanh thu",
-            value: "150.000.000đ",
-            hint: "+8.2% so với tháng trước",
-            trend: "up",
-            spark: [60, 63, 66, 70, 73, 75, 80, 84, 90],
-        },
-        newPosts: {
-            title: "Tin đăng mới",
-            value: "3,420",
-            hint: "12 tin đang chờ duyệt",
-            trend: "up",
-            spark: [3000, 3100, 3150, 3200, 3300, 3400],
-        },
-        newOrders: {
+    /* ===================== KPI: ORDERS + REVENUE ===================== */
+    const [orderKpi, setOrderKpi] = useState({
+        orders: 0,
+        revenue: 0,
+        compareOrders: 0,
+        compareRevenue: 0,
+        series: [],
+        loading: false,
+        error: null,
+    });
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                if (mounted) setOrderKpi((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getOrders(range, "PAID");
+                if (!mounted) return;
+                setOrderKpi({
+                    orders: data?.summary?.orders ?? 0,
+                    revenue: data?.summary?.revenue ?? 0,
+                    compareOrders: data?.summary?.compareOrders ?? 0,
+                    compareRevenue: data?.summary?.compareRevenue ?? 0,
+                    series: Array.isArray(data?.series) ? data.series : [],
+                    loading: false,
+                    error: null,
+                });
+            } catch (e) {
+                if (!mounted) return;
+                setOrderKpi((s) => ({
+                    ...s,
+                    loading: false,
+                    error: e?.response?.data?.message || e?.message || "Không tải được KPI đơn hàng",
+                }));
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, [range]);
+
+    const ordersCard = useMemo(() => {
+        const total = orderKpi.orders ?? 0;
+        const pct = Number(orderKpi.compareOrders ?? 0);
+        const trend = pct < 0 ? "down" : "up";
+        const pctText =
+            pct === 0 && total === 0
+                ? "—"
+                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
+        const spark = (orderKpi.series || []).map((p) => p.orders);
+        const hint = orderKpi.error ? `Lỗi: ${orderKpi.error}` : orderKpi.loading ? "Đang tải…" : pctText;
+        return {
             title: "Đơn hàng mới",
-            value: "56",
-            hint: "-2.1% so với hôm qua",
-            trend: "down",
-            spark: [58, 57, 56, 55, 56, 54, 55],
-        },
-    };
+            value: orderKpi.loading ? "…" : nfmt(total),
+            hint,
+            trend,
+            spark: spark.length ? spark : [2, 1, 3, 2, 4, 5, 3],
+            trendColor: trend === "down" ? "text-red-500" : "text-green-600",
+        };
+    }, [orderKpi]);
 
-    // Chart doanh thu (demo)
-    const chart = useMemo(() => {
-        const labels = [
-            "Thg 1", "Thg 2", "Thg 3", "Thg 4", "Thg 5", "Thg 6",
-            "Thg 7", "Thg 8", "Thg 9", "Thg 10", "Thg 11", "Thg 12"
-        ];
-        const data = [65, 59, 80, 81, 56, 55, 40, 60, 75, 90, 110, 120];
+    const revenueCard = useMemo(() => {
+        const totalVnd = orderKpi.revenue ?? 0;
+        const pct = Number(orderKpi.compareRevenue ?? 0);
+        const trend = pct < 0 ? "down" : "up";
+        const pctText =
+            pct === 0 && totalVnd === 0
+                ? "—"
+                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
+        const spark = (orderKpi.series || []).map((p) => Math.round((p.revenue ?? 0) / 1_000_000));
+        const hint = orderKpi.error ? `Lỗi: ${orderKpi.error}` : orderKpi.loading ? "Đang tải…" : pctText;
+        return {
+            title: "Doanh thu",
+            value: orderKpi.loading ? "…" : vnd(totalVnd),
+            hint,
+            trend,
+            spark: spark.length ? spark : [60, 63, 66, 70, 73, 75],
+        };
+    }, [orderKpi]);
 
+    /* ===================== KPI: PROPERTIES ===================== */
+    const [propKpi, setPropKpi] = useState({
+        total: 0,
+        compareToPrev: 0,
+        pending: 0,
+        series: [],
+        loading: false,
+        error: null,
+    });
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                if (mounted) setPropKpi((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getProperties(range, "PUBLISHED", "PENDING_REVIEW");
+                if (!mounted) return;
+                setPropKpi({
+                    total: data?.summary?.total ?? 0,
+                    compareToPrev: data?.summary?.compareToPrev ?? 0,
+                    pending: data?.summary?.pending ?? 0,
+                    series: Array.isArray(data?.series) ? data.series : [],
+                    loading: false,
+                    error: null,
+                });
+            } catch (e) {
+                if (!mounted) return;
+                setPropKpi((s) => ({
+                    ...s,
+                    loading: false,
+                    error: e?.response?.data?.message || e?.message || "Không tải được KPI tin đăng",
+                }));
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, [range]);
+
+    const newPostsCard = useMemo(() => {
+        const total = propKpi.total ?? 0;
+        const pct = Number(propKpi.compareToPrev ?? 0);
+        const trend = pct < 0 ? "down" : "up";
+        const pctText =
+            pct === 0 && total === 0
+                ? "—"
+                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
+        const seriesCounts = (propKpi.series || []).map((p) => p.count ?? 0);
+        const hasSeries = seriesCounts.length > 0;
+        const allZero = hasSeries && seriesCounts.every((v) => (v ?? 0) === 0);
+        const spark = hasSeries ? (allZero ? [0] : seriesCounts) : [0];
+        const hint = propKpi.error
+            ? `Lỗi: ${propKpi.error}`
+            : propKpi.loading
+                ? "Đang tải…"
+                : `${pctText} · ${propKpi.pending ?? 0} tin đang chờ duyệt`;
+        return {
+            title: "Tin đăng mới",
+            value: propKpi.loading ? "…" : nfmt(total),
+            hint,
+            trend,
+            spark,
+            lineColor: "#6366f1",
+        };
+    }, [propKpi]);
+
+    /* ===================== Chart doanh thu theo ngày ===================== */
+    const revenueChart = useMemo(() => {
+        const series = Array.isArray(orderKpi.series) ? orderKpi.series : [];
+        const labels = series.map((p) => p.date);
+        const data = series.map((p) => Math.round((p.revenue ?? 0) / 1_000_000));
         return {
             data: {
                 labels,
                 datasets: [
                     {
-                        label: "Doanh thu (triệu VND)",
+                        label: "Doanh thu (triệu VND) • theo ngày",
                         data,
                         fill: true,
                         backgroundColor: "rgba(59,130,246,0.08)",
                         borderColor: "rgba(59,130,246,0.7)",
                         borderWidth: 2,
                         tension: 0.3,
-                        pointRadius: 3,
+                        pointRadius: 2,
                     },
                 ],
             },
@@ -135,62 +249,152 @@ export default function AdminDashboard() {
                 maintainAspectRatio: false,
                 scales: {
                     y: { beginAtZero: true, ticks: { color: "#6b7280" } },
-                    x: { grid: { display: false }, ticks: { color: "#6b7280" } },
+                    x: { grid: { display: false }, ticks: { color: "#6b7280", maxRotation: 0, autoSkip: true } },
                 },
                 plugins: { legend: { display: false } },
             },
         };
+    }, [orderKpi.series]);
+
+    /* ===================== Tin chờ duyệt ===================== */
+    const [pendingQ, setPendingQ] = useState("");
+    const [pendingList, setPendingList] = useState({
+        content: [],
+        page: 0,
+        size: 8,
+        totalElements: 0,
+        totalPages: 0,
+        first: true,
+        last: true,
+        loading: false,
+        error: null,
+    });
+
+    useEffect(() => {
+        let mounted = true;
+        const timer = setTimeout(async () => {
+            try {
+                if (mounted) setPendingList((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getPendingProperties({ q: pendingQ, page: 0, size: 8 });
+                if (!mounted) return;
+                setPendingList({
+                    content: Array.isArray(data?.content) ? data.content : [],
+                    page: data?.page ?? 0,
+                    size: data?.size ?? 8,
+                    totalElements: data?.totalElements ?? 0,
+                    totalPages: data?.totalPages ?? 0,
+                    first: !!data?.first,
+                    last: !!data?.last,
+                    loading: false,
+                    error: null,
+                });
+            } catch (e) {
+                if (!mounted) return;
+                setPendingList((s) => ({
+                    ...s,
+                    loading: false,
+                    error: e?.response?.data?.message || e?.message || "Không tải được danh sách tin chờ duyệt",
+                }));
+            }
+        }, 300);
+        return () => {
+            mounted = false;
+            clearTimeout(timer);
+        };
+    }, [pendingQ]);
+
+    /* ===================== Đơn hàng mới nhất ===================== */
+    const [recentOrders, setRecentOrders] = useState({
+        content: [],
+        loading: false,
+        error: null,
+    });
+
+    useEffect(() => {
+        let mounted = true;
+        const t = setTimeout(async () => {
+            try {
+                if (mounted) setRecentOrders((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getRecentOrders({ q: orderSearch, page: 0, size: 8 });
+                if (!mounted) return;
+                setRecentOrders({
+                    content: Array.isArray(data?.content) ? data.content : [],
+                    loading: false,
+                    error: null,
+                });
+            } catch (e) {
+                if (!mounted) return;
+                setRecentOrders((s) => ({
+                    ...s,
+                    loading: false,
+                    error: e?.response?.data?.message || e?.message || "Không tải được đơn hàng mới",
+                }));
+            }
+        }, 300); // debounce
+        return () => {
+            mounted = false;
+            clearTimeout(t);
+        };
+    }, [orderSearch]);
+
+
+    // ---- state: recent transactions (from BE) ----
+    const [recentTx, setRecentTx] = useState({ rows: [], loading: false, error: null });
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                if (mounted) setRecentTx((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getRecentTransactions({ status: "PAID", page: 0, size: 4 });
+                if (!mounted) return;
+
+                // data = List<RecentTransactionDto>
+                const rows = Array.isArray(data) ? data : [];
+
+                // map về format RecentTransactionsCard
+                const items = rows.map((r) => ({
+                    ini: initials(r.userName || r.email || "U"),
+                    iniBg: "bg-indigo-100",
+                    iniText: "text-indigo-600",
+                    name: r.userName || r.email || "Người dùng",
+                    desc: r.title || "Giao dịch",
+                    amount: `+${vnd(r.amount || 0)}`,
+                    time: new Date(r.createdAt).toLocaleString("vi-VN"),
+                    wallet: "ví MoMo", // nếu BE có cổng thanh toán thì thay ở đây
+                }));
+
+                setRecentTx({ rows: items, loading: false, error: null });
+            } catch (e) {
+                if (!mounted) return;
+                setRecentTx({
+                    rows: [],
+                    loading: false,
+                    error: e?.response?.data?.message || e?.message || "Không tải được giao dịch",
+                });
+            }
+        })();
+        return () => { mounted = false; };
     }, []);
-
-    const pendingPosts = [
-        { title: "Bán nhà quận 1, 100m2, gần trung tâm, sổ hồng chính chủ...", user: "Nguyễn Văn An", date: "20/10/2025" },
-        { title: "Cho thuê chung cư mini full nội thất, gần ĐH KT, giá tốt...", user: "Trần Thị Bình", date: "20/10/2025" },
-        { title: "Đất nền dự án giá tốt, pháp lý rõ ràng, hạ tầng hoàn thiện...", user: "Lê Văn Cường", date: "19/10/2025" },
-    ];
-
-    const recentOrders = [
-        { code: "#ORD-0125", customer: "Nguyễn Văn An", total: "500.000đ", status: "Hoàn thành", badge: "green" },
-        { code: "#ORD-0124", customer: "Trần Thị Bình", total: "50.000đ", status: "Hoàn thành", badge: "green" },
-        { code: "#ORD-0123", customer: "Lê Văn Cường", total: "1.200.000đ", status: "Chờ xử lý", badge: "yellow" },
-    ];
-
-    const notifications = [
-        { type: "report", text: "<strong>Nguyễn Văn An</strong> đã gửi một báo cáo cho tin đăng 'Bán nhà quận 1...'", time: "5 phút trước" },
-        { type: "new_user", text: "<strong>Trần Thị Bình</strong> vừa đăng ký tài khoản mới.", time: "1 giờ trước" },
-        { type: "comment", text: "<strong>Lê Văn Cường</strong> đã bình luận về một tin đăng.", time: "3 giờ trước" },
-        { type: "report", text: "Tin đăng 'Cho thuê chung cư...' đã nhận được <strong>3 báo cáo</strong>.", time: "1 ngày trước" },
-    ];
-
-    const filteredPosts = pendingPosts.filter(
-        (p) =>
-            p.title.toLowerCase().includes(postSearch.toLowerCase()) ||
-            p.user.toLowerCase().includes(postSearch.toLowerCase())
-    );
-    const filteredOrders = recentOrders.filter(
-        (o) =>
-            o.code.toLowerCase().includes(orderSearch.toLowerCase()) ||
-            o.customer.toLowerCase().includes(orderSearch.toLowerCase())
-    );
 
     return (
         <div className="bg-[#f5f7fb] min-h-screen">
-
+            {/* HEADER: kỳ KPI */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6 px-1">
                 <select
                     value={range}
                     onChange={(e) => setRange(e.target.value)}
                     className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700
-             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ring-inset transition"
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ring-inset transition"
                 >
                     <option value="today">Hôm nay</option>
                     <option value="last_7d">7 ngày qua</option>
                     <option value="last_30d">30 ngày qua</option>
                     <option value="this_month">Tháng này</option>
                 </select>
-
             </div>
 
-            {/* KPI Section */}
+            {/* KPI */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCard
                     {...newUsersCard}
@@ -206,7 +410,7 @@ export default function AdminDashboard() {
                     }
                 />
                 <StatCard
-                    {...kpis.revenue}
+                    {...revenueCard}
                     iconBg="bg-green-100 text-green-600"
                     lineColor="#22c55e"
                     gradientFrom="from-green-50"
@@ -219,7 +423,7 @@ export default function AdminDashboard() {
                     }
                 />
                 <StatCard
-                    {...kpis.newPosts}
+                    {...newPostsCard}
                     iconBg="bg-indigo-100 text-indigo-600"
                     lineColor="#6366f1"
                     gradientFrom="from-indigo-50"
@@ -233,10 +437,10 @@ export default function AdminDashboard() {
                     }
                 />
                 <StatCard
-                    {...kpis.newOrders}
+                    {...ordersCard}
                     iconBg="bg-amber-100 text-amber-600"
                     lineColor="#f59e0b"
-                    trendColor="text-red-500"
+                    trendColor={ordersCard.trendColor}
                     gradientFrom="from-amber-50"
                     gradientTo="to-white"
                     icon={
@@ -252,45 +456,49 @@ export default function AdminDashboard() {
             {/* Layout chính */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-2">
-                    <NotificationsCard items={notifications} />
+                    <NotificationsCard
+                        items={[
+                            { type: "report", text: "<strong>Nguyễn Văn An</strong> đã gửi một báo cáo cho tin đăng 'Bán nhà quận 1...'", time: "5 phút trước" },
+                            { type: "new_user", text: "<strong>Trần Thị Bình</strong> vừa đăng ký tài khoản mới.", time: "1 giờ trước" },
+                            { type: "comment", text: "<strong>Lê Văn Cường</strong> đã bình luận về một tin đăng.", time: "3 giờ trước" },
+                            { type: "report", text: "Tin đăng 'Cho thuê chung cư...' đã nhận được <strong>3 báo cáo</strong>.", time: "1 ngày trước" },
+                        ]}
+                    />
                 </div>
 
                 <div className="lg:col-span-2">
                     <RecentTransactionsCard
                         items={
-                            recentOrders.length
-                                ? [
-                                    { ini: "AV", iniBg: "bg-blue-100", iniText: "text-blue-600", name: "Nguyễn Văn An", desc: "Mua gói tin VIP", amount: "+500.000đ" },
-                                    { ini: "TB", iniBg: "bg-indigo-100", iniText: "text-indigo-600", name: "Trần Thị Bình", desc: "Đăng tin thường", amount: "+50.000đ" },
-                                    { ini: "LC", iniBg: "bg-amber-100", iniText: "text-amber-600", name: "Lê Văn Cường", desc: "Mua gói tin đặc biệt", amount: "+1.200.000đ" },
-                                    { ini: "HD", iniBg: "bg-pink-100", iniText: "text-pink-600", name: "Hồ Thị Dung", desc: "Up tin lên top", amount: "+100.000đ" },
-                                ]
-                                : []
+                            recentTx.loading
+                                ? [] // card có skeleton nhẹ: bạn có thể thay bằng 4 item “Đang tải…”
+                                : recentTx.rows
                         }
                     />
+                    {recentTx.error && (
+                        <div className="mt-2 text-sm text-red-600">{recentTx.error}</div>
+                    )}
                 </div>
 
-                {/* Biểu đồ doanh thu */}
+                {/* Biểu đồ Doanh thu */}
                 <div className="lg:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
                     <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-800">Phân tích doanh thu</h3>
-                        {/* ĐÃ bỏ select tại đây để dùng select chung phía trên */}
+                        <h3 className="text-lg font-semibold text-gray-800">Phân tích doanh thu theo ngày</h3>
                     </div>
-                    <p className="text-sm text-gray-500 mb-4">Dữ liệu trong 12 tháng gần nhất</p>
+                    <p className="text-sm text-gray-500 mb-4">Nguồn dữ liệu: đơn hàng (status=PAID) • Kỳ: {range}</p>
                     <div className="h-80 w-full">
-                        <Line ref={chartRef} data={chart.data} options={chart.options} />
+                        <Line ref={chartRef} data={revenueChart.data} options={revenueChart.options} />
                     </div>
                 </div>
 
-                {/* Tin cần duyệt */}
+                {/* Tin đăng mới cần duyệt */}
                 <div className="lg:col-span-2">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
                         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                             <h3 className="text-lg font-semibold text-gray-800">Tin đăng mới cần duyệt</h3>
                             <div className="relative">
                                 <input
-                                    value={postSearch}
-                                    onChange={(e) => setPostSearch(e.target.value)}
+                                    value={pendingQ}
+                                    onChange={(e) => setPendingQ(e.target.value)}
                                     placeholder="Tìm tiêu đề/người đăng…"
                                     className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
                                 />
@@ -300,6 +508,7 @@ export default function AdminDashboard() {
                                 </svg>
                             </div>
                         </div>
+
                         <div className="relative overflow-x-auto rounded-xl ring-1 ring-gray-200">
                             <table className="w-full text-sm text-left">
                                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
@@ -310,28 +519,54 @@ export default function AdminDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {filteredPosts.map((p, i) => (
-                                        <tr key={i} className={`bg-white hover:bg-slate-50 transition-colors ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}>
-                                            <td className="py-3 px-4 font-medium text-gray-900">
-                                                <div className="max-w-xs truncate" title={p.title}>{p.title}</div>
+                                    {pendingList.loading && (
+                                        <tr>
+                                            <td colSpan={3} className="py-8 text-center text-gray-500">
+                                                Đang tải…
                                             </td>
-                                            <td className="py-3 px-4">
-                                                <div className="inline-flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                                        {p.user.split(" ").map((x) => x[0]).join("").slice(0, 2)}
-                                                    </div>
-                                                    <span className="text-gray-700 truncate" title={p.user}>{p.user}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{p.date}</td>
                                         </tr>
-                                    ))}
-                                    {filteredPosts.length === 0 && (
-                                        <tr><td colSpan={3} className="py-8 text-center text-gray-500">Không có tin phù hợp</td></tr>
+                                    )}
+                                    {!pendingList.loading &&
+                                        !pendingList.error &&
+                                        pendingList.content.map((p) => (
+                                            <tr key={p.id} className="bg-white hover:bg-slate-50 transition-colors">
+                                                <td className="py-3 px-4 font-medium text-gray-900">
+                                                    <div className="max-w-xs truncate" title={p.title}>
+                                                        {p.title}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <div className="inline-flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                                            {initials(p.author)}
+                                                        </div>
+                                                        <span className="text-gray-700 truncate" title={p.author}>
+                                                            {p.author}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{p.postedDate || "—"}</td>
+                                            </tr>
+                                        ))}
+                                    {!pendingList.loading && !pendingList.error && pendingList.content.length === 0 && (
+                                        <tr>
+                                            <td colSpan={3} className="py-8 text-center text-gray-500">
+                                                Không có tin phù hợp
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {pendingList.error && (
+                                        <tr>
+                                            <td colSpan={3} className="py-8 text-center text-red-500">
+                                                {pendingList.error}
+                                            </td>
+                                        </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
+
+                        <div className="mt-3 text-xs text-gray-500">Tổng: {pendingList.totalElements} tin cần duyệt</div>
                     </div>
                 </div>
 
@@ -344,7 +579,7 @@ export default function AdminDashboard() {
                                 <input
                                     value={orderSearch}
                                     onChange={(e) => setOrderSearch(e.target.value)}
-                                    placeholder="Tìm mã đơn/khách hàng…"
+                                    placeholder="Tìm mã đơn (id)/khách hàng…"
                                     className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
                                 />
                                 <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -353,6 +588,7 @@ export default function AdminDashboard() {
                                 </svg>
                             </div>
                         </div>
+
                         <div className="relative overflow-x-auto rounded-xl ring-1 ring-gray-200">
                             <table className="w-full text-sm text-left">
                                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
@@ -361,44 +597,78 @@ export default function AdminDashboard() {
                                         <th className="py-3 px-4">Khách hàng</th>
                                         <th className="py-3 px-4">Tổng tiền</th>
                                         <th className="py-3 px-4">Trạng thái</th>
+                                        <th className="py-3 px-4">Thời gian</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {filteredOrders.map((o, i) => (
-                                        <tr key={i} className={`bg-white hover:bg-slate-50 transition-colors ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}>
-                                            <td className="py-3 px-4 font-semibold text-gray-900 whitespace-nowrap">{o.code}</td>
-                                            <td className="py-3 px-4">
-                                                <div className="inline-flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                                        {o.customer.split(" ").map((x) => x[0]).join("").slice(0, 2)}
-                                                    </div>
-                                                    <span className="text-gray-700 truncate" title={o.customer}>{o.customer}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-4 font-medium text-gray-900 tabular-nums whitespace-nowrap">{o.total}</td>
-                                            <td className="py-3 px-4">
-                                                <span
-                                                    className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${o.badge === "green"
-                                                        ? "bg-green-50 text-green-700 ring-green-100"
-                                                        : o.badge === "yellow"
-                                                            ? "bg-amber-50 text-amber-700 ring-amber-100"
-                                                            : "bg-gray-50 text-gray-700 ring-gray-100"
-                                                        }`}
-                                                >
-                                                    {o.status}
-                                                </span>
+                                    {recentOrders.loading && (
+                                        <tr>
+                                            <td colSpan={5} className="py-8 text-center text-gray-500">
+                                                Đang tải…
                                             </td>
                                         </tr>
-                                    ))}
-                                    {filteredOrders.length === 0 && (
-                                        <tr><td colSpan={4} className="py-8 text-center text-gray-500">Không có đơn hàng phù hợp</td></tr>
+                                    )}
+
+                                    {!recentOrders.loading &&
+                                        !recentOrders.error &&
+                                        recentOrders.content.map((o) => {
+                                            const name =
+                                                o.customerName || o.userName || o.fullName || (o.userId != null ? `User #${o.userId}` : "");
+                                            return (
+                                                <tr key={o.id} className="bg-white hover:bg-slate-50 transition-colors">
+                                                    <td className="py-3 px-4 font-semibold text-gray-900 whitespace-nowrap">
+                                                        {o.orderCode ?? `ORD-${String(o.id).padStart(6, "0")}`}
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <div className="inline-flex items-center gap-2">
+                                                            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                                                {initials(name) || "KH"}
+                                                            </div>
+                                                            <span className="text-gray-700 truncate" title={name}>
+                                                                {name || "(Ẩn danh)"}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3 px-4 font-medium text-gray-900 tabular-nums whitespace-nowrap">
+                                                        {vnd(o.total ?? 0)}
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <span
+                                                            className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${o.status === "PAID"
+                                                                ? "bg-green-50 text-green-700 ring-green-100"
+                                                                : o.status?.startsWith("PENDING")
+                                                                    ? "bg-amber-50 text-amber-700 ring-amber-100"
+                                                                    : "bg-gray-50 text-gray-700 ring-gray-100"
+                                                                }`}
+                                                        >
+                                                            {o.status === "PAID" ? "Hoàn thành" : o.status?.startsWith("PENDING") ? "Chờ xử lý" : (o.status || "—")}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{fmtDate(o.createdAt)}</td>
+                                                </tr>
+                                            );
+                                        })}
+
+                                    {!recentOrders.loading && !recentOrders.error && recentOrders.content.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="py-8 text-center text-gray-500">
+                                                Không có đơn hàng phù hợp
+                                            </td>
+                                        </tr>
+                                    )}
+
+                                    {recentOrders.error && (
+                                        <tr>
+                                            <td colSpan={5} className="py-8 text-center text-red-500">
+                                                {recentOrders.error}
+                                            </td>
+                                        </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     );
