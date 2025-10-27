@@ -3,6 +3,7 @@ package com.backend.be_realestate.service.impl;
 import com.backend.be_realestate.converter.PropertyConverter;
 import com.backend.be_realestate.entity.*;
 import com.backend.be_realestate.enums.ListingType;
+import com.backend.be_realestate.enums.NotificationType;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.exceptions.OutOfStockException;
 import com.backend.be_realestate.exceptions.ResourceNotFoundException;
@@ -12,9 +13,11 @@ import com.backend.be_realestate.modals.property.RejectPropertyRequest;
 import com.backend.be_realestate.modals.response.PropertyShortResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.AdminPropertyService;
+import com.backend.be_realestate.service.NotificationService;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +36,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AdminPropertyServiceImpl implements AdminPropertyService {
 
     private final PropertyRepository propertyRepository;
@@ -41,6 +45,8 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
     private final PropertyAuditRepository auditRepo; // nếu có bảng audit
     private final PropertyConverter propertyConverter;
     private final PropertyImage propertyImageRepository;
+
+    private final NotificationServiceImpl notificationService;
 
     @Override
     @Transactional
@@ -89,7 +95,39 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
 
         p.setExpiresAt(Timestamp.from(Instant.now().plus(days, ChronoUnit.DAYS)));
         p.setStatus(PropertyStatus.PUBLISHED); // map sang FE là "PUBLISHED"
-        propertyRepository.save(p);
+        PropertyEntity savedProperty = propertyRepository.save(p);
+
+        try {
+            log.info("[PropertyService] Tin đăng {} đã được DUYỆT, đang gửi thông báo...", savedProperty.getId());
+
+            String title = savedProperty.getTitle();
+            if (title == null || title.isBlank()) {
+                title = "không có tiêu đề";
+            } else if (title.length() > 50) {
+                // Rút gọn tiêu đề cho ngắn
+                title = title.substring(0, 47) + "...";
+            }
+
+            // --- GỬI THÔNG BÁO CHO NGƯỜI ĐĂNG (AUTHOR) ---
+            String userMessage = String.format("Tin đăng '%s' của bạn đã được duyệt thành công!", title);
+
+            // Sửa link tới tab "Đang đăng"
+            String userLink = "/dashboard/posts?tab=active";
+
+            // *** Đây là lúc sử dụng service đã "tiêm" ***
+            notificationService.createNotification(
+                    savedProperty.getUser(), // Lấy user ID từ property đã lưu
+                    NotificationType.LISTING_APPROVED, // <-- Bạn cần tạo Enum này
+                    userMessage,
+                    userLink
+            );
+            log.info("[PropertyService] Đã gửi thông báo LISTING_APPROVED cho user {}.", savedProperty.getUser().getUserId());
+
+        } catch (Exception e) {
+            // Rất quan trọng: Vẫn bắt lỗi để nếu gửi noti lỗi,
+            // nó KHÔNG làm rollback việc DUYỆT TIN
+            log.error("!!!!!!!!!!!! LỖI KHI GỬI NOTIFICATION 'APPROVED' (nhưng tin đăng đã duyệt thành công): {}", e.getMessage(), e);
+        }
 
         saveAudit(p, adminId, "APPROVED", req.getNote() != null ? req.getNote() :
                 String.format("Approved %d days (%s)", days, targetType));

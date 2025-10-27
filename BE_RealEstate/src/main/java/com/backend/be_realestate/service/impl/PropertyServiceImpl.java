@@ -2,6 +2,7 @@ package com.backend.be_realestate.service.impl;
 
 import com.backend.be_realestate.converter.PropertyConverter;
 import com.backend.be_realestate.converter.PropertyMapper;
+import com.backend.be_realestate.converter.UserConverter;
 import com.backend.be_realestate.entity.*;
 import com.backend.be_realestate.enums.*;
 import com.backend.be_realestate.exceptions.OutOfStockException;
@@ -9,6 +10,7 @@ import com.backend.be_realestate.exceptions.ResourceNotFoundException;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
+import com.backend.be_realestate.modals.dto.UserFavoriteDTO;
 import com.backend.be_realestate.modals.dto.propertyEvent.PropertyEvent;
 import com.backend.be_realestate.modals.dto.propertydashboard.PendingPropertyDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
@@ -18,6 +20,7 @@ import com.backend.be_realestate.modals.response.admin.PropertyKpiResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
+import jakarta.persistence.EntityNotFoundException;
 import com.backend.be_realestate.utils.RecommendationSpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +30,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -56,6 +60,9 @@ public class PropertyServiceImpl implements IPropertyService {
     private final UserInventoryRepository inventoryRepo;
     private final ApplicationEventPublisher publisher;
     private final NotificationServiceImpl notificationService;
+    private final SavedPropertyRepository savedPropertyRepository;
+
+    private final UserConverter userConverter;
     private final SavedPropertyRepository savedRepo;
 
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
@@ -251,7 +258,7 @@ public class PropertyServiceImpl implements IPropertyService {
                     log.warn("[PropertyService] Không tìm thấy ADMIN để gửi thông báo.");
                 } else {
                     String adminMessage = String.format("Tin đăng mới '%s' (ID: %d) đang chờ duyệt.", title, saved.getId());
-                    String adminLink = "/dashboard/posts?tab=pending";
+                    String adminLink = "/admin/posts";
 
                     for (UserEntity admin : admins) {
                         notificationService.createNotification(
@@ -368,6 +375,27 @@ public class PropertyServiceImpl implements IPropertyService {
         }
 
         return counts;
+    }
+
+    @Override
+    public List<UserFavoriteDTO> getUsersWhoFavorited(Long propertyId, Long currentUserId) {
+
+        // 1. Lấy tin đăng và kiểm tra quyền sở hữu
+        PropertyEntity property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy tin đăng với ID: " + propertyId));
+
+        if (!property.getUser().getUserId().equals(currentUserId)) {
+            throw new AccessDeniedException("Bạn không có quyền xem danh sách yêu thích của tin đăng này");
+        }
+
+        // 2. Lấy danh sách SavedProperty (các lượt lưu)
+        List<SavedPropertyEntity> saves = savedPropertyRepository.findByProperty_Id(propertyId);
+
+        // 3. Chuyển đổi danh sách User sang UserFavoriteDTO
+        // (Giả sử SavedProperty entity có trường 'private User user;')
+        return saves.stream()
+                .map(savedProperty -> userConverter.toFavoriteDto(savedProperty.getUser()))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

@@ -4,6 +4,7 @@ import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
+import com.backend.be_realestate.modals.dto.UserFavoriteDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import com.backend.be_realestate.modals.response.PageResponse;
@@ -113,4 +114,16 @@ public class PropertyController {
     ) {
         return ResponseEntity.ok(propertyService.getRecommendations(userId, limit));
     }
+    @GetMapping("/{id}/favorites")
+    public ResponseEntity<List<UserFavoriteDTO>> getPropertyFavorites( // Sửa ResponseEntity<?>
+                                                                       @PathVariable Long id,
+                                                                       Authentication auth
+    ) {
+        Long userId = securityUtils.currentUserId(auth);
+        if (userId == null) return ResponseEntity.status(401).build();
+
+        List<UserFavoriteDTO> users = propertyService.getUsersWhoFavorited(id, userId);
+        return ResponseEntity.ok(users);
+    }
+
 }

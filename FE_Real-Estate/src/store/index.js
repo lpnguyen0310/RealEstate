@@ -12,6 +12,7 @@ import transactionsSlice from "./transactionsSlice";
 
 // Import file API của bạn (đã đúng)
 import { notificationApi } from "@/services/notificationApi";
+import { listenerMiddleware } from "./listenerMiddleware";
 
 export const store = configureStore({
   reducer: { 
@@ -34,5 +35,7 @@ export const store = configureStore({
   // 2. THÊM KHỐI NÀY (Middleware):
   // Để RTK Query có thể xử lý việc gọi API, cache, và tự động refresh
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(notificationApi.middleware),
+    getDefaultMiddleware()
+      .concat(notificationApi.middleware)
+      .prepend(listenerMiddleware.middleware),
 });

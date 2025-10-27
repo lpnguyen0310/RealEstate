@@ -1,5 +1,5 @@
 import { Button } from "antd";
-import { useEffect, useState, useMemo } from "react"; // Keep useMemo if other parts need it, but not for counts
+import { useEffect, useState } from "react"; // Đã xóa useMemo
 import { PlusOutlined } from "@ant-design/icons";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination as SwiperPagination, Autoplay } from "swiper/modules";
@@ -34,10 +34,31 @@ export default function PostManagerPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTab = searchParams.get("tab");
 
-    // Select all necessary state including 'counts'
-    const { list, page, size, totalElements, loading, error, counts } = useSelector(
-        (s) => s.property
-    );
+    // ----------------------------------------------------
+    // ⭐️⭐️⭐️ SỬA LỖI Ở ĐÂY ⭐️⭐️⭐️
+    // ----------------------------------------------------
+    // Lấy đúng các state của "myList" và đổi tên (alias)
+    const { 
+      list,         // (myList -> list)
+      page,         // (myPage -> page)
+      size,         // (mySize -> size)
+      totalElements,// (myTotalElements -> totalElements)
+      loading, 
+      error, 
+      counts 
+    } = useSelector((s) => ({
+        list: s.property.myList,           // Lấy myList
+        page: s.property.myPage,           // Lấy myPage
+        size: s.property.mySize,           // Lấy mySize
+        totalElements: s.property.myTotalElements, // Lấy myTotalElements
+        
+        // Các state này đã đúng
+        loading: s.property.loading,
+        error: s.property.error,
+        counts: s.property.counts,
+    }));
+    // ----------------------------------------------------
+
 
     // Initialize status based on URL or default to 'active'
     const [status, setStatus] = useState(urlTab || "active");
@@ -46,6 +67,7 @@ export default function PostManagerPage() {
     // Effect 1: Fetch the list based on the current status, page, and size
     useEffect(() => {
         if (status) {
+            // 'page' và 'size' bây giờ đã là 'myPage' và 'mySize' từ selector
             dispatch(fetchMyPropertiesThunk({ page, size, status: status }));
         }
     }, [dispatch, page, size, status]); // Re-run when status, page, or size changes
@@ -55,8 +77,16 @@ export default function PostManagerPage() {
         dispatch(fetchMyPropertyCountsThunk());
     }, [dispatch]); // Runs only once
 
-    // Remove the old useMemo that calculated counts locally
-    // const counts = useMemo(() => { ... }); // DELETE THIS
+    // (Log của bạn để kiểm tra, bây giờ nó sẽ in ra myList)
+    useEffect(() => {
+      if (loading === false && list) { // Chỉ in ra khi không loading và list đã có
+        console.log("--- [KIỂM TRA DỮ LIỆU TẠI PostManagerPage] ---");
+        console.log("Toàn bộ 'list' (đã fix, lấy từ myList):", list);
+        if (list.length > 0) {
+          console.log("Tin đăng đầu tiên (list[0]):", list[0]);
+        }
+      }
+    }, [list, loading]);
 
     return (
         <div>
@@ -138,8 +168,8 @@ export default function PostManagerPage() {
                     </div>
                 ) : (
                     <PostList
-                        items={list} // Display the list fetched for the current status
-                        total={totalElements} // Total items for the current status (used by pagination)
+                        items={list} // <-- Bây giờ 'list' là 'myList'
+                        total={totalElements} // <-- Bây giờ 'totalElements' là 'myTotalElements'
                         page={page + 1} // Antd pagination starts from 1
                         pageSize={size}
                         onPageChange={(p) => dispatch(setPage(p - 1))} // Dispatch page change (0-based)

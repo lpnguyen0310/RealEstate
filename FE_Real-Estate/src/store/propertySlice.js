@@ -54,6 +54,24 @@ export const fetchPropertyByIdThunk = createAsyncThunk(
     }
 );
 
+export const fetchPropertyFavoritesThunk = createAsyncThunk(
+    "property/fetchFavorites",
+    /**
+     * @param {number | string} propertyId ID của tin đăng
+     */
+    async (propertyId, { rejectWithValue }) => {
+        try {
+            // API bạn vừa tạo: GET /api/properties/{id}/favorites
+            const res = await api.get(`/properties/${propertyId}/favorites`);
+            // API trả về List<UserFavoriteDTO>
+            return res.data; 
+        } catch (e) {
+            const msg = e?.response?.data?.message || "Không thể tải danh sách người yêu thích";
+            return rejectWithValue(msg);
+        }
+    }
+);
+
 // Tạo tin
 export const createPropertyThunk = createAsyncThunk(
     "property/create",
@@ -238,7 +256,8 @@ function mapDtoToPostCard(p) {
         note: "",
 
         createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
-        views: p?.views ?? 0,
+        views: p?.viewCount ?? 0, 
+        favoriteCount: p?.favoriteCount ?? 0,
 
         listingType: p?.listingType,
         postedAt: p?.postedAt ?? null,
@@ -327,6 +346,11 @@ const initialState = {
     creating: false,
     createError: null,
     lastCreated: null,
+
+    //STATE CHO MODAL FAVORITES
+    loadingFavorites: false,
+    errorFavorites: null,
+    currentFavoriteUsers: [],
 };
 
 const propertySlice = createSlice({
@@ -362,6 +386,11 @@ const propertySlice = createSlice({
         clearCurrentProperty(state) {
             state.currentProperty = null;
             state.errorDetail = null;
+        },
+        clearFavorites(state) {
+            state.currentFavoriteUsers = [];
+            state.errorFavorites = null;
+            state.loadingFavorites = false;
         },
     },
     extraReducers: (b) => {
@@ -474,6 +503,20 @@ const propertySlice = createSlice({
             .addCase(fetchMyPropertyCountsThunk.rejected, (state) => {
                 state.loadingCounts = false;
                 state.counts = { ...initialState.counts };
+            })
+            // ===== FAVORITES =====
+            .addCase(fetchPropertyFavoritesThunk.pending, (state) => {
+                state.loadingFavorites = true;
+                state.errorFavorites = null;
+                state.currentFavoriteUsers = [];
+            })
+            .addCase(fetchPropertyFavoritesThunk.fulfilled, (state, action) => {
+                state.loadingFavorites = false;
+                state.currentFavoriteUsers = action.payload; // Gán List<UserFavoriteDTO>
+            })
+            .addCase(fetchPropertyFavoritesThunk.rejected, (state, action) => {
+                state.loadingFavorites = false;
+                state.errorFavorites = action.payload;
             });
     },
 });
@@ -515,5 +558,5 @@ export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
 
 /* ===================== EXPORTS ===================== */
 
-export const { setPage, setSize, setSort, clearProperties, clearCurrentProperty } = propertySlice.actions;
+export const { setPage, setSize, setSort, clearProperties, clearCurrentProperty, clearFavorites } = propertySlice.actions;
 export default propertySlice.reducer;
