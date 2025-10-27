@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
     Drawer,
     Box,
@@ -20,6 +20,9 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 import { STATUS_LABEL, STATUS_CHIP_COLOR } from "./constants";
 import ImageViewer from "./ImageViewer";
+
+// NEW: dùng modal xác nhận chung
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 
 function Row({ label, value }) {
     return (
@@ -52,12 +55,41 @@ export default function PostDetailDrawer({
                 ? "warning"
                 : "info";
 
-    // Khi mở Drawer, đồng bộ số ngày theo dữ liệu từ backend
+    // Khi mở Drawer, đồng bộ số ngày theo policy từ backend (read-only hiển thị)
     useEffect(() => {
-        if (open && detail?.policyDurationDays && decision.durationDays !== detail.policyDurationDays) {
+        if (
+            open &&
+            detail?.policyDurationDays &&
+            decision.durationDays !== detail.policyDurationDays
+        ) {
             setDecision((s) => ({ ...s, durationDays: detail.policyDurationDays }));
         }
-    }, [open, detail?.durationDays, decision.durationDays, setDecision]);
+        // NOTE: phụ thuộc policyDurationDays, không phải durationDays cũ
+    }, [open, detail?.policyDurationDays, decision.durationDays, setDecision]);
+
+    // ===== Modal xác nhận "Từ chối" =====
+    const [rejectConfirm, setRejectConfirm] = useState({
+        open: false,
+        loading: false,
+    });
+
+    const openRejectConfirm = useCallback(() => {
+        setRejectConfirm({ open: true, loading: false });
+    }, []);
+
+    const closeRejectConfirm = useCallback(() => {
+        setRejectConfirm({ open: false, loading: false });
+    }, []);
+
+    const doReject = useCallback(async () => {
+        try {
+            setRejectConfirm((s) => ({ ...s, loading: true }));
+            await onReject(detail.id); // thunk + refresh ở trên cha
+            onClose();                 // đóng Drawer sau khi từ chối thành công
+        } finally {
+            closeRejectConfirm();
+        }
+    }, [detail?.id, onReject, onClose, closeRejectConfirm]);
 
     return (
         <Drawer
@@ -109,10 +141,7 @@ export default function PostDetailDrawer({
                                 <Row label="Giá" value={money(detail.price)} />
                             </Grid>
                             <Grid item xs={12} sm={6}>
-                                <Row
-                                    label="Diện tích"
-                                    value={`${detail.area ?? "-"} m²`}
-                                />
+                                <Row label="Diện tích" value={`${detail.area ?? "-"} m²`} />
                             </Grid>
 
                             <Grid item xs={12} sm={6}>
@@ -158,18 +187,18 @@ export default function PostDetailDrawer({
 
                 {/* Quyết định duyệt */}
                 <Grid container spacing={2}>
-                    {/* Thời hạn gói */}
+                    {/* Thời hạn gói (read-only) */}
                     <Grid item xs={12} md={6}>
                         <TextField
                             size="small"
                             label="Thời hạn gói (ngày)"
-                            value={`${decision.durationDays || detail?.durationDays || "-"}`}
+                            value={`${decision.durationDays || detail?.policyDurationDays || "-"}`}
                             InputProps={{ readOnly: true }}
                             fullWidth
                         />
                     </Grid>
 
-                    {/* Loại tin: readonly */}
+                    {/* Loại tin (read-only) */}
                     <Grid item xs={12} md={6}>
                         <TextField
                             size="small"
@@ -214,12 +243,7 @@ export default function PostDetailDrawer({
                                 variant="outlined"
                                 startIcon={<HighlightOffOutlinedIcon />}
                                 disabled={busy}
-                                onClick={() => {
-                                    if (window.confirm("Từ chối tin này?")) {
-                                        onReject(detail.id);
-                                        onClose();
-                                    }
-                                }}
+                                onClick={openRejectConfirm} // mở modal xác nhận
                             >
                                 Từ chối
                             </Button>
@@ -234,19 +258,27 @@ export default function PostDetailDrawer({
                         <Stack spacing={1}>
                             {(detail.audit || []).map((i, idx) => (
                                 <Typography key={idx} fontSize={14}>
-                                    <strong>{i.at}</strong> • <em>{i.by}</em>:{" "}
-                                    {i.message || i.type}
+                                    <strong>{i.at}</strong> • <em>{i.by}</em>: {i.message || i.type}
                                 </Typography>
                             ))}
                             {!(detail.audit || []).length && (
-                                <Typography color="text.secondary">
-                                    Chưa có lịch sử
-                                </Typography>
+                                <Typography color="text.secondary">Chưa có lịch sử</Typography>
                             )}
                         </Stack>
                     </CardContent>
                 </Card>
             </Box>
+
+            {/* ===== Modal xác nhận từ chối ===== */}
+            <ConfirmDialog
+                open={rejectConfirm.open}
+                title="Từ chối bài đăng"
+                content={`Bạn chắc chắn muốn từ chối tin #${detail.id}?`}
+                confirmText="Từ chối"
+                loading={rejectConfirm.loading}
+                onClose={closeRejectConfirm}
+                onConfirm={doReject}
+            />
         </Drawer>
     );
 }

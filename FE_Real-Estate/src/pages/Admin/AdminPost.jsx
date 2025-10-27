@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Box } from "@mui/material";
 import { fmtDate, money } from "@/utils/validators";
@@ -32,9 +32,10 @@ import {
 
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-
-// URL query sync
 import { useSearchParams } from "react-router-dom";
+
+// >>> NEW: Confirm Dialog
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 
 export default function AdminPostsMUI() {
     const dispatch = useDispatch();
@@ -46,11 +47,11 @@ export default function AdminPostsMUI() {
         loadingList,
         loadingCounts,
         actioningId,
-        q,                // FE keyword (applied)
-        category,         // categoryId (nên là id)
+        q,
+        category,
         listingType,
         selectedTab,
-        page,             // 1-based ở UI
+        page,
         pageSize,
         totalItems,
         totalPages,
@@ -102,11 +103,11 @@ export default function AdminPostsMUI() {
         return () => clearTimeout(t);
     }, [selectedTab, q, category, listingType, page, pageSize, searchParams, setSearchParams]);
 
-    /* =============== FETCH LIST (debounce, LIVE SEARCH) =============== */
+    /* =============== FETCH LIST (debounce) =============== */
     useEffect(() => {
         const t = setTimeout(() => {
             dispatch(fetchPostsThunk());
-        }, 250); // gõ sẽ fetch sau 250ms
+        }, 250);
         return () => clearTimeout(t);
     }, [dispatch, selectedTab, page, pageSize, q, category, listingType]);
 
@@ -128,7 +129,8 @@ export default function AdminPostsMUI() {
                     try {
                         JSON.parse(msg.body);
                         await dispatch(fetchCountsThunk());
-                        const shouldReloadList = selectedTab === "ALL" || selectedTab === "PENDING_REVIEW";
+                        const shouldReloadList =
+                            selectedTab === "ALL" || selectedTab === "PENDING_REVIEW";
                         if (shouldReloadList) await dispatch(fetchPostsThunk());
                     } catch (e) {
                         console.warn("Invalid WS payload:", e);
@@ -140,6 +142,41 @@ export default function AdminPostsMUI() {
         return () => client.deactivate();
     }, [dispatch, selectedTab]);
 
+    /* =============== MUI Confirm Modal state (NEW) =============== */
+    const [confirm, setConfirm] = useState({
+        open: false,
+        title: "",
+        content: "",
+        confirmText: "Xác nhận",
+        loading: false,
+        onConfirm: null,
+    });
+
+    const openConfirm = useCallback((cfg) => {
+        setConfirm({
+            open: true,
+            title: cfg.title || "Xác nhận",
+            content: cfg.content || "",
+            confirmText: cfg.confirmText || "Xác nhận",
+            loading: false,
+            onConfirm: cfg.onConfirm || null,
+        });
+    }, []);
+
+    const closeConfirm = useCallback(() => {
+        setConfirm((s) => ({ ...s, open: false, loading: false, onConfirm: null }));
+    }, []);
+
+    const runConfirm = useCallback(async () => {
+        if (!confirm.onConfirm) return;
+        try {
+            setConfirm((s) => ({ ...s, loading: true }));
+            await confirm.onConfirm();
+        } finally {
+            closeConfirm();
+        }
+    }, [confirm.onConfirm, closeConfirm]);
+
     /* =============== ACTIONS =============== */
     const approve = useCallback(
         async (id) => {
@@ -149,15 +186,24 @@ export default function AdminPostsMUI() {
         },
         [dispatch]
     );
+
+    // >>> NEW: mở modal xác nhận trước khi từ chối
     const reject = useCallback(
         async (id) => {
-            if (!window.confirm("Từ chối tin này?")) return;
-            await dispatch(rejectPostThunk(id));
-            await dispatch(fetchCountsThunk());
-            await dispatch(fetchPostsThunk());
+            openConfirm({
+                title: "Từ chối bài đăng",
+                content: `Bạn chắc chắn muốn từ chối tin #${id}?`,
+                confirmText: "Từ chối",
+                onConfirm: async () => {
+                    await dispatch(rejectPostThunk(id));
+                    await dispatch(fetchCountsThunk());
+                    await dispatch(fetchPostsThunk());
+                },
+            });
         },
-        [dispatch]
+        [dispatch, openConfirm]
     );
+
     const hide = useCallback(
         async (id) => {
             await dispatch(hidePostThunk(id));
@@ -166,6 +212,7 @@ export default function AdminPostsMUI() {
         },
         [dispatch]
     );
+
     const unhide = useCallback(
         async (id) => {
             await dispatch(unhidePostThunk(id));
@@ -174,15 +221,24 @@ export default function AdminPostsMUI() {
         },
         [dispatch]
     );
+
+    // >>> NEW: mở modal xác nhận trước khi xóa vĩnh viễn
     const hardDelete = useCallback(
         async (id) => {
-            if (!window.confirm(`Xóa tin ${id}? Hành động không thể hoàn tác.`)) return;
-            await dispatch(hardDeletePostThunk(id));
-            await dispatch(fetchCountsThunk());
-            await dispatch(fetchPostsThunk());
+            openConfirm({
+                title: "Xóa vĩnh viễn",
+                content: `Xóa vĩnh viễn tin #${id}? Hành động không thể hoàn tác.`,
+                confirmText: "Xóa",
+                onConfirm: async () => {
+                    await dispatch(hardDeletePostThunk(id));
+                    await dispatch(fetchCountsThunk());
+                    await dispatch(fetchPostsThunk());
+                },
+            });
         },
-        [dispatch]
+        [dispatch, openConfirm]
     );
+
     const onOpenDetail = useCallback(
         (r) => {
             dispatch(openDetail({ ...r, priceLabel: money(r.price) }));
@@ -198,8 +254,17 @@ export default function AdminPostsMUI() {
         const expired = counts.EXPIRED || 0;
         const hidden = counts.HIDDEN || 0;
         const rejected = counts.REJECTED || 0;
-        const total = pending + published + expSoon + expired + hidden + rejected;
-        return { total, pending, active: published + expSoon, expSoon, expired, hidden, rejected };
+        const total =
+            pending + published + expSoon + expired + hidden + rejected;
+        return {
+            total,
+            pending,
+            active: published + expSoon,
+            expSoon,
+            expired,
+            hidden,
+            rejected,
+        };
     }, [counts]);
 
     return (
@@ -228,7 +293,6 @@ export default function AdminPostsMUI() {
                 <FiltersBar
                     q={q}
                     setQ={(v) => {
-                        // live search: khi đổi q → về trang 1 để kết quả chuẩn
                         if (page !== 1) dispatch(setPage(1));
                         dispatch(setQ(v));
                     }}
@@ -242,7 +306,6 @@ export default function AdminPostsMUI() {
                         if (page !== 1) dispatch(setPage(1));
                         dispatch(setListingType(v));
                     }}
-                    // Các prop onSearch/onReset giữ lại để tái sử dụng nếu cần nút
                     onSearch={() => dispatch(setPage(1))}
                     onReset={() => {
                         dispatch(resetFilters());
@@ -268,10 +331,10 @@ export default function AdminPostsMUI() {
                     }}
                     onOpenDetail={onOpenDetail}
                     onApprove={approve}
-                    onReject={reject}
+                    onReject={reject}           // << dùng modal
                     onHide={hide}
                     onUnhide={unhide}
-                    onHardDelete={hardDelete}
+                    onHardDelete={hardDelete}   // << dùng modal
                     money={money}
                     fmtDate={fmtDate}
                     setDecision={(payload) => dispatch(setDecision(payload))}
@@ -286,11 +349,22 @@ export default function AdminPostsMUI() {
                     money={money}
                     fmtDate={fmtDate}
                     onApprove={approve}
-                    onReject={reject}
+                    onReject={reject}       
                     actioningId={actioningId}
                     canEditDuration={false}
                 />
             </Box>
+
+            {/* === Modal xác nhận dùng chung === */}
+            <ConfirmDialog
+                open={confirm.open}
+                title={confirm.title}
+                content={confirm.content}
+                confirmText={confirm.confirmText}
+                loading={confirm.loading}
+                onClose={closeConfirm}
+                onConfirm={runConfirm}
+            />
         </Box>
     );
 }

@@ -1,7 +1,9 @@
+// src/routes/auth/RequireRole.jsx
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useMemo, useRef } from "react";
 import { getProfileThunk, hydrateFromSession } from "@/store/authSlice";
+import { getAccessToken } from "@/utils/auth";
 
 const normalizeRoles = (arr = []) =>
   arr
@@ -17,12 +19,20 @@ export default function RequireRole({ roles = [] }) {
 
   const required = useMemo(() => normalizeRoles(roles), [roles]);
 
-  const hasToken = !!sessionStorage.getItem("access_token");
+  // ✅ Dùng chung 1 nguồn sự thật cho token
+  const hasToken = !!getAccessToken();
+
+  // đọc cache profile từ session hoặc local
   const cachedProfile = useMemo(() => {
-    try { return JSON.parse(sessionStorage.getItem("profile") || "null"); } catch { return null; }
+    const read = (k) => {
+      try { return JSON.parse(k || "null"); } catch { return null; }
+    };
+    const s = read(sessionStorage.getItem("profile"));
+    const l = read(localStorage.getItem("profile"));
+    return s || l || null;
   }, []);
 
-  // Hydrate từ session ngay khi mount (nếu chưa có user)
+  // Hydrate ngay khi mount (một lần)
   const hydratedRef = useRef(false);
   useEffect(() => {
     if (!hydratedRef.current) {
@@ -31,7 +41,7 @@ export default function RequireRole({ roles = [] }) {
     }
   }, [dispatch]);
 
-  // Nếu có token mà chưa có user, chủ động fetch profile 1 lần
+  // Nếu có token mà chưa có user -> fetch profile đúng 1 lần
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (hasToken && !user && status === "idle" && !fetchedRef.current) {
@@ -40,12 +50,13 @@ export default function RequireRole({ roles = [] }) {
     }
   }, [dispatch, hasToken, user, status]);
 
-  // Tính role thực có (ưu tiên Redux, fallback cache)
-  const effectiveRoles = (stateRoles?.length ? stateRoles : normalizeRoles(
-    (cachedProfile?.roles ?? cachedProfile?.authorities ?? cachedProfile?.role ?? [])
-  ));
+  // Tính vai trò hiện có (ưu tiên Redux, fallback cache)
+  const effectiveRoles = (stateRoles?.length
+    ? stateRoles
+    : normalizeRoles(cachedProfile?.roles ?? cachedProfile?.authorities ?? cachedProfile?.role ?? [])
+  );
 
-  // Đang bootstrap -> hiển thị loading, tránh nhảy login sớm
+  // Đang bootstrap → chờ, tránh redirect sớm
   const isBootstrapping =
     status === "loading" ||
     (hasToken && (!user || effectiveRoles.length === 0));
@@ -55,10 +66,10 @@ export default function RequireRole({ roles = [] }) {
   }
 
   const hasRequired = required.length === 0
-    ? Boolean(user) // nếu không truyền roles, chỉ cần đã đăng nhập
+    ? Boolean(user)
     : required.some((r) => effectiveRoles.includes(r));
 
-  return user && hasRequired
+  return (user && hasRequired)
     ? <Outlet />
     : <Navigate to="/login" replace state={{ from: loc.pathname }} />;
 }

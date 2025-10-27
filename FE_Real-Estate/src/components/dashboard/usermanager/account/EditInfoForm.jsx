@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Card, Form, Input, Button, Upload, Space, Typography, Divider, Select, message } from "antd";
-import { PlusOutlined, UploadOutlined, LoadingOutlined } from "@ant-design/icons";
+import { Card, Form, Input, Button, Upload, Space, Typography, Divider, Select } from "antd";
+import { PlusOutlined, LoadingOutlined } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
 const { Item } = Form;
@@ -13,23 +13,23 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
 
   // (useMemo tính initialValues giữ nguyên)
   const initialValues = useMemo(() => {
-     if (!initialData) return {};
-     const profile = initialData; // Dữ liệu profile nằm ngay cấp đầu
-     return {
-       fullName: initialData.fullName,
-       personalTaxCode: profile?.personalTaxCode,
-       email: initialData.email,
-       __mainPhone: initialData.phone,
-       phones: profile?.additionalPhones || [],
-       buyerName: profile?.buyerName || initialData.fullName,
-       invoiceEmail: profile?.invoiceEmail || initialData.email,
-       companyName: profile?.companyName,
-       companyTaxCode: profile?.companyTaxCode,
-       cccd: profile?.citizenId,
-       dvqhns: profile?.dvqhns,
-       passport: profile?.passport,
-       address: profile?.address || "VN",
-     };
+    if (!initialData) return {};
+    const profile = initialData; // Dữ liệu profile nằm ngay cấp đầu
+    return {
+      fullName: initialData.fullName,
+      personalTaxCode: profile?.personalTaxCode,
+      email: initialData.email,
+      __mainPhone: initialData.phone,
+      phones: profile?.additionalPhones || [],
+      buyerName: profile?.buyerName || initialData.fullName,
+      invoiceEmail: profile?.invoiceEmail || initialData.email,
+      companyName: profile?.companyName,
+      companyTaxCode: profile?.companyTaxCode,
+      cccd: profile?.citizenId,
+      dvqhns: profile?.dvqhns,
+      passport: profile?.passport,
+      address: profile?.address || "VN",
+    };
   }, [initialData]);
 
   // useEffect để cập nhật form khi data tải xong (giữ nguyên)
@@ -40,7 +40,6 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
     }
   }, [initialValues, initialData, form]);
 
-
   // --- HÀM TRUNG GIAN ĐỂ GỌI UPLOAD TỪ CHA ---
   // customRequest của antd Upload sẽ gọi hàm này
   const customUploadRequest = async ({ file, onSuccess, onError }) => {
@@ -50,7 +49,6 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
       await onUploadAvatar?.(file);
       onSuccess?.("ok"); // Báo cho antd Upload là thành công
     } catch (error) {
-      // Lỗi đã được AccountManagement báo message.error
       onError?.(error); // Báo cho antd Upload là thất bại
     } finally {
       setUploading(false); // Kết thúc loading (cho UI của Upload)
@@ -58,34 +56,31 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
   };
 
   // --- COMPONENT UPLOAD AVATAR (HIỂN THỊ ẢNH) ---
-  // (Component này không thay đổi nhiều, chỉ sửa lại cách gọi upload)
-  const RenderUploadAvatar = () => { // Đổi tên thành RenderUploadAvatar để tránh trùng tên biến Upload của antd
+  const RenderUploadAvatar = () => {
     const currentAvatarUrl = initialData?.avatar; // Lấy URL avatar từ Redux data
 
     return (
       <Upload
         name="avatar"
         listType="picture-circle"
-        className="avatar-uploader" // Thêm class để dễ style
+        className="avatar-uploader"
         showUploadList={false}
-        customRequest={customUploadRequest} // <-- DÙNG HÀM TRUNG GIAN Ở TRÊN
-        // Bỏ onChange vì customRequest đã xử lý loading
-        disabled={uploading} // Vô hiệu hóa khi đang tải
+        customRequest={customUploadRequest}
+        disabled={uploading}
       >
         {currentAvatarUrl ? (
           <img
             src={currentAvatarUrl}
             alt="Avatar"
             style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: '50%', // Đảm bảo ảnh tròn
-              objectFit: 'cover',   // Crop ảnh cho vừa
+              width: "100%",
+              height: "100%",
+              borderRadius: "50%",
+              objectFit: "cover",
             }}
           />
         ) : (
-          // Placeholder nếu chưa có ảnh
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: "center" }}>
             {uploading ? <LoadingOutlined /> : <PlusOutlined />}
             <div style={{ marginTop: 8 }}>{uploading ? "Đang tải..." : "Tải ảnh"}</div>
           </div>
@@ -94,45 +89,37 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
     );
   };
 
-
-  // Hàm submit form (text) (giữ nguyên)
+  // Hàm submit form (text)
   const handleFinish = (values) => {
-     // ... (logic payload giữ nguyên) ...
-     const payload = {
-       fullName: values.fullName,
-       email: values.email,
-       personalTaxCode: values.personalTaxCode,
-       additionalPhones: (values.phones || []).filter(Boolean),
-       buyerName: values.buyerName,
-       invoiceEmail: values.invoiceEmail,
-       companyName: values.companyName,
-       companyTaxCode: values.companyTaxCode,
-       address: values.address,
-       dvqhns: values.dvqhns,
-       citizenId: values.cccd,
-       passport: values.passport,
-     };
-     return onSubmit?.(payload);
+    const payload = {
+      fullName: values.fullName,
+      email: values.email,
+      personalTaxCode: values.personalTaxCode,
+      additionalPhones: (values.phones || []).filter(Boolean),
+      buyerName: values.buyerName,
+      invoiceEmail: values.invoiceEmail,
+      companyName: values.companyName,
+      companyTaxCode: values.companyTaxCode,
+      address: values.address,
+      dvqhns: values.dvqhns,
+      citizenId: values.cccd,
+      passport: values.passport,
+    };
+    return onSubmit?.(payload);
   };
-
 
   return (
     <div className="max-w-[700px]">
-      {/* SỬA CẢNH BÁO: Thay bordered={false} bằng variant="outlined" */}
-      {/* Mặc định của Card là có border nhẹ, dùng "borderless" nếu muốn bỏ hẳn */}
       <Card variant="borderless">
-        <Title level={5} className="!mt-0">Thông tin cá nhân</Title>
-        {/* SỬA LỖI: Gọi component RenderUploadAvatar */}
-        <div className="my-4 flex justify-center"><RenderUploadAvatar /></div>
+        <Title level={5} className="!mt-0">
+          Thông tin cá nhân
+        </Title>
 
-        <Form
-          layout="vertical"
-          form={form}
-          // Bỏ initialValues vì đã dùng useEffect
-          onFinish={handleFinish}
-        >
-          {/* ... (Toàn bộ Form.Item giữ nguyên y hệt) ... */}
+        <div className="my-4 flex justify-center">
+          <RenderUploadAvatar />
+        </div>
 
+        <Form layout="vertical" form={form} onFinish={handleFinish}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Item
               label="Họ và tên"
@@ -160,15 +147,9 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
                 {(fields, { add, remove }) => (
                   <>
                     <Space className="mb-2" size={8} align="center">
-                      <Text>
-                        Thêm số điện thoại ({1 + fields.length}/{MAX_PHONES})
-                      </Text>
+                      <Text>Thêm số điện thoại ({1 + fields.length}/{MAX_PHONES})</Text>
                       {fields.length < MAX_PHONES - 1 && (
-                        <Button
-                          type="link"
-                          icon={<PlusOutlined />}
-                          onClick={() => add("")}
-                        >
+                        <Button type="link" icon={<PlusOutlined />} onClick={() => add("")}>
                           Thêm
                         </Button>
                       )}
@@ -179,9 +160,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
                         <Space key={field.key} align="start">
                           <Form.Item
                             {...field}
-                            rules={[
-                              { max: 20, message: "Số quá dài" },
-                            ]}
+                            rules={[{ max: 20, message: "Số quá dài" }]}
                           >
                             <Input
                               placeholder="Số điện thoại phụ"
@@ -210,7 +189,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
                 <Input placeholder="Nhập email" />
               </Form.Item>
               <Form.Item className="!mb-0">
-                <Button className="h-[40px]" onClick={() => message.info("Chức năng xác thực (demo).")}>
+                <Button className="h-[40px]" onClick={() => window?.alert?.("Chức năng xác thực (demo).")}>
                   Xác thực
                 </Button>
               </Form.Item>
@@ -264,7 +243,6 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
             <div>• Thắc mắc hoá đơn: 1900 1881 (trước 18h).</div>
           </div>
 
-
           {/* Submit ẩn */}
           <button type="submit" id="edit-info-submit" style={{ display: "none" }} />
         </Form>
@@ -272,4 +250,3 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
     </div>
   );
 }
-
