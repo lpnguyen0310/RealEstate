@@ -32,15 +32,32 @@ function timeAgo(ts) {
 /* ============ Thunks ============ */
 // Lấy danh sách id đã lưu từ server → hợp nhất với local
 export const hydrateFavorites = createAsyncThunk(
-    "favorite/hydrate",
-    async () => {
-        try {
-            const ids = await favoriteApi.getIds(); // [1,2,3]
-            return { ids };
-        } catch {
-            return { ids: null }; // chưa đăng nhập/ngoại tuyến → bỏ qua
-        }
-    }
+    "favorite/hydrate",
+    async (_, { getState, rejectWithValue }) => { // Thêm getState
+        try {
+            // Lấy IDs từ local (đã tải khi khởi tạo slice)
+            const localIds = selectIds(getState()); 
+            
+            const serverIds = await favoriteApi.getIds(); // [1, 2, 3]
+            
+            // Hợp nhất IDs từ server và local
+            const mergedIds = Array.from(new Set([...localIds, ...(serverIds || [])]));
+
+            // Gọi API mới để lấy chi tiết đầy đủ cho tất cả IDs
+            if (mergedIds.length === 0) {
+                 return { details: [] };
+            }
+            
+            const details = await favoriteApi.getDetails(mergedIds); // Trả về [{id, title, ...}]
+
+            return { details }; // Trả về chi tiết thay vì chỉ IDs
+
+        } catch (e) {
+            // Nếu lỗi (chưa đăng nhập/mất mạng), trả về null details để không ảnh hưởng list local
+            console.error("Hydration failed (network error or not logged in):", e);
+            return { details: null }; 
+        }
+    }
 );
 
 // Toggle có gọi API (optimistic + rollback)
@@ -116,22 +133,19 @@ const favoriteSlice = createSlice({
         },
     },
     extraReducers: (b) => {
-        b.addCase(hydrateFavorites.fulfilled, (state, { payload }) => {
-            const serverIds = payload?.ids;
-            if (!Array.isArray(serverIds)) return;
-            const set = new Set([...state.ids, ...serverIds]);
-            const mergedIds = Array.from(set);
-
-            const map = new Map(state.list.map(x => [x.id, x]));
-            mergedIds.forEach(id => {
-                if (!map.has(id)) {
-                    map.set(id, { id, title: "", thumb: "", href: "", savedAt: Date.now() });
-                }
-            });
-            state.ids = mergedIds;
-            state.list = Array.from(map.values()).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
-            saveLS(state.list);
-        });
+        b.addCase(hydrateFavorites.fulfilled, (state, { payload }) => {
+            const details = payload?.details;
+            if (Array.isArray(details)) {
+                const existingMap = new Map(state.list.map(x => [x.id, x]));
+                const mergedList = details.map(d => ({
+                    ...d,
+                    savedAt: existingMap.get(d.id)?.savedAt ?? Date.now(),
+                }));
+                state.list = mergedList.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+                state.ids = state.list.map(x => x.id);
+                saveLS(state.list);
+            }
+        });
     }
 });
 
