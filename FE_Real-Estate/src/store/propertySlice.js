@@ -64,7 +64,7 @@ export const fetchPropertyFavoritesThunk = createAsyncThunk(
             // API bạn vừa tạo: GET /api/properties/{id}/favorites
             const res = await api.get(`/properties/${propertyId}/favorites`);
             // API trả về List<UserFavoriteDTO>
-            return res.data; 
+            return res.data;
         } catch (e) {
             const msg = e?.response?.data?.message || "Không thể tải danh sách người yêu thích";
             return rejectWithValue(msg);
@@ -256,7 +256,7 @@ function mapDtoToPostCard(p) {
         note: "",
 
         createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
-        views: p?.viewCount ?? 0, 
+        views: p?.viewCount ?? 0,
         favoriteCount: p?.favoriteCount ?? 0,
 
         listingType: p?.listingType,
@@ -391,6 +391,11 @@ const propertySlice = createSlice({
             state.currentFavoriteUsers = [];
             state.errorFavorites = null;
             state.loadingFavorites = false;
+        },
+        clearForYou(state) {
+            state.forYouList = [];
+            state.forYouLoading = false; state.forYouError = null;
+            state.forYouSource = null;
         },
     },
     extraReducers: (b) => {
@@ -558,5 +563,5 @@ export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
 
 /* ===================== EXPORTS ===================== */
 
-export const { setPage, setSize, setSort, clearProperties, clearCurrentProperty, clearFavorites } = propertySlice.actions;
+export const { setPage, setSize, setSort, clearProperties, clearCurrentProperty, clearFavorites, clearForYou } = propertySlice.actions;
 export default propertySlice.reducer;

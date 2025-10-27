@@ -1,5 +1,5 @@
 // src/components/sections/ForYouList.jsx
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
@@ -9,22 +9,39 @@ import { fetchPropertiesThunk } from "@/store/propertySlice";
 export default function ForYouList() {
     const dispatch = useDispatch();
     const { forYouList, forYouLoading, forYouError, forYouSource } = useSelector((s) => s.property);
+    const authUser = useSelector((s) => s.auth.user);
+    const userId = authUser?.id || authUser?.userId || null;
 
-    const INITIAL = 8; // số item hiển thị ban đầu
+    const INITIAL = 8;
     const [expanded, setExpanded] = useState(false);
 
-    const loadData = useCallback(() => {
-        dispatch(fetchPropertiesThunk({ type: "forYou", size: 24 })); // lấy dư để bấm "Mở rộng"
-    }, [dispatch]);
+    // Cờ đánh dấu đã từng fetch popular để tránh spam khi userId chưa có
+    const [didFetchPopular, setDidFetchPopular] = useState(false);
+    // Cờ đánh dấu đã fetch forYou với userId hiện tại
+    const [fetchedForUserId, setFetchedForUserId] = useState(null);
 
+    // Quyết định KHI NÀO gọi API
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        // 1) Nếu có userId → gọi forYou (limit dư để mở rộng)
+        if (userId && fetchedForUserId !== userId) {
+            dispatch(fetchPropertiesThunk({ type: "forYou", userId, limit: 24 }));
+            setFetchedForUserId(userId);
+            return;
+        }
 
-    const visible = expanded ? forYouList : forYouList.slice(0, INITIAL);
-    console.log("📦 ForYouList nhận list từ Redux:", forYouList);
+        // 2) Nếu CHƯA có userId (chưa đăng nhập/chưa hydrate) → fallback popular (chỉ 1 lần)
+        if (!userId && !didFetchPopular) {
+            dispatch(fetchPropertiesThunk({ type: "popular", limit: 8 }));
+            setDidFetchPopular(true);
+        }
+    }, [dispatch, userId, didFetchPopular, fetchedForUserId]);
 
-    if (forYouLoading) {
+    const visible = useMemo(
+        () => (expanded ? forYouList : forYouList.slice(0, INITIAL)),
+        [expanded, forYouList]
+    );
+
+    if (forYouLoading && (!forYouList || forYouList.length === 0)) {
         return (
             <section className="mt-10">
                 <div className="flex items-center justify-between mb-4">
@@ -44,7 +61,7 @@ export default function ForYouList() {
         );
     }
 
-    if (forYouError) {
+    if (forYouError && (!forYouList || forYouList.length === 0)) {
         return (
             <section className="mt-10">
                 <div className="flex items-center justify-between mb-4">
@@ -68,9 +85,10 @@ export default function ForYouList() {
                         </span>
                     )}
                 </div>
-                <a href="/goi-y-cho-ban" className="text-[#1f5fbf] font-semibold hover:underline">
+                {/* Dùng Link để không reload (giữ Redux, giữ user) */}
+                <Link to="/goi-y-cho-ban" className="text-[#1f5fbf] font-semibold hover:underline">
                     Xem tất cả
-                </a>
+                </Link>
             </div>
 
             {/* Grid card */}

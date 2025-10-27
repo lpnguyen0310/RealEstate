@@ -6,8 +6,10 @@ import {
   EnvironmentOutlined,
   DollarCircleOutlined,
 } from "@ant-design/icons";
-import useFavorites from "@/hooks/useFavorites";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { selectList, selectIds } from "@/store/favoriteSlice";
+import { formatVNDShort } from "@/utils/money";
 
 function money(v) {
   if (v === null || v === undefined) return "Liên hệ";
@@ -23,11 +25,13 @@ function money(v) {
     return "Liên hệ";
   }
 }
-import { formatVNDShort } from "@/utils/money";
 
 export default function FavoritePostList({ width = 340, iconSize = 25 }) {
   const nav = useNavigate();
-  const { list: savedPosts } = useFavorites(); // lấy từ store
+
+  // Lấy trực tiếp từ Redux store (không dùng hook custom)
+  const savedPosts = useSelector(selectList); // [{ id, title, thumb, href, price, priceDisplay, displayAddress, savedAgo, ...}]
+  const savedCount = useSelector(selectIds).length;
 
   return (
     <Dropdown
@@ -39,7 +43,10 @@ export default function FavoritePostList({ width = 340, iconSize = 25 }) {
       overlayClassName="bds-saved-dropdown"
       zIndex={120}
       popupRender={() => (
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden" style={{ width }}>
+        <div
+          className="bg-white rounded-2xl shadow-xl overflow-hidden"
+          style={{ width }}
+        >
           <div className="animate-fade-up">
             {/* Header */}
             <div className="text-center font-semibold text-[15px] text-gray-800 py-3 border-b border-gray-100">
@@ -71,7 +78,10 @@ export default function FavoritePostList({ width = 340, iconSize = 25 }) {
                         src={p.thumb}
                         alt="thumb"
                         className="w-[70px] h-[50px] object-cover rounded-md border"
-                        onError={(e) => (e.currentTarget.src = "https://picsum.photos/140/100")}
+                        onError={(e) =>
+                        (e.currentTarget.src =
+                          "https://picsum.photos/140/100")
+                        }
                       />
 
                       <div className="flex-1 min-w-0">
@@ -90,7 +100,9 @@ export default function FavoritePostList({ width = 340, iconSize = 25 }) {
                           {addr && (
                             <div className="flex items-center gap-1.5 text-[12px] text-gray-600 min-w-0">
                               <EnvironmentOutlined className="text-gray-500" />
-                              <span className="truncate" title={addr}>{addr}</span>
+                              <span className="truncate" title={addr}>
+                                {addr}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -135,7 +147,7 @@ export default function FavoritePostList({ width = 340, iconSize = 25 }) {
           mouseLeaveDelay={0.12}
           zIndex={100}
         >
-          <Badge count={savedPosts.length} size="small" offset={[-2, 6]}>
+          <Badge count={savedCount} size="small" offset={[-2, 6]}>
             <HeartOutlined
               className="cursor-pointer text-gray-800 hover:text-[#d6402c]"
               style={{ fontSize: iconSize }}

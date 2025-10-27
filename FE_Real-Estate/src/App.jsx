@@ -4,30 +4,40 @@ import { hydrateFromSession, getProfileThunk } from "@/store/authSlice";
 import { getAccessToken } from "@/utils/auth";
 import AppRoutes from "@/routes/AppRoutes";
 import WebSocketListener from "@/components/common/WebSocketListener";
+import { hydrateFavorites } from "@/store/favoriteSlice";
 
 export default function App() {
   const dispatch = useDispatch();
   const user = useSelector((s) => s.auth.user);
   const status = useSelector((s) => s.auth.status);
 
+  // 🔥 THÊM DÒNG NÀY
+  const userId = user?.id ?? user?.userId ?? null;
+
+  // 1️⃣ Hydrate session và load profile
   useEffect(() => {
     dispatch(hydrateFromSession());
     const t = getAccessToken();
     if (t && !user && status !== "loading") {
       dispatch(getProfileThunk());
     }
-  }, [dispatch]); // Giữ nguyên dependency array này
+  }, [dispatch]); // giữ nguyên dependency array này
 
-  // THÊM LOG NÀY
-  console.log('App.jsx rendering - User:', user, 'Status:', status);
+  // 2️⃣ Gọi hydrateFavorites mỗi khi userId thay đổi (đăng nhập / đăng xuất)
+  useEffect(() => {
+    dispatch(hydrateFavorites());
+  }, [dispatch, userId]);
+
+  // 3️⃣ Log để kiểm tra render
+  console.log("App.jsx rendering - User:", user, "Status:", status);
 
   return (
     <>
-      {/* Log này sẽ cho biết liệu listener có được render hay không */}
-      {user && console.log('App.jsx: Rendering WebSocketListener because user exists.')}
+      {/* Kiểm tra listener */}
+      {user && console.log("App.jsx: Rendering WebSocketListener because user exists.")}
       {user && <WebSocketListener />}
       <AppRoutes />
     </>
   );
 }
-
+  

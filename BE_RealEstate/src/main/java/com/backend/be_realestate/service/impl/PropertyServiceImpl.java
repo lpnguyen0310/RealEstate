@@ -63,7 +63,6 @@ public class PropertyServiceImpl implements IPropertyService {
     private final SavedPropertyRepository savedPropertyRepository;
 
     private final UserConverter userConverter;
-    private final SavedPropertyRepository savedRepo;
 
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String TZ_OFFSET = "+07:00";
@@ -402,16 +401,16 @@ public class PropertyServiceImpl implements IPropertyService {
     @Override
     public List<PropertyCardDTO> getRecommendations(Long userId, int limit) {
         // 1) Tín hiệu Saved
-        List<Long> savedIds = savedRepo.findPropertyIdsByUser(userId);
+        List<Long> savedIds = savedPropertyRepository.findPropertyIdsByUser(userId);
 
-        List<Long> favDistrictIds = savedRepo.topDistrictIds(userId).stream()
+        List<Long> favDistrictIds = savedPropertyRepository.topDistrictIds(userId).stream()
                 .map(r -> (Long) r[0]).limit(3).toList();
 
-        List<PropertyType> favTypes = savedRepo.topPropertyTypes(userId).stream()
+        List<PropertyType> favTypes = savedPropertyRepository.topPropertyTypes(userId).stream()
                 .map(r -> (PropertyType) r[0]).limit(3).toList();
 
         Double avgPrice = null, stdPrice = null, avgArea = null, stdArea = null;
-        Object[] stats = savedRepo.priceAreaStats(userId);
+        Object[] stats = savedPropertyRepository.priceAreaStats(userId);
         if (stats != null && stats.length == 4) {
             avgPrice = toD(stats[0]); stdPrice = toD(stats[1]);
             avgArea  = toD(stats[2]); stdArea  = toD(stats[3]);

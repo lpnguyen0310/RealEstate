@@ -1,7 +1,5 @@
 // src/pages/SavedPosts.jsx
 import React, { useMemo } from "react";
-import useFavorites from "@/hooks/useFavorites";
-import { favoriteApi } from "@/api/favoriteApi";
 import { Empty, Tooltip, message } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -11,15 +9,20 @@ import {
   CameraOutlined,
   ClockCircleOutlined,
 } from "@ant-design/icons";
+import { useDispatch, useSelector } from "react-redux";
+import { selectList, toggleFavorite } from "@/store/favoriteSlice";
 
 const FALLBACK_IMG =
   "https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1400&auto=format&fit=crop";
 
 export default function SavedPosts() {
   const nav = useNavigate();
-  const fav = useFavorites();
-  const list = fav?.list ?? [];
-  const loading = fav?.loading ?? false;
+  const dispatch = useDispatch();
+
+  // Lấy trực tiếp từ Redux (đã kèm savedAgo trong selector)
+  const list = useSelector(selectList);
+  // Nếu bạn có trạng thái hydrate trong slice thì lấy, còn không để false
+  const loading = useSelector((s) => s.favorite?.isHydrating) || false;
 
   const total = useMemo(() => list.length, [list]);
 
@@ -71,19 +74,12 @@ export default function SavedPosts() {
             key={p.id}
             post={p}
             onOpen={() => p.href && nav(p.href)}
-            onRemove={async () => {
-              // Optimistic remove
-              try {
-                if (fav?.remove) fav.remove(p.id);
-                else fav?.toggle?.({ id: p.id });
-
-                await favoriteApi.toggle(p.id); // đổi thành favoriteApi.remove(p.id) nếu có
-                message.success("Đã bỏ lưu tin");
-              } catch (err) {
-                // Rollback: thêm lại
-                fav?.toggle?.(p);
-                message.error("Không thể bỏ lưu. Thử lại sau.");
-              }
+            onRemove={() => {
+              // Giao cho thunk trong slice: optimistic + API + rollback nếu lỗi
+              dispatch(toggleFavorite({ id: p.id, payload: { id: p.id } }))
+                .unwrap()
+                .then(() => message.success("Đã bỏ lưu tin"))
+                .catch(() => message.error("Không thể bỏ lưu. Thử lại sau."));
             }}
           />
         ))}
@@ -100,14 +96,14 @@ function RowCard({ post, onRemove, onOpen }) {
     title,
     savedAgo,
     price,
-    priceDisplay,   // "7,35 tỷ" | "500 triệu" | "22.000 đ"
-    pricePerM2,     // "210 tr/m²"
+    priceDisplay, // "7,35 tỷ" | "500 triệu" | "22.000 đ"
+    pricePerM2, // "210 tr/m²"
     area,
     bed,
     bath,
     photos,
     postedAt,
-    listingType,    // VIP | PREMIUM | NORMAL
+    listingType, // VIP | PREMIUM | NORMAL
     displayAddress,
     address,
   } = post || {};
@@ -117,9 +113,12 @@ function RowCard({ post, onRemove, onOpen }) {
 
   const badge = (listingType || "").toUpperCase();
   const badgeColor =
-    badge === "VIP" ? "bg-orange-500"
-      : badge === "PREMIUM" ? "bg-red-500"
-        : badge ? "bg-gray-700"
+    badge === "VIP"
+      ? "bg-orange-500"
+      : badge === "PREMIUM"
+        ? "bg-red-500"
+        : badge
+          ? "bg-gray-700"
           : "";
 
   return (
@@ -150,7 +149,9 @@ function RowCard({ post, onRemove, onOpen }) {
               </div>
             )}
             {badge && (
-              <div className={`absolute left-2 top-2 px-2.5 py-1 text-white text-[12px] font-bold rounded-md shadow ${badgeColor}`}>
+              <div
+                className={`absolute left-2 top-2 px-2.5 py-1 text-white text-[12px] font-bold rounded-md shadow ${badgeColor}`}
+              >
                 {badge}
               </div>
             )}

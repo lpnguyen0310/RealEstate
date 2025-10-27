@@ -1,14 +1,31 @@
+// src/layouts/PublicLayout.jsx
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Outlet, useNavigate } from "react-router-dom";
 import Header from "@/layouts/Header";
 import Footer from "@/layouts/Footer";
-import { Outlet } from "react-router-dom";
-import AIChatWidget from "../components/aiChatBox/AIChatWidget";
-import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import AIChatWidget from "@/components/aiChatBox/AIChatWidget";
+import { hydrateFromSession, getProfileThunk } from "@/store/authSlice";
+
 export default function PublicLayout() {
-  const nav = useNavigate();
   const dispatch = useDispatch();
+  const nav = useNavigate();
 
   const user = useSelector((s) => s.auth.user);
+  const status = useSelector((s) => s.auth.status);
+
+  // ✅ Khi reload trang (F5), tự hydrate từ sessionStorage
+  useEffect(() => {
+    dispatch(hydrateFromSession());
+  }, [dispatch]);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem("access_token");
+    if (token && !user && status !== "loading") {
+      dispatch(getProfileThunk());
+    }
+  }, [user, status, dispatch]);
+
   return (
     <>
       <Header />

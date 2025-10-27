@@ -3,6 +3,8 @@ import api from "@/api/axios";
 import { setAccessToken, clearAccessToken } from "@/utils/auth";
 import { favoriteApi } from "@/api/favoriteApi";                 // <= FE call BE
 import { hydrateFavorites, clearAll as clearFavs } from "@/store/favoriteSlice";
+import { clearForYou } from "@/store/propertySlice";
+
 const extractRoles = (profile) => {
     if (!profile) return [];
     // chấp nhận cả 3 dạng: ["ADMIN"], ["ROLE_ADMIN"], [{authority:"ROLE_ADMIN"}]
@@ -29,7 +31,7 @@ export const loginThunk = createAsyncThunk(
             if (!access) throw new Error("No access token");
             setAccessToken(access);
 
-            const me = await api.get("user/me").catch(() => ({ data: null }));
+            const me = await api.get("/user/me").catch(() => ({ data: null }));
             const profile = me?.data?.data ?? me?.data ?? null;
 
             // Lưu profile vào sessionStorage
@@ -55,7 +57,7 @@ export const getProfileThunk = createAsyncThunk(
     "auth/getProfile",
     async (_, { rejectWithValue, dispatch }) => {
         try {
-            const me = await api.get("user/me");
+            const me = await api.get("/user/me");
             const profile = me?.data?.data ?? me?.data ?? null;
             if (profile) sessionStorage.setItem("profile", JSON.stringify(profile));
             try {
@@ -82,7 +84,8 @@ export const logoutThunk = createAsyncThunk(
         try {
             localStorage.removeItem("bds_favorites_v1");
         } catch { }
-        dispatch(clearFavs()); // từ favoriteSlice
+        dispatch(clearFavs());
+        dispatch(clearForYou());
     }
 );
 
