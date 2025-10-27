@@ -1,8 +1,11 @@
 package com.backend.be_realestate.service.impl;
 
+import com.backend.be_realestate.converter.PropertyConverter;
+import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.entity.SavedPropertyEntity;
 import com.backend.be_realestate.entity.UserEntity;
 import com.backend.be_realestate.enums.NotificationType;
+import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.repository.PropertyRepository;
 import com.backend.be_realestate.repository.SavedPropertyRepository;
 import com.backend.be_realestate.repository.UserRepository;
@@ -14,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +27,7 @@ public class SavedPropertyServiceImpl implements SavedPropertyService {
     private final PropertyRepository propertyRepo;
     private final UserRepository userRepo;
     private final NotificationServiceImpl notificationService;
+    private final PropertyConverter propertyConverter;
 
     @Override
     @Transactional
@@ -108,5 +113,15 @@ public class SavedPropertyServiceImpl implements SavedPropertyService {
     @Override
     public List<Long> listIds(Long userId) {
         return savedRepo.findPropertyIdsByUser(userId);
+    }
+
+    @Override
+    public List<PropertyDTO> listDetails(Long userId, List<Long> propertyIds) {
+        List<PropertyEntity> properties = propertyRepo.findAllById(propertyIds);
+
+        return properties.stream()
+                // Sử dụng converter/mapper đã được inject
+                .map(propertyConverter::toDto)
+                .collect(Collectors.toList());
     }
 }
