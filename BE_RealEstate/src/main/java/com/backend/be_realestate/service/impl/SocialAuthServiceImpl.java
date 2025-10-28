@@ -39,6 +39,8 @@ public class SocialAuthServiceImpl implements SocialAuthService {
                     .lastName(p.getFamilyName() != null ? p.getFamilyName() : "A")
                     .avatar(p.getPicture())
                     .isActive(true)
+                    .lockRequested(false)          // <<< THÊM
+                    .deleteRequested(false)        // <<< THÊM
                     .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
                     .build();
             RoleEntity userRole = roleRepo.findByCode("USER")

@@ -213,7 +213,7 @@ export default function SearchList({ items }) {
         <PropertyListItem
           key={p.id}
           data={p}
-          onClick={() => window.location.assign(`/properties/${p.id}`)}
+          onClick={() => window.location.assign(`/real-estate/${p.id}`)}
         />
       ))}
     </div>
