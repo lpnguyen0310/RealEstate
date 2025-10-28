@@ -27,6 +27,7 @@ function money(v) {
 }
 
 export default function FavoritePostList({ width = 340, iconSize = 25 }) {
+  
   const nav = useNavigate();
 
   // Lấy trực tiếp từ Redux store (không dùng hook custom)

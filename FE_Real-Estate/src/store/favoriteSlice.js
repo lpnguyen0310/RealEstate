@@ -97,11 +97,20 @@ const favoriteSlice = createSlice({
                 state.ids.splice(i, 1);
                 state.list = state.list.filter(x => x.id !== id);
             } else {
+
+                const thumbUrl = (
+                    (payload.imageUrls && payload.imageUrls.length > 0) 
+                    ? payload.imageUrls[0] 
+                    : (payload.thumb ?? payload.image ?? "")
+                );
+
                 const entry = {
                     id,
                     title: payload.title ?? "",
-                    thumb: payload.thumb ?? payload.image ?? "",
-                    href: payload.href ?? "",
+                    // SỬA: Dùng logic lấy ảnh đã cải tiến
+                    thumb: thumbUrl, 
+                    // thumb: payload.thumb ?? payload.image ?? "", // Dòng cũ
+                    href: payload.href ?? `/real-estate/${id}`,
                     price: payload.price ?? null,
                     priceDisplay: payload.priceDisplay ?? "",
                     displayAddress: payload.displayAddress ?? payload.address ?? "",
@@ -139,7 +148,9 @@ const favoriteSlice = createSlice({
                 const existingMap = new Map(state.list.map(x => [x.id, x]));
                 const mergedList = details.map(d => ({
                     ...d,
-                    savedAt: existingMap.get(d.id)?.savedAt ?? Date.now(),
+                    thumb: (d.imageUrls && d.imageUrls.length > 0) ? d.imageUrls[0] : (existingMap.get(d.id)?.thumb ?? ""),
+                    href: `/real-estate/${d.id}`, 
+                    savedAt: existingMap.get(d.id)?.savedAt ?? Date.now(),
                 }));
                 state.list = mergedList.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
                 state.ids = state.list.map(x => x.id);
