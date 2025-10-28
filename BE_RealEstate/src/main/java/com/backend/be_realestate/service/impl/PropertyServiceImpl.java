@@ -20,15 +20,16 @@ import com.backend.be_realestate.modals.response.admin.PropertyKpiResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
-import jakarta.persistence.EntityNotFoundException;
 import com.backend.be_realestate.utils.RecommendationSpec;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.criteria.From;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.sql.Timestamp;
 import java.time.*;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -61,11 +61,14 @@ public class PropertyServiceImpl implements IPropertyService {
     private final ApplicationEventPublisher publisher;
     private final NotificationServiceImpl notificationService;
     private final SavedPropertyRepository savedPropertyRepository;
-
     private final UserConverter userConverter;
 
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String TZ_OFFSET = "+07:00";
+
+    /* =========================================================
+     * PUBLIC LIST / SEARCH (HOME)
+     * ========================================================= */
     @Override
     public List<PropertyCardDTO> getAllPropertiesForCardView() {
         return propertyRepository.findAll().stream()
@@ -74,6 +77,44 @@ public class PropertyServiceImpl implements IPropertyService {
     }
 
     @Override
+    public Page<PropertyCardDTO> searchProperties(Map<String, String> params) {
+        Pageable pageable = createPageableFromParams(params);
+
+        String keyword      = params.get("keyword");
+        String propertyType = params.get("type");
+        String categorySlug = params.get("category");
+        Double priceFrom    = params.get("priceFrom") != null ? Double.parseDouble(params.get("priceFrom")) : null;
+        Double priceTo      = params.get("priceTo")   != null ? Double.parseDouble(params.get("priceTo"))   : null;
+        Float areaFrom      = params.get("areaFrom")  != null ? Float.parseFloat(params.get("areaFrom"))    : null;
+        Float areaTo        = params.get("areaTo")    != null ? Float.parseFloat(params.get("areaTo"))      : null;
+
+        // kwMode: all (mặc định) / any
+        boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
+
+        Specification<PropertyEntity> spec =
+                PropertySpecification.hasKeyword(keyword, matchAll)
+                        .and(PropertySpecification.hasPropertyType(propertyType))
+                        .and(PropertySpecification.hasCategorySlug(categorySlug))
+                        .and(PropertySpecification.priceBetween(priceFrom, priceTo))
+                        .and(PropertySpecification.areaBetween(areaFrom, areaTo));
+
+        Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
+        return resultPage.map(propertyMapper::toPropertyCardDTO);
+    }
+
+    private Pageable createPageableFromParams(Map<String, String> params) {
+        int page = Integer.parseInt(params.getOrDefault("page", "0"));
+        int size = Integer.parseInt(params.getOrDefault("size", "10"));
+        String[] sortParams = params.getOrDefault("sort", "postedAt,desc").split(",");
+        Sort sort = Sort.by(Sort.Direction.fromString(sortParams.length > 1 ? sortParams[1] : "desc"),
+                sortParams[0]);
+        return PageRequest.of(page, size, sort);
+    }
+
+    /* =========================================================
+     * DETAILS
+     * ========================================================= */
+    @Override
     @Transactional
     public PropertyDetailDTO getPropertyDetailById(Long id, Long currentUserId, boolean preview) {
         PropertyEntity entity = propertyRepository.findByIdWithDetails(id)
@@ -81,9 +122,9 @@ public class PropertyServiceImpl implements IPropertyService {
 
         if (!preview) {
             Long authorId = (entity.getUser() != null) ? entity.getUser().getUserId() : null;
-            if (currentUserId == null || !currentUserId.equals(authorId)) {
-                propertyRepository.bumpView(id);                // UPDATE view_count = view_count + 1
-                entity.setViewCount(entity.getViewCount() + 1); // đồng bộ giá trị trả về (tuỳ chọn)
+            if (currentUserId == null || !Objects.equals(currentUserId, authorId)) {
+                propertyRepository.bumpView(id);
+                entity.setViewCount((entity.getViewCount() == null ? 0 : entity.getViewCount()) + 1);
             }
         }
         return propertyMapper.toPropertyDetailDTO(entity);
@@ -97,54 +138,12 @@ public class PropertyServiceImpl implements IPropertyService {
         return propertyMapper.toPropertyDetailDTO(entity);
     }
 
-    @Override
-    public Page<PropertyCardDTO> searchProperties(Map<String, String> params) {
-        Pageable pageable = createPageableFromParams(params);
-
-        // 2) Lấy filter
-        String keyword      = params.get("keyword");
-        String propertyType = params.get("type");
-        String categorySlug = params.get("category");
-        Double priceFrom    = params.get("priceFrom") != null ? Double.parseDouble(params.get("priceFrom")) : null;
-        Double priceTo      = params.get("priceTo")   != null ? Double.parseDouble(params.get("priceTo"))   : null;
-        Float areaFrom      = params.get("areaFrom")  != null ? Float.parseFloat(params.get("areaFrom"))    : null;
-        Float areaTo        = params.get("areaTo")    != null ? Float.parseFloat(params.get("areaTo"))      : null;
-
-        // 2b) Quyết định ALL/ANY cho keyword
-        // UI Metro Modal nên gửi kwMode=any khi chọn nhiều ga
-        boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
-
-        // 3) Kết hợp Spec
-        Specification<PropertyEntity> spec =
-                PropertySpecification.hasKeyword(keyword, matchAll)
-                        .and(PropertySpecification.hasPropertyType(propertyType))
-                        .and(PropertySpecification.hasCategorySlug(categorySlug))
-                        .and(PropertySpecification.priceBetween(priceFrom, priceTo))
-                        .and(PropertySpecification.areaBetween(areaFrom, areaTo));
-
-        // 4) Query & map
-        Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
-        return resultPage.map(propertyMapper::toPropertyCardDTO);
-    }
-
-    // Phương thức phụ trợ để code gọn gàng hơn
-    private Pageable createPageableFromParams(Map<String, String> params) {
-        int page = Integer.parseInt(params.getOrDefault("page", "0"));
-        int size = Integer.parseInt(params.getOrDefault("size", "10"));
-        String[] sortParams = params.getOrDefault("sort", "postedAt,desc").split(",");
-        Sort sort = Sort.by(Sort.Direction.fromString(sortParams[1].toUpperCase()), sortParams[0]);
-        return PageRequest.of(page, size, sort);
-    }
-
-    @Override
-    public Page<PropertyDTO> getPropertiesByUser(Long userId, Pageable pageable) {
-        return propertyRepository.findAllByUser_UserId(userId, pageable)
-                .map(propertyConverter::toDto);
-    }
-
+    /* =========================================================
+     * CREATE
+     * ========================================================= */
     @Override
     public PropertyDTO create1(Long currentUserId, CreatePropertyRequest req, List<MultipartFile> images) {
-        return null;
+        return null; // chưa dùng
     }
 
     @Override
@@ -157,28 +156,12 @@ public class PropertyServiceImpl implements IPropertyService {
             throw new IllegalStateException("Listing type is inactive");
         }
 
-//        // Kiểm tra & trừ tồn kho nếu VIP/PREMIUM
-//        var type = policy.getListingType(); // NORMAL / VIP / PREMIUM
-//        if (type != ListingType.NORMAL) {
-//            // dùng khoá bi quan để tránh race condition (khuyên dùng), hoặc optimistic lock với @Version
-//            UserInventoryEntity inv = inventoryRepo.lockByUserAndType(userId, type.name())
-//                    .orElseGet(() -> inventoryRepo.findByUser_UserIdAndItemType(userId, type.name())
-//                            .orElseThrow(() -> new IllegalStateException("Inventory not found")));
-//            if (inv.getQuantity() == null || inv.getQuantity() <= 0) {
-//                throw new OutOfStockException(type.name());
-//            }
-//            inv.setQuantity(inv.getQuantity() - 1);
-//            inventoryRepo.save(inv);
-//        }
-
         var property = new PropertyEntity();
 
-        // --- SỬA LẠI CHỖ NÀY ---
-        // Chúng ta cần UserEntity THẬT, không phải proxy
+        // luôn load UserEntity thật
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid user ID: " + userId));
         property.setUser(user);
-        // --- KẾT THÚC SỬA ---
 
         if (req.getCategoryId() != null) {
             property.setCategory(categoryRepository.findById(req.getCategoryId())
@@ -187,13 +170,13 @@ public class PropertyServiceImpl implements IPropertyService {
         if (req.getCityId() != null) property.setCity(cityRepository.findById(req.getCityId()).orElse(null));
         if (req.getDistrictId() != null) property.setDistrict(districtRepository.findById(req.getDistrictId()).orElse(null));
         if (req.getWardId() != null) property.setWard(wardRepository.findById(req.getWardId()).orElse(null));
+
         property.setListingTypePolicy(policy);
         property.setListingType(policy.getListingType());
 
-        // Trường cơ bản
+        // fields
         property.setTitle(req.getTitle());
         property.setPrice(req.getPrice());
-        // ... (Tất cả các trường .set... khác của bạn giữ nguyên) ...
         property.setArea(req.getArea());
         property.setLandArea(req.getLandArea());
         property.setBedrooms(req.getBedrooms());
@@ -208,8 +191,6 @@ public class PropertyServiceImpl implements IPropertyService {
         property.setWidth(req.getWidth());
         property.setHeight(req.getHeight());
 
-
-        // Enum nếu FE gửi string
         if (req.getPropertyType() != null) {
             property.setPropertyType(PropertyType.valueOf(req.getPropertyType().name()));
         }
@@ -217,10 +198,8 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setPriceType(PriceType.valueOf(req.getPriceType().name()));
         }
 
-        // Status
         property.setStatus(PropertyStatus.PENDING_REVIEW);
 
-        // Ảnh
         if (req.getImageUrls() != null && !req.getImageUrls().isEmpty()) {
             var imgs = req.getImageUrls().stream().map(url -> {
                 var img = new PropertyImageEntity();
@@ -231,34 +210,22 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setImages(imgs);
         }
 
-        // Tiện ích
         if (req.getAmenityIds() != null && !req.getAmenityIds().isEmpty()) {
             var amenities = amenityRepository.findAllById(req.getAmenityIds());
             property.setAmenities(amenities);
         }
 
-        // === LƯU PROPERTY ===
         var saved = propertyRepository.save(property);
 
-        // === BỎ EVENT LISTENER ===
-        // publisher.publishEvent(new PropertyEvent( ... )); // <-- BỎ DÒNG NÀY
-
-        // +++ THÊM LOGIC NOTIFICATION TRỰC TIẾP VÀO ĐÂY +++
-
-        // Chỉ gửi thông báo nếu tin ở trạng thái PENDING_REVIEW
+        // Gửi thông báo trực tiếp (không dùng event)
         if (saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
-            log.info("[PropertyService] Tin đăng {} đã lưu, đang gửi thông báo...", saved.getId());
             try {
                 String title = saved.getTitle() != null ? saved.getTitle() : "không có tiêu đề";
 
-                // --- 1. GỬI THÔNG BÁO CHO ADMIN ---
                 List<UserEntity> admins = userRepository.findAllByRoles_Code("ADMIN");
-                if (admins.isEmpty()) {
-                    log.warn("[PropertyService] Không tìm thấy ADMIN để gửi thông báo.");
-                } else {
+                if (!admins.isEmpty()) {
                     String adminMessage = String.format("Tin đăng mới '%s' (ID: %d) đang chờ duyệt.", title, saved.getId());
                     String adminLink = "/admin/posts";
-
                     for (UserEntity admin : admins) {
                         notificationService.createNotification(
                                 admin,
@@ -267,91 +234,121 @@ public class PropertyServiceImpl implements IPropertyService {
                                 adminLink
                         );
                     }
-                    log.info("[PropertyService] Đã gửi thông báo NEW_LISTING_PENDING cho {} admin.", admins.size());
                 }
 
-                // --- 2. GỬI THÔNG BÁO CHO NGƯỜI ĐĂNG (AUTHOR) ---
                 String userMessage = String.format("Tin đăng '%s' của bạn đã được gửi và đang chờ duyệt.", title);
                 String userLink = "/dashboard/posts?tab=pending";
-
                 notificationService.createNotification(
-                        saved.getUser(), // Lấy user ID từ property đã lưu
+                        saved.getUser(),
                         NotificationType.LISTING_PENDING_USER,
                         userMessage,
                         userLink
                 );
-                log.info("[PropertyService] Đã gửi thông báo LISTING_PENDING_USER cho user {}.", saved.getUser().getUserId());
-
             } catch (Exception e) {
-                // Rất quan trọng: Bắt lỗi để nếu gửi noti lỗi, nó KHÔNG làm rollback việc tạo tin đăng
-                log.error("!!!!!!!!!!!! LỖI NGHIÊM TRỌNG KHI GỬI NOTIFICATION (nhưng tin đăng đã tạo thành công): {}", e.getMessage(), e);
+                log.error("Notify error (listing created OK): {}", e.getMessage(), e);
             }
         }
-        // +++ KẾT THÚC PHẦN THÊM MỚI +++
 
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
 
+    /* =========================================================
+     * MY PROPERTIES (WITH MAP FILTERS)
+     * ========================================================= */
     @Override
-    public Page<PropertyDTO> getPropertiesByUser(Long userId, String status, Pageable pageable) {
+    public Page<PropertyDTO> getPropertiesByUser(Long userId,
+                                                 String status,
+                                                 Pageable pageable,
+                                                 Map<String,String> filters) {
 
-        // 1. Luôn lọc theo user ID
-        Specification<PropertyEntity> userSpec = (root, query, cb) ->
+        Specification<PropertyEntity> spec = (root, query, cb) ->
                 cb.equal(root.get("user").get("userId"), userId);
 
-        Specification<PropertyEntity> statusSpec;
+        // 1) status
+        spec = spec.and(buildStatusSpec(status));
 
-        // 2. Lọc status dựa trên logic map (ánh xạ) của frontend
-        if (status != null) {
-            String statusKey = status.toLowerCase();
+        // 2) filters
+        if (filters != null && !filters.isEmpty()) {
 
-            if (statusKey.equals("active")) {
-                // Frontend key "active" = PUBLISHED của BE
-                statusSpec = (root, query, cb) -> cb.equal(root.get("status"), PropertyStatus.PUBLISHED);
+            // q: keyword over title/description/displayAddress/addressStreet + ward/district/city
+            String q = trim(filters.get("q"));
+            if (q != null) {
+                final String[] tokens = q.toLowerCase().split("\\s+");
+                spec = spec.and((root, qy, cb2) -> {
+                    Join<PropertyEntity, WardEntity> ward = safeLeftJoin(root, "ward");
+                    Join<PropertyEntity, DistrictEntity> dist = safeLeftJoin(root, "district");
+                    Join<PropertyEntity, CityEntity> city = safeLeftJoin(root, "city");
 
-            } else if (statusKey.equals("pending")) {
-                statusSpec = (root, query, cb) -> cb.equal(root.get("status"), PropertyStatus.PENDING_REVIEW);
+                    List<Predicate> andPreds = new ArrayList<>();
+                    for (String token : tokens) {
+                        String like = "%" + token + "%";
+                        List<Predicate> ors = new ArrayList<>();
+                        ors.add(cb2.like(cb2.lower(root.get("title")), like));
+                        ors.add(cb2.like(cb2.lower(root.get("description")), like));
+                        ors.add(cb2.like(cb2.lower(root.get("displayAddress")), like));
+                        ors.add(cb2.like(cb2.lower(root.get("addressStreet")), like));
+                        if (ward != null) ors.add(cb2.like(cb2.lower(ward.get("name")), like));
+                        if (dist != null) ors.add(cb2.like(cb2.lower(dist.get("name")), like));
+                        if (city != null) ors.add(cb2.like(cb2.lower(city.get("name")), like));
+                        andPreds.add(cb2.or(ors.toArray(new Predicate[0])));
+                    }
+                    return cb2.and(andPreds.toArray(new Predicate[0]));
+                });
+            }
 
-            } else if (statusKey.equals("draft")) {
-                // Frontend key "draft" = DRAFT HOẶC ACTIVE của BE
-                statusSpec = (root, query, cb) -> cb.or(
-                        cb.equal(root.get("status"), PropertyStatus.DRAFT),
-                        cb.equal(root.get("status"), PropertyStatus.ACTIVE)
-                );
-
-            } else if (statusKey.equals("hidden")) {
-                // Frontend key "hidden" = HIDDEN HOẶC ARCHIVED của BE
-                statusSpec = (root, query, cb) -> cb.or(
-                        cb.equal(root.get("status"), PropertyStatus.HIDDEN),
-                        cb.equal(root.get("status"), PropertyStatus.ARCHIVED)
-                );
-
-            } else {
-                // Các trường hợp 1-1 còn lại (REJECTED, EXPIRED, v.v.)
-                PropertyStatus mappedStatus = mapFrontendStatus(statusKey);
-                if (mappedStatus != null) {
-                    statusSpec = (root, query, cb) -> cb.equal(root.get("status"), mappedStatus);
-                } else {
-                    statusSpec = (root, query, cb) -> cb.conjunction(); // Không lọc nếu key lạ
+            // code: nếu FE nhập số → match id
+            String code = trim(filters.get("code"));
+            if (code != null) {
+                Long maybeId = tryParseLong(code);
+                if (maybeId != null) {
+                    spec = spec.and((r, qy, cb2) -> cb2.equal(r.get("id"), maybeId));
                 }
             }
 
-        } else {
-            // Không lọc status nếu status = null (cho API cũ)
-            statusSpec = (root, query, cb) -> cb.conjunction(); // (Điều kiện luôn đúng)
+            // area (địa lý): district/city name contains
+            String areaGeo = trim(filters.get("area"));
+            if (areaGeo != null) {
+                spec = spec.and((root, qy, cb2) -> {
+                    Join<PropertyEntity, DistrictEntity> dist = safeLeftJoin(root, "district");
+                    Join<PropertyEntity, CityEntity> city = safeLeftJoin(root, "city");
+                    String like = "%" + areaGeo.toLowerCase() + "%";
+                    List<Predicate> ors = new ArrayList<>();
+                    if (dist != null) ors.add(cb2.like(cb2.lower(dist.get("name")), like));
+                    if (city != null) ors.add(cb2.like(cb2.lower(city.get("name")), like));
+                    return ors.isEmpty() ? cb2.conjunction() : cb2.or(ors.toArray(new Predicate[0]));
+                });
+            }
+
+            // diện tích: area (float)
+            Integer areaMin = parseInt(filters.get("areaMin")).orElse(null);
+            Integer areaMax = parseInt(filters.get("areaMax")).orElse(null);
+            if (areaMin != null) spec = spec.and((r, qy, cb2) -> cb2.ge(r.get("area"), areaMin));
+            if (areaMax != null) spec = spec.and((r, qy, cb2) -> cb2.le(r.get("area"), areaMax));
+
+            // giá: price (Double)
+            Long priceMin = parseLong(filters.get("priceMin")).orElse(null);
+            Long priceMax = parseLong(filters.get("priceMax")).orElse(null);
+            if (priceMin != null) spec = spec.and((r, qy, cb2) -> cb2.ge(r.get("price"), priceMin.doubleValue()));
+            if (priceMax != null) spec = spec.and((r, qy, cb2) -> cb2.le(r.get("price"), priceMax.doubleValue()));
+
+            // expireDate (YYYY-MM-DD) -> expiresAt (Timestamp in day range)
+            String expireDate = trim(filters.get("expireDate"));
+            if (expireDate != null) {
+                LocalDate d = LocalDate.parse(expireDate);
+                Timestamp start = Timestamp.valueOf(d.atStartOfDay());
+                Timestamp end = Timestamp.valueOf(d.plusDays(1).atStartOfDay().minusNanos(1));
+                spec = spec.and((r, qy, cb2) -> cb2.between(r.get("expiresAt"), start, end));
+            }
         }
 
-        // 3. Kết hợp điều kiện
-        Specification<PropertyEntity> finalSpec = userSpec.and(statusSpec);
-
-        // 4. Gọi Repository và trả về
-        return propertyRepository.findAll(finalSpec, pageable)
-                .map(propertyConverter::toDto);
+        return propertyRepository.findAll(spec, pageable).map(propertyConverter::toDto);
     }
 
+    /* =========================================================
+     * COUNTS (TABS)
+     * ========================================================= */
     @Override
     public Map<String, Long> getPropertyCountsByStatus(Long userId) {
-        // 1. Khởi tạo Map kết quả với tất cả các key = 0
         Map<String, Long> counts = new HashMap<>();
         counts.put("active", 0L);
         counts.put("pending", 0L);
@@ -361,25 +358,19 @@ public class PropertyServiceImpl implements IPropertyService {
         counts.put("expired", 0L);
         counts.put("expiringSoon", 0L);
 
-        // 2. Gọi query GROUP BY từ Repository
         List<IPropertyCount> results = propertyRepository.countByStatus(userId);
-
-        // 3. Duyệt qua kết quả từ CSDL và map vào Map
         for (IPropertyCount item : results) {
             String frontendKey = mapBackendStatusToFrontendKey(item.getStatus());
-            if (frontendKey != null) {
-                // Ghi đè số 0 bằng số đếm thật
-                counts.put(frontendKey, item.getCount());
-            }
+            if (frontendKey != null) counts.put(frontendKey, item.getCount());
         }
-
         return counts;
     }
 
+    /* =========================================================
+     * FAVORITERS
+     * ========================================================= */
     @Override
     public List<UserFavoriteDTO> getUsersWhoFavorited(Long propertyId, Long currentUserId) {
-
-        // 1. Lấy tin đăng và kiểm tra quyền sở hữu
         PropertyEntity property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy tin đăng với ID: " + propertyId));
 
@@ -387,20 +378,18 @@ public class PropertyServiceImpl implements IPropertyService {
             throw new AccessDeniedException("Bạn không có quyền xem danh sách yêu thích của tin đăng này");
         }
 
-        // 2. Lấy danh sách SavedProperty (các lượt lưu)
         List<SavedPropertyEntity> saves = savedPropertyRepository.findByProperty_Id(propertyId);
-
-        // 3. Chuyển đổi danh sách User sang UserFavoriteDTO
-        // (Giả sử SavedProperty entity có trường 'private User user;')
         return saves.stream()
                 .map(savedProperty -> userConverter.toFavoriteDto(savedProperty.getUser()))
                 .collect(Collectors.toList());
     }
 
+    /* =========================================================
+     * RECOMMENDATIONS
+     * ========================================================= */
     @Transactional(readOnly = true)
     @Override
     public List<PropertyCardDTO> getRecommendations(Long userId, int limit) {
-        // 1) Tín hiệu Saved
         List<Long> savedIds = savedPropertyRepository.findPropertyIdsByUser(userId);
 
         List<Long> favDistrictIds = savedPropertyRepository.topDistrictIds(userId).stream()
@@ -424,10 +413,9 @@ public class PropertyServiceImpl implements IPropertyService {
                     .map(propertyMapper::toPropertyCardDTO).toList();
         }
 
-        // 2) Build “biên” lọc quanh trung bình (nếu có)
         Double priceFrom = null, priceTo = null;
         if (avgPrice != null && avgPrice > 0) {
-            double band = Math.max(n0(stdPrice), avgPrice * 0.2); // ±max(σ, 20%)
+            double band = Math.max(n0(stdPrice), avgPrice * 0.2);
             priceFrom = Math.max(0, avgPrice - band);
             priceTo   = avgPrice + band;
         }
@@ -438,7 +426,6 @@ public class PropertyServiceImpl implements IPropertyService {
             areaTo   = (float) (avgArea + band);
         }
 
-        // 3) Gộp spec
         Specification<PropertyEntity> spec = Specification.where(RecommendationSpec.statusPublished());
         spec = and(spec, RecommendationSpec.inDistrictIds(favDistrictIds));
         spec = and(spec, RecommendationSpec.inPropertyTypes(favTypes));
@@ -446,7 +433,6 @@ public class PropertyServiceImpl implements IPropertyService {
         spec = and(spec, RecommendationSpec.areaBetween(areaFrom, areaTo));
         spec = and(spec, RecommendationSpec.notInIds(savedIds));
 
-        // 4) Lấy candidates (nhiều hơn limit để scoring)
         int pageSize = Math.max(limit * 3, 24);
         List<PropertyEntity> candidates = propertyRepository
                 .findAll(spec, PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "postedAt")))
@@ -457,7 +443,6 @@ public class PropertyServiceImpl implements IPropertyService {
                     .map(propertyMapper::toPropertyCardDTO).toList();
         }
 
-        // 5) Scoring
         final double pAvg = avgPrice != null ? avgPrice : 0d;
         final double aAvg = avgArea  != null ? avgArea  : 0d;
 
@@ -472,6 +457,9 @@ public class PropertyServiceImpl implements IPropertyService {
         return ranked.stream().map(propertyMapper::toPropertyCardDTO).toList();
     }
 
+    /* =========================================================
+     * KPI / PENDING
+     * ========================================================= */
     @Override
     public PropertyKpiResponse propertiesKpi(String range, String status, String pendingStatus) {
         String st = (status == null || status.isBlank()) ? "PUBLISHED" : status.toUpperCase();
@@ -490,7 +478,6 @@ public class PropertyServiceImpl implements IPropertyService {
         long totalPrev = propertyRepository.countPostedBetween(ps, pe, st);
         double pct = (totalPrev == 0) ? (totalCur > 0 ? 1.0 : 0.0) : (double) (totalCur - totalPrev) / totalPrev;
 
-        // series
         List<Object[]> rows = propertyRepository.dailyPostedSeries(cs, ce, TZ_OFFSET, st);
         Map<LocalDate, Long> map = new LinkedHashMap<>();
         for (LocalDate d = cur.start.toLocalDate(); !d.isAfter(cur.end.toLocalDate().minusDays(1)); d = d.plusDays(1)) {
@@ -527,7 +514,6 @@ public class PropertyServiceImpl implements IPropertyService {
 
         final var rows = propertyRepository.findPending(PropertyStatus.PENDING_REVIEW, query, pageable);
 
-        // map Page<PendingPropertyRow> -> Page<PendingPropertyDto> bằng Page.map(...)
         final var dtoPage = rows.map(r -> PendingPropertyDTO.builder()
                 .id(r.getId())
                 .title(r.getTitle())
@@ -542,7 +528,9 @@ public class PropertyServiceImpl implements IPropertyService {
         return PageResponse.from(dtoPage);
     }
 
-
+    /* =========================================================
+     * PRIVATE HELPERS
+     * ========================================================= */
     private static Specification<PropertyEntity> and(Specification<PropertyEntity> base, Specification<PropertyEntity> next) {
         return next == null ? base : base.and(next);
     }
@@ -553,32 +541,27 @@ public class PropertyServiceImpl implements IPropertyService {
     }
     private static double n0(Double d) { return d == null ? 0d : d; }
 
-    // điểm đơn giản, dễ chỉnh
     private double score(PropertyEntity p,
                          List<Long> favDistrictIds,
                          List<PropertyType> favTypes,
                          double avgPrice,
                          double avgArea) {
         double s = 0;
-
-        // 1) Khớp khu vực / loại
         if (p.getDistrict() != null && p.getDistrict().getId() != null
                 && favDistrictIds.contains(p.getDistrict().getId())) s += 3.0;
         if (p.getPropertyType() != null && favTypes.contains(p.getPropertyType())) s += 2.0;
 
-        // 2) Gần trung bình giá / diện tích
         if (avgPrice > 0 && p.getPrice() != null && p.getPrice() > 0) {
             double denom = avgPrice * 0.5;
             double close = Math.max(0, 1 - Math.abs(p.getPrice() - avgPrice) / denom);
             s += close * 2.0;
         }
-        if (avgArea > 0 && p.getArea() > 0) { // area là primitive float → >0
+        if (avgArea > 0 && p.getArea() > 0) {
             double denom = avgArea * 0.5;
             double close = Math.max(0, 1 - Math.abs(p.getArea() - avgArea) / denom);
             s += close * 1.5;
         }
 
-        // 3) Ưu tiên VIP/PREMIUM nhẹ
         if (p.getListingType() != null) {
             switch (p.getListingType()) {
                 case VIP -> s += 0.8;
@@ -587,62 +570,95 @@ public class PropertyServiceImpl implements IPropertyService {
             }
         }
 
-        // 4) Bonus độ mới
         if (p.getPostedAt() != null) {
-            long days = Math.max(0, java.time.Duration.between(p.getPostedAt().toInstant(), java.time.Instant.now()).toDays());
-            double recency = Math.max(0, 1 - (days / 30.0)); // trong 30 ngày gần nhất
+            long days = Math.max(0, Duration.between(p.getPostedAt().toInstant(), Instant.now()).toDays());
+            double recency = Math.max(0, 1 - (days / 30.0));
             s += recency * 0.2;
         }
         return s;
     }
 
-    // +++ THÊM HÀM TRỢ GIÚP ÁNH XẠ NGƯỢC +++
     private String mapBackendStatusToFrontendKey(PropertyStatus beStatus) {
         if (beStatus == null) return null;
-
         switch (beStatus) {
-            case PUBLISHED:
-                return "active";
-            case PENDING_REVIEW:
-                return "pending";
+            case PUBLISHED:      return "active";
+            case PENDING_REVIEW: return "pending";
             case DRAFT:
-            case ACTIVE: // Gộp cả ACTIVE (nếu có) vào "draft" theo logic slice
-                return "draft";
-            case REJECTED:
-                return "rejected";
+            case ACTIVE:         return "draft";
+            case REJECTED:       return "rejected";
             case HIDDEN:
-            case ARCHIVED: // Gộp cả ARCHIVED vào "hidden" theo logic slice
-                return "hidden";
-            case EXPIRED:
-                return "expired";
-            case EXPIRINGSOON:
-                return "expiringSoon";
-            default:
-                return null;
+            case ARCHIVED:       return "hidden";
+            case EXPIRED:        return "expired";
+            case EXPIRINGSOON:   return "expiringSoon";
+            default:             return null;
         }
     }
 
-    // =============================================================
-    // +++ HÀM TRỢ GIÚP (ĐÃ SỬA) +++
-    // =============================================================
     private PropertyStatus mapFrontendStatus(String statusKey) {
-        // Chỉ map các trường 1-1 đơn giản
-        // (Các trường phức tạp 'active', 'draft', 'hidden' đã được xử lý ở trên)
+        if (statusKey == null) return null;
         switch (statusKey) {
-            case "rejected":
-                return PropertyStatus.REJECTED;
-            case "expired":
-                return PropertyStatus.EXPIRED;
-            case "expiringsoon":
-                return PropertyStatus.EXPIRINGSOON;
-            default:
-                return null;
+            case "rejected":      return PropertyStatus.REJECTED;
+            case "expired":       return PropertyStatus.EXPIRED;
+            case "expiringsoon":  return PropertyStatus.EXPIRINGSOON;
+            default:              return null;
         }
     }
 
+    private Specification<PropertyEntity> buildStatusSpec(String status) {
+        if (status == null || status.isBlank()) return (r, q, cb) -> cb.conjunction();
+        String key = status.trim().toLowerCase();
+        switch (key) {
+            case "active":
+                return (r, q, cb) -> cb.equal(r.get("status"), PropertyStatus.PUBLISHED);
+            case "pending":
+                return (r, q, cb) -> cb.equal(r.get("status"), PropertyStatus.PENDING_REVIEW);
+            case "draft":
+                return (r, q, cb) -> cb.or(
+                        cb.equal(r.get("status"), PropertyStatus.DRAFT),
+                        cb.equal(r.get("status"), PropertyStatus.ACTIVE)
+                );
+            case "hidden":
+                return (r, q, cb) -> cb.or(
+                        cb.equal(r.get("status"), PropertyStatus.HIDDEN),
+                        cb.equal(r.get("status"), PropertyStatus.ARCHIVED)
+                );
+            default: {
+                PropertyStatus mapped = mapFrontendStatus(key);
+                return (mapped != null)
+                        ? (r, q, cb) -> cb.equal(r.get("status"), mapped)
+                        : (r, q, cb) -> cb.conjunction();
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <X, Y> Join<X, Y> safeLeftJoin(From<X, ?> root, String attr) {
+        try {
+            return (Join<X, Y>) root.join(attr, JoinType.LEFT);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return null;
+        }
+    }
+
+    private static String trim(String s){
+        return (s == null || s.isBlank()) ? null : s.trim();
+    }
+    private static Optional<Integer> parseInt(String s){
+        try { return (s == null || s.isBlank()) ? Optional.empty() : Optional.of(Integer.parseInt(s)); }
+        catch (Exception e) { return Optional.empty(); }
+    }
+    private static Optional<Long> parseLong(String s){
+        try { return (s == null || s.isBlank()) ? Optional.empty() : Optional.of(Long.parseLong(s)); }
+        catch (Exception e) { return Optional.empty(); }
+    }
+    private static Long tryParseLong(String s){
+        try { return (s == null || s.isBlank()) ? null : Long.valueOf(s); }
+        catch (Exception e){ return null; }
+    }
+
+    /* ================= Range helpers for KPI ================= */
     private static class Range { LocalDateTime start, end;
         Range(LocalDateTime s, LocalDateTime e) { this.start = s; this.end = e; } }
-
 
     private Range resolveRange(String key, LocalDate today) {
         String k = key == null ? "" : key;
@@ -665,9 +681,9 @@ public class PropertyServiceImpl implements IPropertyService {
             }
             case "last_30d":
             default: {
-                    LocalDate endDay = today.plusDays(1);
-                    return new Range(endDay.minusDays(30).atStartOfDay(), endDay.atStartOfDay());
-                }
+                LocalDate endDay = today.plusDays(1);
+                return new Range(endDay.minusDays(30).atStartOfDay(), endDay.atStartOfDay());
+            }
         }
     }
 

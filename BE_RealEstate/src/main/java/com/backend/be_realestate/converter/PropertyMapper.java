@@ -42,7 +42,7 @@ public class PropertyMapper {
         dto.setBed(entity.getBedrooms() != null ? entity.getBedrooms() : 0);
         dto.setBath(entity.getBathrooms() != null ? entity.getBathrooms() : 0);
         dto.setViewCount(entity.getViewCount() != null ? entity.getViewCount() : 0);
-
+        dto.setStatus(entity.getStatus());
         // === THAY ĐỔI 1: Thêm trường price đã được định dạng ===
         if (entity.getPrice() != null) {
             dto.setPrice(formatPrice(entity.getPrice().longValue()));

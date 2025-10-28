@@ -52,11 +52,16 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 .picture((String) p.getAttributes().get("picture"))
                 .build();
 
-        // upsert user + provider → về DTO (nếu cần trả cho FE)
         UserDTO dto = socialAuthService.upsertGoogleUser(profile);
 
-        // JWT
-        String access  = jwtService.generateAccess(dto.getEmail(), Map.of("typ", "access"));
+        // ✅ Đính kèm uid vào claims
+        Map<String, Object> accessClaims = new java.util.HashMap<>();
+        accessClaims.put("typ", "access");
+        accessClaims.put("uid", dto.getId());
+        accessClaims.put("roles", dto.getRoles());
+
+
+        String access  = jwtService.generateAccess(dto.getEmail(), accessClaims);
         String refresh = jwtService.generateRefresh(dto.getEmail());
 
         // redirect FE (hoặc set HttpOnly cookie tuỳ chiến lược)

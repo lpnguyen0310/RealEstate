@@ -14,7 +14,7 @@ import { useDispatch } from "react-redux";
 import { notificationApi } from "@/services/notificationApi";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK);
-const BACK_HREF = "/dashboard/purchage"; // đổi nếu route khác
+const BACK_HREF = "/dashboard/purchase"; // đổi nếu route khác
 
 /* ---------- Small UI helpers ---------- */
 function Modal({ open, onClose, children, width = "max-w-md" }) {

@@ -135,19 +135,40 @@ export const createPropertyThunk = createAsyncThunk(
 
 // Lấy danh sách tin của chính user (dashboard)
 export const fetchMyPropertiesThunk = createAsyncThunk(
-    "property/fetchMyProperties",
-    async ({ page = 0, size = 20, sort = "postedAt,desc", status } = {}, { rejectWithValue }) => {
+    "property/fetchMine",
+    async (params = {}, thunkApi) => {
         try {
-            const params = { page, size, sort };
-            if (status) params.status = status;
-            const res = await api.get("/properties/me", { params });
-            return res.data;
-        } catch (e) {
-            const msg = e?.response?.data?.message || "Không thể tải danh sách tin đăng của tôi";
-            return rejectWithValue(msg);
+            const {
+                page = 0,
+                size = 10,
+                status,
+                sort = "postedAt,desc",
+                q, code, area, areaMin, areaMax, priceMin, priceMax,
+                autoPosting, expireDate,
+            } = params;
+
+            const query = {
+                page, size, sort,
+                ...(status ? { status } : {}),
+                ...(q ? { q } : {}), // 🔍 keyword
+                ...(code ? { code } : {}),
+                ...(area ? { area } : {}),
+                ...(areaMin != null ? { areaMin } : {}),
+                ...(areaMax != null ? { areaMax } : {}),
+                ...(priceMin != null ? { priceMin } : {}),
+                ...(priceMax != null ? { priceMax } : {}),
+                ...(autoPosting ? { autoPosting } : {}),
+                ...(expireDate ? { expireDate } : {}),
+            };
+
+            const res = await api.get("/properties/me", { params: query });
+            return res.data; // PageResponse
+        } catch (err) {
+            return thunkApi.rejectWithValue(err?.response?.data?.message || err.message);
         }
     }
 );
+
 
 // Lấy số đếm dashboard
 export const fetchMyPropertyCountsThunk = createAsyncThunk(

@@ -41,7 +41,7 @@ export default function DashboardHeader({
         </Link>
 
         <Link
-          to="/profile"
+          to="/dashboard/account"
           className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 no-underline text-gray-800"
         >
           <UserOutlined className="text-[16px] text-gray-600" />

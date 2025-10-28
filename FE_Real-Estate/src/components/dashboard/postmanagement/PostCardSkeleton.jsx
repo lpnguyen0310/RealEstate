@@ -1,29 +1,6 @@
-import { Select, Pagination, Empty, Skeleton } from "antd";
+import { Select, Pagination } from "antd";
 import PostCard from "./PostCard";
 import "../../../../public/css/post_list.css";
-
-function PostCardSkeleton() {
-    return (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-[0_6px_24px_rgba(13,47,97,0.04)]">
-            <div className="flex gap-4">
-                <div className="w-[160px] h-[110px] overflow-hidden rounded-xl bg-gray-100">
-                    <Skeleton.Image active style={{ width: "100%", height: "110px" }} />
-                </div>
-                <div className="flex-1">
-                    <Skeleton
-                        active
-                        title={{ width: "80%" }}
-                        paragraph={{ rows: 2, width: ["90%", "70%"] }}
-                    />
-                    <div className="mt-2 flex items-center justify-between">
-                        <Skeleton.Button active size="small" style={{ width: 120 }} />
-                        <Skeleton.Button active size="small" shape="round" style={{ width: 80 }} />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 export default function PostList({
     items = [],
@@ -32,23 +9,15 @@ export default function PostList({
     pageSize = 5,
     onPageChange = () => { },
     onPageSizeChange = () => { },
-    loading = false, // ✅ thêm prop loading
 }) {
-    const showEmpty = !loading && items.length === 0;
-
     return (
         <div className="space-y-4">
             {/* LIST */}
             <div className="space-y-4">
-                {loading
-                    ? Array.from({ length: Math.min(pageSize, 6) }).map((_, i) => (
-                        <PostCardSkeleton key={`sk-${i}`} />
-                    ))
-                    : items.map((p) => <PostCard key={p.id} post={p} />)}
-
-                {showEmpty && (
+                {items.map((p) => <PostCard key={p.id} post={p} />)}
+                {items.length === 0 && (
                     <div className="text-center text-gray-500 bg-white rounded-2xl border border-gray-100 p-8">
-                        <Empty description="Chưa có tin nào." />
+                        Chưa có tin nào.
                     </div>
                 )}
             </div>
@@ -59,7 +28,6 @@ export default function PostList({
                 <div className="flex items-center gap-3">
                     <Select
                         value={pageSize}
-                        disabled={loading} // ✅ disable khi đang tải
                         onChange={(v) => onPageSizeChange(v)}
                         options={[10, 20, 30, 50].map((n) => ({
                             label: n.toString(),
@@ -77,13 +45,12 @@ export default function PostList({
 
                 {/* right: pagination */}
                 <Pagination
-                    className="flex items-center post-pagination"
+                    className="flex items-center post-pagination "
                     current={page}
                     total={total}
                     pageSize={pageSize}
                     showSizeChanger={false}
                     onChange={onPageChange}
-                    disabled={loading} // ✅ disable khi đang tải
                     itemRender={(p, type, original) => {
                         const baseBtn =
                             "px-5 h-10 inline-flex items-center justify-center rounded-xl transition font-medium " +
@@ -95,15 +62,15 @@ export default function PostList({
                         const activeBtn = "bg-[#415a8c] text-white shadow-sm";
 
                         const totalPages = Math.max(1, Math.ceil(total / pageSize));
-                        const isPrevDisabled = page <= 1 || loading;
-                        const isNextDisabled = page >= totalPages || loading;
+                        const isPrevDisabled = page <= 1;
+                        const isNextDisabled = page >= totalPages;
 
                         if (type === "prev") {
                             return (
                                 <button
                                     className={`${baseBtn} ${grayBtn} ${isPrevDisabled
-                                            ? "opacity-60 cursor-not-allowed pointer-events-none"
-                                            : ""
+                                        ? "opacity-60 cursor-not-allowed pointer-events-none"
+                                        : ""
                                         }`}
                                     tabIndex={-1}
                                     onMouseDown={(e) => e.preventDefault()}
@@ -116,8 +83,8 @@ export default function PostList({
                             return (
                                 <button
                                     className={`${baseBtn} ${grayBtn} ${isNextDisabled
-                                            ? "opacity-60 cursor-not-allowed pointer-events-none"
-                                            : ""
+                                        ? "opacity-60 cursor-not-allowed pointer-events-none"
+                                        : ""
                                         }`}
                                     tabIndex={-1}
                                     onMouseDown={(e) => e.preventDefault()}
@@ -131,12 +98,9 @@ export default function PostList({
                             return (
                                 <button
                                     className={`${numBtn} ${isActive
-                                            ? activeBtn
-                                            : "bg-white text-gray-700 hover:bg-gray-50"
-                                        } !focus:outline-none !focus-visible:outline-none !focus:ring-0 ${loading
-                                            ? "opacity-60 cursor-not-allowed pointer-events-none"
-                                            : ""
-                                        }`}
+                                        ? activeBtn
+                                        : "bg-white text-gray-700 hover:bg-gray-50"
+                                        } !focus:outline-none !focus-visible:outline-none !focus:ring-0`}
                                     tabIndex={-1}
                                     onMouseDown={(e) => e.preventDefault()}
                                 >

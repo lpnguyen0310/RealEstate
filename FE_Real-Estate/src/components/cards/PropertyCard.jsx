@@ -1,5 +1,5 @@
 // src/components/PropertyCard.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import {
   ShareAltOutlined,
   HeartOutlined,
@@ -14,11 +14,6 @@ import { openLoginModal } from "@/store/uiSlice";
 import { makeSelectIsSaved, toggleFavorite } from "@/store/favoriteSlice";
 import { formatVNDShort } from "@/utils/money";
 
-function stopLink(e) {
-  e.preventDefault();
-  e.stopPropagation();
-}
-
 export default function PropertyCard({ item = {} }) {
   const dispatch = useDispatch();
   const user = useSelector((s) => s.auth.user);
@@ -31,7 +26,7 @@ export default function PropertyCard({ item = {} }) {
   const href = `/real-estate/${item.id}`;
   const thumb = imageUrl;
 
-  // read saved state from slice (no custom hooks)
+  // đọc trạng thái đã lưu từ slice
   const isSaved = useSelector((state) => makeSelectIsSaved(item.id)(state));
 
   const favPayload = useMemo(
@@ -43,13 +38,13 @@ export default function PropertyCard({ item = {} }) {
       price: item.price ?? null,
       priceDisplay: item.priceDisplay || formatVNDShort(item.price),
       displayAddress: item.displayAddress || item.addressMain || "",
-      pricePerM2: item.pricePerM2, // ví dụ: "210 tr/m²"
-      area: item.area, // 35
-      bed: item.bedrooms ?? item.bed, // 3
-      bath: item.bathrooms ?? item.bath, // 4
+      pricePerM2: item.pricePerM2,
+      area: item.area,
+      bed: item.bedrooms ?? item.bed,
+      bath: item.bathrooms ?? item.bath,
       photos: item.photos ?? item?.imageUrls?.length ?? 0,
-      postedAt: item.postedAtText ?? item.postedAt, // "Đăng hôm nay"
-      listingType: item.listingType, // VIP/PREMIUM/NORMAL
+      postedAt: item.postedAtText ?? item.postedAt,
+      listingType: item.listingType,
     }),
     [
       item?.id,
@@ -74,23 +69,37 @@ export default function PropertyCard({ item = {} }) {
     ]
   );
 
-  const handleToggle = (e) => {
-    stopLink(e);
+  // tránh mở trùng modal đăng nhập
+  const loginModalOpenRef = useRef(false);
+
+  const handleHeartClick = (e) => {
+    // CHẶN điều hướng thẻ <a>, nhưng KHÔNG dùng onMouseDown
+    e.preventDefault();
+    e.stopPropagation();
 
     if (!user) {
+      if (loginModalOpenRef.current) return;
+      loginModalOpenRef.current = true;
+
       Modal.confirm({
         title: "Bạn cần đăng nhập để thực hiện",
-        content:
-          "Vui lòng đăng nhập để lưu tin và đồng bộ trên nhiều thiết bị.",
+        content: "Vui lòng đăng nhập để lưu tin và đồng bộ trên nhiều thiết bị.",
         okText: "Đăng nhập",
         cancelText: "Quay lại",
         centered: true,
-        onOk: () => dispatch(openLoginModal()),
+        maskClosable: false,
+        onOk: () => {
+          dispatch(openLoginModal());
+        },
+        onCancel: () => { },
+        afterClose: () => {
+          loginModalOpenRef.current = false;
+        },
       });
       return;
     }
 
-    // Giao cho slice làm optimistic + rollback + gọi API
+    // Đã đăng nhập → toggle yêu thích
     dispatch(toggleFavorite({ id: item.id, payload: favPayload }))
       .unwrap()
       .catch(() => {
@@ -98,8 +107,16 @@ export default function PropertyCard({ item = {} }) {
         Modal.error({
           title: "Có lỗi xảy ra",
           content: "Không thể lưu/bỏ lưu. Vui lòng thử lại!",
+          centered: true,
         });
       });
+  };
+
+  const handleShareClick = (e) => {
+    // chỉ chặn điều hướng, chưa làm share
+    e.preventDefault();
+    e.stopPropagation();
+    message.info("Tính năng chia sẻ sẽ có sớm!");
   };
 
   // Badge loại tin
@@ -127,9 +144,7 @@ export default function PropertyCard({ item = {} }) {
             alt={item.title}
             className="block w-full h-[220px] object-cover transition-transform duration-300 hover:scale-105"
             loading="lazy"
-            onError={(e) =>
-              (e.currentTarget.src = "https://picsum.photos/800/480")
-            }
+            onError={(e) => (e.currentTarget.src = "https://picsum.photos/800/480")}
           />
 
           {/* BADGE loại tin */}
@@ -142,12 +157,11 @@ export default function PropertyCard({ item = {} }) {
           )}
 
           {/* QUICK ACTIONS */}
-          <div className="absolute right-4 top-4 flex gap-2">
+          <div className="absolute right-4 top-4 flex gap-2 z-10">
             <button
               type="button"
               className="w-9 h-9 rounded-full bg-white/95 backdrop-blur-sm hover:bg-white shadow flex items-center justify-center"
-              onMouseDown={stopLink}
-              onClick={stopLink}
+              onClick={handleShareClick}
               aria-label="Chia sẻ"
               title="Chia sẻ"
             >
@@ -157,11 +171,9 @@ export default function PropertyCard({ item = {} }) {
             {/* ❤️ Toggle */}
             <button
               type="button"
-              className={`w-9 h-9 rounded-full backdrop-blur-sm shadow flex items-center justify-center ${
-                isSaved ? "bg-[#fff1ef]" : "bg-white/95 hover:bg-white"
-              }`}
-              onMouseDown={stopLink}
-              onClick={handleToggle}
+              className={`w-9 h-9 rounded-full backdrop-blur-sm shadow flex items-center justify-center ${isSaved ? "bg-[#fff1ef]" : "bg-white/95 hover:bg-white"
+                }`}
+              onClick={handleHeartClick}
               aria-label={isSaved ? "Bỏ lưu" : "Lưu tin"}
               title={isSaved ? "Bỏ lưu" : "Lưu tin"}
             >
@@ -183,7 +195,7 @@ export default function PropertyCard({ item = {} }) {
 
           {/* BADGE: số ảnh */}
           <div className="absolute right-4 bottom-4 flex items-center gap-1 bg-black/70 text-white text-[12px] px-2.5 py-1 rounded-full">
-            <CameraOutlined className="text-[12px]" />
+            <CameraOutlined className="text-[12px]}" />
             <span>{item.photos ?? item?.imageUrls?.length ?? 0}</span>
           </div>
         </div>
@@ -200,18 +212,14 @@ export default function PropertyCard({ item = {} }) {
             {item.priceDisplay || item.price || formatVNDShort(item.price)}
           </span>
           {item.pricePerM2 && (
-            <span className="ml-2 text-gray-500 text-[13px]">
-              ({item.pricePerM2})
-            </span>
+            <span className="ml-2 text-gray-500 text-[13px]">({item.pricePerM2})</span>
           )}
         </div>
 
         {(item.displayAddress || item.addressMain) && (
           <div className="mt-2 text-gray-700 text-[14px] flex items-center gap-2">
             <EnvironmentOutlined className="text-[#1f5fbf]" />
-            <span className="truncate">
-              {item.displayAddress || item.addressMain}
-            </span>
+            <span className="truncate">{item.displayAddress || item.addressMain}</span>
           </div>
         )}
 

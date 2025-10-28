@@ -1,114 +1,126 @@
-// src/components/sections/ForYouList.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import PropertyCard from "./PropertyCard";
+import PropertyCardSkeleton from "./skeletion/PropertyCardSkeleton";
 import { fetchPropertiesThunk } from "@/store/propertySlice";
+
+const MIN_SKELETON_MS = 2000; // giữ skeleton ít nhất 2s
 
 export default function ForYouList() {
     const dispatch = useDispatch();
-    const { forYouList, forYouLoading, forYouError, forYouSource } = useSelector((s) => s.property);
+
+    // --- Lấy dữ liệu từ Redux ---
+    const { forYouList, forYouError, forYouSource } = useSelector((s) => s.property);
     const authUser = useSelector((s) => s.auth.user);
     const userId = authUser?.id || authUser?.userId || null;
 
+    // --- State UI ---
     const INITIAL = 8;
     const [expanded, setExpanded] = useState(false);
-
-    // Cờ đánh dấu đã từng fetch popular để tránh spam khi userId chưa có
     const [didFetchPopular, setDidFetchPopular] = useState(false);
-    // Cờ đánh dấu đã fetch forYou với userId hiện tại
     const [fetchedForUserId, setFetchedForUserId] = useState(null);
+    const [minDelayDone, setMinDelayDone] = useState(false);
+    const timerRef = useRef(null);
 
-    // Quyết định KHI NÀO gọi API
+    // --- Giữ skeleton ít nhất MIN_SKELETON_MS ---
     useEffect(() => {
-        // 1) Nếu có userId → gọi forYou (limit dư để mở rộng)
+        timerRef.current = setTimeout(() => setMinDelayDone(true), MIN_SKELETON_MS);
+        return () => clearTimeout(timerRef.current);
+    }, []);
+
+    // --- Gọi API fetch dữ liệu ---
+    useEffect(() => {
         if (userId && fetchedForUserId !== userId) {
+            // Nếu có user → gọi personalized
             dispatch(fetchPropertiesThunk({ type: "forYou", userId, limit: 24 }));
             setFetchedForUserId(userId);
-            return;
-        }
-
-        // 2) Nếu CHƯA có userId (chưa đăng nhập/chưa hydrate) → fallback popular (chỉ 1 lần)
-        if (!userId && !didFetchPopular) {
+        } else if (!userId && !didFetchPopular) {
+            // Nếu chưa đăng nhập → chỉ fetch phổ biến
             dispatch(fetchPropertiesThunk({ type: "popular", limit: 8 }));
             setDidFetchPopular(true);
         }
     }, [dispatch, userId, didFetchPopular, fetchedForUserId]);
 
+    // --- Xử lý hiển thị dữ liệu ---
+    const hasData = Array.isArray(forYouList) && forYouList.length > 0;
     const visible = useMemo(
         () => (expanded ? forYouList : forYouList.slice(0, INITIAL)),
         [expanded, forYouList]
     );
 
-    if (forYouLoading && (!forYouList || forYouList.length === 0)) {
+    // --- Nếu chưa đăng nhập → không hiển thị skeleton ---
+    if (!userId) {
         return (
-            <section className="mt-10">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-[#1b2a57]">Bất động sản dành cho tôi</h2>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[10px]">
-                    {Array.from({ length: INITIAL }).map((_, i) => (
-                        <div key={i} className="rounded-[20px] border bg-white p-4 animate-pulse">
-                            <div className="h-[220px] w-full bg-gray-200 rounded-[16px]" />
-                            <div className="mt-4 h-5 w-3/4 bg-gray-200 rounded" />
-                            <div className="mt-2 h-4 w-1/2 bg-gray-200 rounded" />
-                            <div className="mt-3 h-4 w-2/3 bg-gray-200 rounded" />
-                        </div>
-                    ))}
-                </div>
+            <section className="mt-10 text-center text-gray-600">
+                <h2 className="text-2xl font-bold text-[#1b2a57] mb-2">
+                    Bất động sản dành cho tôi
+                </h2>
+                <p>Vui lòng đăng nhập để xem các gợi ý cá nhân hóa.</p>
             </section>
         );
     }
 
-    if (forYouError && (!forYouList || forYouList.length === 0)) {
-        return (
-            <section className="mt-10">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-[#1b2a57]">Bất động sản dành cho tôi</h2>
-                </div>
-                <div className="text-red-500 text-center">Lỗi khi tải dữ liệu: {forYouError}</div>
-            </section>
-        );
-    }
-
-    if (!forYouList || forYouList.length === 0) return null;
+    // --- Skeleton chỉ hiển thị khi chưa có data HOẶC chưa hết min delay ---
+    const showSkeleton = (!hasData && !forYouError) || !minDelayDone;
 
     return (
         <section className="mt-10">
+            {/* HEADER */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-bold text-[#1b2a57]">Bất động sản dành cho tôi</h2>
-                    {forYouSource && (
+                    <h2 className="text-2xl font-bold text-[#1b2a57]">
+                        Bất động sản dành cho tôi
+                    </h2>
+                    {forYouSource && hasData && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
                             Nguồn: {forYouSource === "personalized" ? "Cá nhân hóa" : "Phổ biến"}
                         </span>
                     )}
                 </div>
-                {/* Dùng Link để không reload (giữ Redux, giữ user) */}
-                <Link to="/goi-y-cho-ban" className="text-[#1f5fbf] font-semibold hover:underline">
+                <Link
+                    to="/goi-y-cho-ban"
+                    className="text-[#1f5fbf] font-semibold hover:underline"
+                >
                     Xem tất cả
                 </Link>
             </div>
 
-            {/* Grid card */}
+            {/* ERROR */}
+            {forYouError && !hasData && minDelayDone && (
+                <div className="text-red-500 text-center mb-4">
+                    Lỗi khi tải dữ liệu: {forYouError}
+                </div>
+            )}
+
+            {/* LIST */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1">
-                {visible.map((p) => (
-                    <Link key={p.id} to={`/real-estate/${p.id}`} className="block group">
-                        <PropertyCard item={p} />
-                    </Link>
-                ))}
+                {(showSkeleton ? Array.from({ length: INITIAL }) : visible).map((item, i) =>
+                    showSkeleton ? (
+                        <PropertyCardSkeleton key={`sk-${i}`} />
+                    ) : (
+                        <Link
+                            key={item.id}
+                            to={`/real-estate/${item.id}`}
+                            className="block group"
+                        >
+                            <PropertyCard item={item} />
+                        </Link>
+                    )
+                )}
             </div>
 
-            {/* Nút Mở rộng / Thu gọn */}
-            {forYouList.length > INITIAL && (
+            {/* EXPAND BUTTON */}
+            {!showSkeleton && forYouList.length > INITIAL && (
                 <div className="mt-6 flex justify-center">
                     <button
                         type="button"
                         onClick={() => setExpanded((v) => !v)}
                         className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 bg-white hover:bg-gray-50 shadow-sm"
                     >
-                        {expanded ? "Thu gọn" : "Mở rộng"} {expanded ? <UpOutlined /> : <DownOutlined />}
+                        {expanded ? "Thu gọn" : "Mở rộng"}{" "}
+                        {expanded ? <UpOutlined /> : <DownOutlined />}
                     </button>
                 </div>
             )}

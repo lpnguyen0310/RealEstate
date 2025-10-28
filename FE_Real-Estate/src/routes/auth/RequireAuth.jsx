@@ -1,12 +1,12 @@
-// src/routes/auth/RequireAuth.jsx
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { getAccessToken } from "@/utils/auth";
 
 export default function RequireAuth() {
     const { user, status } = useSelector((s) => s.auth);
     const loc = useLocation();
 
-    const hasToken = !!sessionStorage.getItem("access_token");
+    const hasToken = !!getAccessToken();
     const hasProfileCache = !!sessionStorage.getItem("profile");
     const isBootstrapping = status === "loading" || hasToken || hasProfileCache;
 

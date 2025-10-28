@@ -1,4 +1,5 @@
 package com.backend.be_realestate.modals.dto;
+import com.backend.be_realestate.enums.PropertyStatus;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -26,4 +27,5 @@ public class PropertyCardDTO {
     private List<String> images;
     private String listing_type;
     private Long viewCount;
+    private PropertyStatus status;
 }

@@ -1,36 +1,41 @@
-import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { message } from "antd";
-
+import { setAccessToken } from "@/utils/auth";
 import { getProfileThunk } from "@/store/authSlice";
-import { setAccessToken } from "@/utils/auth"; 
 
 export default function OAuth2Callback() {
-    const [params] = useSearchParams();
     const nav = useNavigate();
+    const { search } = useLocation();
     const dispatch = useDispatch();
+    const ran = useRef(false); // chặn double-run ở StrictMode
 
     useEffect(() => {
         (async () => {
-            const access = params.get("access");
-            const refresh = params.get("refresh"); 
-            if (!access) {
-                message.error("Đăng nhập Google thất bại!");
-                nav("/login", { replace: true });
-                return;
-            }
-            setAccessToken(access);
-            try {
-                await dispatch(getProfileThunk()).unwrap();
-                message.success("Đăng nhập Google thành công!");
-                nav("/", { replace: true });
-            } catch (e) {
-                message.error("Không tải được hồ sơ người dùng.");
-                nav("/login", { replace: true });
-            }
-        })();
-    }, [dispatch, nav, params]);
+            if (ran.current) return;
+            ran.current = true;
 
-    return <div style={{ padding: 32, textAlign: "center" }}>Đang đăng nhập…</div>;
+            const qs = new URLSearchParams(search);
+            const access = qs.get("access");
+            const refresh = qs.get("refresh");
+            console.log("[CB] query:", { access: !!access, refresh: !!refresh });
+
+            if (access) {
+                setAccessToken(access);
+                sessionStorage.setItem("refresh_token", refresh || "");
+                console.log("[CB] token saved. Dispatch getProfile…");
+                try {
+                    await dispatch(getProfileThunk()).unwrap(); // đợi /user/me xong
+                } catch (e) {
+                }
+            } else {
+            }
+
+            const back = sessionStorage.getItem("post_login_redirect") || "/";
+            sessionStorage.removeItem("post_login_redirect");
+            nav(back, { replace: true });
+        })();
+    }, [search, nav, dispatch]);
+
+    return <div style={{ padding: 24 }}>Đang hoàn tất đăng nhập…</div>;
 }

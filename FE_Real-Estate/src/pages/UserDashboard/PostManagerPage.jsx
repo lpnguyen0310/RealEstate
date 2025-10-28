@@ -1,5 +1,5 @@
 import { Button } from "antd";
-import { useEffect, useState } from "react"; // Đã xóa useMemo
+import { useEffect, useMemo, useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination as SwiperPagination, Autoplay } from "swiper/modules";
@@ -7,18 +7,20 @@ import "swiper/css";
 import "swiper/css/pagination";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+
 import {
     fetchMyPropertiesThunk,
-    fetchMyPropertyCountsThunk, // <-- Import the counts thunk
+    fetchMyPropertyCountsThunk,
     setPage,
     setSize,
-} from "@/store/propertySlice"; // Adjust path if needed
+} from "@/store/propertySlice";
+
 import {
     PostFilters,
     PostStatusTabs,
     PostCreateDrawer,
     PostList,
-} from "@/components/dashboard/postmanagement"; // Adjust path if needed
+} from "@/components/dashboard/postmanagement";
 
 const SLIDES = [
     "https://images.unsplash.com/photo-1501183638710-841dd1904471?q=80&w=1400",
@@ -26,77 +28,127 @@ const SLIDES = [
     "https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1400",
 ];
 
+/* ----------------- helpers ----------------- */
+const cleanObj = (obj) => {
+    const out = {};
+    Object.entries(obj || {}).forEach(([k, v]) => {
+        if (v === undefined || v === null || v === "" || Number.isNaN(v)) return;
+        out[k] = v;
+    });
+    return out;
+};
+const parseNumber = (v) => (v == null ? undefined : (isNaN(+v) ? undefined : +v));
+
+const parseFiltersFromSearch = (sp) => {
+    const obj = Object.fromEntries(sp.entries());
+    return cleanObj({
+        q: obj.q,
+        area: obj.area,
+        areaMin: parseNumber(obj.areaMin),
+        areaMax: parseNumber(obj.areaMax),
+        priceMin: parseNumber(obj.priceMin),
+        priceMax: parseNumber(obj.priceMax),
+        expireDate: obj.expireDate,
+    });
+};
+
+const buildSearchParams = ({ status, page, size, filters }) => {
+    const base = cleanObj({
+        tab: status && status !== "active" ? status : undefined,
+        page: page > 0 ? page + 1 : 1, // URL 1-based
+        size,
+        ...cleanObj(filters),
+    });
+    return base;
+};
+/* ------------------------------------------- */
+
 export default function PostManagerPage() {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { user } = useOutletContext() || {};
 
     const [searchParams, setSearchParams] = useSearchParams();
-    const urlTab = searchParams.get("tab");
 
-    // ----------------------------------------------------
-    // ⭐️⭐️⭐️ SỬA LỖI Ở ĐÂY ⭐️⭐️⭐️
-    // ----------------------------------------------------
-    // Lấy đúng các state của "myList" và đổi tên (alias)
-    const { 
-      list,         // (myList -> list)
-      page,         // (myPage -> page)
-      size,         // (mySize -> size)
-      totalElements,// (myTotalElements -> totalElements)
-      loading, 
-      error, 
-      counts 
+    const {
+        list,
+        page,
+        size,
+        totalElements,
+        loading,
+        error,
+        counts,
     } = useSelector((s) => ({
-        list: s.property.myList,           // Lấy myList
-        page: s.property.myPage,           // Lấy myPage
-        size: s.property.mySize,           // Lấy mySize
-        totalElements: s.property.myTotalElements, // Lấy myTotalElements
-        
-        // Các state này đã đúng
+        list: s.property.myList,
+        page: s.property.myPage,
+        size: s.property.mySize,
+        totalElements: s.property.myTotalElements,
         loading: s.property.loading,
         error: s.property.error,
         counts: s.property.counts,
     }));
-    // ----------------------------------------------------
 
-
-    // Initialize status based on URL or default to 'active'
-    const [status, setStatus] = useState(urlTab || "active");
+    // ---- local ui states ----
+    const [status, setStatus] = useState(searchParams.get("tab") || "active");
+    const [filters, setFilters] = useState(parseFiltersFromSearch(searchParams));
     const [openCreate, setOpenCreate] = useState(false);
 
-    // Effect 1: Fetch the list based on the current status, page, and size
+    /* ========== URL -> STATE ========== */
     useEffect(() => {
-        if (status) {
-            // 'page' và 'size' bây giờ đã là 'myPage' và 'mySize' từ selector
-            dispatch(fetchMyPropertiesThunk({ page, size, status: status }));
-        }
-    }, [dispatch, page, size, status]); // Re-run when status, page, or size changes
+        const urlStatus = searchParams.get("tab") || "active";
+        const urlPage = parseNumber(searchParams.get("page")) ?? 1;
+        const urlSize = parseNumber(searchParams.get("size")) ?? size;
 
-    // Effect 2: Fetch the counts once when the component mounts
+        setStatus(urlStatus);
+        setFilters(parseFiltersFromSearch(searchParams));
+
+        if (urlPage - 1 !== page) dispatch(setPage(Math.max(0, urlPage - 1)));
+        if (urlSize !== size && urlSize != null) dispatch(setSize(urlSize));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
+    /* ========== STATE -> FETCH ========== */
+    useEffect(() => {
+        dispatch(fetchMyPropertiesThunk({ page, size, status, ...filters }));
+    }, [dispatch, page, size, status, filters]);
+
+    // Fetch counts (1 lần)
     useEffect(() => {
         dispatch(fetchMyPropertyCountsThunk());
-    }, [dispatch]); // Runs only once
+    }, [dispatch]);
 
-    // (Log của bạn để kiểm tra, bây giờ nó sẽ in ra myList)
+    /* ========== STATE -> URL ========== */
+    const pushUrl = (next = {}) => {
+        const params = buildSearchParams({
+            status: next.status ?? status,
+            page: next.page ?? page,
+            size: next.size ?? size,
+            filters: next.filters ?? filters,
+        });
+        setSearchParams(params, { replace: false });
+    };
+
+    const rawLoading = useSelector((s) => s.property.loading);
+    const [delayedLoading, setDelayedLoading] = useState(false);
+
     useEffect(() => {
-      if (loading === false && list) { // Chỉ in ra khi không loading và list đã có
-        console.log("--- [KIỂM TRA DỮ LIỆU TẠI PostManagerPage] ---");
-        console.log("Toàn bộ 'list' (đã fix, lấy từ myList):", list);
-        if (list.length > 0) {
-          console.log("Tin đăng đầu tiên (list[0]):", list[0]);
+        if (rawLoading) {
+            // Khi Redux loading = true → bật skeleton ngay
+            setDelayedLoading(true);
+        } else {
+            // Khi Redux loading = false → giữ skeleton thêm 2s
+            const t = setTimeout(() => setDelayedLoading(false), 2000);
+            return () => clearTimeout(t);
         }
-      }
-    }, [list, loading]);
+    }, [rawLoading]);
 
     return (
         <div>
-            {/* Banner Section */}
+            {/* Banner */}
             <div className="rounded-2xl bg-gradient-to-r from-[#1B264F] to-[#1D5DCB] py-5 md:py-6 px-6 md:px-8 text-white mb-8 flex flex-col md:flex-row items-center justify-between">
                 <div className="flex-1 max-w-[540px] space-y-3">
-                    <h2 className="text-[26px] font-bold">Radanhadat.vn</h2>
-                    <h3 className="text-[20px] font-semibold">
-                        Nền tảng Đăng tin Bất động sản Thế hệ mới
-                    </h3>
+                    <h2 className="text-[26px] font-bold">Badongsan.vn</h2>
+                    <h3 className="text-[20px] font-semibold">Nền tảng Đăng tin Bất động sản Thế hệ mới</h3>
                     <p className="text-gray-200 leading-relaxed">
                         Đăng tin tìm kiếm khách hàng, quản lý danh mục bất động sản, gợi ý
                         thông minh giỏ hàng phù hợp cho khách hàng mục tiêu.
@@ -134,7 +186,12 @@ export default function PostManagerPage() {
 
             {/* Filters Bar */}
             <PostFilters
-                onSearch={(filters) => console.log("search filters:", filters)}
+                onSearch={(f) => {
+                    const nextFilters = cleanObj(f || {});
+                    setFilters(nextFilters);
+                    dispatch(setPage(0));
+                    pushUrl({ page: 0, filters: nextFilters });
+                }}
                 onCreate={() => setOpenCreate(true)}
             />
 
@@ -143,39 +200,32 @@ export default function PostManagerPage() {
                 <PostStatusTabs
                     activeKey={status}
                     onChange={(newStatus) => {
-                        // Update local state
                         setStatus(newStatus);
-                        // Reset pagination to page 1
                         dispatch(setPage(0));
-                        // Update URL search params
-                        if (newStatus === 'active') {
-                            setSearchParams({}, { replace: true }); // Remove ?tab for default
-                        } else {
-                            setSearchParams({ tab: newStatus }, { replace: true });
-                        }
+                        pushUrl({ status: newStatus, page: 0 });
                     }}
-                    counts={counts} // Use counts from Redux state
+                    counts={counts}
                 />
             </div>
 
             {/* Post List + Pagination */}
             <div className="mt-4">
-                {loading ? (
-                    <div className="p-6 bg-white rounded-2xl border text-center text-gray-500">Đang tải danh sách...</div>
-                ) : error ? (
-                    <div className="p-6 bg-white rounded-2xl border text-red-500">
-                        Lỗi: {error}
-                    </div>
-                ) : (
-                    <PostList
-                        items={list} // <-- Bây giờ 'list' là 'myList'
-                        total={totalElements} // <-- Bây giờ 'totalElements' là 'myTotalElements'
-                        page={page + 1} // Antd pagination starts from 1
-                        pageSize={size}
-                        onPageChange={(p) => dispatch(setPage(p - 1))} // Dispatch page change (0-based)
-                        onPageSizeChange={(n) => dispatch(setSize(n))} // Dispatch size change
-                    />
-                )}
+                <PostList
+                    loading={delayedLoading}
+                    items={list}
+                    total={totalElements}
+                    page={page + 1} // Antd 1-based
+                    pageSize={size}
+                    onPageChange={(p) => {
+                        dispatch(setPage(p - 1));
+                        pushUrl({ page: p - 1 });
+                    }}
+                    onPageSizeChange={(n) => {
+                        dispatch(setSize(n));
+                        dispatch(setPage(0));
+                        pushUrl({ size: n, page: 0 });
+                    }}
+                />
             </div>
 
             {/* Create Post Drawer */}
@@ -184,22 +234,18 @@ export default function PostManagerPage() {
                 onClose={() => setOpenCreate(false)}
                 onSaveDraft={(values) => {
                     console.log("SAVE DRAFT:", values);
-                    // Add dispatch logic for saving draft if needed
                 }}
                 onContinue={(values) => {
                     console.log("CONTINUE:", values);
-                    // Add logic if needed
                 }}
                 onCreated={() => {
                     setOpenCreate(false);
-                    // Navigate to 'pending' tab after creation
                     setStatus("pending");
                     dispatch(setPage(0));
-                    setSearchParams({ tab: 'pending' }, { replace: true });
-                    // Re-fetch counts to update the numbers on tabs
+                    pushUrl({ status: "pending", page: 0 });
                     dispatch(fetchMyPropertyCountsThunk());
                 }}
-                user={user} // Pass user data if needed by the drawer
+                user={user}
             />
         </div>
     );
