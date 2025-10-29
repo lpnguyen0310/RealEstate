@@ -3,9 +3,7 @@ package com.backend.be_realestate.service.impl;
 import com.backend.be_realestate.converter.OrderConverter;
 import com.backend.be_realestate.entity.*;
 import com.backend.be_realestate.enums.*;
-import com.backend.be_realestate.modals.dto.order.OrderDTO;
-import com.backend.be_realestate.modals.dto.order.OrderItemDTO;
-import com.backend.be_realestate.modals.dto.order.OrderSimpleDTO;
+import com.backend.be_realestate.modals.dto.order.*;
 import com.backend.be_realestate.modals.request.order.CheckoutReq;
 import com.backend.be_realestate.modals.response.PageResponse;
 import com.backend.be_realestate.modals.response.admin.OrderKpiResponse;
@@ -77,6 +75,16 @@ public class OrderServiceImpl implements OrderService {
         OrderEntity order = new OrderEntity();
         order.setUser(currentUser);
         order.setStatus(OrderStatus.PENDING_PAYMENT);
+
+        PaymentMethod method;
+        try {
+            String methodStr = req.getMethod() != null ? req.getMethod().toUpperCase() : "STRIPE";
+            method = PaymentMethod.valueOf(methodStr);
+        } catch (IllegalArgumentException e) {
+            log.warn("Phương thức thanh toán không hợp lệ trong request: {}. Mặc định là STRIPE.", req.getMethod());
+            method = PaymentMethod.STRIPE;
+        }
+        order.setMethod(method);
 
         long calculatedSubtotal = 0L;
 
@@ -338,6 +346,125 @@ public class OrderServiceImpl implements OrderService {
 
         return PageResponse.from(page.map(OrderSimpleDTO::fromEntity));
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<AdminOrderListDTO> adminSearchOrders(String q, String status, String method, String dateRange, Pageable pageable) {
+        // 1. Phân tích tham số Enum
+        OrderStatus orderStatus = status.equalsIgnoreCase("ALL") ? null : OrderStatus.valueOf(status.toUpperCase());
+        PaymentMethod paymentMethod = method.equalsIgnoreCase("ALL") ? null : PaymentMethod.valueOf(method.toUpperCase());
+
+        // 2. Tính toán khoảng thời gian (sử dụng hàm resolveRange đã có)
+        Range range = resolveRange(dateRange, LocalDate.now(ZONE_VN));
+
+        // --- SỬA LỖI CHUYỂN ĐỔI KIỂU DỮ LIỆU ---
+        // Chuyển LocalDateTime sang Instant, sau đó sang java.util.Date
+        Date startDate = Date.from(range.start.atZone(ZONE_VN).toInstant());
+        Date endDate = Date.from(range.end.atZone(ZONE_VN).toInstant());
+
+        // 3. GỌI REPOSITORY: Truyền các đối tượng Date đã được chuyển đổi
+        Page<OrderEntity> page = orderRepository.adminSearch(
+                q, orderStatus, paymentMethod, startDate, endDate, pageable // Đã sửa startDate, endDate
+        );
+
+        // 4. Chuyển đổi Page<Entity> sang PageResponse<DTO>
+        Page<AdminOrderListDTO> dtoPage = page.map(order -> {
+            List<OrderItemEntity> items = orderItemRepository.findByOrderId(order.getId());
+            return orderConverter.toAdminListDto(order, items); // <-- SỬ DỤNG DTO CHUYÊN BIỆT
+        });
+
+        return PageResponse.from(dtoPage);
+    }
+
+    @Override
+    @Transactional
+    public void adminMarkPaid(Long id) {
+        // Tái sử dụng logic nghiệp vụ chính (processPaidOrder) để đảm bảo cập nhật trạng thái PAID,
+        // cộng vật phẩm vào kho và gửi thông báo.
+        this.processPaidOrder(id);
+        // Nếu processPaidOrder không có cơ chế log/ghi timeline, bạn có thể thêm:
+        // log.info("Admin manually marked order {} as PAID", id);
+    }
+
+    @Override
+    @Transactional
+    public void adminCancelOrder(Long id) {
+        OrderEntity order = orderRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Đơn hàng không tồn tại: " + id));
+
+        // Điều kiện: chỉ hủy nếu trạng thái cho phép (ví dụ: PENDING, UNPAID, PAID)
+        if (order.getStatus() == OrderStatus.CANCELED || order.getStatus() == OrderStatus.REFUNDED) {
+            log.warn("Cannot cancel order {} in status {}", id, order.getStatus());
+            return;
+        }
+
+        order.setStatus(OrderStatus.CANCELED);
+        orderRepository.save(order);
+        // TODO: Bổ sung logic hủy: hoàn tiền tự động nếu trạng thái cũ là PAID.
+        log.info("Admin canceled order {}", id);
+    }
+
+    @Override
+    @Transactional
+    public void adminRefundOrder(Long id) {
+        OrderEntity order = orderRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Đơn hàng không tồn tại: " + id));
+
+        // Điều kiện: chỉ hoàn tiền đơn đã PAID
+        if (order.getStatus() != OrderStatus.PAID) {
+            throw new IllegalStateException("Chỉ có thể hoàn tiền đơn hàng đã thanh toán. Trạng thái hiện tại: " + order.getStatus());
+        }
+
+        // Yêu cầu bạn đã thêm OrderStatus.REFUNDED vào Enum
+        order.setStatus(OrderStatus.REFUNDED);
+        orderRepository.save(order);
+
+        // TODO: THỰC HIỆN HOÀN TIỀN THỰC TẾ QUA CỔNG THANH TOÁN (Ví dụ: Stripe API refund call)
+        log.info("Admin refunded order {}", id);
+    }
+
+    @Override
+    @Transactional
+    public void adminBulkAction(List<Long> ids, String action) {
+        if (ids == null || ids.isEmpty()) return;
+
+        for (Long id : ids) {
+            // Tái sử dụng các hàm xử lý đơn lẻ để đảm bảo logic nhất quán và xử lý lỗi
+            try {
+                switch (action.toLowerCase()) {
+                    case "paid":
+                        adminMarkPaid(id);
+                        break;
+                    case "cancel":
+                        adminCancelOrder(id);
+                        break;
+                    case "refund":
+                        adminRefundOrder(id);
+                        break;
+                    default:
+                        log.warn("Bulk action không hợp lệ: {}", action);
+                }
+            } catch (Exception e) {
+                // Log lỗi nhưng không dừng toàn bộ bulk action
+                log.error("Failed to perform bulk action '{}' on order {}: {}", action, id, e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminOrderDetailDTO getAdminOrderDetail(Long orderId) {
+        // 1. Tìm Order, báo lỗi nếu không thấy
+        OrderEntity order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+        // 2. Lấy danh sách items
+        List<OrderItemEntity> items = orderItemRepository.findByOrderId(orderId);
+
+        // 3. Gọi hàm converter MỚI (toAdminDetailDto) mà bạn đã tạo ở bước trước
+        return orderConverter.toAdminDetailDto(order, items);
+    }
+
     private Long parseLongOrNull(String s) {
         try { return Long.parseLong(s); } catch (Exception e) { return null; }
     }

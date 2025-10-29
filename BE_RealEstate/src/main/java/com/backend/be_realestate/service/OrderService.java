@@ -1,5 +1,7 @@
 package com.backend.be_realestate.service;
 
+import com.backend.be_realestate.modals.dto.order.AdminOrderDetailDTO;
+import com.backend.be_realestate.modals.dto.order.AdminOrderListDTO;
 import com.backend.be_realestate.modals.dto.order.OrderDTO;
 import com.backend.be_realestate.modals.dto.order.OrderSimpleDTO;
 import com.backend.be_realestate.modals.request.order.CheckoutReq;
@@ -22,4 +24,16 @@ public interface OrderService {
     OrderKpiResponse ordersKpi(String range, String status); // status: PAID/DRAFT/... hoặc null
     PageResponse<OrderSimpleDTO> getRecentOrders(String keyword, Pageable pageable);
 
+    // 1. Tìm kiếm Admin (Đã thêm dateRange)
+    PageResponse<AdminOrderListDTO> adminSearchOrders(String q, String status, String method, String dateRange, Pageable pageable);
+
+    // 2. Hành động đơn lẻ
+    void adminMarkPaid(Long id);
+    void adminCancelOrder(Long id);
+    void adminRefundOrder(Long id);
+
+    // 3. Hành động hàng loạt
+    void adminBulkAction(List<Long> ids, String action);
+
+    AdminOrderDetailDTO getAdminOrderDetail(Long orderId);
 }

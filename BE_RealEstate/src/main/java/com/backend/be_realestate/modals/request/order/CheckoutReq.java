@@ -9,7 +9,5 @@ import java.util.List;
 public class CheckoutReq {
     @NotEmpty
     private List<CheckoutItemReq> items;
-    // (để dành) private String returnUrl;
-    // (để dành) private InvoiceReq invoice;
-
+    private String method;
 }

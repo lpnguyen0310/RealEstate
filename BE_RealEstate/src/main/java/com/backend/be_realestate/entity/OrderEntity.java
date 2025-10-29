@@ -1,6 +1,7 @@
 package com.backend.be_realestate.entity;
 
 import com.backend.be_realestate.enums.OrderStatus;
+import com.backend.be_realestate.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -33,6 +34,10 @@ import java.util.List;
         @Enumerated(EnumType.STRING)
         @Column(name = "status", length = 20, nullable = false)
         private OrderStatus status = OrderStatus.PENDING_PAYMENT;  // DRAFT|PENDING_PAYMENT|PAID|...
+
+        @Enumerated(EnumType.STRING)
+        @Column(name = "method", length = 30, nullable = false)
+        private PaymentMethod method; // Không đặt mặc định để buộc phải gán khi tạo
 
         @Column(name = "currency", length = 10, nullable = false)
         private String currency = "VND";

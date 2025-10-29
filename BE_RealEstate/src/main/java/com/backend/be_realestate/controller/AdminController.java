@@ -1,9 +1,15 @@
 package com.backend.be_realestate.controller;
 
 import com.backend.be_realestate.modals.dto.PropertyDTO;
+import com.backend.be_realestate.modals.dto.order.AdminOrderDetailDTO;
+import com.backend.be_realestate.modals.dto.order.AdminOrderListDTO;
+import com.backend.be_realestate.modals.dto.order.OrderDTO;
 import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
+import com.backend.be_realestate.modals.request.order.AdminOrderBulkReq;
 import com.backend.be_realestate.modals.response.AdminUserResponse;
+import com.backend.be_realestate.modals.response.ApiResponse;
+import com.backend.be_realestate.modals.response.PageResponse;
 import com.backend.be_realestate.modals.response.PropertyShortResponse;
 import com.backend.be_realestate.modals.response.admin.NewUsersKpiResponse;
 import com.backend.be_realestate.service.AdminPropertyService;
@@ -14,6 +20,8 @@ import com.backend.be_realestate.utils.SecurityUtils;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -140,6 +148,71 @@ public class AdminController {
         adminUserService.rejectLock(id);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/orders")
+    public ApiResponse<PageResponse<AdminOrderListDTO>> searchOrders( // <-- SỬA ĐỔI KIỂU TRẢ VỀ TẠI ĐÂY
+                                                                      @RequestParam(required = false) String q,
+                                                                      @RequestParam(required = false, defaultValue = "ALL") String status,
+                                                                      @RequestParam(required = false, defaultValue = "ALL") String method,
+                                                                      // Thêm Date Range để giới hạn dữ liệu, giúp tăng hiệu suất
+                                                                      @RequestParam(required = false, defaultValue = "LAST_6_MONTHS") String dateRange,
+                                                                      @PageableDefault(size = 10, sort = "createdAt,desc") Pageable pageable // Match FE default sort
+    ) {
+        // Service đã trả về PageResponse<AdminOrderListDTO>
+        PageResponse<AdminOrderListDTO> result = orderService.adminSearchOrders(q, status, method, dateRange, pageable);
+
+        // Trả về ApiResponse chứa kiểu DTO mới đã được phân trang
+        return ApiResponse.success(result);
+    }
+
+    // 2. XEM CHI TIẾT (adminOrdersApi.getById)
+    // Endpoint: GET /api/admin/orders/{id}
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/orders/{id}")
+    public ApiResponse<AdminOrderDetailDTO> getOrderById(@PathVariable Long id) {
+
+        // SỬA LẠI ĐỂ GỌI HÀM MỚI: getAdminOrderDetail
+        AdminOrderDetailDTO detail = orderService.getAdminOrderDetail(id);
+
+        return ApiResponse.success(detail);
+    }
+
+
+    @PostMapping("/orders/{id}/mark-paid")
+    public ApiResponse<Void> markPaid(@PathVariable Long id) {
+        orderService.adminMarkPaid(id);
+
+        // SỬA: Dùng success(null) và message thành công sẽ nằm trong trường 'message' của ApiResponse
+        return ApiResponse.success(null);
+    }
+
+    // 4. Hủy đơn
+    @PostMapping("/orders/{id}/cancel")
+    public ApiResponse<Void> cancelOrder(@PathVariable Long id) {
+        orderService.adminCancelOrder(id);
+
+        // SỬA: Dùng success(null)
+        return ApiResponse.success(null);
+    }
+
+    // 5. Hoàn tiền
+    @PostMapping("/orders/{id}/refund")
+    public ApiResponse<Void> refundOrder(@PathVariable Long id) {
+        orderService.adminRefundOrder(id);
+
+        // SỬA: Dùng success(null)
+        return ApiResponse.success(null);
+    }
+
+
+    // 6. Bulk Action
+    @PostMapping("/orders/bulk-action")
+    public ApiResponse<Void> bulkAction(@RequestBody AdminOrderBulkReq req) {
+        orderService.adminBulkAction(req.getIds(), req.getAction());
+
+        // SỬA: Dùng success(null)
+        return ApiResponse.success(null);
+    }
 
 
 }

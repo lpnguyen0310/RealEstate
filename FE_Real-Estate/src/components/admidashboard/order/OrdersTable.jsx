@@ -1,4 +1,3 @@
-// src/components/admidashboard/order/OrdersTable.jsx
 import React from "react";
 import {
     Paper, LinearProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -30,12 +29,24 @@ export default function OrdersTable({
     const allChecked = rows.length > 0 && selected.length === rows.length;
     const indeterminate = selected.length > 0 && selected.length < rows.length;
 
-    const toggleAll = (e) => { if (e.target.checked) setSelected(rows.map((r) => r.id)); else setSelected([]); };
-    const toggleOne = (id) => { setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]); };
+    const toggleAll = (e) => { if (e.target.checked) setSelected(rows.map((r) => r.orderId)); else setSelected([]); };
+    // Sửa toggleOne để sử dụng r.orderId
+    const toggleOne = (id) => {
+        // 'selected' là mảng IDs được truyền từ component cha (AdminOrder)
+        const newSelected = selected.includes(id)
+            ? selected.filter((x) => x !== id)  // Tạo mảng mới loại bỏ 'id'
+            : [...selected, id];                // Tạo mảng mới thêm 'id'
+
+        // Gửi mảng mới này về cho Redux
+        setSelected(newSelected);
+    };
 
     const totalPages = Math.max(1, Math.ceil(total / (pageSize || 1)));
     const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, start + rows.length - 1);
+
+    // Hàm format ID để khớp với format cũ (ORD-000059)
+    const fmtOrderId = (id) => `ORD-${String(id).padStart(6, "0")}`;
 
     return (
         <Paper
@@ -91,10 +102,13 @@ export default function OrdersTable({
                                 </TableRow>
                             ) : (
                                 rows.map((r) => {
+                                    // Dữ liệu từ BE: r.method (string), r.user (object), r.orderId (long), r.total (long)
                                     const MB = METHOD_BADGE[r.method];
+                                    const primaryItem = r.primaryItem; // Lấy thông tin gói chính
+
                                     return (
                                         <TableRow
-                                            key={r.id}
+                                            key={r.orderId} // Dùng orderId làm key
                                             hover
                                             sx={{
                                                 "& td": { transition: "background-color 140ms ease" },
@@ -103,16 +117,17 @@ export default function OrdersTable({
                                         >
                                             <TableCell padding="checkbox" sx={styles.bodyCell}>
                                                 <Checkbox
-                                                    checked={selected.includes(r.id)}
-                                                    onChange={() => toggleOne(r.id)}
+                                                    checked={selected.includes(r.orderId)} // Dùng orderId
+                                                    onChange={() => toggleOne(r.orderId)} // Dùng orderId
                                                 />
                                             </TableCell>
 
+                                            {/* CỘT MÃ ĐƠN */}
                                             <TableCell sx={styles.bodyCell}>
                                                 <Stack direction="row" spacing={1.25} alignItems="center">
                                                     <Badge
                                                         color="primary"
-                                                        badgeContent={r.itemsCount}
+                                                        badgeContent={r.itemsCount} // itemsCount đã có
                                                         anchorOrigin={{ vertical: "top", horizontal: "right" }}
                                                     >
                                                         <Avatar sx={{ width: 32, height: 32, bgcolor: "#eef2ff", color: "#4f46e5" }}>
@@ -121,38 +136,42 @@ export default function OrdersTable({
                                                     </Badge>
                                                     <Box sx={{ minWidth: 0 }}>
                                                         <Typography fontWeight={700} noWrap>
-                                                            {r.id}
+                                                            {fmtOrderId(r.orderId)} {/* SỬA: Dùng orderId và format */}
                                                         </Typography>
                                                         <Typography fontSize={12} color="#718198">
-                                                            {r.meta?.listingType} • #{r.meta?.propertyId}
+                                                            {primaryItem?.title} {/* SỬA: Lấy tên gói hàng chính */}
                                                         </Typography>
                                                     </Box>
                                                 </Stack>
                                             </TableCell>
 
+                                            {/* CỘT KHÁCH HÀNG */}
                                             <TableCell sx={styles.bodyCell}>
                                                 <Stack direction="row" spacing={1} alignItems="center">
-                                                    <Avatar src={r.user.avatar} sx={{ width: 28, height: 28 }} />
+                                                    <Avatar src={r.user?.avatar} sx={{ width: 28, height: 28 }} /> {/* Đã sửa Optional Chaining */}
                                                     <Box>
-                                                        <Typography fontWeight={600}>{r.user.name}</Typography>
-                                                        <Typography fontSize={12} color="#718198">{r.user.email}</Typography>
+                                                        <Typography fontWeight={600}>{r.user?.fullName}</Typography> {/* Đã sửa Optional Chaining */}
+                                                        <Typography fontSize={12} color="#718198">{r.user?.email}</Typography> {/* Đã sửa Optional Chaining */}
                                                     </Box>
                                                 </Stack>
                                             </TableCell>
 
+                                            {/* CỘT PHƯƠNG THỨC */}
                                             <TableCell sx={styles.bodyCell}>
                                                 <Chip
                                                     size="small"
                                                     variant="outlined"
                                                     icon={MB ? <MB.Icon fontSize="small" /> : null}
-                                                    label={MB?.label || r.method}
+                                                    label={MB?.label || r.method} 
                                                 />
                                             </TableCell>
 
+                                            {/* CỘT SỐ TIỀN */}
                                             <TableCell sx={{ ...styles.bodyCell, textAlign: "right", fontWeight: 700 }}>
-                                                {fmtVND(r.amount)}
+                                                {fmtVND(r.total)} {/* SỬA: Dùng r.total thay vì r.amount */}
                                             </TableCell>
 
+                                            {/* CỘT TRẠNG THÁI */}
                                             <TableCell sx={styles.bodyCell}>
                                                 <Chip
                                                     size="small"
@@ -161,9 +180,13 @@ export default function OrdersTable({
                                                 />
                                             </TableCell>
 
+                                            {/* CỘT TẠO LÚC */}
                                             <TableCell sx={styles.bodyCell}>{fmtDateOrder(r.createdAt)}</TableCell>
+                                            
+                                            {/* CỘT CẬP NHẬT */}
                                             <TableCell sx={styles.bodyCell}>{fmtDateOrder(r.updatedAt)}</TableCell>
 
+                                            {/* CỘT HÀNH ĐỘNG */}
                                             <TableCell align="center" sx={styles.bodyCell}>
                                                 <Stack direction="row" spacing={0.5} justifyContent="center">
                                                     <Tooltip title="Xem chi tiết">
@@ -172,7 +195,8 @@ export default function OrdersTable({
                                                         </IconButton>
                                                     </Tooltip>
 
-                                                    {["UNPAID", "PENDING"].includes(r.status) && (
+                                                    {/* QICK ACTION */}
+                                                    {["UNPAID", "PENDING_PAYMENT"].includes(r.status) && ( // Thêm PENDING_PAYMENT
                                                         <Tooltip title="Đánh dấu đã thanh toán">
                                                             <IconButton onClick={() => onQuickAction("paid", r)} color="success" size="small">
                                                                 <CheckCircleOutlineOutlinedIcon fontSize="small" />
@@ -188,7 +212,8 @@ export default function OrdersTable({
                                                         </Tooltip>
                                                     )}
 
-                                                    {!["CANCELED", "REFUNDED"].includes(r.status) && (
+                                                    {/* Hủy đơn áp dụng cho hầu hết trạng thái trừ CANCELED/REFUNDED */}
+                                                    {r.status !== "CANCELED" && r.status !== "REFUNDED" && (
                                                         <Tooltip title="Hủy đơn">
                                                             <IconButton onClick={() => onQuickAction("cancel", r)} color="error" size="small">
                                                                 <CancelOutlinedIcon fontSize="small" />
@@ -208,6 +233,7 @@ export default function OrdersTable({
                 {/* Footer giống bố cục mẫu */}
                 <Box sx={{ mt: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
                     <Box display="flex" alignItems="center" gap={1.5}>
+                        {/* setPageSize không được truyền từ AdminOrder, nên phần này sẽ không được render */}
                         {setPageSize && (
                             <Select
                                 size="small"
