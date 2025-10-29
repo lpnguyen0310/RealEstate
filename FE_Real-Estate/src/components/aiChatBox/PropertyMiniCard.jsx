@@ -1,15 +1,27 @@
+// src/components/PropertyMiniCard.jsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function PropertyMiniCard({ item }) {
     const nav = useNavigate();
     const {
-        id, image, images = [], title, addressShort, price, pricePerM2,
-        area, bed, bath
+        id,
+        image,
+        images = [],
+        title,
+        addressShort,
+        price, // giá tính theo TRIỆU đồng (ví dụ: 1 = 1 triệu)
+        area,  // diện tích (m²)
+        bed,
+        bath,
     } = item || {};
 
     const fmt = new Intl.NumberFormat("vi-VN");
     const img = image || images[0];
+
+    // ==== TÍNH GIÁ ====
+    const totalPriceVND = price ? price * 1_000_000 : null; // triệu -> VND
+    const pricePerM2VND = area && price ? (totalPriceVND / area) : null;
 
     return (
         <div
@@ -46,11 +58,14 @@ export default function PropertyMiniCard({ item }) {
                 <div className="text-[11px] text-zinc-500 line-clamp-1">{addressShort}</div>
 
                 <div className="flex items-center justify-between pt-1">
+                    {/* Tổng giá */}
                     <div className="text-[13px] font-bold text-indigo-600">
-                        {price != null ? `${fmt.format(price)} ₫` : "—"}
+                        {totalPriceVND != null ? `${fmt.format(totalPriceVND)} ₫` : "—"}
                     </div>
+
+                    {/* Giá / m² */}
                     <div className="text-[11px] text-zinc-500">
-                        {pricePerM2 != null ? `${fmt.format(pricePerM2)} ₫/m²` : ""}
+                        {pricePerM2VND != null ? `${fmt.format(pricePerM2VND)} ₫/m²` : ""}
                     </div>
                 </div>
 

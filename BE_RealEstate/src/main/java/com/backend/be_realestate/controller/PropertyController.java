@@ -103,6 +103,19 @@ public class PropertyController {
         return ResponseEntity.status(HttpStatus.CREATED).body(res);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<CreatePropertyResponse> update(
+            @PathVariable("id") Long id,
+            Authentication authentication,
+            @RequestBody CreatePropertyRequest req
+    ) {
+        Long userId = securityUtils.currentUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        var res = propertyService.update(userId, id, req);
+        return ResponseEntity.ok(res);
+    }
+
     @GetMapping("/my-counts")
     public ResponseEntity<Map<String, Long>> getMyPropertyCounts(Authentication auth) {
         Long userId = securityUtils.currentUserId(auth);
@@ -130,6 +143,21 @@ public class PropertyController {
 
         List<UserFavoriteDTO> users = propertyService.getUsersWhoFavorited(id, userId);
         return ResponseEntity.ok(users);
+    }
+
+
+    @GetMapping("/edit/{id}")
+    public ResponseEntity<PropertyDTO> getDetailForEdit(
+            @PathVariable Long id,
+            Authentication auth
+    ) {
+        // Lấy userId từ token hoặc UserDetails
+        Long userId = securityUtils.currentUserId(auth);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        PropertyDTO dto = propertyService.getDetailForEdit(id, userId);
+        return ResponseEntity.ok(dto);
     }
 
 }

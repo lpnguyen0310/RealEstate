@@ -34,6 +34,9 @@ public interface IPropertyService {
     PropertyDTO create1(Long currentUserId, CreatePropertyRequest req, List<MultipartFile> images);
     CreatePropertyResponse create(Long userId, CreatePropertyRequest req);
 
+    CreatePropertyResponse update(Long userId, Long propertyId, CreatePropertyRequest req);
+
+
     Page<PropertyDTO> getPropertiesByUser(Long userId,
                                           String status,
                                           Pageable pageable,
@@ -47,5 +50,7 @@ public interface IPropertyService {
 
     PropertyKpiResponse propertiesKpi(String range, String status, String pendingStatus);
     PageResponse<PendingPropertyDTO> findPending(String q, int page, int size);
+
+    PropertyDTO getDetailForEdit(Long propertyId, Long requesterUserId);
 
 }

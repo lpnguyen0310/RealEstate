@@ -131,9 +131,21 @@ import java.util.List;
         @JoinColumn(name = "city_id")
         private CityEntity city;
 
-        @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-        private List<PropertyImageEntity> images;
-
+        @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
+        @Builder.Default
+        private java.util.List<PropertyImageEntity> images = new java.util.ArrayList<>();
+        public void replaceImages(java.util.List<String> urls) {
+            this.images.clear();                 // orphanRemoval tự xoá ảnh cũ
+            if (urls == null || urls.isEmpty()) return;
+            int i = 0;
+            for (String url : urls) {
+                var img = new PropertyImageEntity();
+                img.setProperty(this);
+                img.setImageUrl(url);
+                img.setDisplayOrder(i++);
+                this.images.add(img);
+            }
+        }
 
         @ManyToMany
         @JoinTable(

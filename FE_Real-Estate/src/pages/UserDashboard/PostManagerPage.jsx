@@ -1,3 +1,4 @@
+// src/pages/dashboard/posts/PostManagerPage.jsx
 import { Button } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
@@ -67,7 +68,6 @@ export default function PostManagerPage() {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { user } = useOutletContext() || {};
-
     const [searchParams, setSearchParams] = useSearchParams();
 
     const {
@@ -75,16 +75,12 @@ export default function PostManagerPage() {
         page,
         size,
         totalElements,
-        loading,
-        error,
         counts,
     } = useSelector((s) => ({
         list: s.property.myList,
         page: s.property.myPage,
         size: s.property.mySize,
         totalElements: s.property.myTotalElements,
-        loading: s.property.loading,
-        error: s.property.error,
         counts: s.property.counts,
     }));
 
@@ -92,6 +88,9 @@ export default function PostManagerPage() {
     const [status, setStatus] = useState(searchParams.get("tab") || "active");
     const [filters, setFilters] = useState(parseFiltersFromSearch(searchParams));
     const [openCreate, setOpenCreate] = useState(false);
+
+    // 🆕 state để mở Drawer chi tiết theo ID
+    const [editingId, setEditingId] = useState(null);
 
     /* ========== URL -> STATE ========== */
     useEffect(() => {
@@ -133,14 +132,26 @@ export default function PostManagerPage() {
 
     useEffect(() => {
         if (rawLoading) {
-            // Khi Redux loading = true → bật skeleton ngay
             setDelayedLoading(true);
         } else {
-            // Khi Redux loading = false → giữ skeleton thêm 2s
             const t = setTimeout(() => setDelayedLoading(false), 2000);
             return () => clearTimeout(t);
         }
     }, [rawLoading]);
+
+    // 🆕 mở Drawer chi tiết từ card
+    const handleOpenDetail = (id) => {
+        if (!id) return;
+        console.log('Open detail id=', id)
+        setEditingId(id);
+        setOpenCreate(true);
+    };
+
+    // 🆕 đóng Drawer
+    const handleCloseDrawer = () => {
+        setOpenCreate(false);
+        setEditingId(null);
+    };
 
     return (
         <div>
@@ -158,7 +169,10 @@ export default function PostManagerPage() {
                         icon={<PlusOutlined />}
                         size="large"
                         className="mt-2 bg-[#FFD43B] text-[#1B264F] font-semibold hover:bg-[#ffe480] border-none"
-                        onClick={() => navigate("/dashboard/posts/new")}
+                        onClick={() => {
+                            setEditingId(null);       // tạo mới
+                            setOpenCreate(true);
+                        }}
                     >
                         Đăng tin mới
                     </Button>
@@ -192,7 +206,10 @@ export default function PostManagerPage() {
                     dispatch(setPage(0));
                     pushUrl({ page: 0, filters: nextFilters });
                 }}
-                onCreate={() => setOpenCreate(true)}
+                onCreate={() => {
+                    setEditingId(null);
+                    setOpenCreate(true);
+                }}
             />
 
             {/* Status Tabs */}
@@ -214,7 +231,7 @@ export default function PostManagerPage() {
                     loading={delayedLoading}
                     items={list}
                     total={totalElements}
-                    page={page + 1} // Antd 1-based
+                    page={page + 1}
                     pageSize={size}
                     onPageChange={(p) => {
                         dispatch(setPage(p - 1));
@@ -225,27 +242,23 @@ export default function PostManagerPage() {
                         dispatch(setPage(0));
                         pushUrl({ size: n, page: 0 });
                     }}
+                    // 🆕 truyền callback click item
+                    onItemClick={handleOpenDetail}
                 />
             </div>
 
-            {/* Create Post Drawer */}
+            {/* Drawer tạo/chỉnh sửa */}
             <PostCreateDrawer
                 open={openCreate}
-                onClose={() => setOpenCreate(false)}
-                onSaveDraft={(values) => {
-                    console.log("SAVE DRAFT:", values);
-                }}
-                onContinue={(values) => {
-                    console.log("CONTINUE:", values);
-                }}
+                onClose={handleCloseDrawer}
                 onCreated={() => {
-                    setOpenCreate(false);
-                    setStatus("pending");
-                    dispatch(setPage(0));
-                    pushUrl({ status: "pending", page: 0 });
+                    handleCloseDrawer();
                     dispatch(fetchMyPropertyCountsThunk());
+                    dispatch(fetchMyPropertiesThunk({ page, size, status, ...filters }));
                 }}
                 user={user}
+                editingId={editingId}
+                isEdit={!!editingId}
             />
         </div>
     );

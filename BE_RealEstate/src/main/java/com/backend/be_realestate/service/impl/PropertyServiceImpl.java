@@ -155,69 +155,20 @@ public class PropertyServiceImpl implements IPropertyService {
         if (policy.getIsActive() == null || policy.getIsActive() == 0L) {
             throw new IllegalStateException("Listing type is inactive");
         }
-
-        var property = new PropertyEntity();
-
-        // luôn load UserEntity thật
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid user ID: " + userId));
+
+        var property = new PropertyEntity();
         property.setUser(user);
 
-        if (req.getCategoryId() != null) {
-            property.setCategory(categoryRepository.findById(req.getCategoryId())
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid categoryId")));
-        }
-        if (req.getCityId() != null) property.setCity(cityRepository.findById(req.getCityId()).orElse(null));
-        if (req.getDistrictId() != null) property.setDistrict(districtRepository.findById(req.getDistrictId()).orElse(null));
-        if (req.getWardId() != null) property.setWard(wardRepository.findById(req.getWardId()).orElse(null));
-
+        // Set policy + listingType từ policy
         property.setListingTypePolicy(policy);
         property.setListingType(policy.getListingType());
 
-        // fields
-        property.setTitle(req.getTitle());
-        property.setPrice(req.getPrice());
-        property.setArea(req.getArea());
-        property.setLandArea(req.getLandArea());
-        property.setBedrooms(req.getBedrooms());
-        property.setBathrooms(req.getBathrooms());
-        property.setAddressStreet(req.getAddressStreet());
-        property.setDisplayAddress(req.getDisplayAddress());
-        property.setPosition(req.getPosition());
-        property.setLegalStatus(req.getLegalStatus());
-        property.setDirection(req.getDirection());
-        property.setDescription(req.getDescription());
-        property.setFloors(req.getFloors());
-        property.setWidth(req.getWidth());
-        property.setHeight(req.getHeight());
-
-        if (req.getPropertyType() != null) {
-            property.setPropertyType(PropertyType.valueOf(req.getPropertyType().name()));
-        }
-        if (req.getPriceType() != null) {
-            property.setPriceType(PriceType.valueOf(req.getPriceType().name()));
-        }
-
-        property.setStatus(PropertyStatus.PENDING_REVIEW);
-
-        if (req.getImageUrls() != null && !req.getImageUrls().isEmpty()) {
-            var imgs = req.getImageUrls().stream().map(url -> {
-                var img = new PropertyImageEntity();
-                img.setProperty(property);
-                img.setImageUrl(url);
-                return img;
-            }).toList();
-            property.setImages(imgs);
-        }
-
-        if (req.getAmenityIds() != null && !req.getAmenityIds().isEmpty()) {
-            var amenities = amenityRepository.findAllById(req.getAmenityIds());
-            property.setAmenities(amenities);
-        }
+        applyRequestToEntity(property, req, /*createMode*/ true);
 
         var saved = propertyRepository.save(property);
 
-        // Gửi thông báo trực tiếp (không dùng event)
         if (saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
             try {
                 String title = saved.getTitle() != null ? saved.getTitle() : "không có tiêu đề";
@@ -252,7 +203,97 @@ public class PropertyServiceImpl implements IPropertyService {
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
 
-    /* =========================================================
+    @Override
+    @Transactional
+    public CreatePropertyResponse update(Long userId, Long propertyId, CreatePropertyRequest req) {
+        var property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new IllegalArgumentException("Property not found: " + propertyId));
+        if (property.getUser() == null || !Objects.equals(property.getUser().getUserId(), userId)) {
+            throw new AccessDeniedException("Bạn không có quyền sửa tin này");
+        }
+
+        if (req.getListingTypePolicyId() != null) {
+            var policy = policyRepo.findById(req.getListingTypePolicyId())
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid listingTypePolicyId"));
+            if (policy.getIsActive() == null || policy.getIsActive() == 0L) {
+                throw new IllegalStateException("Listing type is inactive");
+            }
+            property.setListingTypePolicy(policy);
+            property.setListingType(policy.getListingType());
+        }
+        applyRequestToEntity(property, req, /*createMode*/ false);
+
+        var saved = propertyRepository.save(property);
+
+        // tuỳ chính sách: khi update, có cần push về PENDING_REVIEW lại hay giữ nguyên?
+        // Ở đây giữ nguyên status hiện tại; nếu muốn đẩy về pending khi thay info quan trọng:
+        // property.setStatus(PropertyStatus.PENDING_REVIEW);
+
+        return new CreatePropertyResponse(saved.getId(), saved.getStatus());
+    }
+    private void applyRequestToEntity(PropertyEntity property,
+                                      CreatePropertyRequest req,
+                                      boolean createMode) {
+
+        // Map FK (category/city/district/ward) — cho phép null
+        if (req.getCategoryId() != null) {
+            property.setCategory(categoryRepository.findById(req.getCategoryId())
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid categoryId")));
+        }
+        if (req.getCityId() != null) {
+            property.setCity(req.getCityId() == null ? null : cityRepository.findById(req.getCityId()).orElse(null));
+        }
+        if (req.getDistrictId() != null) {
+            property.setDistrict(req.getDistrictId() == null ? null : districtRepository.findById(req.getDistrictId()).orElse(null));
+        }
+        if (req.getWardId() != null) {
+            property.setWard(req.getWardId() == null ? null : wardRepository.findById(req.getWardId()).orElse(null));
+        }
+
+        // Fields cơ bản
+        if (req.getTitle() != null)         property.setTitle(req.getTitle());
+        if (req.getPrice() != null)         property.setPrice(req.getPrice());
+        if (req.getArea() != null)          property.setArea(req.getArea());
+        if (req.getLandArea() != null)      property.setLandArea(req.getLandArea());
+        if (req.getBedrooms() != null)      property.setBedrooms(req.getBedrooms());
+        if (req.getBathrooms() != null)     property.setBathrooms(req.getBathrooms());
+        if (req.getAddressStreet() != null) property.setAddressStreet(req.getAddressStreet());
+        if (req.getDisplayAddress() != null)property.setDisplayAddress(req.getDisplayAddress());
+        if (req.getPosition() != null)      property.setPosition(req.getPosition());
+        if (req.getLegalStatus() != null)   property.setLegalStatus(req.getLegalStatus());
+        if (req.getDirection() != null)     property.setDirection(req.getDirection());
+        if (req.getDescription() != null)   property.setDescription(req.getDescription());
+        if (req.getFloors() != null)        property.setFloors(req.getFloors());
+        if (req.getWidth() != null)         property.setWidth(req.getWidth());
+        if (req.getHeight() != null)        property.setHeight(req.getHeight());
+
+        if (req.getPropertyType() != null) {
+            property.setPropertyType(PropertyType.valueOf(req.getPropertyType().name()));
+        }
+        if (req.getPriceType() != null) {
+            property.setPriceType(PriceType.valueOf(req.getPriceType().name()));
+        }
+
+        // Ảnh: replace toàn bộ theo mảng imageUrls gửi lên
+        if (req.getImageUrls() != null) {
+            property.replaceImages(req.getImageUrls()); // 1 dòng
+        }
+        // Tiện ích: replace toàn bộ
+        if (req.getAmenityIds() != null) {
+            var amenities = req.getAmenityIds().isEmpty()
+                    ? Collections.<AmenityEntity>emptyList()
+                    : amenityRepository.findAllById(req.getAmenityIds());
+            property.setAmenities(amenities);
+        }
+
+        // Status khi tạo mới
+        if (createMode) {
+            property.setStatus(PropertyStatus.PENDING_REVIEW);
+            property.setPostedAt((Timestamp) new Date()); // nếu bạn muốn gán thời điểm nộp
+        }
+    }
+
+    /* =====================    ====================================
      * MY PROPERTIES (WITH MAP FILTERS)
      * ========================================================= */
     @Override
@@ -384,9 +425,7 @@ public class PropertyServiceImpl implements IPropertyService {
                 .collect(Collectors.toList());
     }
 
-    /* =========================================================
-     * RECOMMENDATIONS
-     * ========================================================= */
+
     @Transactional(readOnly = true)
     @Override
     public List<PropertyCardDTO> getRecommendations(Long userId, int limit) {
@@ -526,6 +565,18 @@ public class PropertyServiceImpl implements IPropertyService {
         );
 
         return PageResponse.from(dtoPage);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PropertyDTO getDetailForEdit(Long propertyId, Long requesterUserId) {
+        PropertyEntity property = propertyRepository.findDetailForEdit(propertyId)
+                .orElseThrow(() -> new IllegalArgumentException("Property not found"));
+        if (property.getUser() == null || !property.getUser().getUserId().equals(requesterUserId)) {
+            throw new AccessDeniedException("Bạn không có quyền truy cập tin đăng này");
+        }
+
+        return propertyConverter.toDto(property);
     }
 
     /* =========================================================
