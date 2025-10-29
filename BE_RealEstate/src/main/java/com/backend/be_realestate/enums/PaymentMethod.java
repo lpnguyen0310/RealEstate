@@ -6,4 +6,5 @@ public enum PaymentMethod {
     STRIPE,
     BANK_QR,  // Chuyển khoản qua QR ngân hàng
     ZALOPAY,
+    BALANCE,
 }

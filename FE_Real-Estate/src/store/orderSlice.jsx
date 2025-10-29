@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { createOrderApi, getMyOrdersApi } from "@/services/orderApi";
+import { createOrderApi, getMyOrdersApi, payOrderWithBalanceApi } from "@/services/orderApi";
 
 import { notificationApi } from "@/services/notificationApi";
 
@@ -37,11 +37,28 @@ export const fetchMyOrders = createAsyncThunk(
   }
 );
 
+export const payOrderByBalanceThunk = createAsyncThunk(
+    'orders/payWithBalance', // Tên action type
+    async (orderId, { rejectWithValue }) => {
+        try {
+            // Gọi hàm API đã tạo trong orderApi.js
+            const paidOrderData = await payOrderWithBalanceApi(orderId);
+            return paidOrderData; // Dữ liệu trả về khi thành công (OrderDTO)
+        } catch (error) {
+            // Trả về message lỗi khi thất bại
+            return rejectWithValue(error.message);
+        }
+    }
+);
+
 const initialState = {
   myOrders: [],
   currentOrder: null, // Lưu thông tin đơn hàng vừa tạo thành công
   loading: false,
   error: null,
+
+  payWithBalanceStatus: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
+  payWithBalanceError: null,    // Lỗi riêng cho payWithBalance
 };
 
 const orderSlice = createSlice({
@@ -51,6 +68,7 @@ const orderSlice = createSlice({
     // Reducer để xóa thông báo lỗi khi người dùng muốn thử lại
     clearOrderError: (state) => {
       state.error = null;
+      state.payWithBalanceError = null;
     },
     // Reducer để reset toàn bộ state của order, ví dụ khi người dùng rời khỏi trang
     resetOrderState: () => initialState,
@@ -81,6 +99,32 @@ const orderSlice = createSlice({
       .addCase(fetchMyOrders.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || "Tải lịch sử đơn hàng thất bại.";
+      })
+      .addCase(payOrderByBalanceThunk.pending, (state) => {
+          state.payWithBalanceStatus = 'loading';
+          state.payWithBalanceError = null;
+          // Tùy chọn: Bạn có thể set loading = true nếu muốn nút bị disable
+          // state.loading = true;
+      })
+      .addCase(payOrderByBalanceThunk.fulfilled, (state, action) => {
+          state.payWithBalanceStatus = 'succeeded';
+          // state.loading = false; // Tắt loading nếu đã bật ở pending
+          console.log("Thanh toán bằng số dư thành công (Reducer):", action.payload);
+          // Cập nhật lại đơn hàng trong myOrders nếu cần thiết
+          const updatedOrder = action.payload;
+          const index = state.myOrders.findIndex(order => order.id === updatedOrder.id); // Giả sử DTO có id
+          if (index !== -1) {
+              state.myOrders[index] = updatedOrder;
+          }
+          // Có thể cập nhật currentOrder nếu đang xem chi tiết đơn hàng đó
+          if (state.currentOrder?.id === updatedOrder.id) {
+              state.currentOrder = updatedOrder;
+          }
+      })
+      .addCase(payOrderByBalanceThunk.rejected, (state, action) => {
+          state.payWithBalanceStatus = 'failed';
+          state.payWithBalanceError = action.payload; // Lưu message lỗi
+          // state.loading = false; // Tắt loading nếu đã bật ở pending
       });
   },
 });

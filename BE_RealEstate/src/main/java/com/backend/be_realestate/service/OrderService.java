@@ -2,6 +2,7 @@ package com.backend.be_realestate.service;
 
 import com.backend.be_realestate.entity.OrderEntity;
 import com.backend.be_realestate.entity.UserEntity;
+import com.backend.be_realestate.exceptions.InsufficientBalanceException;
 import com.backend.be_realestate.modals.dto.order.AdminOrderDetailDTO;
 import com.backend.be_realestate.modals.dto.order.AdminOrderListDTO;
 import com.backend.be_realestate.modals.dto.order.OrderDTO;
@@ -40,4 +41,6 @@ public interface OrderService {
     AdminOrderDetailDTO getAdminOrderDetail(Long orderId);
 
     OrderEntity createTopUpOrder(UserEntity user, Long amount);
+
+    OrderDTO payWithBalance(Long orderId, String userEmail) throws InsufficientBalanceException;
 }

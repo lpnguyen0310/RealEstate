@@ -3,6 +3,7 @@ package com.backend.be_realestate.service.impl;
 import com.backend.be_realestate.converter.OrderConverter;
 import com.backend.be_realestate.entity.*;
 import com.backend.be_realestate.enums.*;
+import com.backend.be_realestate.exceptions.InsufficientBalanceException;
 import com.backend.be_realestate.modals.dto.order.*;
 import com.backend.be_realestate.modals.request.order.CheckoutReq;
 import com.backend.be_realestate.modals.response.PageResponse;
@@ -609,6 +610,103 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return 0L; // Không có thưởng
+    }
+
+    @Override
+    @Transactional
+    public OrderDTO payWithBalance(Long orderId, String userEmail) throws InsufficientBalanceException {
+        log.info("--- Bắt đầu PAY WITH BALANCE cho orderId={} bởi user={} ---", orderId, userEmail);
+
+        UserEntity user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng: " + userEmail));
+
+        OrderEntity order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Đơn hàng không tồn tại: " + orderId));
+
+        if (!order.getUser().getUserId().equals(user.getUserId())) {
+            throw new IllegalArgumentException("Bạn không có quyền thanh toán đơn hàng này.");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new IllegalStateException("Đơn hàng không thể thanh toán bằng số dư ở trạng thái hiện tại (" + order.getStatus() + ").");
+        }
+
+        if (order.getType() != OrderType.PACKAGE_PURCHASE) {
+            throw new IllegalStateException("Chỉ có thể thanh toán đơn hàng mua gói bằng số dư.");
+        }
+
+        Long totalAmountNeeded = order.getTotal();
+        Long currentMainBalance = user.getMainBalance();
+        Long currentBonusBalance = user.getBonusBalance();
+        Long totalAvailableBalance = currentMainBalance + currentBonusBalance;
+
+        log.info("Order {} cần thanh toán: {}. Số dư hiện có: Main={}, Bonus={}, Tổng={}",
+                orderId, totalAmountNeeded, currentMainBalance, currentBonusBalance, totalAvailableBalance);
+
+        if (totalAvailableBalance < totalAmountNeeded) {
+            throw new InsufficientBalanceException("Số dư tài khoản không đủ. Cần " + totalAmountNeeded + ", còn thiếu " + (totalAmountNeeded - totalAvailableBalance));
+        }
+
+        Long bonusDeducted = Math.min(totalAmountNeeded, currentBonusBalance);
+        Long mainDeducted = totalAmountNeeded - bonusDeducted;
+
+        user.setBonusBalance(currentBonusBalance - bonusDeducted);
+        user.setMainBalance(currentMainBalance - mainDeducted);
+        userRepository.save(user);
+
+        log.info("Đã trừ tiền cho order {}: Bonus={}, Main={}. Số dư mới: Main={}, Bonus={}",
+                orderId, bonusDeducted, mainDeducted, user.getMainBalance(), user.getBonusBalance());
+
+        order.setStatus(OrderStatus.PAID);
+        order.setMethod(PaymentMethod.BALANCE); // Gán phương thức thanh toán
+        OrderEntity savedOrder = orderRepository.save(order);
+
+        log.info("Đã cập nhật orderId={} thành PAID (thanh toán bằng số dư)", order.getId());
+
+        // Cộng vật phẩm vào kho
+        try {
+            for (OrderItemEntity orderItem : order.getItems()) { // Cần lấy items nếu chưa load (lazy)
+                creditItemsFromOrderItem(user, orderItem);
+            }
+            log.info("Đã cộng vật phẩm thành công cho orderId={} (thanh toán bằng số dư)", orderId);
+        } catch(Exception e) {
+            log.error("!!! Lỗi khi cộng vật phẩm cho orderId={} (thanh toán bằng số dư). Lỗi: {}", orderId, e.getMessage());
+            // Xem xét rollback hoặc ghi nhận lỗi
+        }
+
+        // Tạo Transaction ghi nhận
+        try {
+            TransactionEntity transaction = TransactionEntity.builder()
+                    .order(savedOrder)
+                    .amount(totalAmountNeeded)
+                    .status(TransactionStatus.SUCCEEDED)
+                    .type(TransactionType.PACKAGE_PURCHASE)
+                    .reason("Thanh toán bằng số dư (Bonus: " + bonusDeducted + ", Main: " + mainDeducted + ")")
+                    .build();
+            transactionRepository.save(transaction);
+            log.info("Đã tạo transaction SUCCEEDED (type=PACKAGE_PURCHASE) cho orderId={} (thanh toán bằng số dư)", order.getId());
+        } catch(Exception e) {
+            log.error("!!! Lỗi khi tạo transaction cho orderId={} (thanh toán bằng số dư). Lỗi: {}", orderId, e.getMessage());
+        }
+
+        // Gửi Notification
+        try {
+            notificationService.createNotification(
+                    user,
+                    NotificationType.PACKAGE_PURCHASED, // Sử dụng lại type này hoặc tạo type mới
+                    "Thanh toán thành công bằng số dư cho đơn hàng #" + savedOrder.getId() + ". Gói tin đã được cộng vào tài khoản.",
+                    "/dashboard/transactions?order_id=" + savedOrder.getId()
+            );
+            log.info("Đã gửi notification thành công cho orderId={} (thanh toán bằng số dư)", order.getId());
+        } catch(Exception e) {
+            log.error("!!! Lỗi khi gửi notification cho orderId={} (thanh toán bằng số dư). Lỗi: {}", orderId, e.getMessage());
+        }
+
+        log.info("--- Kết thúc PAY WITH BALANCE thành công cho orderId={} ---", orderId);
+
+        // Trả về DTO của đơn hàng đã cập nhật
+        List<OrderItemEntity> items = orderItemRepository.findByOrderId(savedOrder.getId());
+        return orderConverter.toDto(savedOrder, items);
     }
 
 }
