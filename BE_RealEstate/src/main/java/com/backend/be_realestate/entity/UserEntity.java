@@ -75,4 +75,12 @@ public class UserEntity extends BaseEntity {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private UserProfile userProfile;
 
+    @Column(name = "main_balance", nullable = false)
+    @Builder.Default
+    private Long mainBalance = 0L;
+
+    @Column(name = "bonus_balance", nullable = false)
+    @Builder.Default
+    private Long bonusBalance = 0L;
+
 }

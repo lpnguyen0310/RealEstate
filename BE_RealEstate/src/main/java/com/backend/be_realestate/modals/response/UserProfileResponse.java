@@ -35,5 +35,8 @@ public class UserProfileResponse {
     private String dvqhns;
     private String citizenId;
     private String passport;
+
+    private Long mainBalance;
+    private Long bonusBalance;
 }
 

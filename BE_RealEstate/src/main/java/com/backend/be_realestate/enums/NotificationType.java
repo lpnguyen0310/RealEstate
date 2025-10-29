@@ -11,6 +11,8 @@ public enum NotificationType {
     LISTING_PENDING_USER,
     LISTING_FAVORITED,
 
+    TOP_UP_SUCCESSFUL, // <-- THÊM MỚI: Nạp tiền vào tài khoản thành công
+
     // Dành cho Admin
     NEW_LISTING_PENDING, // Có tin mới chờ duyệt
     NEW_USER_REGISTERED, // Có user mới

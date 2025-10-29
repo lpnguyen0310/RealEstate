@@ -1,6 +1,7 @@
 package com.backend.be_realestate.entity;
 
 import com.backend.be_realestate.enums.OrderStatus;
+import com.backend.be_realestate.enums.OrderType;
 import com.backend.be_realestate.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
@@ -51,6 +52,10 @@ import java.util.List;
 
         @Column(name = "total", nullable = false)
         private Long total = 0L;
+
+        @Enumerated(EnumType.STRING)
+        @Column(name = "type", length = 30, nullable = false)
+        private OrderType type;
 
         // Quan hệ 1-n với OrderItem
         @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
