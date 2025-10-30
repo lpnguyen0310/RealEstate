@@ -47,9 +47,30 @@ export const fetchPropertyByIdThunk = createAsyncThunk(
     async (propertyId, { rejectWithValue }) => {
         try {
             const res = await api.get(`/properties/${propertyId}`);
+            console.log("[fetchById] raw:", res.data);            // <= log
             return res?.data?.data ?? res?.data;
         } catch (e) {
             return rejectWithValue(e?.response?.data?.message || "Không thể tải chi tiết tin đăng");
+        }
+    }
+);
+// src/store/propertySlice.js
+
+// ... imports giữ nguyên
+
+// Lấy chi tiết tin để EDIT (yêu cầu đã đăng nhập)
+export const fetchPropertyEditByIdThunk = createAsyncThunk(
+    "property/fetchEditById",
+    async (propertyId, { rejectWithValue }) => {
+        try {
+            // gọi đúng route mới:
+            const res = await api.get(`/properties/edit/${propertyId}`);
+            // BE trả thẳng DTO => res.data là object; vẫn an toàn nếu sau này bọc {data: ...}
+            return res?.data?.data ?? res?.data;
+        } catch (e) {
+            return rejectWithValue(
+                e?.response?.data?.message || "Không thể tải chi tiết tin đăng (edit)"
+            );
         }
     }
 );
@@ -135,19 +156,103 @@ export const createPropertyThunk = createAsyncThunk(
 
 // Lấy danh sách tin của chính user (dashboard)
 export const fetchMyPropertiesThunk = createAsyncThunk(
-    "property/fetchMyProperties",
-    async ({ page = 0, size = 20, sort = "postedAt,desc", status } = {}, { rejectWithValue }) => {
+    "property/fetchMine",
+    async (params = {}, thunkApi) => {
         try {
-            const params = { page, size, sort };
-            if (status) params.status = status;
-            const res = await api.get("/properties/me", { params });
-            return res.data;
+            const {
+                page = 0,
+                size = 10,
+                status,
+                sort = "postedAt,desc",
+                q, code, area, areaMin, areaMax, priceMin, priceMax,
+                autoPosting, expireDate,
+            } = params;
+
+            const query = {
+                page, size, sort,
+                ...(status ? { status } : {}),
+                ...(q ? { q } : {}), // 🔍 keyword
+                ...(code ? { code } : {}),
+                ...(area ? { area } : {}),
+                ...(areaMin != null ? { areaMin } : {}),
+                ...(areaMax != null ? { areaMax } : {}),
+                ...(priceMin != null ? { priceMin } : {}),
+                ...(priceMax != null ? { priceMax } : {}),
+                ...(autoPosting ? { autoPosting } : {}),
+                ...(expireDate ? { expireDate } : {}),
+            };
+
+            const res = await api.get("/properties/me", { params: query });
+            return res.data; // PageResponse
+        } catch (err) {
+            return thunkApi.rejectWithValue(err?.response?.data?.message || err.message);
+        }
+    }
+);
+
+
+// Cập nhật tin đăng
+export const updatePropertyThunk = createAsyncThunk(
+    "property/update",
+    /**
+     * @param {{ id: number|string, formData: any, listingTypePolicyId?: number|null }} arg
+     */
+    async ({ id, formData, listingTypePolicyId }, { rejectWithValue }) => {
+        try {
+            // 1) Ảnh: tách file & URL
+            const imgs = formData.images || [];
+            const files = imgs.filter((x) => x instanceof File || x instanceof Blob);
+            const existedUrls = imgs.filter((x) => typeof x === "string" && x.startsWith("http"));
+
+            // 2) Upload file lên Cloudinary
+            const uploaded = files.length ? await uploadMany(files, "properties") : [];
+            const uploadedUrls = uploaded.map((x) => x.secure_url);
+            const imageUrls = [...existedUrls, ...uploadedUrls];
+
+            // 3) Build payload — dùng format y chang create
+            const payload = {
+                title: formData.title,
+                price: Number(formData.price) || 0,
+                area: Number(formData.usableArea || formData.landArea) || 0,
+                bedrooms: formData.bedrooms ?? 0,
+                bathrooms: formData.bathrooms ?? 0,
+                addressStreet: formData.streetName || "",
+                propertyType: formData.propertyType || "sell",
+                priceType: formData.priceType || "SELL_PRICE",
+                status: "PENDING_REVIEW",
+
+                legalStatus: formData.legalDocument || "",
+                direction: formData.direction || "",
+                description: formData.description || "",
+
+                floors: Number(formData.floors) || null,
+                position: formData.position || "",
+                displayAddress: formData.displayAddress || formData.suggestedAddress || "",
+
+                landArea: Number(formData.landArea) || null,
+                width: Number(formData.width) || null,
+                height: Number(formData.length) || null,
+
+                categoryId: formData.categoryId || null,
+                wardId: formData.wardId || null,
+                districtId: formData.districtId || null,
+                cityId: formData.provinceId || null,
+
+                listingTypePolicyId: listingTypePolicyId ?? formData.listingTypePolicyId,
+                imageUrls,
+                amenityIds: formData.amenityIds || [],
+            };
+
+            // 4) Gọi API update
+            const res = await api.put(`/properties/${id}`, payload);
+            return res?.data?.data ?? res?.data;
         } catch (e) {
-            const msg = e?.response?.data?.message || "Không thể tải danh sách tin đăng của tôi";
+            const msg = e?.response?.data?.message || "Cập nhật tin thất bại";
             return rejectWithValue(msg);
         }
     }
 );
+
 
 // Lấy số đếm dashboard
 export const fetchMyPropertyCountsThunk = createAsyncThunk(
@@ -522,6 +627,33 @@ const propertySlice = createSlice({
             .addCase(fetchPropertyFavoritesThunk.rejected, (state, action) => {
                 state.loadingFavorites = false;
                 state.errorFavorites = action.payload;
+            })
+            // ===== DETAIL (EDIT) =====
+            .addCase(fetchPropertyEditByIdThunk.pending, (state) => {
+                state.loadingDetail = true;
+                state.errorDetail = null;
+                state.currentProperty = null;
+            })
+            .addCase(fetchPropertyEditByIdThunk.fulfilled, (state, action) => {
+                state.loadingDetail = false;
+                state.currentProperty = action.payload; // chính là PropertyDTO
+            })
+            .addCase(fetchPropertyEditByIdThunk.rejected, (state, action) => {
+                state.loadingDetail = false;
+                state.errorDetail = action.payload;
+            })
+            // ===== UPDATE =====
+            .addCase(updatePropertyThunk.pending, (s) => {
+                s.creating = true;
+                s.createError = null;
+            })
+            .addCase(updatePropertyThunk.fulfilled, (s, a) => {
+                s.creating = false;
+                s.lastCreated = a.payload || null;
+            })
+            .addCase(updatePropertyThunk.rejected, (s, a) => {
+                s.creating = false;
+                s.createError = a.payload || "Cập nhật tin thất bại";
             });
     },
 });

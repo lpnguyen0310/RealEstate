@@ -1,13 +1,16 @@
 import { useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-
-import {TextField,MenuItem,Button as MUIButton,Popover,} from "@mui/material";
+import { TextField, MenuItem, Button as MUIButton, Popover } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
-import { AREA_OPTIONS, AUTO_POSTING, PRICE_PRESETS } from "@/data/PostManagementData/FilterData";
-
 import { DatePicker as AntDatePicker } from "antd";
 
+import {
+    AREA_OPTIONS,
+    PRICE_PRESETS,
+} from "@/data/PostManagementData/FilterData";
+
+/* ====== UI tokens ====== */
 const PILL_RADIUS = 50;
 
 const TF_PILL = {
@@ -62,11 +65,10 @@ const fmtVN = (v) =>
         : `${Math.round(v / 1_000_000)} triệu`;
 
 export default function PostFilters({ onSearch, onCreate }) {
-    // state
-    const [code, setCode] = useState("");
+    // ====== states ======
+    const [keyword, setKeyword] = useState("");      // q
     const [area, setArea] = useState("");
-    const [autoPosting, setAutoPosting] = useState("all");
-    const [expireDate, setExpireDate] = useState(null);
+    const [expireDate, setExpireDate] = useState(null); // dayjs | null
 
     const [areaMin, setAreaMin] = useState("");
     const [areaMax, setAreaMax] = useState("");
@@ -75,7 +77,7 @@ export default function PostFilters({ onSearch, onCreate }) {
     const [priceMax, setPriceMax] = useState("");
     const [priceLabel, setPriceLabel] = useState("Khoảng giá");
 
-    // popover control
+    // popovers
     const [openArea, setOpenArea] = useState(false);
     const [openPrice, setOpenPrice] = useState(false);
     const areaAnchorRef = useRef(null);
@@ -92,28 +94,32 @@ export default function PostFilters({ onSearch, onCreate }) {
         return "Khoảng giá";
     }, [priceMin, priceMax, priceLabel]);
 
-    // actions
+    // ====== actions ======
     const submit = () => {
         onSearch?.({
-            code: code?.trim() || undefined,
+            q: keyword?.trim() || undefined,                 // từ khóa
             area: area || undefined,
             areaMin: areaMin === "" ? undefined : Number(areaMin),
             areaMax: areaMax === "" ? undefined : Number(areaMax),
             priceMin: priceMin === "" ? undefined : Number(priceMin),
             priceMax: priceMax === "" ? undefined : Number(priceMax),
-            autoPosting: autoPosting === "all" ? undefined : autoPosting,
             expireDate: expireDate ? dayjs(expireDate).format("YYYY-MM-DD") : undefined,
         });
     };
 
     const reset = () => {
-        setCode(""); setArea(""); setAreaMin(""); setAreaMax("");
-        setPriceMin(""); setPriceMax(""); setPriceLabel("Khoảng giá");
-        setAutoPosting("all"); setExpireDate(null);
+        setKeyword("");
+        setArea("");
+        setAreaMin("");
+        setAreaMax("");
+        setPriceMin("");
+        setPriceMax("");
+        setPriceLabel("Khoảng giá");
+        setExpireDate(null);
         onSearch?.({});
     };
 
-    // Popover: Diện tích
+    // ====== popover contents ======
     const areaContent = (
         <div className="w-[280px] p-1">
             <div className="mb-2 text-sm text-gray-500">Diện tích (m²)</div>
@@ -149,9 +155,8 @@ export default function PostFilters({ onSearch, onCreate }) {
         </div>
     );
 
-    // Popover: Giá
     const priceContent = (
-        <div className="w-[340px] p-1">
+        <div className="w:[340px] md:w-[340px] w-[300px] p-1">
             <div className="mb-2 text-sm text-gray-500">Khoảng giá (VNĐ)</div>
             <div className="flex items-center gap-2">
                 <TextField
@@ -215,19 +220,19 @@ export default function PostFilters({ onSearch, onCreate }) {
     return (
         <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 md:p-5">
             <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap">
-                {/* Mã tin */}
-                <div className="basis-[240px] xl:basis-[220px] grow">
+                {/* Từ khóa */}
+                <div className="basis-[260px] xl:basis-[240px] grow">
                     <TextField
-                        label="Tìm kiếm mã tin đăng"
+                        label="Từ khóa"
                         variant="outlined"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
+                        value={keyword}
+                        onChange={(e) => setKeyword(e.target.value)}
                         fullWidth
                         sx={TF_PILL}
                     />
                 </div>
 
-                {/* Khu vực (Select) */}
+                {/* Khu vực */}
                 <div className="basis-[220px] xl:basis-[200px] grow">
                     <TextField
                         label="Khu vực"
@@ -296,25 +301,6 @@ export default function PostFilters({ onSearch, onCreate }) {
                     </Popover>
                 </div>
 
-                {/* Tự động đăng */}
-                {/* <div className="basis-[200px] xl:basis-[180px] grow">
-                    <TextField
-                        label="Tự động đăng"
-                        variant="outlined"
-                        select
-                        value={autoPosting}
-                        onChange={(e) => setAutoPosting(e.target.value)}
-                        fullWidth
-                        sx={TF_PILL}
-                    >
-                        {AUTO_POSTING.map((opt) => (
-                            <MenuItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                            </MenuItem>
-                        ))}
-                    </TextField>
-                </div> */}
-
                 {/* Ngày hết hạn (AntD) */}
                 <div className="basis-[220px] xl:basis-[200px] grow">
                     <AntDatePicker
@@ -324,12 +310,12 @@ export default function PostFilters({ onSearch, onCreate }) {
                         placeholder="Ngày hết hạn"
                         allowClear
                         className={`w-full
-                            !h-11 !rounded-full !border !border-gray-200 !px-4
-                            [&_.ant-picker-input>input]:!h-11
-                            [&_.ant-picker-input>input]:!leading-[44px]
-                            [&_.ant-picker-input>input::placeholder]:!text-gray-400
-                            [&_.ant-picker-suffix]:!text-gray-400
-                            `}
+              !h-11 !rounded-full !border !border-gray-200 !px-4
+              [&_.ant-picker-input>input]:!h-11
+              [&_.ant-picker-input>input]:!leading-[44px]
+              [&_.ant-picker-input>input::placeholder]:!text-gray-400
+              [&_.ant-picker-suffix]:!text-gray-400
+            `}
                     />
                 </div>
 

@@ -232,7 +232,7 @@ export default function PropertyDetailSection({
 
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
                     <FormControl size="small" sx={selectSx}>
-                        <Select displayEmpty {...F("houseDirection")}>
+                        <Select displayEmpty {...F("direction")}>
                             <MenuItem disabled value="">
                                 <span style={{ color: "#94a3b8" }}>Hướng nhà</span>
                             </MenuItem>

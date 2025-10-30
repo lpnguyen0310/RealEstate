@@ -1,4 +1,3 @@
-// src/components/post-create/PostTypeSection.jsx
 import React, { useMemo, useState, useCallback } from "react";
 import { Card, Radio, Button, Alert, Skeleton, Tooltip } from "antd";
 import { DownOutlined, UpOutlined } from "@ant-design/icons";
@@ -37,6 +36,7 @@ function Bullet({ ok, size = 18 }) {
  * @param {boolean} [props.loading]
  * @param {string|null} [props.error]
  * @param {Record<'VIP'|'PREMIUM'|'NORMAL', number|undefined>} [props.inventory]
+ * @param {"NORMAL"|"VIP"|"PREMIUM"|null} [props.currentTypeText] - gói hiện tại của tin (khi edit)
  */
 export default function PostTypeSection({
     value,
@@ -45,6 +45,7 @@ export default function PostTypeSection({
     loading = false,
     error = null,
     inventory = {},
+    currentTypeText = null,
 }) {
     const selectedId = value;
     const [showDetails, setShowDetails] = useState(true);
@@ -113,7 +114,8 @@ export default function PostTypeSection({
                         const isActive = String(selectedId) === String(opt.id);
                         const isVipLike = opt.type === "VIP" || opt.type === "PREMIUM";
                         const isDepleted = isVipLike && opt.qty === 0; // hết lượt
-                        const badgeText = isVipLike ? (typeof opt.qty === "number" ? `Còn ${opt.qty}` : "—") : "Free";
+                        const defaultBadge = isVipLike ? (typeof opt.qty === "number" ? `Còn ${opt.qty}` : "—") : "Free";
+                        const isCurrent = currentTypeText === opt.type; // đánh dấu gói hiện tại khi edit
 
                         const cardStyle = isActive
                             ? {
@@ -125,11 +127,9 @@ export default function PostTypeSection({
 
                         const cardClass =
                             "rounded-2xl overflow-hidden select-none transition-all border " +
-                            (isActive
-                                ? "ring-1 ring-[#2E5BFF]/30"
-                                : "border-[#e9eef7] hover:border-[#cfdcff] hover:-translate-y-[1px]") +
+                            (isActive ? "ring-1 ring-[#2E5BFF]/30" : "border-[#e9eef7] hover:border-[#cfdcff] hover:-translate-y-[1px]") +
                             " cursor-pointer" +
-                            (isDepleted ? " border-dashed" : ""); // Không mờ nhưng có border dashed
+                            (isDepleted ? " border-dashed" : "");
 
                         return (
                             <Tooltip key={opt.id} title={isDepleted ? "Đã hết lượt gói này" : ""}>
@@ -160,7 +160,7 @@ export default function PostTypeSection({
                                         </Radio>
 
                                         <span className="inline-flex items-center justify-center px-2.5 h-6 rounded-full text-[12px] leading-none font-semibold bg-[#2E5BFF] text-white shadow-sm">
-                                            {badgeText}
+                                            {isActive ? "Đang chọn" : isCurrent ? "Hiện tại" : defaultBadge}
                                         </span>
                                     </div>
 
@@ -172,11 +172,7 @@ export default function PostTypeSection({
                                                     <span
                                                         className={[
                                                             "text-[14px] leading-6",
-                                                            f.ok
-                                                                ? isActive
-                                                                    ? "text-[#23407a]"
-                                                                    : "text-[#334e7a]"
-                                                                : "text-[#ef4444]",
+                                                            f.ok ? (isActive ? "text-[#23407a]" : "text-[#334e7a]") : "text-[#ef4444]",
                                                         ].join(" ")}
                                                     >
                                                         {f.text}
@@ -185,12 +181,7 @@ export default function PostTypeSection({
                                             ))}
                                         </ul>
                                     ) : (
-                                        <div
-                                            className={[
-                                                "mt-2 text-[13px]",
-                                                isActive ? "text-[#2a4e9a]" : "text-[#5d6b85]",
-                                            ].join(" ")}
-                                        />
+                                        <div className={["mt-2 text-[13px]", isActive ? "text-[#2a4e9a]" : "text-[#5d6b85]"].join(" ")} />
                                     )}
                                 </Card>
                             </Tooltip>

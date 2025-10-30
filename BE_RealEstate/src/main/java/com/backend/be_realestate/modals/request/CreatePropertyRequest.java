@@ -18,7 +18,7 @@ public class CreatePropertyRequest {
     private Double price;
 
     @NotNull(message = "Diện tích (area) là bắt buộc")
-    private float area;
+    private Float area;
 
     private Double landArea;
 

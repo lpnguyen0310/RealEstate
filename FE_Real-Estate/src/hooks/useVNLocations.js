@@ -15,7 +15,9 @@ export default function useVNLocations(enabled = true) {
         if (!enabled) return;
         let alive = true;
         const ctrl = new AbortController();
-        getProvinces(ctrl.signal).then((p) => alive && setProvinces(p)).catch(() => { });
+        getProvinces(ctrl.signal)
+            .then((p) => alive && setProvinces(p))
+            .catch(() => { });
         return () => { alive = false; ctrl.abort?.(); };
     }, [enabled]);
 
@@ -25,7 +27,9 @@ export default function useVNLocations(enabled = true) {
         provinceCtrl.current = new AbortController();
         setLoadingDistricts(true);
         getDistrictsByProvinceId(provinceId, provinceCtrl.current.signal)
-            .then(setDistricts).catch(() => { }).finally(() => setLoadingDistricts(false));
+            .then(setDistricts)
+            .catch(() => { })
+            .finally(() => setLoadingDistricts(false));
     }, []);
 
     const loadWards = useCallback((districtId) => {
@@ -34,8 +38,22 @@ export default function useVNLocations(enabled = true) {
         districtCtrl.current = new AbortController();
         setLoadingWards(true);
         getWardsByDistrictId(districtId, districtCtrl.current.signal)
-            .then(setWards).catch(() => { }).finally(() => setLoadingWards(false));
+            .then(setWards)
+            .catch(() => { })
+            .finally(() => setLoadingWards(false));
     }, []);
 
-    return { provinces, districts, wards, loadingDistricts, loadingWards, loadDistricts, loadWards };
+    // ⬇️ Tiện ích: nạp sẵn theo ID (dùng khi edit)
+    const reloadAllByIds = useCallback(async (provinceId, districtId) => {
+        if (!provinceId) return;
+        await loadDistricts(provinceId);
+        if (districtId) await loadWards(districtId);
+    }, [loadDistricts, loadWards]);
+
+    return {
+        provinces, districts, wards,
+        loadingDistricts, loadingWards,
+        loadDistricts, loadWards,
+        reloadAllByIds,
+    };
 }

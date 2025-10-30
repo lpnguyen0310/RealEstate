@@ -66,19 +66,25 @@ public class PropertyController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "postedAt,desc") String sort,
-            @RequestParam(required = false) String status // <-- THÊM THAM SỐ NÀY
+            @RequestParam(required = false) String status,
+            @RequestParam Map<String, String> filters // nhận tất cả query params
     ) {
         Long userId = securityUtils.currentUserId(auth);
         if (userId == null) return ResponseEntity.status(401).build();
 
+        // loại bỏ các param phân trang khỏi filters
+        filters.remove("page");
+        filters.remove("size");
+        filters.remove("sort");
+        filters.remove("status");
+
         String[] s = sort.split(",");
-        var dir = (s.length>1 && s[1].equalsIgnoreCase("asc")) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        var dir = (s.length > 1 && s[1].equalsIgnoreCase("asc"))
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
         var pageable = PageRequest.of(page, size, Sort.by(dir, s[0]));
 
-        // === GỌI HÀM SERVICE MỚI ===
-        // Truyền 'status' (có thể là null) vào service
-        var pageDto = propertyService.getPropertiesByUser(userId, status, pageable);
-
+        var pageDto = propertyService.getPropertiesByUser(userId, status, pageable, filters);
         return ResponseEntity.ok(PageResponse.from(pageDto));
     }
 
@@ -95,6 +101,19 @@ public class PropertyController {
 
         var res = propertyService.create(userId, req);
         return ResponseEntity.status(HttpStatus.CREATED).body(res);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<CreatePropertyResponse> update(
+            @PathVariable("id") Long id,
+            Authentication authentication,
+            @RequestBody CreatePropertyRequest req
+    ) {
+        Long userId = securityUtils.currentUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        var res = propertyService.update(userId, id, req);
+        return ResponseEntity.ok(res);
     }
 
     @GetMapping("/my-counts")
@@ -124,6 +143,21 @@ public class PropertyController {
 
         List<UserFavoriteDTO> users = propertyService.getUsersWhoFavorited(id, userId);
         return ResponseEntity.ok(users);
+    }
+
+
+    @GetMapping("/edit/{id}")
+    public ResponseEntity<PropertyDTO> getDetailForEdit(
+            @PathVariable Long id,
+            Authentication auth
+    ) {
+        // Lấy userId từ token hoặc UserDetails
+        Long userId = securityUtils.currentUserId(auth);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        PropertyDTO dto = propertyService.getDetailForEdit(id, userId);
+        return ResponseEntity.ok(dto);
     }
 
 }

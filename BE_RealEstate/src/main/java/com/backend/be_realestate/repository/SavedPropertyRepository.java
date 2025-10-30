@@ -35,7 +35,7 @@ public interface SavedPropertyRepository extends JpaRepository<SavedPropertyEnti
            """)
     List<Object[]> topDistrictIds(@Param("uid") Long userId);
 
-    // Top PropertyType theo Saved (enum)
+
     @Query("""
            select p.propertyType, count(p.id)
            from SavedPropertyEntity sp
@@ -46,8 +46,7 @@ public interface SavedPropertyRepository extends JpaRepository<SavedPropertyEnti
            """)
     List<Object[]> topPropertyTypes(@Param("uid") Long userId);
 
-    // Thống kê giá & diện tích
-    // Lưu ý: stddev có thể không hỗ trợ tùy DB. Dùng function(...) để an toàn hơn.
+
     @Query("""
            select avg(p.price),
                   function('stddev_pop', p.price),
