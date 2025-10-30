@@ -32,7 +32,7 @@ public class TransactionEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private OrderEntity order;
 
-    @Column(name = "stripe_payment_intent_id", nullable = false, unique = true)
+    @Column(name = "stripe_payment_intent_id", nullable = true, unique = true)
     private String stripePaymentIntentId;
 
     @Column(nullable = false)

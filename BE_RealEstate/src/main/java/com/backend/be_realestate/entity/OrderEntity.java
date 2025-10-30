@@ -1,6 +1,8 @@
 package com.backend.be_realestate.entity;
 
 import com.backend.be_realestate.enums.OrderStatus;
+import com.backend.be_realestate.enums.OrderType;
+import com.backend.be_realestate.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -34,6 +36,10 @@ import java.util.List;
         @Column(name = "status", length = 20, nullable = false)
         private OrderStatus status = OrderStatus.PENDING_PAYMENT;  // DRAFT|PENDING_PAYMENT|PAID|...
 
+        @Enumerated(EnumType.STRING)
+        @Column(name = "method", length = 30, nullable = false)
+        private PaymentMethod method; // Không đặt mặc định để buộc phải gán khi tạo
+
         @Column(name = "currency", length = 10, nullable = false)
         private String currency = "VND";
 
@@ -46,6 +52,10 @@ import java.util.List;
 
         @Column(name = "total", nullable = false)
         private Long total = 0L;
+
+        @Enumerated(EnumType.STRING)
+        @Column(name = "type", length = 30, nullable = false)
+        private OrderType type;
 
         // Quan hệ 1-n với OrderItem
         @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)

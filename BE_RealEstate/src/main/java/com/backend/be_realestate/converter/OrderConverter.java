@@ -2,7 +2,10 @@ package com.backend.be_realestate.converter;
 
 import com.backend.be_realestate.entity.OrderEntity;
 import com.backend.be_realestate.entity.OrderItemEntity;
+import com.backend.be_realestate.modals.dto.order.AdminOrderDetailDTO;
+import com.backend.be_realestate.modals.dto.order.AdminOrderListDTO;
 import com.backend.be_realestate.modals.dto.order.OrderDTO;
+import com.backend.be_realestate.modals.dto.order.OrderItemDTO;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Component;
@@ -12,12 +15,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 
+import static org.apache.http.client.utils.DateUtils.formatDate;
+
 @Component
 @RequiredArgsConstructor
 public class OrderConverter {
 
     private final ModelMapper modelMapper;
     private final OrderItemConverter orderItemConverter;
+    private final UserConverter userConverter;
 
     /** Dùng khi đã fetch items riêng (khuyến nghị trong service) */
     public OrderDTO toDto(OrderEntity order, List<OrderItemEntity> items) {
@@ -59,4 +65,74 @@ public class OrderConverter {
 
     // ------- helpers -------
     private Long safeLong(Long v) { return v == null ? 0L : v; }
+
+
+    /** Chuyển đổi từ OrderEntity sang AdminOrderListDTO */
+    public AdminOrderListDTO toAdminListDto(OrderEntity order, List<OrderItemEntity> items) {
+        if (order == null) return null;
+
+        AdminOrderListDTO dto = new AdminOrderListDTO();
+
+        // 1. Ánh xạ cơ bản
+        dto.setOrderId(order.getId());
+        dto.setUserId(order.getUser() != null ? order.getUser().getUserId() : null);
+        dto.setTotal(safeLong(order.getTotal()));
+        dto.setStatus(order.getStatus() != null ? order.getStatus().name() : null);
+        dto.setMethod(order.getMethod() != null ? order.getMethod().name() : null);
+
+        // 2. Thông tin Khách hàng (Lazy load friendly)
+        if (order.getUser() != null) {
+            // Giả định userConverter.toSimpleDto() tồn tại
+            dto.setUser(userConverter.toSimpleDto(order.getUser()));
+        }
+
+        // 3. Thông tin Items (Chỉ cần cái đầu tiên)
+        if (items != null && !items.isEmpty()) {
+            OrderItemEntity primary = items.get(0);
+
+            // <-- SỬ DỤNG orderItemConverter ĐỂ CHUYỂN OrderItemEntity -> OrderItemDTO -->
+            OrderItemDTO primaryItemDto = orderItemConverter.toDto(primary);
+
+            dto.setPrimaryItem(primaryItemDto);
+            dto.setItemsCount(items.size());
+        } else {
+            dto.setItemsCount(0);
+        }
+
+        // 4. Thời gian
+        dto.setCreatedAt(formatDate(order.getCreatedAt()));
+        dto.setUpdatedAt(formatDate(order.getUpdatedAt()));
+
+        return dto;
+    }
+
+    public AdminOrderDetailDTO toAdminDetailDto(OrderEntity order, List<OrderItemEntity> items) {
+        if (order == null) return null;
+
+        AdminOrderDetailDTO dto = new AdminOrderDetailDTO();
+
+        // 1. Map các trường chính
+        dto.setOrderId(order.getId());
+        dto.setStatus(order.getStatus() != null ? order.getStatus().name() : null);
+        dto.setMethod(order.getMethod() != null ? order.getMethod().name() : null); // <-- LẤY METHOD
+
+        // 2. Map tiền tệ
+        dto.setSubtotal(safeLong(order.getSubtotal()));
+        dto.setDiscount(safeLong(order.getDiscount()));
+        dto.setTotal(safeLong(order.getTotal()));
+
+        // 3. Map User (Dùng UserConverter)
+        if (order.getUser() != null) {
+            dto.setUser(userConverter.toSimpleDto(order.getUser())); // <-- LẤY USER OBJECT
+        }
+
+        // 4. Map thời gian (dùng format ISO)
+        dto.setCreatedAt(formatDate(order.getCreatedAt())); // <-- LẤY CREATED_AT
+        dto.setUpdatedAt(formatDate(order.getUpdatedAt())); // <-- LẤY UPDATED_AT
+
+        // 5. Map Items (Danh sách đầy đủ)
+        dto.setItems(orderItemConverter.toDtoList(items));
+
+        return dto;
+    }
 }

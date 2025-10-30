@@ -38,6 +38,8 @@ public class UserProfileConverter {
                 .lastName(user.getLastName())
                 .fullName(fullName) // fullName tính toán
                 .avatar(user.getAvatar())
+                .mainBalance(user.getMainBalance())
+                .bonusBalance(user.getBonusBalance())
 
                 // Từ UserProfile
                 .personalTaxCode(profile.getPersonalTaxCode())
