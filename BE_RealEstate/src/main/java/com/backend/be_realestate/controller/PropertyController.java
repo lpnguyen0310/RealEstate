@@ -1,5 +1,6 @@
 package com.backend.be_realestate.controller;
 
+import com.backend.be_realestate.enums.SubmitMode;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 
 import com.backend.be_realestate.modals.dto.PropertyDTO;
@@ -92,29 +93,30 @@ public class PropertyController {
     @PostMapping("create")
     public ResponseEntity<CreatePropertyResponse> create(
             Authentication authentication,
-            @RequestBody CreatePropertyRequest req
-    ) {
-        Long userId = securityUtils.currentUserId(authentication);
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        var res = propertyService.create(userId, req);
-        return ResponseEntity.status(HttpStatus.CREATED).body(res);
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<CreatePropertyResponse> update(
-            @PathVariable("id") Long id,
-            Authentication authentication,
-            @RequestBody CreatePropertyRequest req
+            @RequestBody CreatePropertyRequest req,
+            @RequestParam(name = "mode", required = false) SubmitMode mode
     ) {
         Long userId = securityUtils.currentUserId(authentication);
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-        var res = propertyService.update(userId, id, req);
+        var effectiveMode = (mode == null) ? SubmitMode.PUBLISH : mode;
+        var res = propertyService.create(userId, req, effectiveMode);
+        return ResponseEntity.status(HttpStatus.CREATED).body(res);
+    }
+    @PutMapping("/{id}")
+    public ResponseEntity<CreatePropertyResponse> update(
+            @PathVariable("id") Long id,
+            Authentication authentication,
+            @RequestBody CreatePropertyRequest req,
+            @RequestParam(name = "mode", required = false) SubmitMode mode
+    ) {
+        Long userId = securityUtils.currentUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        var res = propertyService.update(userId, id, req, mode);
         return ResponseEntity.ok(res);
     }
+
 
     @GetMapping("/my-counts")
     public ResponseEntity<Map<String, Long>> getMyPropertyCounts(Authentication auth) {

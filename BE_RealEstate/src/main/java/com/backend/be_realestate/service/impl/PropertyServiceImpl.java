@@ -21,6 +21,7 @@ import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
 import com.backend.be_realestate.utils.RecommendationSpec;
+import io.micrometer.common.lang.Nullable;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.Join;
@@ -148,41 +149,44 @@ public class PropertyServiceImpl implements IPropertyService {
 
     @Override
     @Transactional
-    public CreatePropertyResponse create(Long userId, CreatePropertyRequest req) {
+    public CreatePropertyResponse create(Long userId, CreatePropertyRequest req,SubmitMode mode) {
         var policy = policyRepo.findById(req.getListingTypePolicyId())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid listingTypePolicyId"));
-
         if (policy.getIsActive() == null || policy.getIsActive() == 0L) {
             throw new IllegalStateException("Listing type is inactive");
         }
-        UserEntity user = userRepository.findById(userId)
+
+        var user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid user ID: " + userId));
 
         var property = new PropertyEntity();
         property.setUser(user);
-
-        // Set policy + listingType từ policy
         property.setListingTypePolicy(policy);
         property.setListingType(policy.getListingType());
 
-        applyRequestToEntity(property, req, /*createMode*/ true);
+        // map field
+        applyRequestToEntity(property, req, /*createMode*/ true, /*mode*/ mode);
+
+        // === Business khác CHỈ khi publish ===
+        if (mode == SubmitMode.PUBLISH) {
+            // ví dụ: kiểm tra & trừ lượt khi VIP/PREMIUM, set postedAt, duration…
+            // consumeQuotaIfNeeded(policy, user);
+        }
 
         var saved = propertyRepository.save(property);
 
-        if (saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
+        // notify CHỈ khi publish → PENDING_REVIEW
+        if (mode == SubmitMode.PUBLISH && saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
             try {
-                String title = saved.getTitle() != null ? saved.getTitle() : "không có tiêu đề";
+                String title = (saved.getTitle() != null) ? saved.getTitle() : "không có tiêu đề";
 
-                List<UserEntity> admins = userRepository.findAllByRoles_Code("ADMIN");
+                var admins = userRepository.findAllByRoles_Code("ADMIN");
                 if (!admins.isEmpty()) {
                     String adminMessage = String.format("Tin đăng mới '%s' (ID: %d) đang chờ duyệt.", title, saved.getId());
                     String adminLink = "/admin/posts";
                     for (UserEntity admin : admins) {
                         notificationService.createNotification(
-                                admin,
-                                NotificationType.NEW_LISTING_PENDING,
-                                adminMessage,
-                                adminLink
+                                admin, NotificationType.NEW_LISTING_PENDING, adminMessage, adminLink
                         );
                     }
                 }
@@ -190,10 +194,7 @@ public class PropertyServiceImpl implements IPropertyService {
                 String userMessage = String.format("Tin đăng '%s' của bạn đã được gửi và đang chờ duyệt.", title);
                 String userLink = "/dashboard/posts?tab=pending";
                 notificationService.createNotification(
-                        saved.getUser(),
-                        NotificationType.LISTING_PENDING_USER,
-                        userMessage,
-                        userLink
+                        saved.getUser(), NotificationType.LISTING_PENDING_USER, userMessage, userLink
                 );
             } catch (Exception e) {
                 log.error("Notify error (listing created OK): {}", e.getMessage(), e);
@@ -205,7 +206,7 @@ public class PropertyServiceImpl implements IPropertyService {
 
     @Override
     @Transactional
-    public CreatePropertyResponse update(Long userId, Long propertyId, CreatePropertyRequest req) {
+    public CreatePropertyResponse update(Long userId, Long propertyId, CreatePropertyRequest req,@Nullable SubmitMode mode) {
         var property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new IllegalArgumentException("Property not found: " + propertyId));
         if (property.getUser() == null || !Objects.equals(property.getUser().getUserId(), userId)) {
@@ -221,21 +222,28 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setListingTypePolicy(policy);
             property.setListingType(policy.getListingType());
         }
-        applyRequestToEntity(property, req, /*createMode*/ false);
+
+        applyRequestToEntity(property, req, /*createMode*/ false, /*mode*/ (mode == null ? null : mode));
+
+        if (mode == SubmitMode.PUBLISH) {
+            // ví dụ: nếu từ DRAFT chuyển sang publish → kiểm tra & trừ lượt, set postedAt…
+            // consumeQuotaIfNeeded(property.getListingTypePolicy(), property.getUser());
+            // Và nếu muốn đẩy về pending_review:
+            property.setStatus(PropertyStatus.PENDING_REVIEW);
+        } else if (mode == SubmitMode.DRAFT) {
+            property.setStatus(PropertyStatus.DRAFT);
+        }
+        // mode == null → giữ nguyên status hiện tại
 
         var saved = propertyRepository.save(property);
-
-        // tuỳ chính sách: khi update, có cần push về PENDING_REVIEW lại hay giữ nguyên?
-        // Ở đây giữ nguyên status hiện tại; nếu muốn đẩy về pending khi thay info quan trọng:
-        // property.setStatus(PropertyStatus.PENDING_REVIEW);
-
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
     private void applyRequestToEntity(PropertyEntity property,
                                       CreatePropertyRequest req,
-                                      boolean createMode) {
+                                      boolean createMode,
+                                      @org.springframework.lang.Nullable SubmitMode mode) {
 
-        // Map FK (category/city/district/ward) — cho phép null
+        // === Map FK (cho phép null) ===
         if (req.getCategoryId() != null) {
             property.setCategory(categoryRepository.findById(req.getCategoryId())
                     .orElseThrow(() -> new IllegalArgumentException("Invalid categoryId")));
@@ -250,7 +258,7 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setWard(req.getWardId() == null ? null : wardRepository.findById(req.getWardId()).orElse(null));
         }
 
-        // Fields cơ bản
+        // === Fields cơ bản ===
         if (req.getTitle() != null)         property.setTitle(req.getTitle());
         if (req.getPrice() != null)         property.setPrice(req.getPrice());
         if (req.getArea() != null)          property.setArea(req.getArea());
@@ -274,22 +282,21 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setPriceType(PriceType.valueOf(req.getPriceType().name()));
         }
 
-        // Ảnh: replace toàn bộ theo mảng imageUrls gửi lên
+        // === Ảnh & tiện ích (replace) ===
         if (req.getImageUrls() != null) {
-            property.replaceImages(req.getImageUrls()); // 1 dòng
+            property.replaceImages(req.getImageUrls());
         }
-        // Tiện ích: replace toàn bộ
         if (req.getAmenityIds() != null) {
             var amenities = req.getAmenityIds().isEmpty()
-                    ? Collections.<AmenityEntity>emptyList()
+                    ? java.util.Collections.<AmenityEntity>emptyList()
                     : amenityRepository.findAllById(req.getAmenityIds());
             property.setAmenities(amenities);
         }
 
-        // Status khi tạo mới
+        // === Status khi tạo ===
         if (createMode) {
-            property.setStatus(PropertyStatus.PENDING_REVIEW);
-            property.setPostedAt((Timestamp) new Date()); // nếu bạn muốn gán thời điểm nộp
+            SubmitMode effective = (mode == null) ? SubmitMode.PUBLISH : mode;
+            property.setStatus(effective == SubmitMode.DRAFT ? PropertyStatus.DRAFT : PropertyStatus.PENDING_REVIEW);
         }
     }
 

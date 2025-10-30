@@ -7,6 +7,7 @@ import com.backend.be_realestate.enums.NotificationType;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.exceptions.OutOfStockException;
 import com.backend.be_realestate.exceptions.ResourceNotFoundException;
+import com.backend.be_realestate.modals.dto.PropertyAuditDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
@@ -29,10 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -45,7 +43,6 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
     private final PropertyAuditRepository auditRepo; // nếu có bảng audit
     private final PropertyConverter propertyConverter;
     private final PropertyImage propertyImageRepository;
-
     private final NotificationServiceImpl notificationService;
 
     @Override
@@ -234,10 +231,17 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
         if (status != null && !status.isBlank()) {
             try {
                 PropertyStatus statusEnum = PropertyStatus.valueOf(status);
+                          // Admin KHÔNG được xem DRAFT:
+                                  if (statusEnum == PropertyStatus.DRAFT) {
+                                        return Page.empty(pageable);
+                                  }
                 spec = spec.and((root, cq, cb) -> cb.equal(root.get("status"), statusEnum));
             } catch (IllegalArgumentException ex) {
                 throw new IllegalArgumentException("Invalid status: " + status);
             }
+        } else {
+                   // Khi KHÔNG truyền status -> mặc định loại DRAFT khỏi admin list
+                           spec = spec.and((root, cq, cb) -> cb.notEqual(root.get("status"), PropertyStatus.DRAFT));
         }
 
         // ====== QUERY DB ======
@@ -253,9 +257,41 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             }
         }
 
+        Map<Long, List<PropertyAuditEntity>> auditsByProp = new HashMap<>();
+        Map<Long, String> latestRejectReason = new HashMap<>();
+        if (!ids.isEmpty()) {
+            List<PropertyAuditEntity> audits = auditRepo.findByProperty_IdInOrderByAtDesc(ids);
+            for (PropertyAuditEntity a : audits) {
+                Long pid = a.getProperty().getId();
+                auditsByProp.computeIfAbsent(pid, k -> new ArrayList<>()).add(a);
+
+                // cache reject reason lần đầu gặp (vì list đã order desc)
+                if ("REJECTED".equalsIgnoreCase(a.getType()) && !latestRejectReason.containsKey(pid)) {
+                    latestRejectReason.put(pid, a.getMessage());
+                }
+            }
+        }
+
         return pageData.map(e -> {
             PropertyDTO dto = propertyConverter.toDto(e);
             dto.setImageUrls(imageMap.getOrDefault(e.getId(), List.of()));
+            // Map audits -> DTO
+            List<PropertyAuditDTO> auditDtos = Optional.ofNullable(auditsByProp.get(e.getId()))
+                    .orElseGet(List::of)
+                    .stream()
+                    .map(a -> PropertyAuditDTO.builder()
+                            .at(a.getAt())
+                            .type(a.getType())
+                            .message(a.getMessage())
+                            // by: nếu muốn resolve tên actor thì join thêm user repository bằng actorId
+                            .by(null)
+                            .build())
+                    .toList();
+            dto.setAudit(auditDtos);
+
+            // Gán rejectReason (ưu tiên audit gần nhất type=REJECTED)
+            dto.setRejectReason(latestRejectReason.get(e.getId()));
+
             return dto;
         });
     }

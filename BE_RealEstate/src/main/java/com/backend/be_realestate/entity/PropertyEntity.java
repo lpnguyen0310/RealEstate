@@ -14,153 +14,153 @@ import java.sql.Timestamp;
 import java.util.HashSet;
 import java.util.List;
 
-    @Entity
-    @Table(name = "properties", indexes = {
-            @Index(name = "idx_properties_status", columnList = "status"),
-            @Index(name = "idx_properties_type", columnList = "property_type"),
-            @Index(name = "idx_properties_location", columnList = "city_id, district_id, ward_id"),
-            @Index(name = "idx_properties_price", columnList = "price"),
-            @Index(name = "idx_properties_user", columnList = "user_id"),
-            @Index(name = "idx_properties_area", columnList = "area"),
-            @Index(name = "idx_properties_views", columnList = "view_count")
-    })
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public class PropertyEntity {
+        @Entity
+        @Table(name = "properties", indexes = {
+                @Index(name = "idx_properties_status", columnList = "status"),
+                @Index(name = "idx_properties_type", columnList = "property_type"),
+                @Index(name = "idx_properties_location", columnList = "city_id, district_id, ward_id"),
+                @Index(name = "idx_properties_price", columnList = "price"),
+                @Index(name = "idx_properties_user", columnList = "user_id"),
+                @Index(name = "idx_properties_area", columnList = "area"),
+                @Index(name = "idx_properties_views", columnList = "view_count")
+        })
+        @Getter
+        @Setter
+        @NoArgsConstructor
+        @AllArgsConstructor
+        @Builder
+        public class PropertyEntity {
 
-        @Id
-        @GeneratedValue(strategy = GenerationType.IDENTITY)
-        private Long id;
+            @Id
+            @GeneratedValue(strategy = GenerationType.IDENTITY)
+            private Long id;
 
-        @Column(name = "title", length = 255, nullable = false)
-        private String title;
+            @Column(name = "title", length = 255, nullable = false)
+            private String title;
 
-        @Column(name = "price", nullable = false)
-        private Double price;
+            @Column(name = "price", nullable = false)
+            private Double price;
 
-        @Column(name = "area", nullable = false)
-        private float area; // Diện tích sử dụng
+            @Column(name = "area", nullable = false)
+            private float area; // Diện tích sử dụng
 
-        @Column(name = "bedrooms")
-        private Integer bedrooms;
+            @Column(name = "bedrooms")
+            private Integer bedrooms;
 
-        @Column(name = "bathrooms")
-        private Integer bathrooms;
+            @Column(name = "bathrooms")
+            private Integer bathrooms;
 
-        @Column(name = "address_street", length = 255)
-        private String addressStreet;
+            @Column(name = "address_street", length = 255)
+            private String addressStreet;
 
-        @Enumerated(EnumType.STRING)
-        @Column(name = "property_type", nullable = false)
-        private PropertyType propertyType;
+            @Enumerated(EnumType.STRING)
+            @Column(name = "property_type", nullable = false)
+            private PropertyType propertyType;
 
-        @Enumerated(EnumType.STRING)
-        @Column(name = "pricetype", nullable = false)
-        private PriceType priceType;
-
-
-        @Enumerated(EnumType.STRING)
-        @Column(name = "status", nullable = false, length = 32)
-        private PropertyStatus status;
+            @Enumerated(EnumType.STRING)
+            @Column(name = "pricetype", nullable = false)
+            private PriceType priceType;
 
 
-        @Column(name = "legal_status", length = 100)
-        private String legalStatus;
-
-        @Column(name = "direction", length = 255)
-        private String direction;
-
-        @Column(name = "description")
-        private String description;
-
-        @CreationTimestamp
-        @Column(name = "posted_at", updatable = false)
-        private Timestamp postedAt;
-
-        @Column(name = "expires_at")
-        private Timestamp expiresAt;
-
-        @Column(name = "floors")
-        private Integer floors;
-
-        @Column(name = "position", length = 100)
-        private String position;         // "Mặt tiền", "Hẻm xe hơi", ...
-
-        @Column(name = "display_address", length = 500)
-        private String displayAddress;
+            @Enumerated(EnumType.STRING)
+            @Column(name = "status", nullable = false, length = 32)
+            private PropertyStatus status;
 
 
-        @Column(name = "view_count")
-        private Long viewCount = 0L;
+            @Column(name = "legal_status", length = 100)
+            private String legalStatus;
 
-        @Formula("(SELECT COALESCE(COUNT(*), 0) FROM saved_properties sp WHERE sp.property_id = id)")
-        private Long favoriteCount;
+            @Column(name = "direction", length = 255)
+            private String direction;
 
-        @Column(name = "landarea")
-        private Double landArea; // Diện tích đất
+            @Column(name = "description")
+            private String description;
+
+            @CreationTimestamp
+            @Column(name = "posted_at", updatable = false)
+            private Timestamp postedAt;
+
+            @Column(name = "expires_at")
+            private Timestamp expiresAt;
+
+            @Column(name = "floors")
+            private Integer floors;
+
+            @Column(name = "position", length = 100)
+            private String position;         // "Mặt tiền", "Hẻm xe hơi", ...
+
+            @Column(name = "display_address", length = 500)
+            private String displayAddress;
 
 
-        @Column(name = "width")
-        private Double width; // Ngang
-        @Column(name = "height")
-        private Double height; // Cao
+            @Column(name = "view_count")
+            private Long viewCount = 0L;
 
-        // --- Relationships ---
+            @Formula("(SELECT COALESCE(COUNT(*), 0) FROM saved_properties sp WHERE sp.property_id = id)")
+            private Long favoriteCount;
 
-        @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "category_id")
-        private CategoryEntity category;
+            @Column(name = "landarea")
+            private Double landArea; // Diện tích đất
 
-        @ManyToOne(fetch = FetchType.LAZY, optional = false)
-        @JoinColumn(name = "user_id", nullable = false,
-                foreignKey = @ForeignKey(name = "fk_properties_user"))
-        private UserEntity user;
 
-        @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "ward_id")
-        private WardEntity ward;
+            @Column(name = "width")
+            private Double width; // Ngang
+            @Column(name = "height")
+            private Double height; // Cao
 
-        @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "district_id")
-        private DistrictEntity district;
+            // --- Relationships ---
 
-        @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "city_id")
-        private CityEntity city;
+            @ManyToOne(fetch = FetchType.LAZY)
+            @JoinColumn(name = "category_id")
+            private CategoryEntity category;
 
-        @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
-        @Builder.Default
-        private java.util.List<PropertyImageEntity> images = new java.util.ArrayList<>();
-        public void replaceImages(java.util.List<String> urls) {
-            this.images.clear();                 // orphanRemoval tự xoá ảnh cũ
-            if (urls == null || urls.isEmpty()) return;
-            int i = 0;
-            for (String url : urls) {
-                var img = new PropertyImageEntity();
-                img.setProperty(this);
-                img.setImageUrl(url);
-                img.setDisplayOrder(i++);
-                this.images.add(img);
+            @ManyToOne(fetch = FetchType.LAZY, optional = false)
+            @JoinColumn(name = "user_id", nullable = false,
+                    foreignKey = @ForeignKey(name = "fk_properties_user"))
+            private UserEntity user;
+
+            @ManyToOne(fetch = FetchType.LAZY)
+            @JoinColumn(name = "ward_id")
+            private WardEntity ward;
+
+            @ManyToOne(fetch = FetchType.LAZY)
+            @JoinColumn(name = "district_id")
+            private DistrictEntity district;
+
+            @ManyToOne(fetch = FetchType.LAZY)
+            @JoinColumn(name = "city_id")
+            private CityEntity city;
+
+            @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
+            @Builder.Default
+            private java.util.List<PropertyImageEntity> images = new java.util.ArrayList<>();
+            public void replaceImages(java.util.List<String> urls) {
+                this.images.clear();                 // orphanRemoval tự xoá ảnh cũ
+                if (urls == null || urls.isEmpty()) return;
+                int i = 0;
+                for (String url : urls) {
+                    var img = new PropertyImageEntity();
+                    img.setProperty(this);
+                    img.setImageUrl(url);
+                    img.setDisplayOrder(i++);
+                    this.images.add(img);
+                }
             }
+
+            @ManyToMany
+            @JoinTable(
+                    name = "property_amenities",
+                    joinColumns = @JoinColumn(name = "property_id"),
+                    inverseJoinColumns = @JoinColumn(name = "amenity_id")
+            )
+            private List<AmenityEntity> amenities ;
+
+
+            @ManyToOne(fetch = FetchType.LAZY)
+            @JoinColumn(name = "listing_type_policy_id", nullable = false)
+            private ListingTypePolicy listingTypePolicy;
+
+            @Enumerated(EnumType.STRING)
+            @Column(name = "listing_type", nullable = false, length = 16)
+            private ListingType listingType;
         }
-
-        @ManyToMany
-        @JoinTable(
-                name = "property_amenities",
-                joinColumns = @JoinColumn(name = "property_id"),
-                inverseJoinColumns = @JoinColumn(name = "amenity_id")
-        )
-        private List<AmenityEntity> amenities ;
-
-
-        @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "listing_type_policy_id", nullable = false)
-        private ListingTypePolicy listingTypePolicy;
-
-        @Enumerated(EnumType.STRING)
-        @Column(name = "listing_type", nullable = false, length = 16)
-        private ListingType listingType;
-    }

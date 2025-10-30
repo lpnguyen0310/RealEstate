@@ -1,5 +1,6 @@
 package com.backend.be_realestate.service;
 
+import com.backend.be_realestate.enums.SubmitMode;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO; // Import DTO chi tiết
@@ -32,10 +33,8 @@ public interface IPropertyService {
 
 //    Page<PropertyDTO> getPropertiesByUser(Long userId, Pageable pageable);
     PropertyDTO create1(Long currentUserId, CreatePropertyRequest req, List<MultipartFile> images);
-    CreatePropertyResponse create(Long userId, CreatePropertyRequest req);
-
-    CreatePropertyResponse update(Long userId, Long propertyId, CreatePropertyRequest req);
-
+    CreatePropertyResponse create(Long userId, CreatePropertyRequest req, SubmitMode mode);
+    CreatePropertyResponse update(Long userId, Long propertyId, CreatePropertyRequest req, @org.springframework.lang.Nullable SubmitMode mode);
 
     Page<PropertyDTO> getPropertiesByUser(Long userId,
                                           String status,

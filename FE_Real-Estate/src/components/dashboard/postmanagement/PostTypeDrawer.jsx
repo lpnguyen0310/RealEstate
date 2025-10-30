@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from "react";
-import { Card, Radio, Button, Alert, Skeleton, Tooltip } from "antd";
+import { Card, Radio, Button, Alert, Skeleton, Tooltip, message } from "antd";
 import { DownOutlined, UpOutlined } from "@ant-design/icons";
 
 // ------- Helpers -------
@@ -114,33 +114,61 @@ export default function PostTypeSection({
                         const isActive = String(selectedId) === String(opt.id);
                         const isVipLike = opt.type === "VIP" || opt.type === "PREMIUM";
                         const isDepleted = isVipLike && opt.qty === 0; // hết lượt
-                        const defaultBadge = isVipLike ? (typeof opt.qty === "number" ? `Còn ${opt.qty}` : "—") : "Free";
-                        const isCurrent = currentTypeText === opt.type; // đánh dấu gói hiện tại khi edit
+                        const isCurrent = currentTypeText === opt.type; // gói hiện tại khi edit
+                        const isBlocked = isDepleted && !isCurrent; // hết lượt & không phải gói hiện tại → cấm chọn
+
+                        const defaultBadge = isVipLike
+                            ? (typeof opt.qty === "number" ? `Còn ${opt.qty}` : "—")
+                            : "Free";
 
                         const cardStyle = isActive
                             ? {
                                 background: "linear-gradient(180deg,#eff5ff 0%, #e6eeff 100%)",
-                                boxShadow: "0 8px 20px rgba(46,91,255,0.18), inset 0 1px 0 rgba(255,255,255,0.8)",
+                                boxShadow:
+                                    "0 8px 20px rgba(46,91,255,0.18), inset 0 1px 0 rgba(255,255,255,0.8)",
                                 borderColor: "#2E5BFF",
                             }
                             : { background: "#fff", boxShadow: "0 4px 12px rgba(15,23,42,0.06)" };
 
                         const cardClass =
                             "rounded-2xl overflow-hidden select-none transition-all border " +
-                            (isActive ? "ring-1 ring-[#2E5BFF]/30" : "border-[#e9eef7] hover:border-[#cfdcff] hover:-translate-y-[1px]") +
-                            " cursor-pointer" +
+                            (isActive
+                                ? "ring-1 ring-[#2E5BFF]/30"
+                                : "border-[#e9eef7] hover:border-[#cfdcff] hover:-translate-y-[1px]") +
+                            (isBlocked ? " cursor-not-allowed opacity-60" : " cursor-pointer") +
                             (isDepleted ? " border-dashed" : "");
 
                         return (
-                            <Tooltip key={opt.id} title={isDepleted ? "Đã hết lượt gói này" : ""}>
+                            <Tooltip
+                                key={opt.id}
+                                title={
+                                    isBlocked
+                                        ? "Đã hết lượt gói này. Vui lòng mua thêm để chuyển sang gói này."
+                                        : ""
+                                }
+                            >
                                 <Card
                                     role="button"
                                     tabIndex={0}
-                                    onClick={() => handleSelect(opt.id)}
+                                    onClick={() => {
+                                        if (isBlocked) {
+                                            message.warning(
+                                                "Bạn đã hết lượt của gói này. Vào mục Mua gói để nạp thêm nhé!"
+                                            );
+                                            return;
+                                        }
+                                        handleSelect(opt.id);
+                                    }}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter" || e.key === " ") {
                                             e.preventDefault();
-                                            handleSelect(opt.id);
+                                            if (isBlocked) {
+                                                message.warning(
+                                                    "Bạn đã hết lượt của gói này. Vào mục Mua gói để nạp thêm nhé!"
+                                                );
+                                            } else {
+                                                handleSelect(opt.id);
+                                            }
                                         }
                                     }}
                                     className={cardClass}
@@ -172,7 +200,11 @@ export default function PostTypeSection({
                                                     <span
                                                         className={[
                                                             "text-[14px] leading-6",
-                                                            f.ok ? (isActive ? "text-[#23407a]" : "text-[#334e7a]") : "text-[#ef4444]",
+                                                            f.ok
+                                                                ? isActive
+                                                                    ? "text-[#23407a]"
+                                                                    : "text-[#334e7a]"
+                                                                : "text-[#ef4444]",
                                                         ].join(" ")}
                                                     >
                                                         {f.text}
@@ -181,7 +213,12 @@ export default function PostTypeSection({
                                             ))}
                                         </ul>
                                     ) : (
-                                        <div className={["mt-2 text-[13px]", isActive ? "text-[#2a4e9a]" : "text-[#5d6b85]"].join(" ")} />
+                                        <div
+                                            className={[
+                                                "mt-2 text-[13px]",
+                                                isActive ? "text-[#2a4e9a]" : "text-[#5d6b85]",
+                                            ].join(" ")}
+                                        />
                                     )}
                                 </Card>
                             </Tooltip>

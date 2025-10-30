@@ -11,6 +11,7 @@ export default function ConfirmDialog({
     confirmText = "Xác nhận",
     cancelText = "Hủy",
     loading = false,
+    confirmDisabled = false, // <<< NEW
     onClose,
     onConfirm,
 }) {
@@ -30,7 +31,7 @@ export default function ConfirmDialog({
                 </Button>
                 <Button
                     onClick={onConfirm}
-                    disabled={loading}
+                    disabled={loading || confirmDisabled} // <<< NEW
                     variant="contained"
                 >
                     {loading ? "Đang xử lý..." : confirmText}

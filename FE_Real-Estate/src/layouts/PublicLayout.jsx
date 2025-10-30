@@ -6,6 +6,7 @@ import Header from "@/layouts/Header";
 import Footer from "@/layouts/Footer";
 import AIChatWidget from "@/components/aiChatBox/AIChatWidget";
 import { hydrateFromSession, getProfileThunk } from "@/store/authSlice";
+import SupportChatWidget from "@/components/supportchat/SupportChatWidget";
 
 export default function PublicLayout() {
   const dispatch = useDispatch();
@@ -32,6 +33,8 @@ export default function PublicLayout() {
       <main className="min-h-screen">
         <Outlet />
         <AIChatWidget user={user} size="md" />
+        <SupportChatWidget user={user} size="md" />
+
       </main>
       <Footer />
     </>

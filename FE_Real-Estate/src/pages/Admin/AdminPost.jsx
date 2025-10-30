@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Box } from "@mui/material";
+import { Box, TextField, Stack, Typography } from "@mui/material"; // <<< UPDATED
 import { fmtDate, money } from "@/utils/validators";
 import {
     KpiGrid,
@@ -142,7 +142,7 @@ export default function AdminPostsMUI() {
         return () => client.deactivate();
     }, [dispatch, selectedTab]);
 
-    /* =============== MUI Confirm Modal state (NEW) =============== */
+    /* =============== MUI Confirm Modal state (EXISTING) =============== */
     const [confirm, setConfirm] = useState({
         open: false,
         title: "",
@@ -177,6 +177,9 @@ export default function AdminPostsMUI() {
         }
     }, [confirm.onConfirm, closeConfirm]);
 
+    /* =============== NEW: Reject Reason Dialog state =============== */
+    const [rejectDlg, setRejectDlg] = useState({ open: false, id: null, reason: "" });
+
     /* =============== ACTIONS =============== */
     const approve = useCallback(
         async (id) => {
@@ -187,22 +190,25 @@ export default function AdminPostsMUI() {
         [dispatch]
     );
 
-    // >>> NEW: mở modal xác nhận trước khi từ chối
-    const reject = useCallback(
-        async (id) => {
-            openConfirm({
-                title: "Từ chối bài đăng",
-                content: `Bạn chắc chắn muốn từ chối tin #${id}?`,
-                confirmText: "Từ chối",
-                onConfirm: async () => {
-                    await dispatch(rejectPostThunk(id));
-                    await dispatch(fetchCountsThunk());
-                    await dispatch(fetchPostsThunk());
-                },
-            });
-        },
-        [dispatch, openConfirm]
-    );
+    // === CHANGED: mở dialog yêu cầu lý do thay vì confirm trống
+    const reject = useCallback((id) => {
+        setRejectDlg({ open: true, id, reason: "" });
+    }, []);
+
+    const closeReject = useCallback(() => {
+        setRejectDlg((s) => ({ ...s, open: false, id: null, reason: "" }));
+    }, []);
+
+    const confirmReject = useCallback(async () => {
+        const reason = (rejectDlg.reason || "").trim();
+        if (!reason) return;
+        // set vào Redux để rejectPostThunk đọc
+        dispatch(setDecision({ reason }));
+        await dispatch(rejectPostThunk(rejectDlg.id));
+        await dispatch(fetchCountsThunk());
+        await dispatch(fetchPostsThunk());
+        closeReject();
+    }, [dispatch, rejectDlg, closeReject]);
 
     const hide = useCallback(
         async (id) => {
@@ -222,7 +228,6 @@ export default function AdminPostsMUI() {
         [dispatch]
     );
 
-    // >>> NEW: mở modal xác nhận trước khi xóa vĩnh viễn
     const hardDelete = useCallback(
         async (id) => {
             openConfirm({
@@ -254,8 +259,7 @@ export default function AdminPostsMUI() {
         const expired = counts.EXPIRED || 0;
         const hidden = counts.HIDDEN || 0;
         const rejected = counts.REJECTED || 0;
-        const total =
-            pending + published + expSoon + expired + hidden + rejected;
+        const total = pending + published + expSoon + expired + hidden + rejected;
         return {
             total,
             pending,
@@ -331,10 +335,10 @@ export default function AdminPostsMUI() {
                     }}
                     onOpenDetail={onOpenDetail}
                     onApprove={approve}
-                    onReject={reject}           // << dùng modal
+                    onReject={reject}           // <<< CHANGED: mở dialog nhập lý do
                     onHide={hide}
                     onUnhide={unhide}
-                    onHardDelete={hardDelete}   // << dùng modal
+                    onHardDelete={hardDelete}
                     money={money}
                     fmtDate={fmtDate}
                     setDecision={(payload) => dispatch(setDecision(payload))}
@@ -349,13 +353,13 @@ export default function AdminPostsMUI() {
                     money={money}
                     fmtDate={fmtDate}
                     onApprove={approve}
-                    onReject={reject}       
+                    onReject={reject}       // <<< CHANGED: mở dialog nhập lý do
                     actioningId={actioningId}
                     canEditDuration={false}
                 />
             </Box>
 
-            {/* === Modal xác nhận dùng chung === */}
+            {/* === Modal xác nhận dùng chung (giữ nguyên) === */}
             <ConfirmDialog
                 open={confirm.open}
                 title={confirm.title}
@@ -364,6 +368,44 @@ export default function AdminPostsMUI() {
                 loading={confirm.loading}
                 onClose={closeConfirm}
                 onConfirm={runConfirm}
+            />
+
+            {/* === NEW: Dialog bắt buộc nhập lý do từ chối === */}
+            <ConfirmDialog
+                open={rejectDlg.open}
+                title="Từ chối bài đăng"
+                confirmText="Từ chối"
+                onClose={closeReject}
+                onConfirm={confirmReject}
+                confirmDisabled={!rejectDlg.reason.trim() || rejectDlg.reason.trim().length < 5}
+                content={
+                    <Stack spacing={1}>
+                        <Typography sx={{ color: "#475569" }}>
+                            Vui lòng nhập <b>lý do từ chối</b> cho tin #{rejectDlg.id}.
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#64748b" }}>
+                            Tối thiểu 5 ký tự.
+                        </Typography>
+                        <TextField
+                            autoFocus
+                            multiline
+                            minRows={3}
+                            maxRows={6}
+                            placeholder="Nhập lý do..."
+                            value={rejectDlg.reason}
+                            onChange={(e) => setRejectDlg((s) => ({ ...s, reason: e.target.value }))}
+                            inputProps={{ maxLength: 500 }}
+                            FormHelperTextProps={{ sx: { m: 0 } }}
+                            helperText={
+                                !rejectDlg.reason.trim()
+                                    ? "Bắt buộc nhập"
+                                    : rejectDlg.reason.trim().length < 5
+                                        ? "Vui lòng nhập tối thiểu 5 ký tự"
+                                        : " "
+                            }
+                        />
+                    </Stack>
+                }
             />
         </Box>
     );

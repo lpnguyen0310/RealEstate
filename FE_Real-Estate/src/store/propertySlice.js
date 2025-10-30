@@ -99,7 +99,7 @@ export const createPropertyThunk = createAsyncThunk(
     /**
      * @param {{ formData: any, listingTypePolicyId: number|null }} arg
      */
-    async ({ formData, listingTypePolicyId }, { rejectWithValue }) => {
+    async ({ formData, listingTypePolicyId, submitMode = "publish" }, { rejectWithValue }) => {
         try {
             // 1) Ảnh: tách file & URL
             const imgs = formData.images || [];
@@ -121,10 +121,9 @@ export const createPropertyThunk = createAsyncThunk(
                 addressStreet: formData.streetName || "",
                 propertyType: formData.propertyType || "sell",
                 priceType: formData.priceType || "SELL_PRICE",
-                status: "PENDING_REVIEW",
 
                 legalStatus: formData.legalDocument || "",
-                direction: formData.houseDirection || "",
+                direction: formData.direction || "",
                 description: formData.description || "",
 
                 floors: Number(formData.floors) || null,
@@ -145,7 +144,9 @@ export const createPropertyThunk = createAsyncThunk(
                 amenityIds: formData.amenityIds || [],
             };
 
-            const res = await api.post("/properties/create", payload);
+            // const res = await api.post("/properties/create", payload);
+            const mode = submitMode?.toUpperCase() === "DRAFT" ? "DRAFT" : "PUBLISH";
+            const res = await api.post("/properties/create", payload, { params: { mode } });
             return res?.data?.data ?? res?.data;
         } catch (e) {
             const msg = e?.response?.data?.message || "Đăng tin thất bại";
@@ -197,7 +198,7 @@ export const updatePropertyThunk = createAsyncThunk(
     /**
      * @param {{ id: number|string, formData: any, listingTypePolicyId?: number|null }} arg
      */
-    async ({ id, formData, listingTypePolicyId }, { rejectWithValue }) => {
+    async ({ id, formData, listingTypePolicyId, submitMode }, { rejectWithValue }) => {
         try {
             // 1) Ảnh: tách file & URL
             const imgs = formData.images || [];
@@ -219,7 +220,6 @@ export const updatePropertyThunk = createAsyncThunk(
                 addressStreet: formData.streetName || "",
                 propertyType: formData.propertyType || "sell",
                 priceType: formData.priceType || "SELL_PRICE",
-                status: "PENDING_REVIEW",
 
                 legalStatus: formData.legalDocument || "",
                 direction: formData.direction || "",
@@ -244,7 +244,8 @@ export const updatePropertyThunk = createAsyncThunk(
             };
 
             // 4) Gọi API update
-            const res = await api.put(`/properties/${id}`, payload);
+            const mode = submitMode ? submitMode.toUpperCase() : undefined; // "PUBLISH" | "DRAFT" | undefined
+            const res = await api.put(`/properties/${id}`, payload, { params: mode ? { mode } : {} });
             return res?.data?.data ?? res?.data;
         } catch (e) {
             const msg = e?.response?.data?.message || "Cập nhật tin thất bại";
@@ -337,8 +338,17 @@ function statusEnumToKey(status) {
 
 function mapDtoToPostCard(p) {
     const fmt = Intl.NumberFormat("vi-VN");
+
+    // Fallback tính giá/m² nếu BE chưa cung cấp pricePerM2
+    const pricePerM2 = (p?.pricePerM2 != null)
+        ? p.pricePerM2
+        : (p?.price != null && p?.area > 0)
+            ? (p.price / p.area)
+            : null;
+
     const priceText = p?.price != null ? `${fmt.format(p.price)} ₫` : "—";
-    const unitPriceText = p?.pricePerM2 != null ? `${fmt.format(p.pricePerM2)} ₫/m²` : "";
+    const unitPriceText = pricePerM2 != null ? `${fmt.format(pricePerM2)} ₫/m²` : "";
+
     const addressMain = p?.displayAddress || [p?.addressStreet].filter(Boolean).join(", ");
 
     return {
@@ -346,12 +356,17 @@ function mapDtoToPostCard(p) {
         images: Array.isArray(p.imageUrls) && p.imageUrls.length ? p.imageUrls : p.images || [],
         title: p.title,
         description: p.description,
+
         statusTag: toStatusTag(p?.status),
+        statusKey: statusEnumToKey(p?.status),
+
         priceText,
         unitPriceText,
         landPriceText: "",
-        installmentText: p?.propertyType === "sell" ? "Mua bán" : p?.propertyType === "rent" ? "Cho thuê" : "",
-        statusKey: statusEnumToKey(p?.status),
+
+        installmentText:
+            p?.propertyType === "sell" ? "Mua bán" :
+                p?.propertyType === "rent" ? "Cho thuê" : "",
 
         addressMain,
         area: p?.area,
@@ -364,11 +379,16 @@ function mapDtoToPostCard(p) {
         views: p?.viewCount ?? 0,
         favoriteCount: p?.favoriteCount ?? 0,
 
-        listingType: p?.listingType,
+        listingType: p?.listingType,        // NORMAL | VIP | PREMIUM (string)
+
         postedAt: p?.postedAt ?? null,
         expiresAt: p?.expiresAt ?? null,
         durationDays: p?.durationDays ?? null,
         actualDurationDays: p?.actualDurationDays ?? null,
+
+        // 🔥 MỚI: dùng cho UI
+        rejectReason: p?.rejectReason || null,
+        audits: Array.isArray(p?.audit) ? p.audit : [],
     };
 }
 

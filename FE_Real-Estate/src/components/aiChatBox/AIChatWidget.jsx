@@ -11,7 +11,7 @@ import Messages from "./section/Messages";
 import QuickChips from "./section/QuickChips";
 import InputBar from "./section/InputBar";
 
-/* ================== CONFIG ================== */
+
 const PROJECT_NAME = "RealEstateX";
 const SIZES = {
     xs: { btn: "h-11 w-11", panelW: "w-[320px]", panelB: "bottom-16", msgH: "h-[340px]" },

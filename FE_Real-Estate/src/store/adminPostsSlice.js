@@ -56,12 +56,12 @@ export const fetchPostsThunk = createAsyncThunk(
 
             // Chuẩn hóa như trong component
             const content = Array.isArray(res?.content) ? res.content : [];
+            // ... bên trong fetchPostsThunk, đoạn map normalizedRows:
             const normalizedRows = content.map((p) => {
                 const posted = p.postedAt ? dayjs(p.postedAt) : null;
                 const expires = p.expiresAt ? dayjs(p.expiresAt) : null;
                 const actualDurationDays =
-                    p.actualDurationDays ??
-                    (posted && expires ? expires.diff(posted, "day") : null);
+                    p.actualDurationDays ?? (posted && expires ? expires.diff(posted, "day") : null);
 
                 return {
                     id: p.id,
@@ -83,8 +83,19 @@ export const fetchPostsThunk = createAsyncThunk(
 
                     author: { name: p.authorName, email: p.authorEmail },
                     images: p.imageUrls || [],
+
+                    // >>> THÊM 2 DÒNG NÀY <<<
+                    audit: Array.isArray(p.audit) ? p.audit : [],           // lấy lịch sử từ API
+                    rejectReason:
+                        p.rejectReason ??
+                        p.rejectionReason ??
+                        p.reject_note ??
+                        p.rejectNote ??
+                        p.reason ??
+                        null,
                 };
             });
+
 
             const normalized = normalizeStatuses(normalizedRows);
 
@@ -313,20 +324,30 @@ const adminPostsSlice = createSlice({
             .addCase(rejectPostThunk.fulfilled, (s, { payload }) => {
                 const { id } = payload;
                 s.actioningId = null;
+
+                // NEW: lấy lý do hiện tại trong state.decision
+                const reason = (s.decision?.reason ?? "").toString();
+
                 let from = null;
                 s.posts = s.posts.map((x) => {
                     if (x.id === id) {
                         from = x.status;
-                        return { ...x, status: "REJECTED" };
+                        return { ...x, status: "REJECTED", rejectReason: reason };
                     }
                     return x;
                 });
+
                 const _from = from || "PENDING_REVIEW";
                 s.counts = {
                     ...s.counts,
                     [_from]: Math.max(0, (s.counts[_from] || 0) - 1),
                     REJECTED: (s.counts.REJECTED || 0) + 1,
                 };
+
+                // NEW: nếu đang mở Drawer đúng tin này thì đồng bộ luôn detail
+                if (s.open && s.detail && s.detail.id === id) {
+                    s.detail = { ...s.detail, status: "REJECTED", rejectReason: reason };
+                }
             })
             .addCase(rejectPostThunk.rejected, (s) => {
                 s.actioningId = null;
@@ -400,6 +421,12 @@ const adminPostsSlice = createSlice({
                 }
                 // totalItems giảm đi 1
                 s.totalItems = Math.max(0, s.totalItems - 1);
+
+                // Nếu đang xem chi tiết chính tin này thì đóng detail
+                if (s.open && s.detail && s.detail.id === id) {
+                    s.open = false;
+                    s.detail = null;
+                }
             })
             .addCase(hardDeletePostThunk.rejected, (s) => {
                 s.actioningId = null;
