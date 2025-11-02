@@ -183,7 +183,7 @@ public class PropertyServiceImpl implements IPropertyService {
                 var admins = userRepository.findAllByRoles_Code("ADMIN");
                 if (!admins.isEmpty()) {
                     String adminMessage = String.format("Tin đăng mới '%s' (ID: %d) đang chờ duyệt.", title, saved.getId());
-                    String adminLink = "/admin/posts";
+                    String adminLink = String.format("/admin/posts?tab=pending&reviewPostId=%d", saved.getId());
                     for (UserEntity admin : admins) {
                         notificationService.createNotification(
                                 admin, NotificationType.NEW_LISTING_PENDING, adminMessage, adminLink
@@ -204,15 +204,25 @@ public class PropertyServiceImpl implements IPropertyService {
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
 
+    // src/service/impl/PropertyServiceImpl.java
+
     @Override
     @Transactional
-    public CreatePropertyResponse update(Long userId, Long propertyId, CreatePropertyRequest req,@Nullable SubmitMode mode) {
+    public CreatePropertyResponse update(Long userId, Long propertyId, CreatePropertyRequest req, @Nullable SubmitMode mode) {
+
+        // 1. TÌM PROPERTY VÀ LẤY TRẠNG THÁI GỐC
         var property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new IllegalArgumentException("Property not found: " + propertyId));
+
+        // === 💡 BƯỚC MỚI: LƯU LẠI TRẠNG THÁI GỐC ===
+        final PropertyStatus originalStatus = property.getStatus();
+
+        // 2. KIỂM TRA QUYỀN SỞ HỮU
         if (property.getUser() == null || !Objects.equals(property.getUser().getUserId(), userId)) {
             throw new AccessDeniedException("Bạn không có quyền sửa tin này");
         }
 
+        // 3. CẬP NHẬT GÓI TIN (NẾU CÓ)
         if (req.getListingTypePolicyId() != null) {
             var policy = policyRepo.findById(req.getListingTypePolicyId())
                     .orElseThrow(() -> new IllegalArgumentException("Invalid listingTypePolicyId"));
@@ -223,18 +233,66 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setListingType(policy.getListingType());
         }
 
+        // 4. ÁP DỤNG CÁC TRƯỜNG CÒN LẠI TỪ REQUEST
         applyRequestToEntity(property, req, /*createMode*/ false, /*mode*/ (mode == null ? null : mode));
 
+        // 5. XỬ LÝ LOGIC TRẠNG THÁI VÀ GỬI THÔNG BÁO
         if (mode == SubmitMode.PUBLISH) {
-            // ví dụ: nếu từ DRAFT chuyển sang publish → kiểm tra & trừ lượt, set postedAt…
-            // consumeQuotaIfNeeded(property.getListingTypePolicy(), property.getUser());
-            // Và nếu muốn đẩy về pending_review:
+
+            // Luôn set về PENDING_REVIEW khi nhấn "publish"
             property.setStatus(PropertyStatus.PENDING_REVIEW);
+
+            // === 💡 BẮT ĐẦU LOGIC GỬI THÔNG BÁO (COPY TỪ HÀM CREATE VÀ SỬA LẠI) ===
+            try {
+                String title = (property.getTitle() != null) ? property.getTitle() : "không có tiêu đề";
+
+                // 5.1 Gửi thông báo cho Admin (DỰA TRÊN TRẠNG THÁI GỐC)
+                var admins = userRepository.findAllByRoles_Code("ADMIN");
+                if (!admins.isEmpty()) {
+
+                    String adminMessage;
+                    NotificationType adminNotificationType;
+
+                    // === 💡 ĐÂY LÀ LOGIC BẠN YÊU CẦU ===
+                    if (originalStatus == PropertyStatus.WARNED || originalStatus == PropertyStatus.REJECTED) {
+                        // Nếu sửa từ bài bị Cảnh cáo hoặc Từ chối
+                        adminMessage = String.format("Tin '%s' (ID: %d) vừa được sửa (từ %s) và đang chờ duyệt lại.",
+                                title, property.getId(), originalStatus.name());
+                        // Bạn nên tạo type này trong Enum: LISTING_EDITED_PENDING
+                        adminNotificationType = NotificationType.LISTING_EDITED_PENDING;
+                    } else {
+                        // Mặc định, nếu là từ DRAFT
+                        adminMessage = String.format("Tin đăng mới '%s' (ID: %d) đang chờ duyệt.",
+                                title, property.getId());
+                        adminNotificationType = NotificationType.NEW_LISTING_PENDING;
+                    }
+
+                    String adminLink = String.format("/admin/posts?reviewPostId=%d", property.getId());
+                    for (UserEntity admin : admins) {
+                        notificationService.createNotification(
+                                admin, adminNotificationType, adminMessage, adminLink
+                        );
+                    }
+                }
+
+                // 5.2 Gửi thông báo cho User (Luôn giống nhau)
+                String userMessage = String.format("Tin đăng '%s' của bạn đã được cập nhật và đang chờ duyệt lại.", title);
+                String userLink = "/dashboard/posts?tab=pending"; // Điều hướng user đến tab Chờ duyệt
+                notificationService.createNotification(
+                        property.getUser(), NotificationType.LISTING_PENDING_USER, userMessage, userLink
+                );
+
+            } catch (Exception e) {
+                log.error("Notify error (listing updated OK): {}", e.getMessage(), e);
+            }
+            // === KẾT THÚC LOGIC GỬI THÔNG BÁO ===
+
         } else if (mode == SubmitMode.DRAFT) {
             property.setStatus(PropertyStatus.DRAFT);
         }
-        // mode == null → giữ nguyên status hiện tại
+        // mode == null → giữ nguyên status hiện tại (ví dụ: sửa lỗi chính tả khi đang PUBLISHED)
 
+        // 6. LƯU VÀO DB
         var saved = propertyRepository.save(property);
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
@@ -405,6 +463,7 @@ public class PropertyServiceImpl implements IPropertyService {
         counts.put("hidden", 0L);
         counts.put("expired", 0L);
         counts.put("expiringSoon", 0L);
+        counts.put("warned", 0L);
 
         List<IPropertyCount> results = propertyRepository.countByStatus(userId);
         for (IPropertyCount item : results) {
@@ -648,6 +707,7 @@ public class PropertyServiceImpl implements IPropertyService {
             case ARCHIVED:       return "hidden";
             case EXPIRED:        return "expired";
             case EXPIRINGSOON:   return "expiringSoon";
+            case WARNED:         return "warned";
             default:             return null;
         }
     }
@@ -680,6 +740,8 @@ public class PropertyServiceImpl implements IPropertyService {
                         cb.equal(r.get("status"), PropertyStatus.HIDDEN),
                         cb.equal(r.get("status"), PropertyStatus.ARCHIVED)
                 );
+            case "warned":
+                return (r, q, cb) -> cb.equal(r.get("status"), PropertyStatus.WARNED);
             default: {
                 PropertyStatus mapped = mapFrontendStatus(key);
                 return (mapped != null)

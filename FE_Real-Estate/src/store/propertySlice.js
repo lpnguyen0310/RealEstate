@@ -318,6 +318,7 @@ function toStatusTag(status) {
         case "EXPIRED": return "Hết Hạn";
         case "EXPIRINGSOON": return "Sắp Hết Hạn";
         case "ARCHIVED": return "Đã Lưu Trữ";
+        case "WARNED": return "Cần Chỉnh Sửa";
         default: return "Nháp";
     }
 }
@@ -332,6 +333,7 @@ function statusEnumToKey(status) {
         case "EXPIRED": return "expired";
         case "EXPIRINGSOON": return "expiringSoon";
         case "ARCHIVED": return "hidden";
+        case "WARNED": return "warned";
         default: return "draft";
     }
 }
@@ -389,6 +391,8 @@ function mapDtoToPostCard(p) {
         // 🔥 MỚI: dùng cho UI
         rejectReason: p?.rejectReason || null,
         audits: Array.isArray(p?.audit) ? p.audit : [],
+
+        latestWarningMessage: p?.latestWarningMessage || null,
     };
 }
 

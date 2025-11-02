@@ -33,6 +33,12 @@ import {
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { useSearchParams } from "react-router-dom";
+import ReportDetailsModal from "@/components/admidashboard/post/ReportDetailsModal";
+import { 
+  useLazyGetReportsForPostQuery, 
+  useDismissReportsMutation,
+  useSendWarningMutation // <<< IMPORT
+} from "@/services/reportApiSlice";
 
 // >>> NEW: Confirm Dialog
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -180,6 +186,9 @@ export default function AdminPostsMUI() {
     /* =============== NEW: Reject Reason Dialog state =============== */
     const [rejectDlg, setRejectDlg] = useState({ open: false, id: null, reason: "" });
 
+    
+
+
     /* =============== ACTIONS =============== */
     const approve = useCallback(
         async (id) => {
@@ -250,6 +259,143 @@ export default function AdminPostsMUI() {
         },
         [dispatch]
     );
+
+    const [triggerGetReports, { isLoading: isLoadingReports }] = useLazyGetReportsForPostQuery();
+    const [dismissReports, { isLoading: isDismissing }] = useDismissReportsMutation();
+    const [sendWarning, { isLoading: isSendingWarning }] = useSendWarningMutation(); // <<< GỌI HOOK
+
+    const [reportsModal, setReportsModal] = useState({ 
+        open: false, 
+        postId: null, 
+        reports: [], 
+        // loading: false 
+    });
+
+    const [warningDlg, setWarningDlg] = useState({ open: false, id: null, message: "" });
+
+    const openReports = useCallback(async (postId) => {
+        // Mở modal, nhưng chưa có data, loading sẽ được lấy từ hook
+        setReportsModal({ open: true, postId: postId, reports: [] });
+        
+        try {
+        // === THAY THẾ DATA GIẢ BẰNG CODE THẬT ===
+        
+        // Gọi API bằng hook "lazy"
+        // .unwrap() sẽ trả về data hoặc throw lỗi
+        const data = await triggerGetReports(postId).unwrap();
+        
+        // Cập nhật modal với dữ liệu thật
+        setReportsModal({ open: true, postId, reports: data });
+
+        } catch (err) {
+        console.error("Failed to fetch reports:", err);
+        // (Hiển thị message.error ở đây, ví dụ: message.error("Tải báo cáo thất bại"))
+        setReportsModal({ open: false, postId: null, reports: [] });
+        }
+    }, [triggerGetReports]); // <-- Thêm triggerGetReports vào dependency
+
+    const closeReports = useCallback(() => {
+        setReportsModal({ open: false, postId: null, reports: [] });
+    }, []); 
+
+    const handleLockPost = useCallback((postId) => {
+        // 1. Đóng modal chi tiết báo cáo
+        closeReports(); 
+        
+        // 2. Mở modal "Nhập lý do" (chính là hàm 'reject' của bạn)
+        reject(postId); 
+
+    }, [reject, closeReports]);
+
+    const handleDismissReports = useCallback((postId) => {
+        console.log("Admin yêu cầu bỏ qua báo cáo cho bài:", postId);
+        // TODO:
+        // 1. Bạn nên gọi 1 API mới (ví dụ: POST /api/admin/reports/dismiss)
+        //    để đánh dấu các báo cáo này là "Đã xem"
+        //    hoặc reset `reportCount` về 0.
+    }, []);
+
+    const handleSendWarning = useCallback((postId) => {
+        // Đóng modal chi tiết, mở modal nhập cảnh báo
+        setWarningDlg({ open: true, id: postId, message: "" });
+    }, []); 
+
+    // 👇 SỬA HÀM NÀY: Chỉ set open: false
+    const closeWarning = useCallback(() => {
+        setWarningDlg((s) => ({ ...s, open: false }));
+    }, []);
+
+    // 🆕 THÊM HÀM MỚI NÀY
+    // Hàm này sẽ dọn dẹp state SAU KHI modal đã đóng xong
+    const handleWarningExited = useCallback(() => {
+        setWarningDlg({ open: false, id: null, message: "" });
+    }, []);
+
+    const confirmSendWarning = useCallback(async () => {
+        const message = warningDlg.message.trim();
+        if (message.length < 10) return; // (Validation cơ bản)
+
+        try {
+        await sendWarning({ postId: warningDlg.id, message }).unwrap();
+        
+        // (Hiển thị message.success, ví dụ: "Đã gửi cảnh báo")
+        closeWarning();
+
+        } catch (err) {
+        console.error("Gửi cảnh báo thất bại:", err);
+        // (Hiển thị message.error)
+        }
+    }, [warningDlg, closeWarning, sendWarning]);
+    // === (Hết bước 4) ===
+
+    useEffect(() => {
+        const reportId = searchParams.get("reportPostId");
+        const reviewId = searchParams.get("reviewPostId");
+
+        // 1. Ưu tiên mở Modal Báo Cáo
+        if (reportId) {
+            // Chỉ chạy nếu danh sách đã tải VÀ đang ở đúng tab 'REPORTED'
+            if (posts && posts.length > 0 && selectedTab === 'REPORTED') {
+                const postToReport = posts.find(p => p.id === Number(reportId));
+                if (postToReport) {
+                    openReports(postToReport.id); // Mở modal
+
+                    // Xóa param khỏi URL
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete("reportPostId");
+                    setSearchParams(newParams, { replace: true });
+                }
+            }
+        } 
+        // 2. Nếu không, kiểm tra mở Drawer Duyệt
+        else if (reviewId) {
+            
+            // === SỬA LỖI Ở DÒNG IF NÀY ===
+            // Đổi từ 'PENDING_REVIEW' (backend enum) thành 'pending' (frontend tab key)
+            if (posts && posts.length > 0 && selectedTab === 'pending') { 
+                
+                const postToReview = posts.find(p => p.id === Number(reviewId));
+                if (postToReview) {
+                    onOpenDetail(postToReview); // Mở drawer
+
+                    // Xóa param khỏi URL
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete("reviewPostId");
+                    setSearchParams(newParams, { replace: true });
+                }
+            }
+        }
+
+    // Phải phụ thuộc vào 'posts' (để chạy sau khi API trả về)
+    // và 'selectedTab' (để đảm bảo đúng tab)
+    }, [
+        searchParams, 
+        posts, 
+        selectedTab, 
+        setSearchParams, 
+        onOpenDetail, // Đã stable với useCallback
+        openReports   // Đã stable với useCallback
+    ]);
 
     /* =============== KPI calc =============== */
     const kpi = useMemo(() => {
@@ -339,6 +485,7 @@ export default function AdminPostsMUI() {
                     onHide={hide}
                     onUnhide={unhide}
                     onHardDelete={hardDelete}
+                    onOpenReports={openReports}
                     money={money}
                     fmtDate={fmtDate}
                     setDecision={(payload) => dispatch(setDecision(payload))}
@@ -407,6 +554,48 @@ export default function AdminPostsMUI() {
                     </Stack>
                 }
             />
+
+            <ConfirmDialog
+                open={warningDlg.open}
+                title={`Gửi cảnh báo cho tin #${warningDlg.id}`}
+                confirmText="Gửi"
+                loading={isSendingWarning} // Dùng state loading
+                onClose={closeWarning}
+                onConfirm={confirmSendWarning}
+                confirmDisabled={!warningDlg.message.trim() || warningDlg.message.trim().length < 10}
+                TransitionProps={{
+                    onExited: handleWarningExited
+                }}
+                content={
+                <Stack spacing={1} sx={{ pt: 1 }}>
+                    <Typography>Nhập nội dung bạn muốn gửi cho người đăng:</Typography>
+                    <TextField
+                    autoFocus
+                    multiline
+                    rows={3}
+                    placeholder="Ví dụ: Ảnh của bạn bị mờ, vui lòng cập nhật lại..."
+                    value={warningDlg.message}
+                    onChange={(e) => setWarningDlg((s) => ({ ...s, message: e.target.value }))}
+                    helperText={
+                        warningDlg.message.trim().length < 10
+                        ? "Vui lòng nhập tối thiểu 10 ký tự"
+                        : " "
+                    }
+                    />
+                </Stack>
+                }
+            />
+            <ReportDetailsModal
+                open={reportsModal.open}
+                loading={isLoadingReports || isDismissing || isSendingWarning} 
+                postId={reportsModal.postId}
+                reports={reportsModal.reports}
+                onClose={closeReports}
+                onLockPost={handleLockPost}
+                onDismissReports={handleDismissReports}
+                onSendWarning={handleSendWarning} 
+            />
+            {/* === (Hết bước 5) === */}
         </Box>
     );
 }

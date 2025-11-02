@@ -83,4 +83,13 @@ public class UserEntity extends BaseEntity {
     @Builder.Default
     private Long bonusBalance = 0L;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<PropertyEntity> properties;
+
+    @OneToMany(mappedBy = "reporter", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Report> reportsFiled; // Các báo cáo user này đã gửi
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<NotificationEntity> notifications; // Thông báo của user này
+
 }

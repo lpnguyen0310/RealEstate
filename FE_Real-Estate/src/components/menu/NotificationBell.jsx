@@ -27,6 +27,8 @@ const { Text } = Typography;
 // Hàm helper để map NotificationType sang Icon
 const getIconForType = (type) => {
   switch (type) {
+    case "POST_WARNING":
+      return <WarningOutlined className="text-red-500" />;
     case "ORDER_PENDING":
       return <ClockCircleOutlined className="text-yellow-500" />;
     case "PACKAGE_PURCHASED":
@@ -58,7 +60,7 @@ const TABS = {
 const TAB_TYPES = {
   FINANCE: ["ORDER_PENDING", "PACKAGE_PURCHASED", "NEW_ORDER_PAID"],
   // SỬA DÒNG NÀY: Thêm LISTING_PENDING_USER
-  LISTING: ["LISTING_APPROVED", "LISTING_REJECTED", "NEW_LISTING_PENDING", "LISTING_PENDING_USER"],
+  LISTING: ["LISTING_APPROVED", "LISTING_REJECTED", "NEW_LISTING_PENDING", "LISTING_PENDING_USER", "POST_WARNING"],
   SYSTEM: ["CATALOG_UPDATED", "NEW_USER_REGISTERED"],
 };
 
@@ -175,10 +177,13 @@ export default function NotificationBell() {
                   />
                 }
                 title={
-                  <Text strong={!item.isRead} className="!mb-0">
-                    {item.message}
-                  </Text>
-                }
+                  <Text 
+                    strong={!item.isRead} 
+                    className="!mb-0 whitespace-pre-line" // <<< THÊM CLASS NÀY
+                  >
+                    {item.message}
+                  </Text>
+                }
                 description={
                   <Text type="secondary" className="text-xs">
                     <TimeAgo date={item.createdAt} />

@@ -128,7 +128,12 @@ export default function PostCreateDrawer({
         currentProperty: s.property.currentProperty,
         loadingDetail: s.property.loadingDetail,
     }));
-        const isDraft = (currentProperty?.status || "").toUpperCase() === "DRAFT";
+
+    const upperStatus = (currentProperty?.status || "").toUpperCase();
+
+    const isDraft = upperStatus === "DRAFT";
+    // 3. 'needsResubmit = true' NẾU status là WARNED hoặc REJECTED
+    const needsResubmit = upperStatus === "WARNED" || upperStatus === "REJECTED";
 
     const posting = useSelector((s) => s.property?.creating); // dùng chung cho create/update
 
@@ -310,42 +315,51 @@ export default function PostCreateDrawer({
     }, [isEdit, formData, onContinue]);
 
     /* ===== ACTION: UPDATE (isEdit) ===== */
-    const onUpdate = useCallback(async () => {
-        try {
-            // Map id -> listingType
-            const idToType = {};
-            (listingTypes || []).forEach((x) => (idToType[x.id] = x.listingType));
-            const selectedType =
-                idToType[postTypeId ?? formData.listingTypePolicyId] || formData.listingType || null;
+    const onUpdate = useCallback(async () => {
+        try {
+            // Map id -> listingType
+            const idToType = {};
+            (listingTypes || []).forEach((x) => (idToType[x.id] = x.listingType));
+            const selectedType =
+                idToType[postTypeId ?? formData.listingTypePolicyId] || formData.listingType || null;
 
-            const isVipLike = selectedType === "VIP" || selectedType === "PREMIUM";
-            const isChangingType = selectedType && selectedType !== formData.listingType; // khác với gói hiện tại
-            const leftQty = isVipLike ? (invMap?.[selectedType] ?? 0) : Infinity;
+            const isVipLike = selectedType === "VIP" || selectedType === "PREMIUM";
+            const isChangingType = selectedType && selectedType !== formData.listingType; // khác với gói hiện tại
+            const leftQty = isVipLike ? (invMap?.[selectedType] ?? 0) : Infinity;
 
-            // ❗ Nếu đang CHUYỂN sang VIP/PREMIUM mà hết lượt -> chặn và mở modal
-            if (isVipLike && isChangingType && leftQty <= 0) {
-                setShowPromptEdit(true);
-                return;
-            }
+            // ❗ Nếu đang CHUYỂN sang VIP/PREMIUM mà hết lượt -> chặn và mở modal
+            if (isVipLike && isChangingType && leftQty <= 0) {
+                setShowPromptEdit(true);
+                return;
+            }
 
-            const payload = {
-                ...formData,
-                listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
-            };
-            await dispatch(
-                updatePropertyThunk({
-                    id: editingId,
-                    formData: payload,
-                    listingTypePolicyId: payload.listingTypePolicyId,
-                })
-            ).unwrap();
-            message.success("Cập nhật tin thành công!");
-            onCreated?.();       // refresh list ngoài
-            onClose?.();         // đóng drawer
-        } catch (e) {
-            message.error(e || "Cập nhật tin thất bại");
-        }
-    }, [dispatch, editingId, formData, postTypeId, onCreated, onClose, listingTypes, invMap]);
+            const payload = {
+                ...formData,
+                listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
+            };
+
+            // === 💡 LOGIC MỚI ===
+            // 1. Chỉ set 'submitMode' là "publish" NẾU bài đăng đang bị 'WARNED' hoặc 'REJECTED'
+            //    Nếu là 'PUBLISHED' (Đang đăng), 'submitMode' sẽ là 'undefined',
+            //    backend sẽ tự hiểu là giữ nguyên trạng thái.
+            const submitMode = needsResubmit ? "publish" : undefined;
+
+            await dispatch(
+                updatePropertyThunk({
+                    id: editingId,
+                    formData: payload,
+                    listingTypePolicyId: payload.listingTypePolicyId,
+                    submitMode: submitMode // 👈 Dùng biến điều kiện
+                })
+            ).unwrap();
+            message.success("Cập nhật tin thành công!");
+            onCreated?.();       // refresh list ngoài
+            onClose?.();         // đóng drawer
+        } catch (e) {
+            message.error(e || "Cập nhật tin thất bại");
+        }
+    // === 💡 2. THÊM 'needsResubmit' VÀO DEPENDENCY ARRAY ===
+    }, [dispatch, editingId, formData, postTypeId, onCreated, onClose, listingTypes, invMap, needsResubmit]);
 
 
     const onPublishDraft = useCallback(async () => {

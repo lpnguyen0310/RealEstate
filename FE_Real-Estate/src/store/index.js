@@ -14,6 +14,7 @@ import adminOrderReducer from "./adminOrderSlice";
 
 // Import file API của bạn (đã đúng)
 import { notificationApi } from "@/services/notificationApi";
+import {reportApi} from "@/services/reportApiSlice";
 import { listenerMiddleware } from "./listenerMiddleware";
 
 export const store = configureStore({
@@ -33,11 +34,13 @@ export const store = configureStore({
     
     // 1. THÊM DÒNG NÀY (Reducer):
     // Để Redux biết cách lưu trữ data của notificationApi (cache, loading, error)
-    [notificationApi.reducerPath]: notificationApi.reducer
+    [notificationApi.reducerPath]: notificationApi.reducer,
+    [reportApi.reducerPath]: reportApi.reducer
   },
 
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
       .concat(notificationApi.middleware)
+      .concat(reportApi.middleware)
       .prepend(listenerMiddleware.middleware),
 });

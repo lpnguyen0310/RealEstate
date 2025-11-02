@@ -195,7 +195,19 @@ public class OrderServiceImpl implements OrderService {
                     newItem.setQuantity(0);
                     return newItem;
                 });
-        inventoryItem.setQuantity(inventoryItem.getQuantity() + quantityToAdd);
+
+        int newQuantity = inventoryItem.getQuantity() + quantityToAdd;
+
+        // Ngăn số lượng bị âm
+        if (newQuantity < 0) {
+            log.warn("Thao tác kho (thêm/bớt) cho user {} vật phẩm {} (số lượng {}) sẽ dẫn" +
+                            " đến số dư âm ({}). Đặt số lượng về 0.",
+                    user.getEmail(), itemType, quantityToAdd, newQuantity);
+            inventoryItem.setQuantity(0);
+        } else {
+            inventoryItem.setQuantity(newQuantity);
+        }
+
         inventoryRepository.save(inventoryItem);
     }
 
@@ -357,18 +369,138 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
         log.info("Admin canceled order {}", id);
     }
+    // SỬA ĐỔI HOÀN TOÀN HÀM NÀY
     @Override
     @Transactional
     public void adminRefundOrder(Long id) {
-        // (Giữ nguyên code)
         OrderEntity order = orderRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Đơn hàng không tồn tại: " + id));
-        if (order.getStatus() != OrderStatus.PAID) {
-            throw new IllegalStateException("Chỉ có thể hoàn tiền đơn hàng đã thanh toán. Trạng thái hiện tại: " + order.getStatus());
+
+        UserEntity user = order.getUser();
+
+        if (user == null) {
+            throw new IllegalStateException("Đơn hàng " + id + " không có thông tin người" +
+                    " dùng, không thể hoàn tiền.");
         }
+
+        if (order.getStatus() != OrderStatus.PAID) {
+            throw new IllegalStateException("Chỉ có thể hoàn tiền đơn hàng đã thanh toán." +
+                    " Trạng thái hiện tại: " + order.getStatus());
+        }
+
+        // 1. Cập nhật trạng thái đơn hàng
         order.setStatus(OrderStatus.REFUNDED);
         orderRepository.save(order);
         log.info("Admin refunded order {}", id);
+
+        Long refundAmount = order.getTotal();
+
+        // 2. Xử lý nghiệp vụ hoàn tiền
+        // PHÂN LOẠI: Đơn nạp tiền hay đơn mua gói?
+        if (order.getType() == OrderType.PACKAGE_PURCHASE) {
+            // ---- A. Hoàn tiền đơn MUA GÓI ----
+
+            // 2a. Hoàn tiền vào Main Balance (Store Credit)
+            // Đây là cách đơn giản nhất. Admin hoàn tiền = cộng lại vào số dư chính.
+            user.setMainBalance(user.getMainBalance() + refundAmount);
+            log.info("Đã hoàn {} vào Main Balance cho user {} từ order {}",
+                    refundAmount, user.getEmail(), id);
+
+            // 2b. [QUAN TRỌNG] Trừ lại vật phẩm đã cộng (Reverse inventory)
+            try {
+                for (OrderItemEntity orderItem : order.getItems()) {
+                    // Gọi hàm mới để trừ vật phẩm
+                    debitItemsFromOrderItem(user, orderItem);
+                }
+                log.info("Đã trừ lại vật phẩm trong kho của user cho order {}", id);
+            } catch (Exception e) {
+                log.error("Lỗi nghiêm trọng: Không thể trừ vật phẩm khi hoàn tiền order {}. Lỗi:" +
+                        " {}", id, e.getMessage());
+                // Bạn có thể cân nhắc ném lỗi ở đây để rollback toàn bộ transaction
+                throw new RuntimeException("Lỗi trừ vật phẩm, đã rollback", e);
+            }
+
+        } else if (order.getType() == OrderType.TOP_UP) {
+            // ---- B. Hoàn tiền đơn NẠP TIỀN ----
+            // Đơn nạp tiền đã cộng cả Main và Bonus
+            // Logic hoàn tiền là phải TRỪ đi số tiền đã cộng.
+
+            // 2a. Tính lại bonus đã cộng khi nạp
+            Long originalAmount = order.getTotal();
+            Long bonusCredited = calculateBonus(originalAmount);
+
+            log.info("Order TOP_UP {} đã cộng {} (Main) và {} (Bonus). Bắt đầu trừ lại.",
+                    id, originalAmount, bonusCredited);
+
+            // 2b. Trừ tiền (Ưu tiên trừ bonus trước, main sau)
+            Long currentMain = user.getMainBalance();
+            Long currentBonus = user.getBonusBalance();
+
+            Long bonusToDebit = bonusCredited;
+            Long mainToDebit = originalAmount;
+
+            // Trừ phần bonus trước
+            if (currentBonus >= bonusToDebit) {
+                user.setBonusBalance(currentBonus - bonusToDebit);
+            } else {
+                // Nếu bonus không đủ, trừ hết bonus và trừ phần còn thiếu vào Main
+                log.warn("User {} không đủ Bonus ({}) để trừ {}. Trừ hết Bonus và trừ phần" +
+                        " còn thiếu vào Main.", user.getEmail(), currentBonus, bonusToDebit);
+                long deficit = bonusToDebit - currentBonus;
+                user.setBonusBalance(0L);
+                mainToDebit += deficit; // Tăng phần nợ ở Main
+            }
+
+            // Trừ phần main
+            if (currentMain >= mainToDebit) {
+                user.setMainBalance(currentMain - mainToDebit);
+            } else {
+                // Tình huống nguy hiểm: tài khoản không đủ tiền để hoàn
+                log.error("LỖI HOÀN TIỀN: User {} không đủ Main Balance ({}) để trừ {}. Đặt Main" +
+                        " về 0.", user.getEmail(), currentMain, mainToDebit);
+                user.setMainBalance(0L);
+                // GHI CHÚ: Admin cần được thông báo về trường hợp này
+            }
+        }
+
+        // 3. Lưu lại thông tin user
+        userRepository.save(user);
+
+        // 4. Gửi thông báo cho user
+        try {
+            notificationService.createNotification(
+                    user,
+                    NotificationType.ORDER_REFUNDED, // <-- Bạn cần thêm Enum này
+                    "Đơn hàng #" + order.getId() + " của bạn đã được hoàn tiền. Số tiền "
+                            + refundAmount + " VND đã được xử lý.",
+                    "/dashboard/transactions?order_id=" + order.getId()
+            );
+            log.info("Đã gửi thông báo hoàn tiền cho user {}", user.getEmail());
+        } catch (Exception e) {
+            log.error("!!! Lỗi khi gửi notification (REFUND) cho orderId={}. Lỗi: {}",
+                    id, e.getMessage());
+        }
+    }
+    // HÀM MỚI (Cần thêm vào)
+// Dùng để trừ vật phẩm khi hoàn tiền đơn PACKAGE_PURCHASE
+    private void debitItemsFromOrderItem(UserEntity user, OrderItemEntity orderItem) {
+        if (orderItem.getItemType() == ItemType.SINGLE) {
+            String itemType = orderItem.getListingType().name();
+            int quantityToRemove = -orderItem.getQty(); // Dùng số âm
+            updateUserInventory(user, itemType, quantityToRemove);
+        }
+        else if (orderItem.getItemType() == ItemType.COMBO) {
+            ListingPackage comboPackage = listingPackageRepository.findByCode(orderItem.getProductCode())
+                    .orElseThrow(() -> new IllegalStateException("Không tìm thấy thông tin gói" +
+                            " combo: " + orderItem.getProductCode()));
+
+            for (PackageItem itemInCombo : comboPackage.getItems()) {
+                String itemType = itemInCombo.getListingType().name();
+                // Dùng số âm
+                int quantityToRemove = -(itemInCombo.getQuantity() * orderItem.getQty());
+                updateUserInventory(user, itemType, quantityToRemove);
+            }
+        }
     }
     @Override
     @Transactional

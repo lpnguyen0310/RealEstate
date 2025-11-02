@@ -22,6 +22,9 @@ public class NotificationEntity { // Bạn có thể cho extends BaseEntity nế
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity user; // Liên kết tới UserEntity của bạn
 
+//    @Column(nullable = true)
+//    private String title; // <<< THÊM DÒNG NÀY
+
     @Column(nullable = false)
     private String message; // Nội dung thông báo
 

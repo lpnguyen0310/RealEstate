@@ -1,6 +1,6 @@
 // src/pages/dashboard/posts/PostManagerPage.jsx
 import { Button } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination as SwiperPagination, Autoplay } from "swiper/modules";
@@ -22,6 +22,9 @@ import {
     PostCreateDrawer,
     PostList,
 } from "@/components/dashboard/postmanagement";
+
+import WarningModal from "@/components/dashboard/postmanagement/WarningModal.jsx";
+
 
 const SLIDES = [
     "https://images.unsplash.com/photo-1501183638710-841dd1904471?q=80&w=1400",
@@ -69,6 +72,9 @@ export default function PostManagerPage() {
     const dispatch = useDispatch();
     const { user } = useOutletContext() || {};
     const [searchParams, setSearchParams] = useSearchParams();
+    const [warningModal, setWarningModal] = useState({ open: false, message: "" });
+    const [highlightedId, setHighlightedId] = useState(null);
+    const [scrolledOnce, setScrolledOnce] = useState(false);
 
     const {
         list,
@@ -91,6 +97,15 @@ export default function PostManagerPage() {
 
     // 🆕 state để mở Drawer chi tiết theo ID
     const [editingId, setEditingId] = useState(null);
+
+    const handleOpenWarning = useCallback((message) => {
+        setWarningModal({ open: true, message: message || "" });
+    }, []); // <-- Thêm mảng dependency rỗng []
+
+    // Bọc luôn hàm này cho nhất quán
+    const handleCloseWarning = useCallback(() => {
+        setWarningModal({ open: false, message: "" });
+    }, []); // <-- Thêm mảng dependency rỗng []
 
     /* ========== URL -> STATE ========== */
     useEffect(() => {
@@ -115,6 +130,78 @@ export default function PostManagerPage() {
     useEffect(() => {
         dispatch(fetchMyPropertyCountsThunk());
     }, [dispatch]);
+
+    useEffect(() => {
+        const warnId = searchParams.get("warnedPostId");
+        if (!warnId) return;
+
+        if (list && list.length > 0 && status === 'warned') {
+            const postToWarn = list.find(p => p.id === Number(warnId));
+            if (postToWarn) {
+                handleOpenWarning(postToWarn.latestWarningMessage);
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete("warnedPostId");
+                setSearchParams(newParams, { replace: true });
+            }
+        }
+    }, [searchParams, list, status, setSearchParams, handleOpenWarning]); // 💡 Bổ sung handleOpenWarning vào dependency array
+
+    // src/pages/dashboard/posts/PostManagerPage.jsx
+
+   // src/pages/dashboard/posts/PostManagerPage.jsx
+// Thay thế toàn bộ 3 useEffect liên quan đến highlightedId bằng đoạn này
+
+    useEffect(() => {
+        const viewIdParam = searchParams.get("viewPostId");
+        
+        // Thoát nếu không có param hoặc list chưa load, HOẶC highlight đã được bật
+        if (!viewIdParam || !list || list.length === 0 || highlightedId == viewIdParam) {
+            return;
+        }
+        
+        console.log("--- DEBUG HIGHLIGHT (Tìm và Set) ---");
+
+        const postToView = list.find(p => p.id == viewIdParam);
+
+        if (postToView) {
+            console.log("✅ SUCCESS: Đã tìm thấy postToView. ID:", postToView.id);
+            
+            // 1. Kích hoạt Highlight (VĨNH VIỄN)
+            setHighlightedId(postToView.id);
+
+            // 2. Xóa param khỏi URL ngay lập tức (để không chạy lại)
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete("viewPostId");
+            console.log("⭐ Xóa viewPostId khỏi URL");
+            setSearchParams(newParams, { replace: true });
+
+        } else {
+            console.log("❌ INFO: Không tìm thấy post trong list hiện tại.");
+        }
+        console.log("--- END DEBUG ---");
+
+    // Giữ lại dependencies để đảm bảo logic chạy khi list hoặc URL thay đổi
+    }, [searchParams, list, status, highlightedId, setSearchParams]);
+
+useEffect(() => {
+        // 1. Chỉ chạy khi có ID đang được highlight
+        if (!highlightedId) return;
+
+        console.log("⏳ Bật Timer: Tắt highlight theo thời gian Animation (3.5s)");
+
+        // 2. Set timer để xóa highlight
+        const highlightTimer = setTimeout(() => {
+            console.log("⏲️ Timer Hết: Tắt highlight sau khi Animation kết thúc.");
+            setHighlightedId(null);
+        }, 10000); // Đảm bảo khớp với 3.5s trong CSS
+        
+        // 3. Trả về hàm cleanup
+        return () => {
+            clearTimeout(highlightTimer);
+        };
+
+    // Dependency chỉ còn highlightedId
+    }, [highlightedId]);
 
     /* ========== STATE -> URL ========== */
     const pushUrl = (next = {}) => {
@@ -152,6 +239,11 @@ export default function PostManagerPage() {
         setOpenCreate(false);
         setEditingId(null);
     };
+
+    const handleEndHighlight = useCallback(() => {
+        setHighlightedId(null);
+    }, []);
+    
 
     return (
         <div>
@@ -243,7 +335,13 @@ export default function PostManagerPage() {
                         pushUrl({ size: n, page: 0 });
                     }}
                     // 🆕 truyền callback click item
-                    onItemClick={handleOpenDetail}
+                    onItemClick={(id) => {
+                        handleEndHighlight(); // Tắt highlight trước khi mở Drawer
+                        handleOpenDetail(id);
+                    }}
+                    onHighlightEnd={handleEndHighlight}
+                    onViewWarningClick={handleOpenWarning}
+                    highlightedId={highlightedId}
                 />
             </div>
 
@@ -259,6 +357,11 @@ export default function PostManagerPage() {
                 user={user}
                 editingId={editingId}
                 isEdit={!!editingId}
+            />
+            <WarningModal 
+                open={warningModal.open}
+                onClose={handleCloseWarning}
+                message={warningModal.message}
             />
         </div>
     );

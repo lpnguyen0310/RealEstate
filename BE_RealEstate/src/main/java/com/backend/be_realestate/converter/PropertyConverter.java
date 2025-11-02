@@ -65,6 +65,7 @@ public class PropertyConverter {
         dto.setPostedAt(entity.getPostedAt());
         dto.setExpiresAt(entity.getExpiresAt());
         dto.setFavoriteCount(entity.getFavoriteCount());
+        dto.setLatestWarningMessage(entity.getLatestWarningMessage());
 
         // --- Listing type as String ---
         if (entity.getListingType() != null) {

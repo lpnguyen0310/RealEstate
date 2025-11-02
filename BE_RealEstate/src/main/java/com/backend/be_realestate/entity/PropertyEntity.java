@@ -163,4 +163,14 @@ import java.util.List;
             @Enumerated(EnumType.STRING)
             @Column(name = "listing_type", nullable = false, length = 16)
             private ListingType listingType;
+
+            @Column(name = "report_count", nullable = false)
+            @Builder.Default
+            private Integer reportCount = 0;
+
+            @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+            private List<Report> reports;
+
+            @Column(name = "latest_warning_message", length = 1000)
+            private String latestWarningMessage;
         }

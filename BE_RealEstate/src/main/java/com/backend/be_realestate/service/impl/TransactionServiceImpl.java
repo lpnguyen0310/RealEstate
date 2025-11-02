@@ -61,16 +61,27 @@ public class TransactionServiceImpl implements TransactionService {
 
     // Hàm helper để chuyển đổi Entity sang DTO và định dạng dữ liệu
     private TransactionHistoryDTO convertToDto(TransactionEntity entity) {
-        String shortTransactionCode = entity.getStripePaymentIntentId().length() > 6
-                ? entity.getStripePaymentIntentId().substring(entity.getStripePaymentIntentId().length() - 6)
-                : entity.getStripePaymentIntentId();
+
+        String stripeId = entity.getStripePaymentIntentId(); // Lấy ID ra trước
+        String shortTransactionCode; // Khai báo biến
+
+        // THÊM BƯỚC KIỂM TRA NULL
+        if (stripeId == null || stripeId.isEmpty()) {
+            // Nếu là giao dịch BALANCE (không có stripeId), gán giá trị mặc định
+            shortTransactionCode = "-";
+        } else {
+            // Chỉ chạy logic cắt chuỗi khi stripeId tồn tại
+            shortTransactionCode = stripeId.length() > 6
+                    ? stripeId.substring(stripeId.length() - 6)
+                    : stripeId;
+        }
 
         return TransactionHistoryDTO.builder()
                 .id(String.valueOf(entity.getOrder().getId()))
                 .status(translateStatus(entity.getStatus()))
                 .type(translateType(entity.getType()))
                 .amount(formatAmount(entity.getAmount()))
-                .transactionCode(shortTransactionCode)
+                .transactionCode(shortTransactionCode) // Sử dụng biến đã được xử lý an toàn
                 .reason(entity.getReason() != null ? entity.getReason() : "-")
                 .createdAt(entity.getCreatedAt())
                 .build();
