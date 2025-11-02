@@ -1,27 +1,23 @@
-// src/api/cloudinary.js
+// /src/api/cloudinary.js
 import api from "@/api/axios";
 
 /**
- * Gọi BE xin chữ ký Cloudinary
- * @param {string} folder ví dụ "properties" hoặc `properties/${userId}`
+ * Xin chữ ký upload Cloudinary từ BE
+ * @param {string} folder ví dụ "support/123"
  * @returns {Promise<{timestamp:number, signature:string, apiKey:string, cloudName:string, folder:string}>}
  */
-export async function getUploadSignature(folder = "properties") {
+export async function getUploadSignature(folder = "support") {
     const { data } = await api.post("/cloudinary/sign", { folder });
-    // BE của bạn trả JSON payload trực tiếp => data đã là object cần dùng
     return data;
 }
 
 /**
- * Upload trực tiếp file lên Cloudinary.
- * Dùng axios riêng biệt (absolute URL) để không dính baseURL /api.
- *
+ * Upload 1 file lên Cloudinary với resource_type=auto (ảnh/pdf/office/zip...)
  * @param {File|Blob} file
  * @param {{cloudName:string, apiKey:string, signature:string, timestamp:number, folder:string}} sig
- * @param {(pct:number)=>void} [onProgress]
- * @returns {Promise<object>} kết quả Cloudinary (có secure_url, public_id, ...)
+ * @returns {Promise<object>} { secure_url, public_id, resource_type, bytes, format, width?, height? ... }
  */
-export async function uploadToCloudinary(file, sig, onProgress) {
+export async function uploadToCloudinary(file, sig) {
     const form = new FormData();
     form.append("file", file);
     form.append("api_key", sig.apiKey);
@@ -29,9 +25,9 @@ export async function uploadToCloudinary(file, sig, onProgress) {
     form.append("signature", sig.signature);
     form.append("folder", sig.folder);
 
-    // Dùng fetch (nhẹ, không dính interceptor). Bạn có thể đổi sang axios nếu thích.
+    // quan trọng: auto/upload để Cloudinary nhận diện mọi loại file
     const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
+        `https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`,
         { method: "POST", body: form }
     );
     if (!res.ok) {
@@ -42,19 +38,22 @@ export async function uploadToCloudinary(file, sig, onProgress) {
 }
 
 /**
- * Upload nhiều file tuần tự (có thể custom song song nếu muốn)
+ * Upload nhiều file (tuần tự)
  * @param {File[]} files
  * @param {string} folder
- * @param {(i:number,pct:number)=>void} [onOneProgress]
- * @returns {Promise<{secure_url:string, public_id:string}[]>}
+ * @returns {Promise<Array<{secure_url:string, public_id:string, resource_type:string}>>}
  */
-export async function uploadMany(files = [], folder = "properties", onOneProgress) {
+export async function uploadMany(files = [], folder = "support") {
     if (!files.length) return [];
     const sig = await getUploadSignature(folder);
     const out = [];
     for (let i = 0; i < files.length; i++) {
-        const r = await uploadToCloudinary(files[i], sig, (pct) => onOneProgress?.(i, pct));
-        out.push({ secure_url: r.secure_url, public_id: r.public_id });
+        const r = await uploadToCloudinary(files[i], sig);
+        out.push({
+            secure_url: r.secure_url,
+            public_id: r.public_id,
+            resource_type: r.resource_type,
+        });
     }
     return out;
 }

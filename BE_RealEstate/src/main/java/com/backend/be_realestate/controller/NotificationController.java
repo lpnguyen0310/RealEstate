@@ -24,10 +24,6 @@ public class NotificationController {
     private final NotificationService notificationService;
     private final UserRepository userRepository; // Dùng để lấy thông tin user đang đăng nhập
 
-    /**
-     * API: GET /api/notifications
-     * Lấy danh sách thông báo của user đang đăng nhập.
-     */
     @GetMapping
     public ResponseEntity<List<NotificationDTO>> getUserNotifications(Authentication authentication) {
         UserEntity currentUser = getCurrentUser(authentication);
@@ -41,10 +37,6 @@ public class NotificationController {
         return ResponseEntity.ok(dtos);
     }
 
-    /**
-     * API: GET /api/notifications/unread-count
-     * Lấy số lượng thông báo CHƯA ĐỌC.
-     */
     @GetMapping("/unread-count")
     public ResponseEntity<Long> getUnreadNotificationCount(Authentication authentication) {
         UserEntity currentUser = getCurrentUser(authentication);
@@ -52,10 +44,7 @@ public class NotificationController {
         return ResponseEntity.ok(count);
     }
 
-    /**
-     * API: POST /api/notifications/mark-read/{id}
-     * Đánh dấu 1 thông báo cụ thể là ĐÃ ĐỌC.
-     */
+
     @PostMapping("/mark-read/{id}")
     public ResponseEntity<?> markNotificationAsRead(@PathVariable Long id, Authentication authentication) {
         UserEntity currentUser = getCurrentUser(authentication);

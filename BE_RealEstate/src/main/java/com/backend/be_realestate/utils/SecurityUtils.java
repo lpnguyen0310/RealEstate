@@ -30,4 +30,14 @@ public class SecurityUtils {
         }
         return null;
     }
+
+    public boolean hasAnyRole(Authentication auth, String... roles) {
+        if (auth == null || auth.getAuthorities() == null) return false;
+        var auths = auth.getAuthorities();
+        for (String r : roles) {
+            String roleName = r.startsWith("ROLE_") ? r : "ROLE_" + r;
+            if (auths.stream().anyMatch(a -> roleName.equals(a.getAuthority()))) return true;
+        }
+        return false;
+    }
 }

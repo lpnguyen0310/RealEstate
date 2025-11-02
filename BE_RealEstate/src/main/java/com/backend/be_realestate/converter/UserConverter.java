@@ -56,7 +56,6 @@ public class UserConverter {
         r.setPostsCount(postsCount);
 
         // default fields
-        if (r.getBalance() == null) r.setBalance(0L);
         if (r.getAddress() == null) r.setAddress("");
         if (r.getCreatedAt() == null && e.getCreatedAt()!=null) r.setCreatedAt(e.getCreatedAt().toInstant());
 

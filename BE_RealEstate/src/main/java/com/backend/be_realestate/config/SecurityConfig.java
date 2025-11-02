@@ -45,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**", "/topic/**", "/queue/**").permitAll()
                         .requestMatchers("/api/favorites").permitAll()
                         .requestMatchers("/api/orders/**").permitAll()
+                        .requestMatchers("/api/support/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // bật oauth2 login

@@ -4,6 +4,8 @@ export const ADMIN_MENUS = [
     { to: "/admin/users", text: "Người dùng", icon: "👥" },
     { to: "/admin/orders", text: "Đơn hàng", icon: "🧾" },
     { to: "/admin/posts", text: "Tin đăng", icon: "🏠" },
+    { to: "/admin/support", text: "Hỗ trợ khách hàng", icon: "💬" },
+
     { to: "/admin/finance", text: "Giao dịch", icon: "💳" },
     { to: "/admin/settings", text: "Cài đặt", icon: "⚙️" },
 ];

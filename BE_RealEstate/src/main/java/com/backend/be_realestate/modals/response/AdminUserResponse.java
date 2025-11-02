@@ -19,7 +19,6 @@ public class AdminUserResponse {
     private String role;          // rút gọn: 1 role đại diện (hoặc cao nhất)
     private String status;        // "ACTIVE" | "LOCKED" (từ isActive)
     private Integer postsCount;   // tạm thời 0 nếu chưa có
-    private Long balance;         // tạm thời 0 nếu chưa có ví
     private Instant createdAt;    // từ BaseEntity.getCreatedAt()
     private String address;       // tạm thời null / ""
     private Boolean deleteRequested;

@@ -13,11 +13,6 @@ public class RecommendationSpec {
         return (root, cq, cb) -> cb.equal(root.get("status"), PropertyStatus.PUBLISHED);
     }
 
-    public static Specification<PropertyEntity> inDistrictIds(List<Long> districtIds) {
-        if (districtIds == null || districtIds.isEmpty()) return null;
-        return (root, cq, cb) -> root.get("district").get("id").in(districtIds);
-    }
-
     public static Specification<PropertyEntity> inPropertyTypes(List<PropertyType> types) {
         if (types == null || types.isEmpty()) return null;
         return (root, cq, cb) -> root.get("propertyType").in(types);

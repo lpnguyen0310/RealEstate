@@ -6,6 +6,8 @@ import Sidebar from "@/components/Dashboard/Sidebar";
 import DashboardHeader from "@/components/Dashboard/DashboardHeader";
 import { logoutThunk, getProfileThunk } from "@/store/authSlice";
 import AIChatWidget from "../components/aiChatBox/AIChatWidget";
+import ChatHub from "@/components/chathub/ChatHub";
+
 export default function DashboardLayout() {
   const nav = useNavigate();
   const dispatch = useDispatch();
@@ -42,7 +44,7 @@ export default function DashboardLayout() {
         <main className="flex-1 overflow-y-auto px-6 pb-6">
           <Outlet context={{ user, refetchUser }} />
 
-          <AIChatWidget user={user} size="md" />
+          <ChatHub user={user} size="md" />
 
         </main>
       </div>
