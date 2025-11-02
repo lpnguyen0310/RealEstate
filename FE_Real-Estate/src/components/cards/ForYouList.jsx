@@ -1,3 +1,4 @@
+// src/components/ForYouList.jsx
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { DownOutlined, UpOutlined } from "@ant-design/icons";
@@ -6,51 +7,50 @@ import PropertyCard from "./PropertyCard";
 import PropertyCardSkeleton from "./skeletion/PropertyCardSkeleton";
 import { fetchPropertiesThunk } from "@/store/propertySlice";
 
-const MIN_SKELETON_MS = 2000; // giữ skeleton ít nhất 2s
+const MIN_SKELETON_MS = 2000; // Giữ skeleton tối thiểu 2s
 
 export default function ForYouList() {
     const dispatch = useDispatch();
 
-    // --- Lấy dữ liệu từ Redux ---
-    const { forYouList, forYouError, forYouSource } = useSelector((s) => s.property);
+    // --- Redux state ---
+    const { forYouList, forYouError, forYouSource, forYouLoading } = useSelector(
+        (s) => s.property
+    );
     const authUser = useSelector((s) => s.auth.user);
     const userId = authUser?.id || authUser?.userId || null;
 
-    // --- State UI ---
+    // --- UI State ---
     const INITIAL = 8;
     const [expanded, setExpanded] = useState(false);
-    const [didFetchPopular, setDidFetchPopular] = useState(false);
     const [fetchedForUserId, setFetchedForUserId] = useState(null);
     const [minDelayDone, setMinDelayDone] = useState(false);
     const timerRef = useRef(null);
 
-    // --- Giữ skeleton ít nhất MIN_SKELETON_MS ---
+    // Giữ skeleton ít nhất MIN_SKELETON_MS
     useEffect(() => {
         timerRef.current = setTimeout(() => setMinDelayDone(true), MIN_SKELETON_MS);
         return () => clearTimeout(timerRef.current);
     }, []);
 
-    // --- Gọi API fetch dữ liệu ---
+    // Gọi API khi có userId
     useEffect(() => {
         if (userId && fetchedForUserId !== userId) {
-            // Nếu có user → gọi personalized
             dispatch(fetchPropertiesThunk({ type: "forYou", userId, limit: 24 }));
             setFetchedForUserId(userId);
-        } else if (!userId && !didFetchPopular) {
-            // Nếu chưa đăng nhập → chỉ fetch phổ biến
-            dispatch(fetchPropertiesThunk({ type: "popular", limit: 8 }));
-            setDidFetchPopular(true);
         }
-    }, [dispatch, userId, didFetchPopular, fetchedForUserId]);
+    }, [dispatch, userId, fetchedForUserId]);
 
-    // --- Xử lý hiển thị dữ liệu ---
+    // --- Xử lý hiển thị ---
     const hasData = Array.isArray(forYouList) && forYouList.length > 0;
-    const visible = useMemo(
+    const showSkeleton =
+        forYouLoading || (!hasData && !forYouError && !minDelayDone);
+
+    const visibleList = useMemo(
         () => (expanded ? forYouList : forYouList.slice(0, INITIAL)),
         [expanded, forYouList]
     );
 
-    // --- Nếu chưa đăng nhập → không hiển thị skeleton ---
+    // --- Nếu chưa đăng nhập ---
     if (!userId) {
         return (
             <section className="mt-10 text-center text-gray-600">
@@ -62,9 +62,7 @@ export default function ForYouList() {
         );
     }
 
-    // --- Skeleton chỉ hiển thị khi chưa có data HOẶC chưa hết min delay ---
-    const showSkeleton = (!hasData && !forYouError) || !minDelayDone;
-
+    // --- Render ---
     return (
         <section className="mt-10">
             {/* HEADER */}
@@ -75,7 +73,8 @@ export default function ForYouList() {
                     </h2>
                     {forYouSource && hasData && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                            Nguồn: {forYouSource === "personalized" ? "Cá nhân hóa" : "Phổ biến"}
+                            Nguồn:{" "}
+                            {forYouSource === "personalized" ? "Cá nhân hóa" : "Phổ biến"}
                         </span>
                     )}
                 </div>
@@ -94,25 +93,39 @@ export default function ForYouList() {
                 </div>
             )}
 
-            {/* LIST */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1">
-                {(showSkeleton ? Array.from({ length: INITIAL }) : visible).map((item, i) =>
-                    showSkeleton ? (
-                        <PropertyCardSkeleton key={`sk-${i}`} />
-                    ) : (
-                        <Link
-                            key={item.id}
-                            to={`/real-estate/${item.id}`}
-                            className="block group"
-                        >
-                            <PropertyCard item={item} />
-                        </Link>
-                    )
-                )}
-            </div>
+            {/* KHÔNG CÓ GỢI Ý */}
+            {!forYouLoading && !hasData && !forYouError && minDelayDone && (
+                <div className="text-center text-gray-500 py-10">
+                    Chưa có gợi ý phù hợp — hãy lưu vài tin yêu thích để hệ thống học thói
+                    quen của bạn 💡
+                </div>
+            )}
 
-            {/* EXPAND BUTTON */}
-            {!showSkeleton && forYouList.length > INITIAL && (
+            {/* DANH SÁCH */}
+            {showSkeleton ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1">
+                    {Array.from({ length: INITIAL }).map((_, i) => (
+                        <PropertyCardSkeleton key={`sk-${i}`} />
+                    ))}
+                </div>
+            ) : (
+                hasData && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1">
+                        {visibleList.map((item) => (
+                            <Link
+                                key={item.id}
+                                to={`/real-estate/${item.id}`}
+                                className="block group"
+                            >
+                                <PropertyCard item={item} />
+                            </Link>
+                        ))}
+                    </div>
+                )
+            )}
+
+            {/* NÚT MỞ RỘNG */}
+            {hasData && forYouList.length > INITIAL && (
                 <div className="mt-6 flex justify-center">
                     <button
                         type="button"

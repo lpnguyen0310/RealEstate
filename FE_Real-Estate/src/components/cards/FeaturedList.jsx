@@ -34,7 +34,7 @@ export default function SimilarNews() {
         size: 8,
         status: "PUBLISHED",    
         ensurePublished: true,     
-        sort: "publishedAt,DESC",  
+        sort: "postedAt,DESC",  
       })
     );
   }, [dispatch]);

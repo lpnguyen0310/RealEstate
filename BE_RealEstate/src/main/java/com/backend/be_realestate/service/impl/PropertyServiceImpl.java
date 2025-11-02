@@ -44,6 +44,8 @@ import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.springframework.data.domain.Sort.Direction.DESC;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -68,7 +70,6 @@ public class PropertyServiceImpl implements IPropertyService {
 
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String TZ_OFFSET = "+07:00";
-    private static final Logger log = LoggerFactory.getLogger(PropertyServiceImpl.class);
 
     /* =========================================================
      * PUBLIC LIST / SEARCH (HOME)
@@ -438,77 +439,152 @@ public class PropertyServiceImpl implements IPropertyService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<PropertyCardDTO> getRecommendations(Long userId, int limit) {
+        public List<PropertyCardDTO> getRecommendations(Long userId, int limit) {
+        log.info("[Reco] userId={}, limit={}", userId, limit);
+
+        // 1) Các tin đã lưu + loại BĐS ưa thích
         List<Long> savedIds = savedPropertyRepository.findPropertyIdsByUser(userId);
+        log.info("[Reco] savedIds={}", savedIds);
 
-        // BỎ DISTRICT: chỉ giữ loại BĐS ưa thích
         List<PropertyType> favTypes = savedPropertyRepository.topPropertyTypes(userId).stream()
-                .map(r -> (PropertyType) r[0]).limit(3).toList();
+                .map(r -> (PropertyType) r[0])  // r[0] là PropertyType
+                .limit(3)
+                .toList();
+        log.info("[Reco] favTypes={}", favTypes);
 
-        // Thống kê giá & diện tích từ các tin đã lưu
-        Double avgPrice = null, stdPrice = null, avgArea = null, stdArea = null;
-        Object[] stats = savedPropertyRepository.priceAreaStats(userId);
-        if (stats != null && stats.length == 4) {
-            avgPrice = toD(stats[0]); stdPrice = toD(stats[1]);
-            avgArea  = toD(stats[2]); stdArea  = toD(stats[3]);
+        // 2) Lấy min/max price & min/max area từ các tin đã lưu
+        Double minPrice = null, maxPrice = null;
+        Float  minArea  = null, maxArea  = null;
+
+        List<Object[]> rows = savedPropertyRepository.priceAreaMinMax(userId);
+        if (rows != null && !rows.isEmpty()) {
+            Object[] r = rows.get(0);
+            if (r != null && r.length == 4) {
+                minPrice = toD(r[0]);
+                maxPrice = toD(r[1]);
+                Double minAreaD = toD(r[2]);
+                Double maxAreaD = toD(r[3]);
+                minArea = minAreaD == null ? null : minAreaD.floatValue();
+                maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
+            }
+        }
+        log.info("[Reco] min/max: price[{}, {}], area[{}, {}]", minPrice, maxPrice, minArea, maxArea);
+
+        // 3) Kiểm tra "tín hiệu" — chỉ cần 1 trong 2 hợp lệ (priceOk || areaOk)
+        boolean priceOk = (minPrice != null && maxPrice != null && minPrice > 0 && maxPrice > 0 && minPrice <= maxPrice);
+        boolean areaOk  = (minArea  != null && maxArea  != null && minArea  > 0 && maxArea  > 0  && minArea  <= maxArea);
+
+        if (!(priceOk || areaOk)) {
+            log.info("[Reco] noSignal (neither price nor area valid) → return empty list");
+            return Collections.emptyList();
         }
 
-        boolean noSignal =
-                favTypes.isEmpty()
-                        && (avgPrice == null || avgPrice <= 0)
-                        && (avgArea  == null || avgArea  <= 0);
-
-        if (noSignal) {
-            return propertyRepository.findPopular(PageRequest.of(0, limit)).stream()
-                    .map(propertyMapper::toPropertyCardDTO).toList();
-        }
-
-        // ƯU TIÊN GIÁ: tính price band trước
-        Double priceFrom = null, priceTo = null;
-        if (avgPrice != null && avgPrice > 0) {
-            double band = Math.max(n0(stdPrice), avgPrice * 0.2);
-            priceFrom = Math.max(0, avgPrice - band);
-            priceTo   = avgPrice + band;
-        }
-
-        // Diện tích band sau
-        Float areaFrom = null, areaTo = null;
-        if (avgArea != null && avgArea > 0) {
-            double band = Math.max(n0(stdArea), avgArea * 0.2);
-            areaFrom = (float) Math.max(0, avgArea - band);
-            areaTo   = (float) (avgArea + band);
-        }
-
-        // Lọc: status → PRICE → AREA → TYPE → NOT IN savedIds
+        // 4) Build specification: CHỈ CẦN 1 trong 2 (price OR area)
         Specification<PropertyEntity> spec = Specification.where(RecommendationSpec.statusPublished());
-        spec = and(spec, RecommendationSpec.priceBetween(priceFrom, priceTo));  // Ưu tiên giá trước
-        spec = and(spec, RecommendationSpec.areaBetween(areaFrom, areaTo));
-        spec = and(spec, RecommendationSpec.inPropertyTypes(favTypes));
-        spec = and(spec, RecommendationSpec.notInIds(savedIds));
 
+        if (!favTypes.isEmpty()) {
+            spec = spec.and(RecommendationSpec.inPropertyTypes(favTypes));
+        }
+        if (!savedIds.isEmpty()) {
+            spec = spec.and(RecommendationSpec.notInIds(savedIds));
+        }
+
+        Specification<PropertyEntity> priceSpec = null;
+        Specification<PropertyEntity> areaSpec  = null;
+
+        if (priceOk) {
+            priceSpec = RecommendationSpec.priceBetween(minPrice, maxPrice);
+            // Hoặc siết biên trên bằng exclusive:
+            // priceSpec = RecommendationSpec.priceBetweenExclusive(minPrice, maxPrice);
+        }
+        if (areaOk) {
+            areaSpec = RecommendationSpec.areaBetween(minArea, maxArea);
+            // Hoặc exclusive:
+            // areaSpec = RecommendationSpec.areaBetweenExclusive(minArea, maxArea);
+        }
+
+        Specification<PropertyEntity> priceOrArea = RecommendationSpec.orSafe(priceSpec, areaSpec);
+        spec = spec.and(priceOrArea);
+
+        // 5) Lấy ứng viên (ưu tiên bài mới)
         int pageSize = Math.max(limit * 3, 24);
         List<PropertyEntity> candidates = propertyRepository
-                .findAll(spec, PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "postedAt")))
+                .findAll(spec, PageRequest.of(0, pageSize, Sort.by(DESC, "postedAt")))
                 .getContent();
 
+        log.info("[Reco] candidates={}", candidates.stream().map(PropertyEntity::getId).toList());
         if (candidates.isEmpty()) {
-            return propertyRepository.findPopular(PageRequest.of(0, limit)).stream()
-                    .map(propertyMapper::toPropertyCardDTO).toList();
+            log.info("[Reco] empty candidates → return empty list");
+            return Collections.emptyList();
         }
 
-        final double pAvg = avgPrice != null ? avgPrice : 0d;
-        final double aAvg = avgArea  != null ? avgArea  : 0d;
+        // 6) Chấm điểm trong phạm vi đã lọc (ưu tiên gần median giá/diện tích)
+        final double priceCenter = priceOk ? median(minPrice, maxPrice) : 0d;
+        final double areaCenter  = areaOk  ? median(
+                minArea  == null ? null : minArea.doubleValue(),
+                maxArea  == null ? null : maxArea.doubleValue()
+        ) : 0d;
 
-        // Xếp hạng: ưu tiên sát giá trung bình, rồi đến diện tích, type và độ mới
         List<PropertyEntity> ranked = candidates.stream()
                 .sorted((x, y) -> Double.compare(
-                        score(y, /*favTypes*/ favTypes, pAvg, aAvg),
-                        score(x, /*favTypes*/ favTypes, pAvg, aAvg)
+                        scoreRangeAware(y, favTypes, priceCenter, areaCenter),
+                        scoreRangeAware(x, favTypes, priceCenter, areaCenter)
                 ))
                 .limit(limit)
                 .toList();
 
+        log.info("[Reco] ranked={}", ranked.stream().map(PropertyEntity::getId).toList());
         return ranked.stream().map(propertyMapper::toPropertyCardDTO).toList();
+    }
+    private double scoreRangeAware(PropertyEntity p,
+                                   List<PropertyType> favTypes,
+                                   double priceCenter,
+                                   double areaCenter) {
+        double s = 0.0;
+
+        // (1) GIÁ — ưu tiên gần "tâm" dải (median)
+        if (priceCenter > 0 && p.getPrice() != null && p.getPrice() > 0) {
+            double denom = Math.max(1d, priceCenter * 0.25);   // hẹp hơn để sát tâm hơn
+            double close = Math.max(0, 1 - Math.abs(p.getPrice() - priceCenter) / denom);
+            s += close * 2.4;
+        }
+
+        // (2) DIỆN TÍCH — ưu tiên gần "tâm" dải
+        if (areaCenter > 0 && p.getArea() > 0) {
+            double denom = Math.max(1d, areaCenter * 0.25);
+            double close = Math.max(0, 1 - Math.abs(p.getArea() - areaCenter) / denom);
+            s += close * 1.2;
+        }
+
+        // (3) Loại BĐS ưa thích
+        if (p.getPropertyType() != null && favTypes != null && favTypes.contains(p.getPropertyType())) {
+            s += 0.6;
+        }
+
+        // (4) Listing Type
+        if (p.getListingType() != null) {
+            switch (p.getListingType()) {
+                case VIP     -> s += 0.8;
+                case PREMIUM -> s += 1.0;
+                default -> {}
+            }
+        }
+
+        // (5) Độ mới
+        if (p.getPostedAt() != null) {
+            long days = Math.max(0, Duration.between(p.getPostedAt().toInstant(), Instant.now()).toDays());
+            double recency = Math.max(0, 1 - (days / 30.0));
+            s += recency * 0.2;
+        }
+
+        return s;
+    }
+
+    private static double median(Double a, Double b) {
+        if (a == null && b == null) return 0d;
+        if (a == null) return b;
+        if (b == null) return a;
+        return (a + b) / 2.0;
     }
 
     /* =========================================================
@@ -600,10 +676,10 @@ public class PropertyServiceImpl implements IPropertyService {
     private static Specification<PropertyEntity> and(Specification<PropertyEntity> base, Specification<PropertyEntity> next) {
         return next == null ? base : base.and(next);
     }
-    private static Double toD(Object o) {
-        if (o == null) return null;
-        if (o instanceof Number n) return n.doubleValue();
-        try { return Double.parseDouble(o.toString()); } catch (Exception e) { return null; }
+    private static Double toD(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.doubleValue();
+        try { return Double.parseDouble(String.valueOf(v)); } catch (Exception e) { return null; }
     }
     private static double n0(Double d) { return d == null ? 0d : d; }
 
