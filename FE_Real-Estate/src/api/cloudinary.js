@@ -7,7 +7,11 @@ import api from "@/api/axios";
  * @returns {Promise<{timestamp:number, signature:string, apiKey:string, cloudName:string, folder:string}>}
  */
 export async function getUploadSignature(folder = "support") {
-    const { data } = await api.post("/cloudinary/sign", { folder });
+    const { data } = await api.post("/cloudinary/sign", {
+        folder,
+        use_filename: "true",
+        unique_filename: "false",
+    });
     return data;
 }
 
@@ -24,7 +28,9 @@ export async function uploadToCloudinary(file, sig) {
     form.append("timestamp", sig.timestamp);
     form.append("signature", sig.signature);
     form.append("folder", sig.folder);
-
+    form.append("use_filename", sig.use_filename);
+    form.append("unique_filename", sig.unique_filename);
+    
     // quan trọng: auto/upload để Cloudinary nhận diện mọi loại file
     const res = await fetch(
         `https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`,
@@ -45,7 +51,10 @@ export async function uploadToCloudinary(file, sig) {
  */
 export async function uploadMany(files = [], folder = "support") {
     if (!files.length) return [];
-    const sig = await getUploadSignature(folder);
+    const sig = await getUploadSignature(folder, {
+        use_filename: "true",
+        unique_filename: "false",
+    });
     const out = [];
     for (let i = 0; i < files.length; i++) {
         const r = await uploadToCloudinary(files[i], sig);

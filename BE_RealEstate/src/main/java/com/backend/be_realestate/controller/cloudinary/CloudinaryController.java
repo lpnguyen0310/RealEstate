@@ -30,7 +30,13 @@ public class CloudinaryController {
         Map<String, Object> params = new HashMap<>();
         params.put("timestamp", timestamp);
         params.put("folder", folder);
-        // có thể ép thêm eager/context/tags/public_id nếu muốn
+
+        if (body != null) {
+            if (body.get("use_filename") != null)
+                params.put("use_filename", String.valueOf(body.get("use_filename")));
+            if (body.get("unique_filename") != null)
+                params.put("unique_filename", String.valueOf(body.get("unique_filename")));
+        }
 
         String signature = cloudinary.apiSignRequest(params, cloudinary.config.apiSecret);
 
@@ -40,6 +46,7 @@ public class CloudinaryController {
         res.put("apiKey", cloudinary.config.apiKey);
         res.put("cloudName", cloudinary.config.cloudName);
         res.put("folder", folder);
+        res.putAll(params); // trả kèm để FE append đúng tham số đã ký
         return res;
     }
 }
