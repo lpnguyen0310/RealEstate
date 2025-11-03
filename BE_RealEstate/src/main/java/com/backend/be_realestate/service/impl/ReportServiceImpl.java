@@ -242,6 +242,52 @@ public class ReportServiceImpl implements ReportService {
         log.info("Đã reset reportCount về 0 cho bài đăng ID: {}", postId);
     }
 
+    @Override
+    @Transactional
+    public void deleteSelectedReports(Long postId, List<Long> reportIds) {
+        log.info("Admin đang xóa {} báo cáo đã chọn cho bài đăng ID: {}", reportIds.size(), postId);
+
+        if (reportIds.isEmpty()) {
+            log.warn("Không có báo cáo nào được chọn để xóa cho bài đăng ID: {}", postId);
+            return;
+        }
+
+        // 1. TÌM VÀ KHÓA (LOCK) BÀI ĐĂNG
+        PropertyEntity property = propertyRepository.findWithLockById(postId)
+                .orElseThrow(() -> new RuntimeException("Property not found with id: " + postId));
+
+        // 2. LOGIC CHÍNH: XÓA CÁC BÁO CÁO ĐƯỢC CHỌN
+
+        // Tạo danh sách các Report Object từ các ID
+        List<Report> reportsToDelete = reportRepository.findAllById(reportIds);
+
+        // Kiểm tra xem tất cả report có thuộc về post này không (Phòng thủ)
+        reportsToDelete.forEach(report -> {
+            if (!report.getProperty().getId().equals(postId)) {
+                log.error("Report ID: {} không thuộc về Post ID: {}", report.getId(), postId);
+                throw new RuntimeException("Report ID mismatch");
+            }
+        });
+
+        // Thực hiện xóa (Do có Cascade, các ảnh minh chứng cũng sẽ bị xóa)
+        reportRepository.deleteAll(reportsToDelete);
+        log.info("Đã xóa thành công {} báo cáo.", reportsToDelete.size());
+
+        // 3. CẬP NHẬT LẠI BIẾN ĐẾM BÁO CÁO (reportCount)
+        // Cách 1: Đếm lại (an toàn nhất)
+        int remainingReportsCount = reportRepository.countByProperty_Id(postId);
+
+        // Cách 2: Trừ đi số lượng đã xóa (hiệu năng tốt hơn)
+        // int remainingReportsCount = property.getReportCount() - reportsToDelete.size();
+
+        property.setReportCount(remainingReportsCount);
+
+        // 4. LƯU LẠI BÀI ĐĂNG (Cập nhật reportCount)
+        propertyRepository.save(property);
+
+        log.info("Đã cập nhật reportCount mới ({}) cho bài đăng ID: {}", remainingReportsCount, postId);
+    }
+
     // Hàm helper (hàm nội bộ) để map
     private ReportDetailDTO mapToReportDetailDTO(Report report) {
         return ReportDetailDTO.builder()

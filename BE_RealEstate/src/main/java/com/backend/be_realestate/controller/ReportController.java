@@ -73,10 +73,14 @@ public class ReportController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/dismiss/post/{postId}")
-    @PreAuthorize("hasRole('ADMIN')") // Dùng hasRole như bạn đã sửa
-    public ResponseEntity<Void> dismissReports(@PathVariable Long postId) {
-        reportService.dismissReportsForPost(postId);
+    @DeleteMapping("/delete-selected/post/{postId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteSelectedReports(
+            @PathVariable Long postId,
+            // Dùng @RequestBody List<Long> để nhận danh sách report IDs từ FE
+            @RequestBody List<Long> reportIds
+    ) {
+        reportService.deleteSelectedReports(postId, reportIds);
         return ResponseEntity.ok().build(); // Trả về 200 OK
     }
 }

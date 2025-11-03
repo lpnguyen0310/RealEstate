@@ -19,4 +19,5 @@ public interface ReportService {
     List<ReportDetailDTO> getReportsForPost(Long postId);
     void sendWarningToPostOwner(Long postId, String message, UserEntity adminUser);
     void dismissReportsForPost(Long postId);
+    void deleteSelectedReports(Long postId, List<Long> reportIds);
 }

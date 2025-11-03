@@ -36,7 +36,7 @@ import { useSearchParams } from "react-router-dom";
 import ReportDetailsModal from "@/components/admidashboard/post/ReportDetailsModal";
 import { 
   useLazyGetReportsForPostQuery, 
-  useDismissReportsMutation,
+  useDeleteSelectedReportsMutation,
   useSendWarningMutation // <<< IMPORT
 } from "@/services/reportApiSlice";
 
@@ -260,8 +260,8 @@ export default function AdminPostsMUI() {
         [dispatch]
     );
 
+    const [deleteReports, { isLoading: isDeletingReports }] = useDeleteSelectedReportsMutation();
     const [triggerGetReports, { isLoading: isLoadingReports }] = useLazyGetReportsForPostQuery();
-    const [dismissReports, { isLoading: isDismissing }] = useDismissReportsMutation();
     const [sendWarning, { isLoading: isSendingWarning }] = useSendWarningMutation(); // <<< GỌI HOOK
 
     const [reportsModal, setReportsModal] = useState({ 
@@ -307,13 +307,31 @@ export default function AdminPostsMUI() {
 
     }, [reject, closeReports]);
 
-    const handleDismissReports = useCallback((postId) => {
-        console.log("Admin yêu cầu bỏ qua báo cáo cho bài:", postId);
-        // TODO:
-        // 1. Bạn nên gọi 1 API mới (ví dụ: POST /api/admin/reports/dismiss)
-        //    để đánh dấu các báo cáo này là "Đã xem"
-        //    hoặc reset `reportCount` về 0.
-    }, []);
+    const handleDeleteReports = useCallback(async (postId, reportIds) => {
+        console.log(`Admin yêu cầu xóa ${reportIds.length} báo cáo cho bài: ${postId}`);
+        
+        try {
+            // 1. Gọi API XÓA
+            await deleteReports({ postId, reportIds }).unwrap();
+            
+            // 2. (Tùy chọn: Hiển thị thông báo thành công)
+            // 3. Tự động đóng modal (Hàm onLockPost/onSendWarning đã làm điều này, nhưng 
+            //    với hàm này thì nên để ReportDetailsModal tự đóng qua onClose nếu cần)
+            
+            // 4. Reload danh sách Posts & Counts để cập nhật `reportCount` (nếu cần)
+            await dispatch(fetchCountsThunk());
+            await dispatch(fetchPostsThunk());
+            
+        } catch (err) {
+            console.error("Xóa báo cáo thất bại:", err);
+            // (Hiển thị message.error)
+        }
+        
+        // Lưu ý: Hàm này được gọi từ ReportDetailsModal, modal này sẽ tự đóng sau khi gọi
+        // hoặc bạn có thể gọi closeReports() ở đây
+        closeReports(); 
+        
+    }, [deleteReports, dispatch, closeReports]);
 
     const handleSendWarning = useCallback((postId) => {
         // Đóng modal chi tiết, mở modal nhập cảnh báo
@@ -587,12 +605,12 @@ export default function AdminPostsMUI() {
             />
             <ReportDetailsModal
                 open={reportsModal.open}
-                loading={isLoadingReports || isDismissing || isSendingWarning} 
+                loading={isLoadingReports || isDeletingReports || isSendingWarning}
                 postId={reportsModal.postId}
                 reports={reportsModal.reports}
                 onClose={closeReports}
                 onLockPost={handleLockPost}
-                onDismissReports={handleDismissReports}
+                onDeleteReports={handleDeleteReports}
                 onSendWarning={handleSendWarning} 
             />
             {/* === (Hết bước 5) === */}
