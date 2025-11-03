@@ -56,3 +56,4 @@
     transform: translateX(100%);
   }
 }
+@keyframes highlight-fade { 0% { background-color: rgba(247, 144, 9, 0.3); box-shadow: 0 0 16px rgba(247, 144, 9, 0.5); } 70% { background-color: rgba(247, 144, 9, 0.05); box-shadow: 0 0 8px rgba(247, 144, 9, 0.1); } 100% { background-color: transparent; box-shadow: none; } } .post-highlight-animation { animation: highlight-fade 10s ease-out; /* THÊM VIỀN ĐỂ NỔI BẬT */ border: 2px solid #f79009 !important; border-radius: 16px !important; position: relative; z-index: 10; }

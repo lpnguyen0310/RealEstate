@@ -61,4 +61,6 @@ public class PropertyDTO {
     private Long favoriteCount;
     private List<PropertyAuditDTO> audit; // lịch sử audit để Drawer hiển thị
     private String rejectReason;          // lấy từ audit REJECTED gần nhất
+    private int reportCount;
+    private String LatestWarningMessage;
 }

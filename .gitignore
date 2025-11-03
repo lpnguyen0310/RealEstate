@@ -1,3 +1,4 @@
 .env
 **/.env
 .env.*
+BE_RealEstate/src/main/resources/application.properties

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Tag, Tooltip, Dropdown, Modal } from "antd"; // thêm Dropdown, Modal
+import { Tag, Tooltip, Dropdown, Modal, Button, Space } from "antd"; // thêm Dropdown, Modal
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination as SwiperPagination } from "swiper/modules";
 import "swiper/css";
@@ -27,6 +27,7 @@ const STATUS_STYLE = {
   expired: { label: "Hết Hạn", cls: "bg-zinc-50   border-zinc-200   text-[#3f3f46]" },
   expiringSoon: { label: "Sắp Hết Hạn", cls: "bg-orange-50 border-orange-200 text-[#9a3412]" },
   rejected: { label: "Bị Từ Chối", cls: "bg-red-50    border-red-200    text-[#b42318]" },
+  warned: { label: "Cần Chỉnh Sửa", cls: "bg-yellow-100 border-yellow-300 text-yellow-700" },
 };
 const getStatusStyle = (key) => STATUS_STYLE[key] ?? STATUS_STYLE.draft;
 
@@ -35,6 +36,8 @@ export default function PostCard({
   onOpenDetail = () => { },
   onConfirmSuccess = (id) => console.log("confirm success:", id),
   onHidePost = (id) => console.log("hide post:", id),
+  onViewWarning = () => { },
+  isHighlighted = false,
 }) {
   const images = useMemo(() => {
     const arr = (post?.images && post.images.length ? post.images : post?.imageUrls) || [];
@@ -73,11 +76,9 @@ export default function PostCard({
 
   const dispatch = useDispatch();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { favoriteUsers, isLoadingFavorites, errorFavorites } = useSelector((s) => ({
-    favoriteUsers: s.property.currentFavoriteUsers,
-    isLoadingFavorites: s.property.loadingFavorites,
-    errorFavorites: s.property.errorFavorites,
-  }));
+  const favoriteUsers = useSelector((s) => s.property.currentFavoriteUsers);
+  const isLoadingFavorites = useSelector((s) => s.property.loadingFavorites);
+  const errorFavorites = useSelector((s) => s.property.errorFavorites);
 
   const handleShowFavorites = (e) => {
     e.stopPropagation();
@@ -130,10 +131,30 @@ export default function PostCard({
     },
   ];
 
+  const cardRef = useRef(null);
+
+  // 💡 [THÊM MỚI] Thêm useEffect để scroll khi được highlight
+  useEffect(() => {
+    // Chỉ chạy khi isHighlighted là true VÀ ref đã được gắn
+    if (isHighlighted && cardRef.current) {
+      console.log(`✅ PostCard [${post.id}]: Đang scroll tới...`);
+      cardRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [isHighlighted, post.id]); // Phụ thuộc vào isHighlighted
+
   return (
     <>
       <div
-        className="relative rounded-2xl bg-[#f2f6fd] p-3 border border-[#e6eefb] shadow-[0_14px_36px_rgba(13,47,97,0.08)] cursor-pointer"
+        ref={cardRef}
+        id={`post-item-${post.id}`} 
+        className={`
+            relative rounded-2xl bg-[#f2f6fd] p-3 border border-[#e6eefb] 
+            shadow-[0_14px_36px_rgba(13,47,97,0.08)] cursor-pointer
+            ${isHighlighted ? 'post-highlight-animation' : ''}
+        `}
         onClick={handleCardClick}
         role="button"
         tabIndex={0}
@@ -214,8 +235,36 @@ export default function PostCard({
               <div className="grid grid-cols-2 gap-y-3 text-[#506285]">
                 <div className="flex items-center gap-2"><span aria-hidden="true">🗂️</span><span>Tình trạng tin đăng</span></div>
                 {(() => {
-                  const stKey = post?.statusKey;
+                  const stKey = post?.statusKey || "draft";
+                  const isWarned = stKey === 'warned';
                   const { label, cls } = getStatusStyle(stKey);
+
+                  if (isWarned) {
+                    // NẾU BỊ CẢNH CÁO: Render Tag + Nút "Xem lý do"
+                    return (
+                      <div className="text-right">
+                        <Space size="small" wrap align="center" className="justify-end">
+                          <span className={"inline-flex items-center justify-center px-3 py-1 rounded-xl border text-sm font-medium " + cls}>
+                            {label}
+                          </span>
+                          <Button
+                            type="link"
+                            size="small"
+                            style={{ padding: 0 }}
+                            onClick={(e) => {
+                              e.stopPropagation(); // RẤT QUAN TRỌNG: Ngăn card bị click
+                              // 'latestWarningMessage' là message từ API
+                              onViewWarning(post.latestWarningMessage); 
+                            }}
+                          >
+                            Xem lý do
+                          </Button>
+                        </Space>
+                      </div>
+                    );
+                  }
+
+                  // NẾU BÌNH THƯỜNG: Render như cũ
                   return (
                     <div className="text-right">
                       <span className={"inline-flex items-center justify-center px-3 py-1 rounded-xl border text-sm font-medium " + cls}>

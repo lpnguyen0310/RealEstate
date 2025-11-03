@@ -11,6 +11,9 @@ import "swiper/css/thumbs";
 import Viewer from "viewerjs";
 import "viewerjs/dist/viewer.min.css";
 
+import CommentsSection from "@/components/detailPost/CommentsSection";
+import ReportModal from "@/components/detailPost/modals/ReportModal";
+
 import {
     DEFAULT_GALLERY_IMAGES,
     DEFAULT_POST_INFO,
@@ -92,6 +95,7 @@ export default function InfoRealEstate() {
     const [thumbsSwiper, setThumbsSwiper] = useState(null);
     const [liked, setLiked] = useState(false);
     const [showPhone, setShowPhone] = useState(false);
+    const [isReportModalVisible, setIsReportModalVisible] = useState(false);
 
     // Refs
     const hiddenGalleryRef = useRef(null);
@@ -420,7 +424,10 @@ export default function InfoRealEstate() {
                             </svg>
                             Lưu tin
                         </button>
-                        <button className="hover:text-gray-700 inline-flex items-center gap-1">
+                        <button
+                            className="hover:text-gray-700 inline-flex items-center gap-1"
+                            onClick={() => setIsReportModalVisible(true)} // <-- THÊM onClick
+                        >
                             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M13 3l-1 2H6v12h6l1 2h5V3h-5z" /></svg>
                             Báo cáo
                         </button>
@@ -546,10 +553,23 @@ export default function InfoRealEstate() {
                         </div>
                     </div>
 
+                    {/* <div className="mt-10">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                            Đánh giá & Bình luận
+                        </h2>
+                        <CommentsSection postId={id} />
+                    </div> */}
+
                     {/* Các tin tương tự */}
                     <div className="mt-10">
                         <SimilarNews />
                     </div>
+
+                    <ReportModal
+                        postId={id}
+                        visible={isReportModalVisible}
+                        onCancel={() => setIsReportModalVisible(false)}
+                    />
                 </div>
             </div>
         </div>

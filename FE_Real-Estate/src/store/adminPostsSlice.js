@@ -74,6 +74,7 @@ export const fetchPostsThunk = createAsyncThunk(
                     status: p.status,
                     createdAt: p.postedAt,
                     expiresAt: p.expiresAt,
+                    reportCount: p.reportCount,
 
                     // BẢNG dùng số ngày THỰC TẾ:
                     durationDays: actualDurationDays,

@@ -15,6 +15,12 @@ export default function PostStatusTabs({
             { key: "expired", label: "Hết Hạn", badgeColor: "bg-gray-300   text-gray-700" },
             { key: "expiringSoon", label: "Sắp Hết Hạn", badgeColor: "bg-orange-100 text-orange-700" },
             { key: "hidden", label: "Đã Ẩn", badgeColor: "bg-gray-200   text-gray-700", activeBg: "bg-[#13284b] text-white" },
+            { 
+                key: "warned", // <-- Key này phải khớp với API counts và logic fetch
+                label: "Bị Cảnh Cáo", 
+                badgeColor: "bg-yellow-100 text-yellow-700", // Màu vàng cho cảnh báo
+                activeBg: "bg-[#13284b] text-white" 
+            },
         ]),
         []
     );

@@ -36,6 +36,8 @@ export default function PostList({
     loading = false,
     // 🆕 callback khi click card
     onItemClick = () => { },
+    onViewWarningClick = () => { },
+    highlightedId = null,
 }) {
     const showEmpty = !loading && items.length === 0;
 
@@ -48,7 +50,7 @@ export default function PostList({
                         <PostCardSkeleton key={`sk-${i}`} />
                     ))
                     : items.map((p) => (
-                        <PostCard key={p.id} post={p} onOpenDetail={onItemClick} />
+                        <PostCard key={p.id} post={p} onOpenDetail={onItemClick} onViewWarning={onViewWarningClick} isHighlighted={p.id === highlightedId}/>
                     ))}
 
                 {showEmpty && (

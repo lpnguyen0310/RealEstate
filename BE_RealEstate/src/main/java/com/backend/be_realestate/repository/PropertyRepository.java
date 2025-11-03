@@ -118,7 +118,8 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     @Query("select p from PropertyEntity p where p.id = :id")
     Optional<PropertyEntity> findDetailForEdit(@Param("id") Long id);
 
-
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<PropertyEntity> findWithLockById(Long id);
 }
 
 

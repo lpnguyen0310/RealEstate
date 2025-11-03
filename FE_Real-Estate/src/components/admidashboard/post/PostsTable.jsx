@@ -1,6 +1,7 @@
 import {
   Box, Paper, Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
-  Avatar, Chip, Stack, Typography, Tooltip, IconButton, Pagination, PaginationItem, Select, MenuItem
+  Avatar, Chip, Stack, Typography, Tooltip, IconButton, Pagination, PaginationItem, Select, MenuItem,
+  Badge // <<< ĐÃ THÊM
 } from "@mui/material";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import RemoveRedEyeOutlinedIcon from "@mui/icons-material/RemoveRedEyeOutlined";
@@ -9,12 +10,15 @@ import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined"; // <<< ĐÃ THÊM
 import { HOVER_BG, STATUS_LABEL, STATUS_CHIP_COLOR, styles } from "./constants";
 
 export default function PostsTable({
-  rows, loading, actioningId,            // NEW
+  rows, loading, actioningId,
   page, totalPages, start, end, totalItems, pageSize, setPage, setPageSize,
-  onOpenDetail, onApprove, onReject, onHide, onUnhide, onHardDelete, money, fmtDate, setDecision,
+  onOpenDetail, onApprove, onReject, onHide, onUnhide, onHardDelete,
+  onOpenReports, // <<< ĐÃ THÊM
+  money, fmtDate, setDecision,
 }) {
   return (
     <Paper elevation={0} sx={{ backgroundColor: "#fff", borderRadius: "14px", border: "1px solid #e8edf6", boxShadow: "0 6px 18px rgba(13,47,97,0.06)", mt: 2 }}>
@@ -28,6 +32,8 @@ export default function PostsTable({
                 <TableCell sx={styles.headCell}>Loại</TableCell>
                 <TableCell sx={styles.headCell} align="right">Giá</TableCell>
                 <TableCell sx={styles.headCell}>Trạng thái</TableCell>
+                {/* === THÊM CỘT BÁO CÁO === */}
+                <TableCell sx={styles.headCell} align="right">Báo cáo</TableCell> 
                 <TableCell sx={styles.headCell}>Tạo lúc</TableCell>
                 <TableCell sx={styles.headCell}>Hết hạn</TableCell>
                 <TableCell sx={styles.headCell}>Người tạo</TableCell>
@@ -38,12 +44,13 @@ export default function PostsTable({
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 6, color: "#7a8aa1", bgcolor: "#fff" }}>
+                  {/* === CẬP NHẬT COLSPAN === */}
+                  <TableCell colSpan={10} align="center" sx={{ py: 6, color: "#7a8aa1", bgcolor: "#fff" }}>
                     {loading ? "Đang tải dữ liệu..." : "Không có dữ liệu"}
                   </TableCell>
                 </TableRow>
               ) : rows.map((r) => {
-                const disabled = actioningId === r.id; // NEW
+                const disabled = actioningId === r.id;
                 return (
                   <TableRow key={r.id} hover sx={{ "& td": { transition: "background-color 140ms ease" }, "&:hover td": { backgroundColor: HOVER_BG } }}>
                     <TableCell sx={styles.bodyCell}>{r.id}</TableCell>
@@ -67,6 +74,26 @@ export default function PostsTable({
 
                     <TableCell sx={styles.bodyCell}>
                       <Chip label={STATUS_LABEL[r.status] ?? r.status} color={STATUS_CHIP_COLOR[r.status] ?? "default"} size="small" />
+                    </TableCell>
+
+                    {/* === THÊM CELL BÁO CÁO === */}
+                    <TableCell sx={{ ...styles.bodyCell, textAlign: "center" }}>
+                      {(r.reportCount || 0) > 0 ? (
+                        <Tooltip title="Xem chi tiết báo cáo">
+                          <IconButton
+                            size="small"
+                            onClick={() => onOpenReports(r.id)} // Gọi hàm prop mới
+                            color="error"
+                            disabled={disabled}
+                          >
+                            <Badge badgeContent={r.reportCount} color="error">
+                              <FeedbackOutlinedIcon fontSize="small" />
+                            </Badge>
+                          </IconButton>
+                        </Tooltip>
+                      ) : (
+                        <Typography variant="body2" sx={{ color: "#9ca3af" }}>-</Typography>
+                      )}
                     </TableCell>
 
                     <TableCell sx={styles.bodyCell}>{fmtDate(r.createdAt)}</TableCell>

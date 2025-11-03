@@ -27,6 +27,7 @@
     "axios": "^1.12.2",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "dayjs": "^1.11.18",
     "emoji-picker-react": "^4.15.0",
     "google-map-react": "^2.2.5",

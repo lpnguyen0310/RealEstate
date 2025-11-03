@@ -1,12 +1,13 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback,useMemo } from "react";
 import {
     Drawer, Box, Stack, Avatar, Typography, Divider, Chip, Button,
-    Card, CardContent, Grid, TextField, Tooltip
+    Card, CardContent, Grid, TextField, Tooltip,Alert, AlertTitle
 } from "@mui/material";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { STATUS_LABEL, STATUS_CHIP_COLOR } from "./constants";
 import ImageViewer from "./ImageViewer";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -57,6 +58,29 @@ export default function PostDetailDrawer({
     const isRejected = detail.status === "REJECTED";
     const isApprovable = isPending;
     const isRejectable = isPending;
+
+    const resubmitInfo = useMemo(() => {
+        // 1. Chỉ kiểm tra nếu tin đang "Chờ duyệt"
+        if (!isPending) {
+            return { isResubmit: false, fromStatus: null };
+        }
+        
+        // 2. Tìm trong lịch sử (audit) xem có hành động nào
+        //    KHÔNG PHẢI là 'APPROVED' (tức là 'REJECTED' hoặc 'WARNED')
+        const lastBadAction = (detail.audit || []).find(
+            a => (a.type || "").toUpperCase() !== 'APPROVED'
+        );
+
+        if (lastBadAction) {
+            const type = (lastBadAction.type || "").toUpperCase();
+             // 3. Nếu tìm thấy, đánh dấu là "duyệt lại"
+             return { isResubmit: true, fromStatus: type };
+        }
+        
+        // 4. Nếu không, đây là tin mới
+        return { isResubmit: false, fromStatus: null };
+
+    }, [isPending, detail.audit]);
 
     const listingChipColor =
         detail.listingType === "VIP" ? "secondary"
@@ -112,6 +136,21 @@ export default function PostDetailDrawer({
                 </Stack>
 
                 <Divider sx={{ my: 1.5 }} />
+
+                {resubmitInfo.isResubmit && (
+                    <Alert 
+                        severity="info" 
+                        icon={<InfoOutlinedIcon />} 
+                        sx={{ mb: 2, borderRadius: 2 }}
+                    >
+                        <AlertTitle sx={{ fontWeight: 600 }}>
+                            Tin đăng được gửi duyệt lại
+                        </AlertTitle>
+                        Tin này đã được người dùng cập nhật lại sau khi bị 
+                        <b> {resubmitInfo.fromStatus === 'WARNED' ? ' Cảnh báo' : ' Từ chối'}</b>.
+                        Vui lòng kiểm tra kỹ các thay đổi.
+                    </Alert>
+                )}
 
                 {/* Hình ảnh */}
                 <ImageViewer images={detail.images} />

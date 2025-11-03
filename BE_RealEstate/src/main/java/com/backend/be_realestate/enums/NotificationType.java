@@ -19,5 +19,12 @@ public enum NotificationType {
     REPORT_SUBMITTED,    // Có báo cáo mới
 
     ORDER_PENDING,      // 1. User tạo đơn hàng, chờ thanh toán
-    NEW_ORDER_PAID      // 2. Admin nhận thông báo có đơn hàng MỚI được thanh toán
+    NEW_ORDER_PAID,      // 2. Admin nhận thông báo có đơn hàng MỚI được thanh toán
+    ORDER_REFUNDED,
+
+    PROPERTY_REPORT_WARNING,
+    REPORT_STATUS_UPDATE,
+    SYSTEM_ANNOUNCEMENT,
+    POST_WARNING,
+    LISTING_EDITED_PENDING
 }

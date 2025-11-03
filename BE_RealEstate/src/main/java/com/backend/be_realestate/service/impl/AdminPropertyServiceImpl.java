@@ -44,6 +44,7 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
     private final PropertyConverter propertyConverter;
     private final PropertyImage propertyImageRepository;
     private final NotificationServiceImpl notificationService;
+    private final ReportRepository reportRepository;
 
     @Override
     @Transactional
@@ -92,6 +93,13 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
 
         p.setExpiresAt(Timestamp.from(Instant.now().plus(days, ChronoUnit.DAYS)));
         p.setStatus(PropertyStatus.PUBLISHED); // map sang FE là "PUBLISHED"
+        p.setReportCount(0);
+        p.setLatestWarningMessage(null);
+
+         List<Report> oldReports = reportRepository.findByPropertyId(propertyId);
+         if (oldReports != null && !oldReports.isEmpty()) {
+             reportRepository.deleteAll(oldReports);
+         }
         PropertyEntity savedProperty = propertyRepository.save(p);
 
         try {
@@ -109,7 +117,7 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             String userMessage = String.format("Tin đăng '%s' của bạn đã được duyệt thành công!", title);
 
             // Sửa link tới tab "Đang đăng"
-            String userLink = "/dashboard/posts?tab=active";
+            String userLink = String.format("/dashboard/posts?tab=active&viewPostId=%d", savedProperty.getId());
 
             // *** Đây là lúc sử dụng service đã "tiêm" ***
             notificationService.createNotification(
