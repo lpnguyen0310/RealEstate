@@ -14,29 +14,61 @@ export const fetchPropertiesThunk = createAsyncThunk(
             // === Route: For You (recommendations) ===
             if (params?.type === "forYou") {
                 const state = getState();
-                const userId = state?.auth?.user?.id || state?.auth?.user?.userId || params?.userId;
+                const userId =
+                    state?.auth?.user?.id ||
+                    state?.auth?.user?.userId ||
+                    params?.userId;
                 const limit = params?.limit ?? params?.size ?? 8;
-                // if (!userId) {
-                //     // chưa đăng nhập → lấy danh sách phổ biến (hoặc trống)
-                //     const res = await api.get("/properties/popular", { params: { limit } }); // nếu đã có endpoint
-                //     const arr = res?.data?.data ?? res?.data ?? [];
-                //     return { content: Array.isArray(arr) ? arr : [], _source: "popular", _forYou: true };
-                // }
-                if (!userId) return { content: [], _source: "popular", _forYou: true };
-                const res = await api.get("/properties/recommendations", {
+
+                // Chưa đăng nhập → vẫn giữ behavior cũ (không fallback)
+                if (!userId)
+                    return { content: [], _source: "popular", _forYou: true };
+
+                // 1) Gọi gợi ý cá nhân hóa
+                const recoRes = await api.get("/properties/recommendations", {
                     params: { userId, limit },
                 });
+                const recoArr = recoRes?.data?.data ?? recoRes?.data ?? [];
+                const recoSource = recoRes?.headers?.["x-reco-source"] || "personalized";
 
-                const arr = res?.data?.data ?? res?.data ?? [];
-                const source = res?.headers?.["x-reco-source"] || null; // optional nếu BE có set
-                return { content: Array.isArray(arr) ? arr : [], _source: source, _forYou: true };
+                // Nếu có data → trả về luôn
+                if (Array.isArray(recoArr) && recoArr.length > 0) {
+                    return {
+                        content: recoArr,
+                        _source: recoSource,
+                        _forYou: true,
+                    };
+                }
+
+                // 2) Fallback: lấy PREMIUM & VIP (PUBLISHED)
+                const fallbackParams = {
+                    page: 0,
+                    size: params?.limit ?? 24,
+                    status: "PUBLISHED",
+                    ensurePublished: true,
+                    // Nếu BE nhận mảng, đổi sang: listingType: ["PREMIUM","VIP"]
+                    listingType: "PREMIUM,VIP",
+                    sort: "postedAt,DESC",
+                };
+                const fbRes = await api.get("/properties", { params: fallbackParams });
+                const fb = fbRes?.data?.data ?? fbRes?.data;
+                const fbContent = fb?.content ??
+                    (Array.isArray(fb) ? fb : []);
+
+                return {
+                    content: Array.isArray(fbContent) ? fbContent : [],
+                    _source: "vip_premium",     // để hiển thị badge "PREMIUM/VIP" ở UI
+                    _forYou: true,
+                };
             }
 
             // === Mặc định: list public / search ===
             const res = await api.get("/properties", { params });
             return res?.data?.data ?? res?.data;
         } catch (e) {
-            return rejectWithValue(e?.response?.data?.message || "Không thể tải danh sách tin đăng");
+            return rejectWithValue(
+                e?.response?.data?.message || "Không thể tải danh sách tin đăng"
+            );
         }
     }
 );
@@ -568,23 +600,28 @@ const propertySlice = createSlice({
             .addCase(fetchPropertiesThunk.fulfilled, (s, a) => {
                 const pageData = a.payload || {};
                 const arr = pageData.content || [];
-                const mapped = Array.isArray(arr) ? arr.map(mapPublicPropertyToCard) : [];
+                let mapped = Array.isArray(arr) ? arr.map(mapPublicPropertyToCard) : [];
 
-                // sort theo loại tin (tuỳ chọn)
+                // Nếu là danh sách ForYou dạng fallback VIP/PREMIUM → lọc cứng NORMAL
+                if ((a.meta?.arg?.type === "forYou" || pageData._forYou) && pageData._source === "vip_premium") {
+                    mapped = mapped.filter(x =>
+                        ["PREMIUM", "VIP"].includes(String(x?.listingType || "").toUpperCase())
+                    );
+                }
+
                 const sortOrder = { PREMIUM: 1, VIP: 2, NORMAL: 3 };
-                const DEFAULT_SORT_VALUE = 99;
                 const sorted = mapped.sort((A, B) => {
                     const aT = (A.listingType || "").toUpperCase();
                     const bT = (B.listingType || "").toUpperCase();
-                    const va = sortOrder[aT] || DEFAULT_SORT_VALUE;
-                    const vb = sortOrder[bT] || DEFAULT_SORT_VALUE;
+                    const va = sortOrder[aT] || 99;
+                    const vb = sortOrder[bT] || 99;
                     return va - vb;
                 });
 
                 if (a.meta?.arg?.type === "forYou" || pageData._forYou) {
                     s.forYouList = sorted;
                     s.forYouLoading = false;
-                    if (pageData._source) s.forYouSource = pageData._source; // personalized | popular
+                    if (pageData._source) s.forYouSource = pageData._source; // "personalized" | "vip_premium" | "popular"
                     return;
                 }
 

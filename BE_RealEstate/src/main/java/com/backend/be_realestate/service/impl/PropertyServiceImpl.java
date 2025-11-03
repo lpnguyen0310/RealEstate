@@ -450,6 +450,17 @@ public class PropertyServiceImpl implements IPropertyService {
                 .map(r -> (PropertyType) r[0])  // r[0] là PropertyType
                 .limit(3)
                 .toList();
+        if (favTypes == null || favTypes.isEmpty()) {
+            favTypes = List.of(PropertyType.sell, PropertyType.rent);
+        } else {
+            // gộp thêm 2 loại cơ bản nếu chưa có
+            Set<PropertyType> all = new HashSet<>(favTypes);
+            all.add(PropertyType.sell);
+            all.add(PropertyType.rent);
+            favTypes = new ArrayList<>(all);
+        }
+        final List<PropertyType> finalFavTypes = List.copyOf(favTypes);
+
         log.info("[Reco] favTypes={}", favTypes);
 
         // 2) Lấy min/max price & min/max area từ các tin đã lưu
@@ -468,11 +479,19 @@ public class PropertyServiceImpl implements IPropertyService {
                 maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
             }
         }
+
+        /* ⚡ BỔ SUNG: nếu chỉ lưu 1 tin => min == max thì mở dải từ 0 */
+        if (minPrice != null && maxPrice != null && minPrice.equals(maxPrice)) {
+            minPrice = 0d;
+        }
+        if (minArea != null && maxArea != null && minArea.equals(maxArea)) {
+            minArea = 0f;
+        }
         log.info("[Reco] min/max: price[{}, {}], area[{}, {}]", minPrice, maxPrice, minArea, maxArea);
 
         // 3) Kiểm tra "tín hiệu" — chỉ cần 1 trong 2 hợp lệ (priceOk || areaOk)
-        boolean priceOk = (minPrice != null && maxPrice != null && minPrice > 0 && maxPrice > 0 && minPrice <= maxPrice);
-        boolean areaOk  = (minArea  != null && maxArea  != null && minArea  > 0 && maxArea  > 0  && minArea  <= maxArea);
+        boolean priceOk = (minPrice != null && maxPrice != null && minPrice >= 0 && maxPrice > 0 && minPrice <= maxPrice);
+        boolean areaOk  = (minArea  != null && maxArea  != null && minArea  >= 0 && maxArea  > 0  && minArea  <= maxArea);
 
         if (!(priceOk || areaOk)) {
             log.info("[Reco] noSignal (neither price nor area valid) → return empty list");
@@ -527,8 +546,8 @@ public class PropertyServiceImpl implements IPropertyService {
 
         List<PropertyEntity> ranked = candidates.stream()
                 .sorted((x, y) -> Double.compare(
-                        scoreRangeAware(y, favTypes, priceCenter, areaCenter),
-                        scoreRangeAware(x, favTypes, priceCenter, areaCenter)
+                        scoreRangeAware(y, finalFavTypes, priceCenter, areaCenter),
+                        scoreRangeAware(x, finalFavTypes, priceCenter, areaCenter)
                 ))
                 .limit(limit)
                 .toList();
