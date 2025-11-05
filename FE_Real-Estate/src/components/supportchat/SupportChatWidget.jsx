@@ -52,13 +52,18 @@ const formatBytes = (b = 0) => {
 // Cloudinary helpers
 function clThumbFromUrl(secureUrl, { w = 360, h = 360, fit = "c_fill" } = {}) {
     if (!secureUrl) return secureUrl;
-    return secureUrl.replace("/upload/", `/upload/${fit},w_${w},h_${h},q_auto,f_auto/`);
+    return secureUrl.replace(
+        "/upload/",
+        `/upload/${fit},w_${w},h_${h},q_auto,f_auto/`
+    );
 }
 
 // chỉ dùng cho NÚT "Tải xuống" (ép attachment)
 function clDownloadUrl(secureUrl, filename) {
     if (!secureUrl) return secureUrl;
-    const flag = filename ? `fl_attachment:${encodeURIComponent(filename)}` : "fl_attachment";
+    const flag = filename
+        ? `fl_attachment:${encodeURIComponent(filename)}`
+        : "fl_attachment";
     return secureUrl.replace("/upload/", `/upload/${flag}/`);
 }
 
@@ -66,7 +71,10 @@ function clDownloadUrl(secureUrl, filename) {
 function isImage(att) {
     const mime = (att?.mimeType || "").toLowerCase();
     const name = (att?.name || "").toLowerCase();
-    return mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+    return (
+        mime.startsWith("image/") ||
+        /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name)
+    );
 }
 
 // ✅ BỔ SUNG: hỗ trợ thêm displayName / name
@@ -118,6 +126,78 @@ function EmojiPortal({ open, anchorEl, onClose, children, width = 320, height = 
             </div>
         </>,
         document.body
+    );
+}
+
+/* ================== UI: Reaction components ================== */
+function ReactionPopover({ visible, onPick, align = "center" }) {
+    if (!visible) return null;
+    const posClass =
+        align === "right"
+            ? "right-0 translate-x-0"
+            : align === "left"
+                ? "left-0 -translate-x-0"
+                : "left-1/2 -translate-x-1/2";
+    return (
+        <div
+            className={`absolute -top-3 ${posClass} -translate-y-full opacity-100 pointer-events-auto select-none`}
+        >
+            <div className="flex items-center gap-1 rounded-2xl px-2 py-1 bg-black/80 text-white shadow-xl border border-black/30">
+                {REACTIONS.map((r) => (
+                    <button
+                        key={r.emoji}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onPick?.(r.emoji);
+                        }}
+                        className="h-9 w-9 rounded-full grid place-items-center text-xl hover:scale-110 transition"
+                        title={r.label}
+                    >
+                        {r.emoji}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ✅ VERSION MỚI: mỗi emoji một pill, đặt DƯỚI bubble
+// mỗi emoji là 1 pill clickable theo đúng lớp Tailwind bạn yêu cầu
+function ReactionSummary({ data = {}, side = "right", onReact }) {
+    const keys = Object.keys(data).filter((k) => data[k]?.count > 0);
+    if (!keys.length) return null;
+
+    const items = keys
+        .map((k) => ({
+            emoji: k,
+            ...data[k],
+        }))
+        .sort(
+            (a, b) =>
+                (b.mine ? 1 : 0) - (a.mine ? 1 : 0) ||
+                (b.count || 0) - (a.count || 0)
+        );
+
+    return (
+        <div
+            className={`mt-1 mb-1 flex flex-wrap gap-2 ${side === "right" ? "justify-end" : "justify-start"
+                }`}
+        >
+            {items.map((it) => (
+                <button
+                    key={it.emoji}
+                    onClick={() => onReact?.(it.emoji)}
+                    className={`px-2 h-6 inline-flex items-center gap-1 rounded-full text-xs border cursor-pointer select-none
+                      bg-indigo-50 text-gray-700 border-gray-200 hover:bg-gray-50
+                      ${it.mine ? "border-blue-300 bg-blue-50 text-blue-700" : ""}`}
+                    title={it.mine ? "Cảm xúc của bạn" : "Thả cảm xúc"}
+                    type="button"
+                >
+                    <span className="text-[15px] leading-none">{it.emoji}</span>
+                    <span className="leading-none">{it.count}</span>
+                </button>
+            ))}
+        </div>
     );
 }
 
@@ -228,6 +308,7 @@ export default function SupportChatWidget({
     const [reactionsByMsg, setReactionsByMsg] = useState({});
     const [pickerFor, setPickerFor] = useState(null);
     const [pickerAlign, setPickerAlign] = useState("center");
+    const [pickerFileIndex, setPickerFileIndex] = useState(null);
 
     // Convert ReactionDto[] -> map {emoji: {count, mine}}
     function dtosToMap(dtos = []) {
@@ -249,23 +330,21 @@ export default function SupportChatWidget({
         () => localStorage.setItem(sk("msgs"), JSON.stringify(messages)),
         [messages, userKey]
     );
+
     // Khi chuyển từ user thật -> guest (logout), xoá form + storage của guest
     useEffect(() => {
         const wasGuest = prevIsGuestRef.current;
         if (!wasGuest && isGuest) {
-            // reset form trắng
             setForm({ fullName: "", phone: "", email: "" });
-            // xoá cache form của guest
             try {
                 localStorage.removeItem(`support_guest_form`);
-                // nếu bạn muốn chắc chắn theo key "sk('form')" hiện tại:
                 localStorage.removeItem(`support_${userKey}_form`);
-            } catch {}
-            // về màn form
+            } catch { }
             setStep("form");
         }
         prevIsGuestRef.current = isGuest;
     }, [isGuest]);
+
     const lastUserRef = useRef(userKey);
     useEffect(() => {
         if (lastUserRef.current !== userKey) {
@@ -279,11 +358,9 @@ export default function SupportChatWidget({
             seenClientIdsRef.current.clear();
             pendingByClientIdRef.current.clear();
             setReactionsByMsg({});
-            // ✅ PREFILL form theo user mới (guest -> user thật hoặc đổi user)
             const defaults = defaultsFromUser(user);
             setForm((prev) => {
                 const empty = !prev || (!prev.fullName && !prev.phone && !prev.email);
-                // Nếu trước đó là guest và giờ đã có user thật -> ưu tiên defaults
                 if (empty || userKey !== "guest") return defaults;
                 return prev;
             });
@@ -360,7 +437,8 @@ export default function SupportChatWidget({
         const e = {};
         if (!form.fullName?.trim()) e.fullName = "Bắt buộc";
         if (!form.phone?.trim()) e.phone = "Bắt buộc";
-        if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Email không hợp lệ";
+        if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+            e.email = "Email không hợp lệ";
         setErrors(e);
         return Object.keys(e).length === 0;
     }
@@ -379,7 +457,7 @@ export default function SupportChatWidget({
                 size: a.sizeBytes || a.size,
                 mimeType: a.mimeType || "",
             })),
-            reactions: m.reactions || [], // giữ thô để convert tiếp
+            reactions: m.reactions || [],
         };
     }
 
@@ -483,7 +561,9 @@ export default function SupportChatWidget({
                 const rawMsg = e?.message ?? e;
                 const msg = rawMsg || {};
 
-                const serverId = String(msg.messageId || msg.id || msg.message_id || msg.uuid || "");
+                const serverId = String(
+                    msg.messageId || msg.id || msg.message_id || msg.uuid || ""
+                );
                 const clientIdFromWs =
                     msg.clientId || msg.clientMessageId || msg.client_message_id || msg.clientMsgId;
 
@@ -499,7 +579,6 @@ export default function SupportChatWidget({
                     pendingByClientIdRef.current.delete(clientIdFromWs);
                     if (serverId) seenServerIdsRef.current.add(serverId);
 
-                    // đồng bộ reaction nếu BE gửi kèm
                     if (mapped.messageId && Array.isArray(msg.reactions)) {
                         setReactionsByMsg((prev) => ({
                             ...prev,
@@ -519,8 +598,8 @@ export default function SupportChatWidget({
                     if (seenServerIdsRef.current.has(serverId)) return;
                     seenServerIdsRef.current.add(serverId);
                 } else {
-                    const sig = `${(msg.senderRole || msg.role) || ""}|${(msg.content || msg.text) || ""}|${Date.parse(msg.createdAt) || 0
-                        }`;
+                    const sig = `${(msg.senderRole || msg.role) || ""}|${(msg.content || msg.text) || ""
+                        }|${Date.parse(msg.createdAt) || 0}`;
                     if (seenSigRef.current.has(sig)) return;
                     seenSigRef.current.add(sig);
                     setTimeout(() => seenSigRef.current.delete(sig), 8000);
@@ -529,7 +608,6 @@ export default function SupportChatWidget({
                 const mapped = mapMessage(msg);
                 setMessages((p) => [...p, mapped]);
 
-                // đồng bộ reaction nếu có
                 if (mapped.messageId && Array.isArray(msg.reactions)) {
                     setReactionsByMsg((prev) => ({
                         ...prev,
@@ -595,7 +673,6 @@ export default function SupportChatWidget({
             seenClientIdsRef.current.add(String(clientIdFromWs));
             if (serverId) seenServerIdsRef.current.add(serverId);
             supportApi.markRead({ conversationId: convId, who: "USER" }).catch(() => { });
-            // sync reactions nếu có
             if (mapped.messageId && Array.isArray(msg.reactions)) {
                 setReactionsByMsg((prev) => ({
                     ...prev,
@@ -616,17 +693,16 @@ export default function SupportChatWidget({
             seenServerIdsRef.current.add(serverId);
         } else {
             // 4) Chưa có id → dùng signature tạm
-            const sig = `${(msg.senderRole || msg.role) || ""}|${(msg.content || msg.text) || ""}|${Date.parse(msg.createdAt) || 0
-                }`;
+            const sig = `${(msg.senderRole || msg.role) || ""}|${(msg.content || msg.text) || ""
+                }|${Date.parse(msg.createdAt) || 0}`;
             if (seenSigRef.current.has(sig)) return;
-            seenSigRef.current.add(sig);
             setTimeout(() => seenSigRef.current.delete(sig), 8000);
+            seenSigRef.current.add(sig);
         }
 
         const mapped = mapMessage(msg);
         setMessages((p) => [...p, mapped]);
         supportApi.markRead({ conversationId: convId, who: "USER" }).catch(() => { });
-        // sync reactions nếu có
         if (mapped.messageId && Array.isArray(msg.reactions)) {
             setReactionsByMsg((prev) => ({
                 ...prev,
@@ -797,6 +873,7 @@ export default function SupportChatWidget({
 
     async function handleReact(messageId, emoji) {
         setPickerFor(null);
+        setPickerFileIndex(null);
         // optimistic
         toggleLocalReaction(messageId, emoji);
         try {
@@ -902,67 +979,6 @@ export default function SupportChatWidget({
         }
     }
 
-    /* ================== UI: Reaction components ================== */
-    function ReactionPopover({ visible, onPick, align = "center" }) {
-        if (!visible) return null;
-        const posClass =
-            align === "right"
-                ? "right-0 translate-x-0"
-                : align === "left"
-                    ? "left-0 -translate-x-0"
-                    : "left-1/2 -translate-x-1/2";
-        return (
-            <div
-                className={`absolute -top-3 ${posClass} -translate-y-full opacity-100 pointer-events-auto select-none`}
-            >
-                <div className="flex items-center gap-1 rounded-2xl px-2 py-1 bg-black/80 text-white shadow-xl border border-black/30">
-                    {REACTIONS.map((r) => (
-                        <button
-                            key={r.emoji}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onPick?.(r.emoji);
-                            }}
-                            className="h-9 w-9 rounded-full grid place-items-center text-xl hover:scale-110 transition"
-                            title={r.label}
-                        >
-                            {r.emoji}
-                        </button>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    function ReactionSummary({ data = {}, side = "right" }) {
-        const keys = Object.keys(data).filter((k) => data[k]?.count > 0);
-        if (!keys.length) return null;
-        const items = keys
-            .map((k) => {
-                const meta = REACTIONS.find((r) => r.emoji === k) || { emoji: k, label: k };
-                return { ...meta, ...data[k] };
-            })
-            .sort((a, b) => (b.mine ? 1 : 0) - (a.mine ? 1 : 0) || (b.count || 0) - (a.count || 0));
-        const total = items.reduce((s, it) => s + (it.count || 0), 0);
-        return (
-            <div className={`mt-1 flex items-center gap-1 ${side === "right" ? "justify-end" : "justify-start"}`}>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/70 text-white text-xs shadow-sm">
-                    {items.slice(0, 3).map((it) => (
-                        <span
-                            key={it.emoji}
-                            className={`text-[15px] leading-none ${it.mine ? "drop-shadow-[0_0_6px_rgba(255,255,255,0.4)]" : ""
-                                }`}
-                            title={it.mine ? `${it.label} (bạn)` : it.label}
-                        >
-                            {it.emoji}
-                        </span>
-                    ))}
-                    <span className="ml-1">{total}</span>
-                </div>
-            </div>
-        );
-    }
-
     /* ================== Body ================== */
     const Body = (
         <>
@@ -1032,16 +1048,13 @@ export default function SupportChatWidget({
                         {messages.map((m) => {
                             const imgs = (m.attachments || []).filter((a) => isImage(a));
                             const files = (m.attachments || []).filter((a) => !isImage(a));
-                            const onlyImages = imgs.length > 0 && files.length === 0 && !(m.content || "").trim();
-                            const align = m.role === "user" ? "justify-end" : "justify-start";
-                            const color =
-                                m.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800";
-                            const bubbleClass = onlyImages
-                                ? `w-fit inline-block ${color} rounded-2xl p-1`
-                                : `w-fit max-w-[80%] inline-flex flex-col ${color} rounded-2xl px-3 py-2 whitespace-pre-wrap break-words`;
+                            const hasText = !!(m.content || "").trim();
 
-                            const mySide = m.role === "user" ? "right" : "left";
+                            const isUser = m.role === "user";
+                            const align = isUser ? "justify-end" : "justify-start";
+                            const bubbleColor = isUser ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800";
                             const msgId = String(m.messageId || m.id || "");
+                            const mySide = isUser ? "right" : "left";
 
                             return (
                                 <div key={m.id} className="mb-5">
@@ -1050,48 +1063,130 @@ export default function SupportChatWidget({
                                             {m.content}
                                         </div>
                                     ) : (
-                                        <div className={`flex ${align}`}>
-                                            <div className={`relative group ${bubbleClass}`}>
-                                                {!!(m.content || "").trim() && (
-                                                    <div className="text-sm leading-5">{m.content}</div>
-                                                )}
+                                        <>
+                                            {/* ===== BUBBLE TEXT (không chứa ảnh/tệp) ===== */}
+                                            {hasText && (
+                                                <div className={`flex ${align}`}>
+                                                    <div className={`relative group w-fit max-w-[80%] inline-flex flex-col ${bubbleColor} rounded-2xl px-3 py-2 whitespace-pre-wrap break-words`}>
+                                                        <div className="text-sm leading-5">{m.content}</div>
+                                                        <div className={`mt-1 text-[10px] ${isUser ? "text-white/80 self-end" : "text-gray-500 self-start"}`}>
+                                                            {fmtTime(m.ts)}
+                                                        </div>
 
-                                                {!!imgs.length && (
-                                                    <div className={onlyImages ? "" : "mt-2"}>
-                                                        {imgs.length === 1 ? (
-                                                            <a href={imgs[0].url} target="_blank" rel="noreferrer">
-                                                                <img
-                                                                    src={
-                                                                        imgs[0]._local
-                                                                            ? imgs[0].url
-                                                                            : clThumbFromUrl(imgs[0].url, { w: 520, h: 520 })
-                                                                    }
-                                                                    alt={imgs[0].name || "image"}
-                                                                    className="block rounded-xl max-w-[260px] max-h-[320px] w-auto h-auto"
-                                                                />
-                                                            </a>
-                                                        ) : (
-                                                            <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2 max-w-[320px]">
-                                                                {imgs.map((a, i) => (
-                                                                    <a key={i} href={a.url} target="_blank" rel="noreferrer">
-                                                                        <img
-                                                                            src={
-                                                                                a._local
-                                                                                    ? a.url
-                                                                                    : clThumbFromUrl(a.url, { w: 240, h: 240 })
-                                                                            }
-                                                                            alt={a.name || `image-${i}`}
-                                                                            className="rounded-lg w-[120px] h-[120px] object-cover"
-                                                                        />
-                                                                    </a>
-                                                                ))}
+                                                        {/* Reaction button bám bubble */}
+                                                        {currentUserId && (
+                                                            <div
+                                                                className={`absolute -bottom-5 ${isUser ? "right-2" : "left-2"} opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition`}
+                                                            >
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setPickerFor((p) => (p === msgId ? null : msgId));
+                                                                        setPickerAlign(isUser ? "right" : "left");
+                                                                    }}
+                                                                    className={`h-7 w-7 grid place-items-center rounded-full ${isUser ? "bg-white/20 text-white" : "bg-white text-gray-700 border"} shadow`}
+                                                                    title="Thả cảm xúc"
+                                                                >
+                                                                    👍
+                                                                </button>
                                                             </div>
                                                         )}
-                                                    </div>
-                                                )}
 
-                                                {!!files.length && (
-                                                    <div className="mt-2 grid grid-cols-1 gap-2">
+                                                        <ReactionPopover
+                                                            visible={pickerFor === msgId}
+                                                            align={pickerAlign}
+                                                            onPick={(emoji) => handleReact(msgId, emoji)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* ===== GALLERY ẢNH (ngoài bubble, có nút reaction overlay từng ảnh) ===== */}
+                                            {!!imgs.length && (
+                                                <div className={`flex ${align}`}>
+                                                    <div className={`${isUser ? "items-end" : "items-start"} flex flex-col w-full`}>
+                                                        <div
+                                                            className={`mt-2 grid gap-2 ${imgs.length === 1
+                                                                ? "grid-cols-1 max-w-[320px]"
+                                                                : "grid-cols-[repeat(auto-fill,minmax(96px,1fr))] max-w-[360px]"
+                                                                }`}
+                                                        >
+                                                            {imgs.map((a, i) => {
+                                                                const openHref = a.url;
+                                                                const thumb = a._local ? a.url : clThumbFromUrl(a.url, { w: 520, h: 520 });
+                                                                return (
+                                                                    <div key={i} className="relative group">
+                                                                        <a href={openHref} target="_blank" rel="noreferrer" className="block">
+                                                                            <img
+                                                                                src={thumb}
+                                                                                alt={a.name || `image-${i}`}
+                                                                                className={`rounded-xl ${imgs.length === 1
+                                                                                    ? "max-w-[320px] max-h-[360px] w-auto h-auto"
+                                                                                    : "w-[120px] h-[120px] object-cover"
+                                                                                    }`}
+                                                                            />
+                                                                        </a>
+
+                                                                        {/* Nút reaction overlay trên từng ảnh */}
+                                                                        {currentUserId && (
+                                                                            <button
+                                                                                className="absolute bottom-1 right-1 h-7 w-7 grid place-items-center rounded-full bg-white/90 text-gray-700 shadow border opacity-0 group-hover:opacity-100 transition"
+                                                                                title="Thả cảm xúc"
+                                                                                onClick={(e) => {
+                                                                                    e.preventDefault();
+                                                                                    e.stopPropagation();
+                                                                                    setPickerFor((p) => (p === msgId ? null : msgId));
+                                                                                    setPickerAlign(isUser ? "right" : "left");
+                                                                                }}
+                                                                            >
+                                                                                👍
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        {/* Nếu KHÔNG có text, vẫn hiện giờ + nút reaction chung */}
+                                                        {!hasText && (
+                                                            <>
+                                                                <div className="mt-1 text-[10px] text-gray-500 whitespace-nowrap leading-none self-end">
+                                                                    {fmtTime(m.ts)}
+                                                                </div>
+
+                                                                {currentUserId && (
+                                                                    <div className="relative group mt-1 self-end">
+                                                                        <button
+                                                                            className="opacity-0 group-hover:opacity-100 transition h-7 w-7 rounded-full bg-white shadow border grid place-items-center"
+                                                                            title="Thả cảm xúc"
+                                                                            onClick={() => {
+                                                                                setPickerFor((p) => (p === msgId ? null : msgId));
+                                                                                setPickerAlign(isUser ? "right" : "left");
+                                                                            }}
+                                                                        >
+                                                                            👍
+                                                                        </button>
+
+                                                                        <div className={`absolute z-50 -top-10 ${isUser ? "right-0" : "left-0"}`}>
+                                                                            <ReactionPopover
+                                                                                visible={pickerFor === msgId}
+                                                                                align={pickerAlign}
+                                                                                onPick={(emoji) => handleReact(msgId, emoji)}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* ===== FILE CARDS (ngoài bubble, có nút reaction overlay từng file) ===== */}
+                                            {/* ===== FILE CARDS (ngoài bubble, có nút reaction + popover từng file) ===== */}
+                                            {!!files.length && (
+                                                <div className={`flex ${align}`}>
+                                                    <div className="mt-2 grid grid-cols-1 gap-2 w-full max-w-[360px]">
                                                         {files.map((a, i) => {
                                                             const openHref = a.url;
                                                             const dlHref = clDownloadUrl(a.url, a.name);
@@ -1105,12 +1200,11 @@ export default function SupportChatWidget({
                                                                         : /\.(ppt|pptx)$/.test(lower)
                                                                             ? "📙"
                                                                             : "📄";
+
                                                             return (
                                                                 <div
                                                                     key={i}
-                                                                    className={`flex items-center justify-between rounded-xl px-3 py-2 ${m.role === "user"
-                                                                        ? "bg-white/15 text-white"
-                                                                        : "bg-white text-gray-800 border"
+                                                                    className={`relative group flex items-center justify-between rounded-xl px-3 py-2 bg-white text-gray-800 border ${isUser ? "border-blue-100" : "border-gray-200"
                                                                         }`}
                                                                 >
                                                                     <div className="flex items-center gap-2 min-w-0">
@@ -1120,18 +1214,12 @@ export default function SupportChatWidget({
                                                                                 href={openHref}
                                                                                 target="_blank"
                                                                                 rel="noreferrer"
-                                                                                className={`block text-sm truncate ${m.role === "user"
-                                                                                    ? "underline decoration-dotted"
-                                                                                    : "text-blue-600 hover:underline"
-                                                                                    }`}
+                                                                                className="block text-sm truncate text-blue-600 hover:underline"
                                                                                 title={a.name}
                                                                             >
                                                                                 {a.name || "file"}
                                                                             </a>
-                                                                            <div
-                                                                                className={`text-[11px] ${m.role === "user" ? "opacity-80" : "text-gray-500"
-                                                                                    }`}
-                                                                            >
+                                                                            <div className="text-[11px] text-gray-500">
                                                                                 {a.size ? formatBytes(a.size) : ""}
                                                                             </div>
                                                                         </div>
@@ -1142,65 +1230,62 @@ export default function SupportChatWidget({
                                                                             href={openHref}
                                                                             target="_blank"
                                                                             rel="noreferrer"
-                                                                            className={`h-7 w-7 grid place-items-center rounded-md ${m.role === "user" ? "bg-white/20" : "bg-gray-100 hover:bg-gray-200"
-                                                                                }`}
+                                                                            className="h-7 w-7 grid place-items-center rounded-md bg-gray-100 hover:bg-gray-200"
                                                                             title="Mở"
                                                                         >
                                                                             📂
                                                                         </a>
                                                                         <a
                                                                             href={dlHref}
-                                                                            className={`h-7 w-7 grid place-items-center rounded-md ${m.role === "user" ? "bg-white/20" : "bg-gray-100 hover:bg-gray-200"
-                                                                                }`}
+                                                                            className="h-7 w-7 grid place-items-center rounded-md bg-gray-100 hover:bg-gray-200"
                                                                             title="Tải xuống"
                                                                         >
                                                                             ⬇
                                                                         </a>
                                                                     </div>
+
+                                                                    {/* Nút reaction overlay góc card */}
+                                                                    {currentUserId && (
+                                                                        <button
+                                                                            className="absolute -top-2 -right-2 h-7 w-7 grid place-items-center rounded-full bg-white text-gray-700 shadow border opacity-0 group-hover:opacity-100 transition"
+                                                                            title="Thả cảm xúc"
+                                                                            onClick={(e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                setPickerFor((p) => (p === msgId && pickerFileIndex === i ? null : msgId));
+                                                                                setPickerAlign(isUser ? "right" : "left");
+                                                                                setPickerFileIndex((prev) => (pickerFor === msgId && prev === i ? null : i));
+                                                                            }}
+                                                                        >
+                                                                            👍
+                                                                        </button>
+                                                                    )}
+
+                                                                    {/* Popover chọn emoji — bám theo đúng file card */}
+                                                                    <div className={`absolute z-50 -top-10 ${isUser ? "right-0" : "left-0"}`}>
+                                                                        <ReactionPopover
+                                                                            visible={pickerFor === msgId && pickerFileIndex === i}
+                                                                            align={pickerAlign}
+                                                                            onPick={(emoji) => handleReact(msgId, emoji)}
+                                                                        />
+                                                                    </div>
                                                                 </div>
                                                             );
                                                         })}
                                                     </div>
-                                                )}
-
-                                                {/* Time */}
-                                                <div
-                                                    className={`mt-1 text-[10px] opacity-70 ${m.role === "user" ? "text-white self-end" : "text-gray-500 self-start"
-                                                        } ${onlyImages ? "px-1" : ""}`}
-                                                >
-                                                    {fmtTime(m.ts)}
                                                 </div>
+                                            )}
 
-                                                {/* Reaction: nút + popover + summary */}
-                                                {currentUserId && (
-                                                    <div
-                                                        className={`absolute -bottom-5 ${mySide === "right" ? "right-2" : "left-2"
-                                                            } opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition`}
-                                                    >
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setPickerFor((p) => (p === msgId ? null : msgId));
-                                                                setPickerAlign(mySide === "right" ? "right" : "left");
-                                                            }}
-                                                            className={`h-7 w-7 grid place-items-center rounded-full ${m.role === "user" ? "bg-white/20 text-white" : "bg-white text-gray-700 border"
-                                                                } shadow`}
-                                                            title="Thả cảm xúc"
-                                                        >
-                                                            👍
-                                                        </button>
-                                                    </div>
-                                                )}
 
-                                                <ReactionPopover
-                                                    visible={pickerFor === msgId}
-                                                    align={pickerAlign}
-                                                    onPick={(emoji) => handleReact(msgId, emoji)}
+                                            {/* ===== REACTION SUMMARY (dưới cùng, canh theo phía) ===== */}
+                                            <div className={`flex ${align}`}>
+                                                <ReactionSummary
+                                                    data={reactionsByMsg[msgId]}
+                                                    side={mySide}
+                                                    onReact={(emoji) => handleReact(msgId, emoji)}
                                                 />
-
-                                                <ReactionSummary data={reactionsByMsg[msgId]} side={mySide} />
                                             </div>
-                                        </div>
+                                        </>
                                     )}
                                 </div>
                             );

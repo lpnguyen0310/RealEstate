@@ -203,7 +203,7 @@ export default function PropertyCard({ item = {} }) {
 
       {/* BODY */}
       <div className="px-5 pb-5">
-        <h3 className="text-[20px] font-extrabold text-gray-900 leading-snug line-clamp-3 min-h-[56px]">
+        <h3 className="text-[20px] font-extrabold text-gray-900 leading-snug line-clamp-2 min-h-[56px]">
           {item.title}
         </h3>
 

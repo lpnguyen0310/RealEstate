@@ -1,24 +1,23 @@
 // src/components/Dashboard/DashboardHeader.jsx
 import { useMemo, useState } from "react";
-import { BellOutlined, CreditCardOutlined, UserOutlined, LogoutOutlined } from "@ant-design/icons";
-import { Avatar, Badge, Button, Dropdown } from "antd";
+import { CreditCardOutlined, UserOutlined, LogoutOutlined } from "@ant-design/icons";
+import { Avatar, Button, Dropdown } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import NotificationBell from "@/components/menu/NotificationBell";
 
 export default function DashboardHeader({
   title = "Tổng quan",
-  user,                // có thể null; sẽ chuẩn hoá bên dưới
+  breadcrumbs = [],   // [{label, to}]
+  live = false,       // hiện badge LIVE
+  user,
   notifyCount = 31,
   onLogout,
 }) {
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
 
-  // Chuẩn hoá user để hiển thị an toàn
   const displayUser = useMemo(() => {
-    if (!user) {
-      return { fullName: "Người dùng", email: "", initial: "U", avatarUrl: "" };
-    }
+    if (!user) return { fullName: "Người dùng", email: "", initial: "U", avatarUrl: "" };
     const fullName =
       user.fullName ||
       `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
@@ -32,18 +31,12 @@ export default function DashboardHeader({
   const dropdown = (
     <div className="bg-white w-[320px] rounded-xl shadow-xl border border-gray-100 overflow-hidden">
       <div className="py-1">
-        <Link
-          to="/dashboard/purchase"
-          className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 no-underline text-gray-800"
-        >
+        <Link to="/dashboard/purchase" className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 no-underline text-gray-800">
           <CreditCardOutlined className="text-[16px] text-gray-600" />
           <span className="text-[14px] font-medium">Mua tin</span>
         </Link>
 
-        <Link
-          to="/dashboard/account"
-          className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 no-underline text-gray-800"
-        >
+        <Link to="/dashboard/account" className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 no-underline text-gray-800">
           <UserOutlined className="text-[16px] text-gray-600" />
           <span className="text-[14px] font-medium">Hồ sơ</span>
         </Link>
@@ -51,15 +44,7 @@ export default function DashboardHeader({
         <div className="h-px bg-gray-100 my-1" />
 
         <button
-          onClick={() => {
-            if (onLogout) onLogout();
-            else {
-              // Fallback
-              localStorage.removeItem("user");
-              nav("/", { replace: true });
-            }
-            setOpen(false);
-          }}
+          onClick={() => { onLogout?.(); setOpen(false); }}
           className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-gray-800"
         >
           <LogoutOutlined className="text-[16px] text-gray-600" />
@@ -71,10 +56,34 @@ export default function DashboardHeader({
 
   return (
     <header className="flex items-center justify-between bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-3 mb-6">
-      <div className="flex items-center h-[42px]">
-        <h1 className="text-[22px] font-semibold text-[#3D3D4E] leading-none !mb-[0px]">
-          {title}
-        </h1>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-3 h-[42px]">
+          <h1 className="text-[22px] font-semibold text-[#3D3D4E] leading-none !mb-0">
+            {title}
+          </h1>
+
+          {live && (
+            <span className="inline-flex items-center text-[12px] font-semibold px-2 py-0.5 rounded-md bg-[#ECF2FF] text-[#274067] border border-[#D9E3FF]">
+              LIVE
+            </span>
+          )}
+        </div>
+
+        {/* Breadcrumb dưới tiêu đề */}
+        {breadcrumbs?.length > 0 && (
+          <nav className="text-[13px] text-[#7A8395]">
+            {breadcrumbs.map((c, i) => (
+              <span key={i}>
+                {c.to ? (
+                  <Link to={c.to} className="hover:text-[#1D3B67]">{c.label}</Link>
+                ) : (
+                  <span>{c.label}</span>
+                )}
+                {i < breadcrumbs.length - 1 && <span className="mx-2 text-[#C0C6D4]">/</span>}
+              </span>
+            ))}
+          </nav>
+        )}
       </div>
 
       <div className="flex items-center gap-6">
@@ -87,14 +96,7 @@ export default function DashboardHeader({
           Mua Tin
         </Button>
 
-        {/* <Badge count={notifyCount} size="small" color="#e74c3c">
-          <Button
-            type="text"
-            shape="circle"
-            icon={<BellOutlined className="text-[18px] text-gray-600" />}
-          />
-        </Badge> */}
-        <NotificationBell />
+        <NotificationBell count={notifyCount} />
 
         <Dropdown
           open={open}

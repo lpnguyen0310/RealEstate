@@ -23,7 +23,7 @@ export default function ProjectCard({ project }) {
             {/* Title box: cố định chiều cao (≈ 2 dòng), ẩn phần tràn */}
             <div className="overflow-hidden h-[48px] md:h-[52px] lg:h-[56px]">
               <h3
-                className="text-[18px] md:text-[20px] lg:text-[22px] font-extrabold leading-tight group-hover:underline"
+                className="text-[18px] md:text-[20px] lg:text-[22px] font-extrabold leading-tight group-hover:underline line-clamp-2"
                 title={project.name}         // tooltip để xem full
               >
                 {project.name}

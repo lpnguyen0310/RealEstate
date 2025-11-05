@@ -1,131 +1,278 @@
 // src/components/ForYouList.jsx
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
+import { Button, Modal, Slider, message, Select, Spin } from "antd";
+import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import PropertyCard from "./PropertyCard";
 import PropertyCardSkeleton from "./skeletion/PropertyCardSkeleton";
 import { fetchPropertiesThunk } from "@/store/propertySlice";
 
-const MIN_SKELETON_MS = 2000; // Giữ skeleton tối thiểu 2s
+// ====== API chọn Tỉnh/Thành phố (chỉnh path cho đúng) ======
+import { getProvinces } from "@/api/provinces";
+// File locationApi của bạn đã có:
+//   - getProvinces(signal) -> [{ id, name }]
+
+const MIN_SKELETON_MS = 2000; // giữ skeleton tối thiểu 2s
+const SS_NS = "fy_interest_state";
+
+// Chuẩn hoá item public → shape dùng bởi <PropertyCard />
+function normalizePublicItem(p = {}) {
+  const imgs = Array.isArray(p.images)
+    ? p.images
+    : Array.isArray(p.imageUrls)
+      ? p.imageUrls
+      : [];
+
+  const pricePerM2 =
+    p.pricePerM2 != null
+      ? p.pricePerM2
+      : p.price != null && p.area > 0
+        ? p.price / p.area
+        : null;
+
+  const listingTypeRaw = p.listing_type ?? p.listingType ?? p.listingtype;
+  const listingType =
+    typeof listingTypeRaw === "string" ? listingTypeRaw.toUpperCase() : listingTypeRaw;
+
+  return {
+    id: p.id,
+    images: imgs,
+    image: p.image,
+    title: p.title,
+    description: p.description,
+
+    price: p.price,
+    pricePerM2,
+    postedAt: p.postedAt,
+    photos: p.photos,
+
+    // address
+    addressMain:
+      p.addressMain || p.addressFull || p.addressShort || p.displayAddress || p.address || "",
+    addressShort: p.addressShort || "",
+    addressFull: p.addressFull || "",
+
+    // specs
+    area: p.area,
+    bed: p.bed ?? p.bedrooms,
+    bath: p.bath ?? p.bathrooms,
+
+    agent: p.agent,
+    type: p.type,
+    category: p.category,
+
+    // badge
+    listingType, // "PREMIUM" | "VIP" | "NORMAL"
+  };
+}
 
 export default function ForYouList() {
   const dispatch = useDispatch();
-
-  // --- Redux state ---
-  const { forYouList, forYouError, forYouSource, forYouLoading } = useSelector(
-    (s) => s.property
-  );
+  const { forYouList, forYouError, forYouSource, forYouLoading } = useSelector((s) => s.property);
   const authUser = useSelector((s) => s.auth.user);
   const userId = authUser?.id || authUser?.userId || null;
 
-  // --- UI State ---
-  const INITIAL = 8;
+  // ===== Derived keys =====
+  const userKey = userId ? `${SS_NS}:${userId}` : null;
+
+  // ===== UI state =====
   const [expanded, setExpanded] = useState(false);
-  const [fetchedForUserId, setFetchedForUserId] = useState(null);
   const [minDelayDone, setMinDelayDone] = useState(false);
-  const timerRef = useRef(null);
+  const [showModal, setShowModal] = useState(false);
 
-  // Fallback (PREMIUM/VIP) local state
-  const [fallbackRequested, setFallbackRequested] = useState(false);
-  const [fallbackLoading, setFallbackLoading] = useState(false);
-  const [fallbackError, setFallbackError] = useState(null);
-  const [fallbackList, setFallbackList] = useState([]);
-  const [fallbackUsed, setFallbackUsed] = useState(false); // để hiển thị badge nguồn
+  // chặn fetch lặp ForYou theo userId
+  const [fetchedForUserId, setFetchedForUserId] = useState(null);
 
-  // Giữ skeleton ít nhất MIN_SKELETON_MS
+  // giữ skeleton tối thiểu cho luồng ForYou
+  const [forYouLocalLoading, setForYouLocalLoading] = useState(false);
+
+  // ====== LOCATION: chỉ Tỉnh/TP ======
+  const [provinces, setProvinces] = useState([]);
+  const [loadingProv, setLoadingProv] = useState(false);
+  const [provinceId, setProvinceId] = useState(undefined);
+  const [provinceName, setProvinceName] = useState("");
+
+  // Modal form (persisted)
+  const [priceRange, setPriceRange] = useState([1_000_000_000, 5_000_000_000]);
+  const [areaRange, setAreaRange] = useState([30, 120]);
+
+  // Kết quả theo sở thích (persisted)
+  const [interestResults, setInterestResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchRequested, setSearchRequested] = useState(false);
+
+  // ====== Reset guard khi đổi user ======
   useEffect(() => {
-    timerRef.current = setTimeout(() => setMinDelayDone(true), MIN_SKELETON_MS);
-    return () => clearTimeout(timerRef.current);
+    // đổi user → reset lần fetch
+    setFetchedForUserId(null);
+    setExpanded(false);
+  }, [userId]);
+
+  // ====== Hydrate từ sessionStorage theo user ======
+  useEffect(() => {
+    if (!userKey) return;
+    try {
+      const raw = sessionStorage.getItem(userKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved?.priceRange)) setPriceRange(saved.priceRange);
+        if (Array.isArray(saved?.areaRange)) setAreaRange(saved.areaRange);
+        if (Array.isArray(saved?.items)) setInterestResults(saved.items);
+
+        if (saved?.provinceId) {
+          setProvinceId(saved.provinceId);
+          setProvinceName(saved.provinceName || "");
+        }
+        setSearchRequested(Boolean(saved?.keyword));
+      } else {
+        setInterestResults([]);
+      }
+    } catch { }
+  }, [userKey]);
+
+  // ====== (tuỳ chọn) Dọn namespace khi logout ======
+  useEffect(() => {
+    if (userId) return;
+    try {
+      Object.keys(sessionStorage)
+        .filter((k) => k.startsWith(`${SS_NS}:`))
+        .forEach((k) => sessionStorage.removeItem(k));
+    } catch { }
+    setInterestResults([]);
+  }, [userId]);
+
+  // Min delay mượt skeleton (trường hợp chưa có gì để render)
+  useEffect(() => {
+    const t = setTimeout(() => setMinDelayDone(true), MIN_SKELETON_MS);
+    return () => clearTimeout(t);
   }, []);
 
-  // Gọi API gợi ý khi có userId
-  useEffect(() => {
-    if (userId && fetchedForUserId !== userId) {
-      dispatch(fetchPropertiesThunk({ type: "forYou", userId, limit: 24 }));
-      setFetchedForUserId(userId);
-      // reset trạng thái fallback khi đổi user
-      setFallbackRequested(false);
-      setFallbackLoading(false);
-      setFallbackError(null);
-      setFallbackList([]);
-      setFallbackUsed(false);
-    }
-  }, [dispatch, userId, fetchedForUserId]);
+  // Personalized có thật sự tồn tại?
+  const hasPersonalized =
+    forYouSource === "personalized" && Array.isArray(forYouList) && forYouList.length > 0;
 
-  // --- Điều kiện kích hoạt Fallback PREMIUM/VIP ---
-  const hasPersonalized = Array.isArray(forYouList) && forYouList.length > 0;
-  const shouldRequestFallback =
-    userId &&
-    !forYouLoading &&
-    !hasPersonalized &&
-    !forYouError &&
-    minDelayDone &&
-    !fallbackRequested &&
-    !fallbackLoading;
-
-  useEffect(() => {
-    if (!shouldRequestFallback) return;
-    setFallbackRequested(true);
-    setFallbackLoading(true);
-    setFallbackError(null);
-
-    // Gọi lại thunk nhưng lấy payload qua unwrap để dùng local state,
-    // đồng thời đặt filter PREMIUM & VIP + PUBLISHED
-    dispatch(
-      fetchPropertiesThunk({
-        // Không set type: "forYou" để tránh backend đặc thù gợi ý,
-        // dùng tìm kiếm thường (tùy slice của bạn, vẫn ok lấy payload).
-        page: 0,
-        size: 24,
-        status: "PUBLISHED",
-        ensurePublished: true,
-        // Nhiều BE nhận "listingType" dạng CSV. Nếu BE của bạn nhận mảng, đổi sang ["PREMIUM","VIP"].
-        listingType: ["PREMIUM", "VIP"],
-        sort: "postedAt,DESC",
-      })
-    )
-      .unwrap()
-      .then((payload) => {
-        // Chuẩn hóa payload sang mảng
-        const items =
-          payload?.content ??
-          payload?.items ??
-          (Array.isArray(payload) ? payload : []);
-        setFallbackList(items || []);
-        setFallbackUsed(true);
-      })
-      .catch((e) => {
-        setFallbackError(e?.message || "Không thể tải PREMIUM/VIP");
-      })
-      .finally(() => setFallbackLoading(false));
-  }, [shouldRequestFallback, dispatch]);
-
-  // --- Xử lý hiển thị ---
-  const hasFallback = Array.isArray(fallbackList) && fallbackList.length > 0;
-
-  const showSkeleton =
-    forYouLoading ||
-    (!hasPersonalized && !forYouError && !minDelayDone) ||
-    // nếu đang fallback và chưa có dữ liệu cũng cho phép skeleton
-    (fallbackRequested && fallbackLoading && !hasFallback && !fallbackError);
-
-  // Chọn nguồn hiển thị: ưu tiên personalized, nếu không có thì fallback
-  const effectiveList = hasPersonalized ? forYouList : fallbackList;
+  // Danh sách để hiển thị
+  const effectiveList = hasPersonalized ? forYouList : interestResults;
   const effectiveHasData = Array.isArray(effectiveList) && effectiveList.length > 0;
 
+  // Hiện skeleton khi: đang search, hoặc đang giữ min-delay cho ForYou, hoặc đang fetch ForYou đúng user, hoặc chưa có data & chưa qua min-delay
+  const showSkeleton =
+    searching ||
+    forYouLocalLoading ||
+    (forYouLoading && fetchedForUserId === userId) ||
+    (!effectiveHasData && !minDelayDone);
+
   const visibleList = useMemo(
-    () => (expanded ? effectiveList : effectiveList.slice(0, INITIAL)),
+    () => (expanded ? effectiveList : effectiveList.slice(0, 8)),
     [expanded, effectiveList]
   );
 
-  // --- Nếu chưa đăng nhập ---
+  // ===== Auto-fetch For You: chỉ 1 lần / userId, và giữ skeleton tối thiểu =====
+  useEffect(() => {
+    if (!userId) return;
+    if (fetchedForUserId === userId) return;
+
+    setForYouLocalLoading(true);
+    const start = performance.now();
+
+    dispatch(
+      fetchPropertiesThunk({
+        type: "forYou",
+        userId,
+        limit: 24,
+        enforcePersonalized: true,
+        fallback: false,
+        slot: "forYou",
+      })
+    ).finally(() => {
+      setFetchedForUserId(userId);
+      const elapsed = performance.now() - start;
+      const remain = Math.max(0, MIN_SKELETON_MS - elapsed);
+      setTimeout(() => setForYouLocalLoading(false), remain);
+    });
+  }, [dispatch, userId, fetchedForUserId]);
+
+  // ===== Nạp provinces khi mở modal (lazy load) =====
+  useEffect(() => {
+    if (!showModal) return;
+    let abort = new AbortController();
+    if (provinces.length === 0) {
+      setLoadingProv(true);
+      getProvinces(abort.signal)
+        .then((list) => setProvinces(list))
+        .catch(() => { })
+        .finally(() => setLoadingProv(false));
+    }
+    return () => abort.abort();
+  }, [showModal]); // chỉ khi mở modal
+
+  // ===== Search theo Tỉnh/TP — giữ skeleton tối thiểu & persist per user =====
+  const handleSearch = async () => {
+    if (!provinceName) {
+      message.warning("Vui lòng chọn Tỉnh/Thành phố.");
+      return;
+    }
+
+    const keyword = provinceName; // chỉ dùng tên Tỉnh/TP làm keyword
+    setSearchRequested(true);
+    setSearching(true);
+    setShowModal(false);
+
+    const start = performance.now();
+
+    try {
+      const payload = await dispatch(
+        fetchPropertiesThunk({
+          page: 0,
+          size: 24,
+          sort: "postedAt,desc",
+          keyword,
+          priceFrom: priceRange[0],
+          priceTo: priceRange[1],
+          areaFrom: areaRange[0],
+          areaTo: areaRange[1],
+        })
+      ).unwrap();
+
+      const items =
+        payload?.content ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
+      const mapped = (items || []).map(normalizePublicItem);
+
+      // Persist theo user
+      try {
+        if (userKey) {
+          sessionStorage.setItem(
+            userKey,
+            JSON.stringify({
+              keyword,
+              priceRange,
+              areaRange,
+              items: mapped,
+              ts: Date.now(),
+              provinceId,
+              provinceName,
+            })
+          );
+        }
+      } catch { }
+
+      setInterestResults(mapped);
+      setExpanded(false);
+    } catch (err) {
+      message.error("Không thể tải dữ liệu theo lựa chọn của bạn.");
+    } finally {
+      const elapsed = performance.now() - start;
+      const remain = Math.max(0, MIN_SKELETON_MS - elapsed);
+      setTimeout(() => setSearching(false), remain);
+    }
+  };
+
+  // ===== Guards =====
   if (!userId) {
     return (
       <section className="mt-10 text-center text-gray-600">
-        <h2 className="text-2xl font-bold text-[#1b2a57] mb-2">
-          Bất động sản dành cho tôi
-        </h2>
+        <h2 className="text-2xl font-bold text-[#1b2a57] mb-2">Bất động sản dành cho tôi</h2>
         <p>Vui lòng đăng nhập để xem các gợi ý cá nhân hóa.</p>
       </section>
     );
@@ -134,73 +281,150 @@ export default function ForYouList() {
   return (
     <section className="mt-10">
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-bold text-[#1b2a57]">
-            Bất động sản dành cho tôi
-          </h2>
-        </div>
-
-        <Link to="/goi-y-cho-ban" className="text-[#1f5fbf] font-semibold hover:underline">
-          Xem tất cả
-        </Link>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-[#1b2a57]">Bất động sản dành cho tôi</h2>
+        {hasPersonalized && (
+          <Link to="/goi-y-cho-ban" className="text-[#1f5fbf] font-semibold hover:underline">
+            Xem tất cả
+          </Link>
+        )}
       </div>
 
-      {/* ERROR personalized */}
-      {forYouError && !hasPersonalized && minDelayDone && !fallbackUsed && (
+      {/* Lỗi personalized */}
+      {forYouError && !hasPersonalized && (
         <div className="text-red-500 text-center mb-4">
-          Lỗi khi tải dữ liệu: {forYouError}
+          Lỗi khi tải gợi ý cá nhân hóa: {forYouError}
         </div>
       )}
 
-      {/* ERROR fallback */}
-      {!hasPersonalized && fallbackError && minDelayDone && (
-        <div className="text-red-500 text-center mb-4">
-          Lỗi khi tải PREMIUM/VIP: {fallbackError}
+      {/* Empty state lần đầu (không hiển thị khi đang search) */}
+      {!hasPersonalized && interestResults.length === 0 && !searching && !searchRequested && (
+        <div className="text-center py-14 bg-[#f8fafc] rounded-2xl shadow-inner">
+          <h3 className="text-xl font-semibold text-[#1b2a57] mb-2">Chào mừng bạn!</h3>
+          <p className="text-gray-600 mb-6">
+            Hãy chọn thành phố, khoảng giá và diện tích để xem các tin phù hợp.
+          </p>
+          <Button
+            type="primary"
+            size="large"
+            onClick={() => setShowModal(true)}
+            style={{ background: "#1f5fbf", borderRadius: 8, fontWeight: 600 }}
+          >
+            Chọn sở thích của bạn
+          </Button>
         </div>
       )}
 
-      {/* KHÔNG CÓ GỢI Ý & CHƯA fallback xong */}
-      {!showSkeleton &&
-        !effectiveHasData &&
-        minDelayDone &&
-        (!fallbackRequested || fallbackLoading) && (
-          <div className="text-center text-gray-500 py-10">
-            Chưa có gợi ý phù hợp — hệ thống đang tải các tin PREMIUM &amp; VIP…
+      {/* Modal chọn sở thích */}
+      <Modal
+        title="Cá nhân hóa gợi ý bất động sản"
+        open={showModal}
+        onCancel={() => setShowModal(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setShowModal(false)}>
+            Hủy
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={searching}
+            onClick={handleSearch}
+            style={{ background: "#1f5fbf" }}
+          >
+            Xem gợi ý
+          </Button>,
+        ]}
+      >
+        <div className="space-y-5">
+          {/* TỈNH / THÀNH PHỐ */}
+          <div>
+            <label className="block font-medium mb-1">Tỉnh / Thành phố</label>
+            <Select
+              showSearch
+              allowClear
+              placeholder="Chọn Tỉnh/Thành phố"
+              value={provinceId}
+              onChange={(val, option) => {
+                setProvinceId(val);
+                setProvinceName(option?.label ?? "");
+              }}
+              style={{ width: "100%" }}
+              options={provinces.map((p) => ({ value: p.id, label: p.name }))}
+              loading={loadingProv}
+              filterOption={(input, option) =>
+                (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              notFoundContent={loadingProv ? <Spin size="small" /> : null}
+            />
           </div>
-        )}
 
-      {/* DANH SÁCH */}
-      {showSkeleton ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1">
-          {Array.from({ length: INITIAL }).map((_, i) => (
+          {/* GIÁ */}
+          <div>
+            <label className="block font-medium mb-1">Khoảng giá (VND)</label>
+            <Slider
+              range
+              min={500_000_000}
+              max={100_000_000_000} // 100 tỷ
+              step={500_000_000}
+              tooltip={{ formatter: (v) => `${(v / 1e9).toFixed(1)} tỷ` }}
+              value={priceRange}
+              onChange={(val) => setPriceRange(val)}
+            />
+            <div className="text-sm text-gray-500">
+              {(priceRange[0] / 1e9).toFixed(1)} tỷ - {(priceRange[1] / 1e9).toFixed(1)} tỷ
+            </div>
+          </div>
+
+          {/* DIỆN TÍCH */}
+          <div>
+            <label className="block font-medium mb-1">Diện tích (m²)</label>
+            <Slider
+              range
+              min={10}
+              max={1000} // 1000 m²
+              step={5}
+              tooltip={{ formatter: (v) => `${v} m²` }}
+              value={areaRange}
+              onChange={(val) => setAreaRange(val)}
+            />
+            <div className="text-sm text-gray-500">
+              {areaRange[0]} m² - {areaRange[1]} m²
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* SKELETON */}
+      {showSkeleton && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1 mt-6">
+          {Array.from({ length: 8 }).map((_, i) => (
             <PropertyCardSkeleton key={`sk-${i}`} />
           ))}
         </div>
-      ) : (
-        effectiveHasData && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1">
+      )}
+
+      {/* Kết quả */}
+      {effectiveHasData && !showSkeleton && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x={[18]} gap-y-[24px] px-1 mt-6">
             {visibleList.map((item) => (
               <Link key={item.id} to={`/real-estate/${item.id}`} className="block group">
                 <PropertyCard item={item} />
               </Link>
             ))}
           </div>
-        )
-      )}
 
-      {/* NÚT MỞ RỘNG */}
-      {effectiveHasData && effectiveList.length > INITIAL && (
-        <div className="mt-6 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 bg-white hover:bg-gray-50 shadow-sm"
-          >
-            {expanded ? "Thu gọn" : "Mở rộng"}{" "}
-            {expanded ? <UpOutlined /> : <DownOutlined />}
-          </button>
-        </div>
+          {effectiveList.length > 8 && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                onClick={() => setExpanded((v) => !v)}
+                icon={expanded ? <UpOutlined /> : <DownOutlined />}
+              >
+                {expanded ? "Thu gọn" : "Xem thêm"}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </section>
   );

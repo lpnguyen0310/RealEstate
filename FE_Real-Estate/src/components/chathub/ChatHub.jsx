@@ -5,7 +5,7 @@ import SupportChatWidget from "@/components/supportchat/SupportChatWidget";
 
 export default function ChatHub({ user, size = "md" }) {
     const [open, setOpen] = useState(false);
-    const [tab, setTab] = useState("ai"); 
+    const [tab, setTab] = useState("ai");
     const baseOffset = { right: 24, bottom: 24 };
     const fabRef = useRef(null);
     const panelRef = useRef(null);
@@ -74,8 +74,8 @@ export default function ChatHub({ user, size = "md" }) {
                     zIndex: 9500,
                 }}
                 className={`transition-all duration-300 ${open
-                        ? "opacity-100 translate-y-0"
-                        : "opacity-0 translate-y-2 pointer-events-none"
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-2 pointer-events-none"
                     }`}
                 role="dialog"
                 aria-modal="true"
@@ -88,8 +88,8 @@ export default function ChatHub({ user, size = "md" }) {
                             <button
                                 onClick={() => setTab("ai")}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-all ${tab === "ai"
-                                        ? "bg-white text-indigo-700 font-semibold shadow"
-                                        : "text-white/85 hover:bg-white/20"
+                                    ? "bg-white text-indigo-700 font-semibold shadow"
+                                    : "text-white/85 hover:bg-white/20"
                                     }`}
                             >
                                 AI Chat
@@ -97,8 +97,8 @@ export default function ChatHub({ user, size = "md" }) {
                             <button
                                 onClick={() => setTab("support")}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-all ${tab === "support"
-                                        ? "bg-white text-purple-700 font-semibold shadow"
-                                        : "text-white/85 hover:bg-white/20"
+                                    ? "bg-white text-purple-700 font-semibold shadow"
+                                    : "text-white/85 hover:bg-white/20"
                                     }`}
                             >
                                 Hỗ trợ

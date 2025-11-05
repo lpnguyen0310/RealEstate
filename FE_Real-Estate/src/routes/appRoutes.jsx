@@ -30,6 +30,7 @@ import AdminUsers from "@/pages/Admin/AdminUsers";
 import AdminPostsMUI from "@/pages/Admin/AdminPost";
 import AdminOrders from "@/pages/Admin/AdminOrder";
 import AdminSupport from "@/pages/Admin/AdminSupport";
+import AdminListingTypePackage from "@/pages/Admin/AdminListingTypePackage";
 export default function AppRoutes() {
   return (
     <Routes>
@@ -63,6 +64,7 @@ export default function AppRoutes() {
           <Route path="posts" element={<AdminPostsMUI />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="support" element={<AdminSupport />} />
+          <Route path="listing-type-packages" element={<AdminListingTypePackage />} />
           {/* <Route path="users" element={<AdminUsers />} /> */}
         </Route>
       </Route>
