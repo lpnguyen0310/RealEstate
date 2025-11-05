@@ -17,7 +17,13 @@ export default function SimilarNews() {
   const nextRef = useRef(null);
 
   const dispatch = useDispatch();
-  const { list, error } = useSelector((state) => state.property);
+
+  // ✅ đọc đúng bucket theo slot
+  const {
+    similarNewsList,
+    similarNewsLoading,
+    similarNewsError,
+  } = useSelector((s) => s.property);
 
   // Min delay cho skeleton
   const [minDelayDone, setMinDelayDone] = useState(false);
@@ -32,9 +38,10 @@ export default function SimilarNews() {
       fetchPropertiesThunk({
         page: 0,
         size: 8,
-        status: "PUBLISHED",    
-        ensurePublished: true,     
-        sort: "postedAt,DESC",  
+        status: "PUBLISHED",
+        ensurePublished: true,
+        sort: "postedAt,DESC",
+        slot: "similarNews", // ✅ quan trọng: ghi vào bucket riêng
       })
     );
   }, [dispatch]);
@@ -47,11 +54,11 @@ export default function SimilarNews() {
     swiper.navigation.update();
   }, []);
 
-  const hasData = Array.isArray(list) && list.length > 0;
+  const hasData = Array.isArray(similarNewsList) && similarNewsList.length > 0;
   const skeletonCount = 8;
 
-  // Chỉ ẩn skeleton khi ĐÃ có data VÀ đã qua thời gian tối thiểu
-  const showSkeleton = !(hasData && minDelayDone);
+  // Ẩn skeleton chỉ khi có data + đã qua minDelay, hoặc hết loading
+  const showSkeleton = similarNewsLoading || !(hasData && minDelayDone);
 
   return (
     <section className="mt-10">
@@ -63,8 +70,8 @@ export default function SimilarNews() {
       </div>
 
       {/* Hiện lỗi nếu không có data và đã qua min delay */}
-      {error && !hasData && minDelayDone && (
-        <div className="mt-4 text-center text-red-500">Lỗi: {error}</div>
+      {similarNewsError && !hasData && minDelayDone && (
+        <div className="mt-4 text-center text-red-500">Lỗi: {similarNewsError}</div>
       )}
 
       <div className="relative">
@@ -98,15 +105,12 @@ export default function SimilarNews() {
           }}
           className="!px-2"
         >
-          {(showSkeleton ? Array.from({ length: skeletonCount }) : list).map((item, i) => (
+          {(showSkeleton ? Array.from({ length: skeletonCount }) : similarNewsList).map((item, i) => (
             <SwiperSlide key={showSkeleton ? `sk-${i}` : item.id}>
               {showSkeleton ? (
                 <PropertyCardSkeleton />
               ) : (
-                <Link
-                  to={`/real-estate/${item.id}`}
-                  className="block group"
-                >
+                <Link to={`/real-estate/${item.id}`} className="block group">
                   <PropertyCard item={item} />
                 </Link>
               )}

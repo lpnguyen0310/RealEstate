@@ -2,11 +2,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import { Button, Modal, Input, Slider, message } from "antd";
+import { Button, Modal, Slider, message, Select, Spin } from "antd";
 import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import PropertyCard from "./PropertyCard";
 import PropertyCardSkeleton from "./skeletion/PropertyCardSkeleton";
 import { fetchPropertiesThunk } from "@/store/propertySlice";
+
+// ====== API chọn Tỉnh/Thành phố (chỉnh path cho đúng) ======
+import { getProvinces } from "@/api/provinces";
+// File locationApi của bạn đã có:
+//   - getProvinces(signal) -> [{ id, name }]
 
 const MIN_SKELETON_MS = 2000; // giữ skeleton tối thiểu 2s
 const SS_NS = "fy_interest_state";
@@ -60,7 +65,7 @@ function normalizePublicItem(p = {}) {
     // badge
     listingType, // "PREMIUM" | "VIP" | "NORMAL"
   };
-} 
+}
 
 export default function ForYouList() {
   const dispatch = useDispatch();
@@ -82,8 +87,13 @@ export default function ForYouList() {
   // giữ skeleton tối thiểu cho luồng ForYou
   const [forYouLocalLoading, setForYouLocalLoading] = useState(false);
 
+  // ====== LOCATION: chỉ Tỉnh/TP ======
+  const [provinces, setProvinces] = useState([]);
+  const [loadingProv, setLoadingProv] = useState(false);
+  const [provinceId, setProvinceId] = useState(undefined);
+  const [provinceName, setProvinceName] = useState("");
+
   // Modal form (persisted)
-  const [cityOrAreaKeyword, setCityOrAreaKeyword] = useState("");
   const [priceRange, setPriceRange] = useState([1_000_000_000, 5_000_000_000]);
   const [areaRange, setAreaRange] = useState([30, 120]);
 
@@ -106,12 +116,16 @@ export default function ForYouList() {
       const raw = sessionStorage.getItem(userKey);
       if (raw) {
         const saved = JSON.parse(raw);
-        if (saved?.keyword) setCityOrAreaKeyword(saved.keyword);
         if (Array.isArray(saved?.priceRange)) setPriceRange(saved.priceRange);
         if (Array.isArray(saved?.areaRange)) setAreaRange(saved.areaRange);
         if (Array.isArray(saved?.items)) setInterestResults(saved.items);
+
+        if (saved?.provinceId) {
+          setProvinceId(saved.provinceId);
+          setProvinceName(saved.provinceName || "");
+        }
+        setSearchRequested(Boolean(saved?.keyword));
       } else {
-        // user này chưa có gì → clear kết quả cũ trong state
         setInterestResults([]);
       }
     } catch { }
@@ -169,22 +183,38 @@ export default function ForYouList() {
         limit: 24,
         enforcePersonalized: true,
         fallback: false,
+        slot: "forYou",
       })
-    )
-      .finally(() => {
-        setFetchedForUserId(userId);
-        const elapsed = performance.now() - start;
-        const remain = Math.max(0, MIN_SKELETON_MS - elapsed);
-        setTimeout(() => setForYouLocalLoading(false), remain);
-      });
+    ).finally(() => {
+      setFetchedForUserId(userId);
+      const elapsed = performance.now() - start;
+      const remain = Math.max(0, MIN_SKELETON_MS - elapsed);
+      setTimeout(() => setForYouLocalLoading(false), remain);
+    });
   }, [dispatch, userId, fetchedForUserId]);
 
-  // ===== Search theo sở thích — giữ skeleton tối thiểu & persist per user =====
+  // ===== Nạp provinces khi mở modal (lazy load) =====
+  useEffect(() => {
+    if (!showModal) return;
+    let abort = new AbortController();
+    if (provinces.length === 0) {
+      setLoadingProv(true);
+      getProvinces(abort.signal)
+        .then((list) => setProvinces(list))
+        .catch(() => { })
+        .finally(() => setLoadingProv(false));
+    }
+    return () => abort.abort();
+  }, [showModal]); // chỉ khi mở modal
+
+  // ===== Search theo Tỉnh/TP — giữ skeleton tối thiểu & persist per user =====
   const handleSearch = async () => {
-    if (!cityOrAreaKeyword) {
-      message.warning("Vui lòng nhập thành phố hoặc khu vực (keyword).");
+    if (!provinceName) {
+      message.warning("Vui lòng chọn Tỉnh/Thành phố.");
       return;
     }
+
+    const keyword = provinceName; // chỉ dùng tên Tỉnh/TP làm keyword
     setSearchRequested(true);
     setSearching(true);
     setShowModal(false);
@@ -197,7 +227,7 @@ export default function ForYouList() {
           page: 0,
           size: 24,
           sort: "postedAt,desc",
-          keyword: cityOrAreaKeyword,
+          keyword,
           priceFrom: priceRange[0],
           priceTo: priceRange[1],
           areaFrom: areaRange[0],
@@ -215,11 +245,13 @@ export default function ForYouList() {
           sessionStorage.setItem(
             userKey,
             JSON.stringify({
-              keyword: cityOrAreaKeyword,
+              keyword,
               priceRange,
               areaRange,
               items: mapped,
               ts: Date.now(),
+              provinceId,
+              provinceName,
             })
           );
         }
@@ -270,7 +302,7 @@ export default function ForYouList() {
         <div className="text-center py-14 bg-[#f8fafc] rounded-2xl shadow-inner">
           <h3 className="text-xl font-semibold text-[#1b2a57] mb-2">Chào mừng bạn!</h3>
           <p className="text-gray-600 mb-6">
-            Hãy chọn khu vực, khoảng giá và diện tích để xem các tin phù hợp.
+            Hãy chọn thành phố, khoảng giá và diện tích để xem các tin phù hợp.
           </p>
           <Button
             type="primary"
@@ -304,15 +336,29 @@ export default function ForYouList() {
         ]}
       >
         <div className="space-y-5">
+          {/* TỈNH / THÀNH PHỐ */}
           <div>
-            <label className="block font-medium mb-1">Thành phố / Khu vực</label>
-            <Input
-              placeholder="VD: Quận 1, TP.HCM"
-              value={cityOrAreaKeyword}
-              onChange={(e) => setCityOrAreaKeyword(e.target.value)}
+            <label className="block font-medium mb-1">Tỉnh / Thành phố</label>
+            <Select
+              showSearch
+              allowClear
+              placeholder="Chọn Tỉnh/Thành phố"
+              value={provinceId}
+              onChange={(val, option) => {
+                setProvinceId(val);
+                setProvinceName(option?.label ?? "");
+              }}
+              style={{ width: "100%" }}
+              options={provinces.map((p) => ({ value: p.id, label: p.name }))}
+              loading={loadingProv}
+              filterOption={(input, option) =>
+                (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              notFoundContent={loadingProv ? <Spin size="small" /> : null}
             />
           </div>
 
+          {/* GIÁ */}
           <div>
             <label className="block font-medium mb-1">Khoảng giá (VND)</label>
             <Slider
@@ -329,8 +375,9 @@ export default function ForYouList() {
             </div>
           </div>
 
+          {/* DIỆN TÍCH */}
           <div>
-            <label className="block font-medium mb-1">Diện tích (m²) </label>
+            <label className="block font-medium mb-1">Diện tích (m²)</label>
             <Slider
               range
               min={10}
@@ -359,7 +406,7 @@ export default function ForYouList() {
       {/* Kết quả */}
       {effectiveHasData && !showSkeleton && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x={[18]} gap-y-[24px] px-1 mt-6">
             {visibleList.map((item) => (
               <Link key={item.id} to={`/real-estate/${item.id}`} className="block group">
                 <PropertyCard item={item} />
@@ -369,7 +416,10 @@ export default function ForYouList() {
 
           {effectiveList.length > 8 && (
             <div className="mt-6 flex justify-center">
-              <Button onClick={() => setExpanded((v) => !v)} icon={expanded ? <UpOutlined /> : <DownOutlined />}>
+              <Button
+                onClick={() => setExpanded((v) => !v)}
+                icon={expanded ? <UpOutlined /> : <DownOutlined />}
+              >
                 {expanded ? "Thu gọn" : "Xem thêm"}
               </Button>
             </div>

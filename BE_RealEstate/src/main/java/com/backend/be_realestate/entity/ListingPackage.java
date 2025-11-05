@@ -35,6 +35,19 @@ public class ListingPackage extends BaseEntity {
     @Column(name="price", nullable=false)
     private Double price;                    // VND (đơn vị nhỏ nhất) — FE dùng để cộng tổng
 
+    @Column(name="price_original")
+    private Double priceOriginal;            // Giá gốc (để gạch ngang), VD: 550.000
+
+    @Column(name="duration_days")
+    private Integer durationDays;            // Thời hạn của gói (VD: 7, 30 ngày)
+    // Cho phép admin tùy chỉnh (VD: Gói VIP 7 ngày)
+
+    @Column(name="highlight_tag", length=50)
+    private String highlightTag;             // "Hữu suất", "Lựa chọn nhiều nhất", "Giá hời nhất"
+
+    @Column(name="description", length=255)
+    private String description;              // "Trên tin thường, x10 lượt xem", "5 tin VIP"
+
     // ---- chỉ giữ lại boostFactor theo yêu cầu ----
     @Column(name="boost_factor")
     private Integer boostFactor;

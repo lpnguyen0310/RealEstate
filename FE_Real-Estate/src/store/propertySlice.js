@@ -20,18 +20,18 @@ export const fetchPropertiesThunk = createAsyncThunk(
                     params?.userId;
                 const limit = params?.limit ?? params?.size ?? 8;
 
-                // Chưa đăng nhập → vẫn giữ behavior cũ (không fallback)
+                // Chưa đăng nhập → không fallback (giữ behavior cũ)
                 if (!userId)
                     return { content: [], _source: "popular", _forYou: true };
 
-                // 1) Gọi gợi ý cá nhân hóa
+                // 1) Personalized
                 const recoRes = await api.get("/properties/recommendations", {
                     params: { userId, limit },
                 });
                 const recoArr = recoRes?.data?.data ?? recoRes?.data ?? [];
-                const recoSource = recoRes?.headers?.["x-reco-source"] || "personalized";
+                const recoSource =
+                    recoRes?.headers?.["x-reco-source"] || "personalized";
 
-                // Nếu có data → trả về luôn
                 if (Array.isArray(recoArr) && recoArr.length > 0) {
                     return {
                         content: recoArr,
@@ -52,12 +52,11 @@ export const fetchPropertiesThunk = createAsyncThunk(
                 };
                 const fbRes = await api.get("/properties", { params: fallbackParams });
                 const fb = fbRes?.data?.data ?? fbRes?.data;
-                const fbContent = fb?.content ??
-                    (Array.isArray(fb) ? fb : []);
+                const fbContent = fb?.content ?? (Array.isArray(fb) ? fb : []);
 
                 return {
                     content: Array.isArray(fbContent) ? fbContent : [],
-                    _source: "vip_premium",     // để hiển thị badge "PREMIUM/VIP" ở UI
+                    _source: "vip_premium",
                     _forYou: true,
                 };
             }
@@ -79,26 +78,22 @@ export const fetchPropertyByIdThunk = createAsyncThunk(
     async (propertyId, { rejectWithValue }) => {
         try {
             const res = await api.get(`/properties/${propertyId}`);
-            console.log("[fetchById] raw:", res.data);            // <= log
             return res?.data?.data ?? res?.data;
         } catch (e) {
-            return rejectWithValue(e?.response?.data?.message || "Không thể tải chi tiết tin đăng");
+            return rejectWithValue(
+                e?.response?.data?.message || "Không thể tải chi tiết tin đăng"
+            );
         }
     }
 );
-// src/store/propertySlice.js
 
-// ... imports giữ nguyên
-
-// Lấy chi tiết tin để EDIT (yêu cầu đã đăng nhập)
+// Lấy chi tiết tin để EDIT (yêu cầu login)
 export const fetchPropertyEditByIdThunk = createAsyncThunk(
     "property/fetchEditById",
     async (propertyId, { rejectWithValue }) => {
         try {
-            // gọi đúng route mới:
             const res = await api.get(`/properties/edit/${propertyId}`);
-            // BE trả thẳng DTO => res.data là object; vẫn an toàn nếu sau này bọc {data: ...}
-            return res?.data?.data ?? res?.data;
+            return res?.data?.data ?? res?.data; // PropertyDTO
         } catch (e) {
             return rejectWithValue(
                 e?.response?.data?.message || "Không thể tải chi tiết tin đăng (edit)"
@@ -107,19 +102,16 @@ export const fetchPropertyEditByIdThunk = createAsyncThunk(
     }
 );
 
+// Danh sách người yêu thích 1 tin
 export const fetchPropertyFavoritesThunk = createAsyncThunk(
     "property/fetchFavorites",
-    /**
-     * @param {number | string} propertyId ID của tin đăng
-     */
     async (propertyId, { rejectWithValue }) => {
         try {
-            // API bạn vừa tạo: GET /api/properties/{id}/favorites
             const res = await api.get(`/properties/${propertyId}/favorites`);
-            // API trả về List<UserFavoriteDTO>
-            return res.data;
+            return res.data; // List<UserFavoriteDTO>
         } catch (e) {
-            const msg = e?.response?.data?.message || "Không thể tải danh sách người yêu thích";
+            const msg =
+                e?.response?.data?.message || "Không thể tải danh sách người yêu thích";
             return rejectWithValue(msg);
         }
     }
@@ -129,7 +121,7 @@ export const fetchPropertyFavoritesThunk = createAsyncThunk(
 export const createPropertyThunk = createAsyncThunk(
     "property/create",
     /**
-     * @param {{ formData: any, listingTypePolicyId: number|null }} arg
+     * @param {{ formData: any, listingTypePolicyId: number|null, submitMode?: "publish"|"draft" }} arg
      */
     async ({ formData, listingTypePolicyId, submitMode = "publish" }, { rejectWithValue }) => {
         try {
@@ -138,12 +130,12 @@ export const createPropertyThunk = createAsyncThunk(
             const files = imgs.filter((x) => x instanceof File || x instanceof Blob);
             const existedUrls = imgs.filter((x) => typeof x === "string" && x.startsWith("http"));
 
-            // 2) Upload file lên Cloudinary
+            // 2) Upload Cloudinary
             const uploaded = files.length ? await uploadMany(files, "properties") : [];
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
 
-            // 3) Build payload
+            // 3) Payload
             const payload = {
                 title: formData.title,
                 price: Number(formData.price) || 0,
@@ -160,7 +152,8 @@ export const createPropertyThunk = createAsyncThunk(
 
                 floors: Number(formData.floors) || null,
                 position: formData.position || "",
-                displayAddress: formData.displayAddress || formData.suggestedAddress || "",
+                displayAddress:
+                    formData.displayAddress || formData.suggestedAddress || "",
 
                 landArea: Number(formData.landArea) || null,
                 width: Number(formData.width) || null,
@@ -171,14 +164,16 @@ export const createPropertyThunk = createAsyncThunk(
                 districtId: formData.districtId || null,
                 cityId: formData.provinceId || null,
 
-                listingTypePolicyId: listingTypePolicyId ?? formData.listingTypePolicyId,
+                listingTypePolicyId:
+                    listingTypePolicyId ?? formData.listingTypePolicyId,
                 imageUrls,
                 amenityIds: formData.amenityIds || [],
             };
 
-            // const res = await api.post("/properties/create", payload);
             const mode = submitMode?.toUpperCase() === "DRAFT" ? "DRAFT" : "PUBLISH";
-            const res = await api.post("/properties/create", payload, { params: { mode } });
+            const res = await api.post("/properties/create", payload, {
+                params: { mode },
+            });
             return res?.data?.data ?? res?.data;
         } catch (e) {
             const msg = e?.response?.data?.message || "Đăng tin thất bại";
@@ -187,7 +182,7 @@ export const createPropertyThunk = createAsyncThunk(
     }
 );
 
-// Lấy danh sách tin của chính user (dashboard)
+// Danh sách tin của tôi (dashboard)
 export const fetchMyPropertiesThunk = createAsyncThunk(
     "property/fetchMine",
     async (params = {}, thunkApi) => {
@@ -197,14 +192,23 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
                 size = 10,
                 status,
                 sort = "postedAt,desc",
-                q, code, area, areaMin, areaMax, priceMin, priceMax,
-                autoPosting, expireDate,
+                q,
+                code,
+                area,
+                areaMin,
+                areaMax,
+                priceMin,
+                priceMax,
+                autoPosting,
+                expireDate,
             } = params;
 
             const query = {
-                page, size, sort,
+                page,
+                size,
+                sort,
                 ...(status ? { status } : {}),
-                ...(q ? { q } : {}), // 🔍 keyword
+                ...(q ? { q } : {}),
                 ...(code ? { code } : {}),
                 ...(area ? { area } : {}),
                 ...(areaMin != null ? { areaMin } : {}),
@@ -218,31 +222,31 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
             const res = await api.get("/properties/me", { params: query });
             return res.data; // PageResponse
         } catch (err) {
-            return thunkApi.rejectWithValue(err?.response?.data?.message || err.message);
+            return thunkApi.rejectWithValue(
+                err?.response?.data?.message || err.message
+            );
         }
     }
 );
-
 
 // Cập nhật tin đăng
 export const updatePropertyThunk = createAsyncThunk(
     "property/update",
     /**
-     * @param {{ id: number|string, formData: any, listingTypePolicyId?: number|null }} arg
+     * @param {{ id: number|string, formData: any, listingTypePolicyId?: number|null, submitMode?: "publish"|"draft"|undefined }} arg
      */
     async ({ id, formData, listingTypePolicyId, submitMode }, { rejectWithValue }) => {
         try {
-            // 1) Ảnh: tách file & URL
+            // 1) Ảnh
             const imgs = formData.images || [];
             const files = imgs.filter((x) => x instanceof File || x instanceof Blob);
             const existedUrls = imgs.filter((x) => typeof x === "string" && x.startsWith("http"));
 
-            // 2) Upload file lên Cloudinary
             const uploaded = files.length ? await uploadMany(files, "properties") : [];
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
 
-            // 3) Build payload — dùng format y chang create
+            // 2) Payload (same as create)
             const payload = {
                 title: formData.title,
                 price: Number(formData.price) || 0,
@@ -259,7 +263,8 @@ export const updatePropertyThunk = createAsyncThunk(
 
                 floors: Number(formData.floors) || null,
                 position: formData.position || "",
-                displayAddress: formData.displayAddress || formData.suggestedAddress || "",
+                displayAddress:
+                    formData.displayAddress || formData.suggestedAddress || "",
 
                 landArea: Number(formData.landArea) || null,
                 width: Number(formData.width) || null,
@@ -270,14 +275,16 @@ export const updatePropertyThunk = createAsyncThunk(
                 districtId: formData.districtId || null,
                 cityId: formData.provinceId || null,
 
-                listingTypePolicyId: listingTypePolicyId ?? formData.listingTypePolicyId,
+                listingTypePolicyId:
+                    listingTypePolicyId ?? formData.listingTypePolicyId,
                 imageUrls,
                 amenityIds: formData.amenityIds || [],
             };
 
-            // 4) Gọi API update
-            const mode = submitMode ? submitMode.toUpperCase() : undefined; // "PUBLISH" | "DRAFT" | undefined
-            const res = await api.put(`/properties/${id}`, payload, { params: mode ? { mode } : {} });
+            const mode = submitMode ? submitMode.toUpperCase() : undefined;
+            const res = await api.put(`/properties/${id}`, payload, {
+                params: mode ? { mode } : {},
+            });
             return res?.data?.data ?? res?.data;
         } catch (e) {
             const msg = e?.response?.data?.message || "Cập nhật tin thất bại";
@@ -286,8 +293,7 @@ export const updatePropertyThunk = createAsyncThunk(
     }
 );
 
-
-// Lấy số đếm dashboard
+// Số đếm dashboard
 export const fetchMyPropertyCountsThunk = createAsyncThunk(
     "property/fetchMyCounts",
     async (_, { rejectWithValue }) => {
@@ -315,8 +321,17 @@ function parseToDate(x) {
             return Number.isNaN(t) ? null : new Date(t);
         }
         if (typeof x === "object" && "year" in x && "month" in x && "day" in x) {
-            const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } = x;
-            return new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1e6));
+            const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } =
+                x;
+            return new Date(
+                year,
+                month - 1,
+                day,
+                hour,
+                minute,
+                second,
+                Math.floor(nano / 1e6)
+            );
         }
         return null;
     } catch {
@@ -342,52 +357,77 @@ function isExpiringSoon(post) {
 function toStatusTag(status) {
     const s = (status ?? "").toString().trim().toUpperCase();
     switch (s) {
-        case "PUBLISHED": return "Đang Đăng";
-        case "PENDING_REVIEW": return "Chờ Duyệt";
-        case "DRAFT": return "Nháp";
-        case "REJECTED": return "Bị Từ Chối";
-        case "HIDDEN": return "Đã Ẩn";
-        case "EXPIRED": return "Hết Hạn";
-        case "EXPIRINGSOON": return "Sắp Hết Hạn";
-        case "ARCHIVED": return "Đã Lưu Trữ";
-        case "WARNED": return "Cần Chỉnh Sửa";
-        default: return "Nháp";
+        case "PUBLISHED":
+            return "Đang Đăng";
+        case "PENDING_REVIEW":
+            return "Chờ Duyệt";
+        case "DRAFT":
+            return "Nháp";
+        case "REJECTED":
+            return "Bị Từ Chối";
+        case "HIDDEN":
+            return "Đã Ẩn";
+        case "EXPIRED":
+            return "Hết Hạn";
+        case "EXPIRINGSOON":
+            return "Sắp Hết Hạn";
+        case "ARCHIVED":
+            return "Đã Lưu Trữ";
+        case "WARNED":
+            return "Cần Chỉnh Sửa";
+        default:
+            return "Nháp";
     }
 }
 function statusEnumToKey(status) {
     const s = (status ?? "").toString().trim().toUpperCase();
     switch (s) {
-        case "PUBLISHED": return "active";
-        case "PENDING_REVIEW": return "pending";
-        case "DRAFT": return "draft";
-        case "REJECTED": return "rejected";
-        case "HIDDEN": return "hidden";
-        case "EXPIRED": return "expired";
-        case "EXPIRINGSOON": return "expiringSoon";
-        case "ARCHIVED": return "hidden";
-        case "WARNED": return "warned";
-        default: return "draft";
+        case "PUBLISHED":
+            return "active";
+        case "PENDING_REVIEW":
+            return "pending";
+        case "DRAFT":
+            return "draft";
+        case "REJECTED":
+            return "rejected";
+        case "HIDDEN":
+            return "hidden";
+        case "EXPIRED":
+            return "expired";
+        case "EXPIRINGSOON":
+            return "expiringSoon";
+        case "ARCHIVED":
+            return "hidden";
+        case "WARNED":
+            return "warned";
+        default:
+            return "draft";
     }
 }
 
 function mapDtoToPostCard(p) {
     const fmt = Intl.NumberFormat("vi-VN");
 
-    // Fallback tính giá/m² nếu BE chưa cung cấp pricePerM2
-    const pricePerM2 = (p?.pricePerM2 != null)
-        ? p.pricePerM2
-        : (p?.price != null && p?.area > 0)
-            ? (p.price / p.area)
-            : null;
+    const pricePerM2 =
+        p?.pricePerM2 != null
+            ? p.pricePerM2
+            : p?.price != null && p?.area > 0
+                ? p.price / p.area
+                : null;
 
     const priceText = p?.price != null ? `${fmt.format(p.price)} ₫` : "—";
-    const unitPriceText = pricePerM2 != null ? `${fmt.format(pricePerM2)} ₫/m²` : "";
+    const unitPriceText =
+        pricePerM2 != null ? `${fmt.format(pricePerM2)} ₫/m²` : "";
 
-    const addressMain = p?.displayAddress || [p?.addressStreet].filter(Boolean).join(", ");
+    const addressMain =
+        p?.displayAddress || [p?.addressStreet].filter(Boolean).join(", ");
 
     return {
         id: p.id,
-        images: Array.isArray(p.imageUrls) && p.imageUrls.length ? p.imageUrls : p.images || [],
+        images:
+            Array.isArray(p.imageUrls) && p.imageUrls.length
+                ? p.imageUrls
+                : p.images || [],
         title: p.title,
         description: p.description,
 
@@ -399,8 +439,11 @@ function mapDtoToPostCard(p) {
         landPriceText: "",
 
         installmentText:
-            p?.propertyType === "sell" ? "Mua bán" :
-                p?.propertyType === "rent" ? "Cho thuê" : "",
+            p?.propertyType === "sell"
+                ? "Mua bán"
+                : p?.propertyType === "rent"
+                    ? "Cho thuê"
+                    : "",
 
         addressMain,
         area: p?.area,
@@ -409,18 +452,19 @@ function mapDtoToPostCard(p) {
         sizeText: p?.width && p?.height ? `${p.width}m x ${p.height}m` : "",
         note: "",
 
-        createdAt: p?.postedAt ? new Date(p.postedAt).toLocaleDateString("vi-VN") : "",
+        createdAt: p?.postedAt
+            ? new Date(p.postedAt).toLocaleDateString("vi-VN")
+            : "",
         views: p?.viewCount ?? 0,
         favoriteCount: p?.favoriteCount ?? 0,
 
-        listingType: p?.listingType,        // NORMAL | VIP | PREMIUM (string)
+        listingType: p?.listingType, // NORMAL | VIP | PREMIUM
 
         postedAt: p?.postedAt ?? null,
         expiresAt: p?.expiresAt ?? null,
         durationDays: p?.durationDays ?? null,
         actualDurationDays: p?.actualDurationDays ?? null,
 
-        // 🔥 MỚI: dùng cho UI
         rejectReason: p?.rejectReason || null,
         audits: Array.isArray(p?.audit) ? p.audit : [],
 
@@ -459,31 +503,64 @@ function mapPublicPropertyToCard(p) {
         listingType: p.listing_type || p.listingType,
     };
 }
+const slotKey = (slot = "list") =>
+({
+    // Trang search (mặc định)
+    list: { list: "list", loading: "loading", error: "error" },
+
+    // Slots cho Home
+    homeFeatured: {
+        list: "homeFeaturedList",
+        loading: "homeFeaturedLoading",
+        error: "homeFeaturedError",
+    },
+    similarNews: {
+        list: "similarNewsList",
+        loading: "similarNewsLoading",
+        error: "similarNewsError",
+    },
+
+    // Slot logic cho For You (để đồng nhất cách bật/tắt cờ)
+    forYou: {
+        list: "forYouList",
+        loading: "forYouLoading",
+        error: "forYouError",
+    },
+}[slot] || { list: "list", loading: "loading", error: "error" });
 
 /* ===================== SLICE ===================== */
 
 const initialState = {
-    // Public page
+    // Public (trang search)
     list: [],
     page: 0,
     size: 20,
     totalElements: 0,
     totalPages: 0,
 
+    // ===== Buckets theo slot cho Home =====
+    homeFeaturedList: [],
+    homeFeaturedLoading: false,
+    homeFeaturedError: null,
+
+    similarNewsList: [],
+    similarNewsLoading: false,
+    similarNewsError: null,
+
     // For You (recommend)
     forYouList: [],
     forYouLoading: false,
     forYouError: null,
-    forYouSource: null, // 'personalized' | 'popular' | null
+    forYouSource: null, // 'personalized' | 'vip_premium' | 'popular' | null
 
-    // My dashboard list
+    // Dashboard list của tôi
     myList: [],
     myPage: 0,
     mySize: 20,
     myTotalElements: 0,
     myTotalPages: 0,
 
-    // UI state
+    // UI state chung
     loading: false,
     error: null,
 
@@ -508,7 +585,7 @@ const initialState = {
     createError: null,
     lastCreated: null,
 
-    //STATE CHO MODAL FAVORITES
+    // STATE CHO MODAL FAVORITES
     loadingFavorites: false,
     errorFavorites: null,
     currentFavoriteUsers: [],
@@ -518,9 +595,17 @@ const propertySlice = createSlice({
     name: "property",
     initialState,
     reducers: {
-        setPage(state, action) { state.page = action.payload ?? 0; },
-        setSize(state, action) { state.size = action.payload ?? 20; state.page = 0; },
-        setSort(state, action) { state.sort = action.payload ?? "postedAt,desc"; state.page = 0; },
+        setPage(state, action) {
+            state.page = action.payload ?? 0;
+        },
+        setSize(state, action) {
+            state.size = action.payload ?? 20;
+            state.page = 0;
+        },
+        setSort(state, action) {
+            state.sort = action.payload ?? "postedAt,desc";
+            state.page = 0;
+        },
         clearProperties(state) {
             state.list = [];
             state.page = 0;
@@ -530,6 +615,14 @@ const propertySlice = createSlice({
             state.lastCreated = null;
             state.createError = null;
             state.creating = false;
+
+            // Clear slots Home
+            state.homeFeaturedList = [];
+            state.homeFeaturedLoading = false;
+            state.homeFeaturedError = null;
+            state.similarNewsList = [];
+            state.similarNewsLoading = false;
+            state.similarNewsError = null;
 
             // Clear For You
             state.forYouList = [];
@@ -555,8 +648,17 @@ const propertySlice = createSlice({
         },
         clearForYou(state) {
             state.forYouList = [];
-            state.forYouLoading = false; state.forYouError = null;
+            state.forYouLoading = false;
+            state.forYouError = null;
             state.forYouSource = null;
+        },
+        clearHomeSlots(state) {
+            state.homeFeaturedList = [];
+            state.homeFeaturedLoading = false;
+            state.homeFeaturedError = null;
+            state.similarNewsList = [];
+            state.similarNewsLoading = false;
+            state.similarNewsError = null;
         },
     },
     extraReducers: (b) => {
@@ -576,10 +678,15 @@ const propertySlice = createSlice({
             })
 
             // ===== MY LIST (dashboard) =====
-            .addCase(fetchMyPropertiesThunk.pending, (s) => { s.loading = true; s.error = null; })
+            .addCase(fetchMyPropertiesThunk.pending, (s) => {
+                s.loading = true;
+                s.error = null;
+            })
             .addCase(fetchMyPropertiesThunk.fulfilled, (s, a) => {
                 const d = a.payload || {};
-                s.myList = Array.isArray(d.content) ? d.content.map(mapDtoToPostCard) : [];
+                s.myList = Array.isArray(d.content)
+                    ? d.content.map(mapDtoToPostCard)
+                    : [];
                 s.myPage = d.page ?? d.number ?? 0;
                 s.mySize = d.size ?? s.mySize;
                 s.myTotalElements = d.totalElements ?? 0;
@@ -591,64 +698,84 @@ const propertySlice = createSlice({
                 s.error = a.payload || "Không thể tải danh sách tin đăng của tôi";
             })
 
-            // ===== PUBLIC LIST + FOR YOU (branch theo meta.arg.type) =====
+            // ===== PUBLIC LIST + FOR YOU (slot-aware) =====
             .addCase(fetchPropertiesThunk.pending, (s, a) => {
-                if (a.meta?.arg?.type === "forYou") {
+                const { type, slot } = a.meta?.arg || {};
+                if (type === "forYou") {
                     s.forYouLoading = true;
                     s.forYouError = null;
                     return;
                 }
-                s.loading = true;
-                s.error = null;
+                const k = slotKey(slot);
+                s[k.loading] = true;
+                s[k.error] = null;
             })
             .addCase(fetchPropertiesThunk.fulfilled, (s, a) => {
                 const pageData = a.payload || {};
                 const arr = pageData.content || [];
                 let mapped = Array.isArray(arr) ? arr.map(mapPublicPropertyToCard) : [];
 
-                // Nếu là danh sách ForYou dạng fallback VIP/PREMIUM → lọc cứng NORMAL
-                if ((a.meta?.arg?.type === "forYou" || pageData._forYou) && pageData._source === "vip_premium") {
-                    mapped = mapped.filter(x =>
-                        ["PREMIUM", "VIP"].includes(String(x?.listingType || "").toUpperCase())
+                // ForYou fallback → lọc NORMAL
+                if (
+                    (a.meta?.arg?.type === "forYou" || pageData._forYou) &&
+                    pageData._source === "vip_premium"
+                ) {
+                    mapped = mapped.filter((x) =>
+                        ["PREMIUM", "VIP"].includes(
+                            String(x?.listingType || "").toUpperCase()
+                        )
                     );
                 }
 
+                // Ưu tiên PREMIUM/VIP
                 const sortOrder = { PREMIUM: 1, VIP: 2, NORMAL: 3 };
                 const sorted = mapped.sort((A, B) => {
                     const aT = (A.listingType || "").toUpperCase();
                     const bT = (B.listingType || "").toUpperCase();
-                    const va = sortOrder[aT] || 99;
-                    const vb = sortOrder[bT] || 99;
-                    return va - vb;
+                    return (sortOrder[aT] || 99) - (sortOrder[bT] || 99);
                 });
 
+                // Nhánh For You
                 if (a.meta?.arg?.type === "forYou" || pageData._forYou) {
                     s.forYouList = sorted;
                     s.forYouLoading = false;
-                    if (pageData._source) s.forYouSource = pageData._source; // "personalized" | "vip_premium" | "popular"
+                    if (pageData._source) s.forYouSource = pageData._source;
                     return;
                 }
 
-                // Public list
-                s.list = sorted;
-                s.page = pageData.number ?? 0;
-                s.size = pageData.size ?? 20;
-                s.totalElements = pageData.totalElements ?? 0;
-                s.totalPages = pageData.totalPages ?? 0;
-                s.loading = false;
-                s.error = null;
+                // Nhánh public theo slot
+                const { slot } = a.meta?.arg || {};
+                const k = slotKey(slot);
+
+                if (k.list === "list") {
+                    // slot mặc định cho trang search: gán cả phân trang
+                    s.list = sorted;
+                    s.page = pageData.number ?? 0;
+                    s.size = pageData.size ?? 20;
+                    s.totalElements = pageData.totalElements ?? 0;
+                    s.totalPages = pageData.totalPages ?? 0;
+                    s[k.loading] = false;
+                    s[k.error] = null;
+                } else {
+                    // các slot khác (homeFeatured/similarNews): chỉ set list
+                    s[k.list] = sorted;
+                    s[k.loading] = false;
+                    s[k.error] = null;
+                }
             })
             .addCase(fetchPropertiesThunk.rejected, (s, a) => {
-                if (a.meta?.arg?.type === "forYou") {
+                const { type, slot } = a.meta?.arg || {};
+                if (type === "forYou") {
                     s.forYouLoading = false;
                     s.forYouError = a.payload || "Không thể tải gợi ý";
                     return;
                 }
-                s.loading = false;
-                s.error = a.payload || "Không thể tải danh sách tin đăng";
+                const k = slotKey(slot);
+                s[k.loading] = false;
+                s[k.error] = a.payload || "Không thể tải danh sách tin đăng";
             })
 
-            // ===== DETAIL =====
+            // ===== DETAIL (view) =====
             .addCase(fetchPropertyByIdThunk.pending, (state) => {
                 state.loadingDetail = true;
                 state.errorDetail = null;
@@ -675,6 +802,7 @@ const propertySlice = createSlice({
                 state.loadingCounts = false;
                 state.counts = { ...initialState.counts };
             })
+
             // ===== FAVORITES =====
             .addCase(fetchPropertyFavoritesThunk.pending, (state) => {
                 state.loadingFavorites = true;
@@ -683,12 +811,13 @@ const propertySlice = createSlice({
             })
             .addCase(fetchPropertyFavoritesThunk.fulfilled, (state, action) => {
                 state.loadingFavorites = false;
-                state.currentFavoriteUsers = action.payload; // Gán List<UserFavoriteDTO>
+                state.currentFavoriteUsers = action.payload;
             })
             .addCase(fetchPropertyFavoritesThunk.rejected, (state, action) => {
                 state.loadingFavorites = false;
                 state.errorFavorites = action.payload;
             })
+
             // ===== DETAIL (EDIT) =====
             .addCase(fetchPropertyEditByIdThunk.pending, (state) => {
                 state.loadingDetail = true;
@@ -697,12 +826,13 @@ const propertySlice = createSlice({
             })
             .addCase(fetchPropertyEditByIdThunk.fulfilled, (state, action) => {
                 state.loadingDetail = false;
-                state.currentProperty = action.payload; // chính là PropertyDTO
+                state.currentProperty = action.payload;
             })
             .addCase(fetchPropertyEditByIdThunk.rejected, (state, action) => {
                 state.loadingDetail = false;
                 state.errorDetail = action.payload;
             })
+
             // ===== UPDATE =====
             .addCase(updatePropertyThunk.pending, (s) => {
                 s.creating = true;
@@ -724,12 +854,20 @@ const propertySlice = createSlice({
 const selectPropertyState = (s) => s.property;
 
 // Dashboard (my list)
-export const selectMyPosts = createSelector(selectPropertyState, (st) => st.myList || []);
+export const selectMyPosts = createSelector(
+    selectPropertyState,
+    (st) => st.myList || []
+);
 
 // Báo cáo nhanh cho dashboard
 export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
-    let active = 0, pending = 0, expiring = 0;
-    let autoTotal = 0, premium = 0, vip = 0, normal = 0;
+    let active = 0,
+        pending = 0,
+        expiring = 0;
+    let autoTotal = 0,
+        premium = 0,
+        vip = 0,
+        normal = 0;
 
     for (const p of posts) {
         const status = (p?.statusKey || "").toLowerCase();
@@ -756,5 +894,15 @@ export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
 
 /* ===================== EXPORTS ===================== */
 
-export const { setPage, setSize, setSort, clearProperties, clearCurrentProperty, clearFavorites, clearForYou } = propertySlice.actions;
+export const {
+    setPage,
+    setSize,
+    setSort,
+    clearProperties,
+    clearCurrentProperty,
+    clearFavorites,
+    clearForYou,
+    clearHomeSlots,
+} = propertySlice.actions;
+
 export default propertySlice.reducer;

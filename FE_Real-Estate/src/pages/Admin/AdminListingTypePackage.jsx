@@ -1,4 +1,3 @@
-// src/pages/Admin/AdminListingTypePackage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
     Box,
@@ -497,11 +496,30 @@ export default function AdminListingTypePackage() {
                         <Chip label="Trống" size="small" />
                     ) : (
                         <Stack direction="row" spacing={1} flexWrap="wrap">
-                            {r.items.map((it, i) => (
-                                <Chip key={i} label={`${typeNameByCode(it.typeCode)} × ${it.qty}`} size="small" sx={{ mb: 0.5 }} />
-                            ))}
+                            {r.items.map((it, i) => {
+                                const color =
+                                    it.typeCode === "VIP"
+                                        ? "warning"
+                                        : it.typeCode === "PREMIUM"
+                                            ? "primary"
+                                            : "default";
+                                return (
+                                    <Chip
+                                        key={i}
+                                        color={color}
+                                        label={`${typeNameByCode(it.typeCode)} × ${it.qty}`}
+                                        size="small"
+                                        sx={{
+                                            mb: 0.5,
+                                            fontWeight: 600,
+                                            color: color === "default" ? "#333" : "#fff",
+                                        }}
+                                    />
+                                );
+                            })}
                         </Stack>
                     ),
+
             },
             { key: "total", label: "Tổng số tin", render: (r) => <Chip label={sumQty(r.items)} size="small" />, sx: { width: 140 } },
             { key: "originalPrice", label: "Giá gốc", render: (r) => fmtVND(r.originalPrice), sx: { width: 140, textAlign: "right" } },
