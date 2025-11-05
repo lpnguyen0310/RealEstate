@@ -24,7 +24,7 @@ import {
 } from "./CreatePostSection";
 import PostTypeSection from "./PostTypeDrawer";
 
-import { validateField } from "@/utils/validators";
+// import { validateField } from "@/utils/validators";
 import { useVNLocations, useAddressSuggestions, useListingTypes } from "@/hooks";
 
 /* ================= Header ================= */
@@ -260,7 +260,8 @@ export default function PostCreateDrawer({
     const onFieldChange = useCallback((name, value) => {
         setFormData((p) => ({ ...p, [name]: value }));
         setErrors((prev) => {
-            const msg = validateField(name, value);
+            // const msg = validateField(name, value);
+            const msg = null; // disabling inline validation
             const next = { ...prev };
             if (msg) next[name] = msg; else delete next[name];
             return next;
@@ -284,13 +285,13 @@ export default function PostCreateDrawer({
 
         const required = [
             "title", "description", "categoryId", "price", "position", "landArea",
-            "provinceId", "districtId", "wardId", "suggestedAddress", "legalDocument",
+            "legalDocument",
         ];
 
         const msgMap = {
-            provinceId: "Vui lòng chọn Tỉnh/Thành phố",
-            districtId: "Vui lòng chọn Quận/Huyện",
-            wardId: "Vui lòng chọn Phường/Xã",
+            // provinceId: "Vui lòng chọn Tỉnh/Thành phố",
+            // districtId: "Vui lòng chọn Quận/Huyện",
+            // wardId: "Vui lòng chọn Phường/Xã",
             suggestedAddress: "Vui lòng chọn Địa chỉ đề xuất",
             position: "Vui lòng chọn Vị trí",
             landArea: "Vui lòng nhập Diện tích đất",
@@ -315,28 +316,26 @@ export default function PostCreateDrawer({
     }, [isEdit, formData, onContinue]);
 
     /* ===== ACTION: UPDATE (isEdit) ===== */
-    const onUpdate = useCallback(async () => {
-        try {
-            // Map id -> listingType
-            const idToType = {};
-            (listingTypes || []).forEach((x) => (idToType[x.id] = x.listingType));
-            const selectedType =
-                idToType[postTypeId ?? formData.listingTypePolicyId] || formData.listingType || null;
+    const onUpdate = useCallback(async () => {
+        try {
+            // Map id -> listingType
+            const idToType = {};
+            (listingTypes || []).forEach((x) => (idToType[x.id] = x.listingType));
+            const selectedType =
+                idToType[postTypeId ?? formData.listingTypePolicyId] || formData.listingType || null;
+            const isVipLike = selectedType === "VIP" || selectedType === "PREMIUM";
+            const isChangingType = selectedType && selectedType !== formData.listingType; // khác với gói hiện tại
+            const leftQty = isVipLike ? (invMap?.[selectedType] ?? 0) : Infinity;
+            // ❗ Nếu đang CHUYỂN sang VIP/PREMIUM mà hết lượt -> chặn và mở modal
+            if (isVipLike && isChangingType && leftQty <= 0) {
+                setShowPromptEdit(true);
+                return;
+            }
 
-            const isVipLike = selectedType === "VIP" || selectedType === "PREMIUM";
-            const isChangingType = selectedType && selectedType !== formData.listingType; // khác với gói hiện tại
-            const leftQty = isVipLike ? (invMap?.[selectedType] ?? 0) : Infinity;
-
-            // ❗ Nếu đang CHUYỂN sang VIP/PREMIUM mà hết lượt -> chặn và mở modal
-            if (isVipLike && isChangingType && leftQty <= 0) {
-                setShowPromptEdit(true);
-                return;
-            }
-
-            const payload = {
-                ...formData,
-                listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
-            };
+            const payload = {
+                ...formData,
+                listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
+            };
 
             // === 💡 LOGIC MỚI ===
             // 1. Chỉ set 'submitMode' là "publish" NẾU bài đăng đang bị 'WARNED' hoặc 'REJECTED'
@@ -344,22 +343,22 @@ export default function PostCreateDrawer({
             //    backend sẽ tự hiểu là giữ nguyên trạng thái.
             const submitMode = needsResubmit ? "publish" : undefined;
 
-            await dispatch(
-                updatePropertyThunk({
-                    id: editingId,
-                    formData: payload,
-                    listingTypePolicyId: payload.listingTypePolicyId,
+            await dispatch(
+                updatePropertyThunk({
+                    id: editingId,
+                    formData: payload,
+                    listingTypePolicyId: payload.listingTypePolicyId,
                     submitMode: submitMode // 👈 Dùng biến điều kiện
-                })
-            ).unwrap();
-            message.success("Cập nhật tin thành công!");
-            onCreated?.();       // refresh list ngoài
-            onClose?.();         // đóng drawer
-        } catch (e) {
-            message.error(e || "Cập nhật tin thất bại");
-        }
-    // === 💡 2. THÊM 'needsResubmit' VÀO DEPENDENCY ARRAY ===
-    }, [dispatch, editingId, formData, postTypeId, onCreated, onClose, listingTypes, invMap, needsResubmit]);
+                })
+            ).unwrap();
+            message.success("Cập nhật tin thành công!");
+            onCreated?.();       // refresh list ngoài
+            onClose?.();         // đóng drawer
+        } catch (e) {
+            message.error(e || "Cập nhật tin thất bại");
+        }
+        // === 💡 2. THÊM 'needsResubmit' VÀO DEPENDENCY ARRAY ===
+    }, [dispatch, editingId, formData, postTypeId, onCreated, onClose, listingTypes, invMap, needsResubmit]);
 
 
     const onPublishDraft = useCallback(async () => {

@@ -60,7 +60,7 @@ function normalizePublicItem(p = {}) {
     // badge
     listingType, // "PREMIUM" | "VIP" | "NORMAL"
   };
-}
+} 
 
 export default function ForYouList() {
   const dispatch = useDispatch();
@@ -270,7 +270,7 @@ export default function ForYouList() {
         <div className="text-center py-14 bg-[#f8fafc] rounded-2xl shadow-inner">
           <h3 className="text-xl font-semibold text-[#1b2a57] mb-2">Chào mừng bạn!</h3>
           <p className="text-gray-600 mb-6">
-            Hãy chọn khu vực (keyword), khoảng giá và diện tích để xem các tin phù hợp.
+            Hãy chọn khu vực, khoảng giá và diện tích để xem các tin phù hợp.
           </p>
           <Button
             type="primary"
