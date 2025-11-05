@@ -14,6 +14,7 @@ public class ListingPackageDTO {
     private Integer boostFactor;  // x10, x50...
     private Integer sortOrder;
     private List<PackageItemDTO> items;
+    private Boolean isActive;
     private Double priceOriginal;   // Giá gốc (để gạch ngang)
     private Integer durationDays;   // Thời hạn của gói (7, 30 ngày)
     private String highlightTag;    // "Hữu suất", "Lựa chọn nhiều nhất"

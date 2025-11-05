@@ -25,9 +25,19 @@ public class PricingCatalogServiceImpl implements PricingCatalogService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ListingPackageDTO> getActiveCatalog() {
-        return packageRepo.findAllByIsActiveTrueOrderBySortOrderAscIdAsc()
-                .stream()
+    public List<ListingPackageDTO> getCatalog(Boolean active) {
+
+        List<ListingPackage> packages;
+
+        if (active == null) {
+            // Nếu React gửi "all" (active = null) -> Lấy tất cả
+            packages = packageRepo.findAllWithItems(); // <-- (Hàm mới, sẽ thêm ở Repository)
+        } else {
+            // Nếu React gửi true/false -> Lọc theo trạng thái
+            packages = packageRepo.findAllActiveWithItems(active); // <-- (Hàm mới, sẽ thêm ở Repository)
+        }
+
+        return packages.stream()
                 .map(converter::toDto)
                 .toList();
     }

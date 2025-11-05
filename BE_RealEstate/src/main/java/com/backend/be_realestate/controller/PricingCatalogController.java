@@ -18,8 +18,12 @@ public class PricingCatalogController {
 
     // FE gọi endpoint này để render UI
     @GetMapping("/catalog")
-    public ApiResponse<List<ListingPackageDTO>> getCatalog() {
-        return ApiResponse.success(service.getActiveCatalog());
+    public ApiResponse<List<ListingPackageDTO>> getCatalog(
+            // Thêm RequestParam, không bắt buộc, mặc định là "null"
+            @RequestParam(name = "active", required = false) Boolean active
+    ) {
+        // Truyền "active" vào service
+        return ApiResponse.success(service.getCatalog(active));
     }
 
     @GetMapping("/packages/{code}")
