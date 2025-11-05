@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Box, TextField, Stack, Typography } from "@mui/material"; // <<< UPDATED
+import { Box, TextField, Stack, Typography, debounce } from "@mui/material"; // <<< UPDATED
 import { fmtDate, money } from "@/utils/validators";
 import {
     KpiGrid,
@@ -28,6 +28,8 @@ import {
     hidePostThunk,
     unhidePostThunk,
     hardDeletePostThunk,
+    setPendingAction, 
+    clearPendingAction,
 } from "@/store/adminPostsSlice";
 
 import { Client } from "@stomp/stompjs";
@@ -64,28 +66,61 @@ export default function AdminPostsMUI() {
         open,
         detail,
         decision,
+        pendingAction,
     } = useSelector((s) => s.adminPosts);
 
     /* =============== URL -> STORE (hydrate) =============== */
     useEffect(() => {
         const qp = Object.fromEntries(searchParams.entries());
-        const urlTab = qp.tab || "ALL";
+        const reportId = qp.reportPostId ? Number(qp.reportPostId) : null;
+        const reviewId = qp.reviewPostId ? Number(qp.reviewPostId) : null;
+
+        // Xử lý các filter KHÁC q và tab
         const urlPage = Math.max(1, parseInt(qp.page || "1", 10) || 1);
         const urlSize = Math.max(1, parseInt(qp.size || "10", 10) || 10);
-        const urlQ = qp.q || "";
         const urlCategoryId = qp.categoryId ? Number(qp.categoryId) : "";
         const urlListingType = qp.listingType || "";
 
-        if (selectedTab !== urlTab) dispatch(setSelectedTab(urlTab));
         if (page !== urlPage) dispatch(setPage(urlPage));
         if (pageSize !== urlSize) dispatch(setPageSize(urlSize));
-        if ((q || "") !== urlQ) dispatch(setQ(urlQ));
         if ((category ?? "") !== (urlCategoryId === 0 ? "" : urlCategoryId)) {
             dispatch(setCategory(urlCategoryId || ""));
         }
         if ((listingType || "") !== urlListingType) dispatch(setListingType(urlListingType));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams]);
+
+        // --- Xử lý logic Q và TAB theo yêu cầu ---
+        if (reportId) {
+            dispatch(setPendingAction({ type: 'report', postId: reportId }));
+            // 1. Set Q bằng ID từ thông báo
+            if (q !== String(reportId)) {
+                dispatch(setQ(String(reportId))); 
+            }
+            // 2. Chuyển sang tab PUBLISHED
+            if (selectedTab !== 'PUBLISHED') { 
+                dispatch(setSelectedTab('PUBLISHED'));
+            }
+        }
+        else if (reviewId) {
+            dispatch(setPendingAction({ type: 'review', postId: reviewId }));
+            // 1. Set Q bằng ID từ thông báo
+            if (q !== String(reviewId)) {
+                dispatch(setQ(String(reviewId)));
+            }
+            // 2. Chuyển sang tab PENDING_REVIEW
+            if (selectedTab !== 'PENDING_REVIEW') { 
+                dispatch(setSelectedTab('PENDING_REVIEW')); 
+            }
+        } 
+        // Bình thường: Không có thông báo
+        else {
+            const urlTab = qp.tab || "ALL";
+            const urlQ = qp.q || ""; 
+            if (selectedTab !== urlTab) dispatch(setSelectedTab(urlTab));
+            if (q !== urlQ) dispatch(setQ(urlQ)); // Đọc 'q' từ URL
+        }
+            
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, dispatch]);
 
     /* =============== STORE -> URL (debounced) =============== */
     useEffect(() => {
@@ -134,10 +169,13 @@ export default function AdminPostsMUI() {
                 client.subscribe("/topic/admin/properties", async (msg) => {
                     try {
                         JSON.parse(msg.body);
+                        
+                        // 1. Luôn tải lại counts
                         await dispatch(fetchCountsThunk());
-                        const shouldReloadList =
-                            selectedTab === "ALL" || selectedTab === "PENDING_REVIEW";
-                        if (shouldReloadList) await dispatch(fetchPostsThunk());
+                        
+                        // 2. SỬA LẠI: Luôn tải lại danh sách
+                        await dispatch(fetchPostsThunk());
+                        
                     } catch (e) {
                         console.warn("Invalid WS payload:", e);
                     }
@@ -146,7 +184,9 @@ export default function AdminPostsMUI() {
         });
         client.activate();
         return () => client.deactivate();
-    }, [dispatch, selectedTab]);
+        
+    // SỬA LẠI: Xóa 'selectedTab' khỏi dependency array
+    }, [dispatch]);
 
     /* =============== MUI Confirm Modal state (EXISTING) =============== */
     const [confirm, setConfirm] = useState({
@@ -366,53 +406,54 @@ export default function AdminPostsMUI() {
     }, [warningDlg, closeWarning, sendWarning]);
     // === (Hết bước 4) ===
 
+    /* =============== XỬ LÝ HÀNH ĐỘNG CHỜ (Mở modal/drawer) =============== */
     useEffect(() => {
-        const reportId = searchParams.get("reportPostId");
-        const reviewId = searchParams.get("reviewPostId");
+        // Guard 1: Phải có hành động đang chờ
+        if (!pendingAction) return;
 
-        // 1. Ưu tiên mở Modal Báo Cáo
-        if (reportId) {
-            // Chỉ chạy nếu danh sách đã tải VÀ đang ở đúng tab 'REPORTED'
-            if (posts && posts.length > 0 && selectedTab === 'REPORTED') {
-                const postToReport = posts.find(p => p.id === Number(reportId));
-                if (postToReport) {
-                    openReports(postToReport.id); // Mở modal
-
-                    // Xóa param khỏi URL
-                    const newParams = new URLSearchParams(searchParams);
-                    newParams.delete("reportPostId");
-                    setSearchParams(newParams, { replace: true });
-                }
-            }
-        } 
-        // 2. Nếu không, kiểm tra mở Drawer Duyệt
-        else if (reviewId) {
-            
-            // === SỬA LỖI Ở DÒNG IF NÀY ===
-            // Đổi từ 'PENDING_REVIEW' (backend enum) thành 'pending' (frontend tab key)
-            if (posts && posts.length > 0 && selectedTab === 'pending') { 
-                
-                const postToReview = posts.find(p => p.id === Number(reviewId));
-                if (postToReview) {
-                    onOpenDetail(postToReview); // Mở drawer
-
-                    // Xóa param khỏi URL
-                    const newParams = new URLSearchParams(searchParams);
-                    newParams.delete("reviewPostId");
-                    setSearchParams(newParams, { replace: true });
-                }
-            }
+        // Guard 2: BẮT BUỘC CHỜ 'posts' tải xong
+        // (Vì chúng ta cần 'posts' đã được lọc bằng 'q' hiển thị ở background)
+        if (loadingList || !posts || posts.length === 0) {
+            return; // Chờ cho lần render sau khi `posts` tải xong
         }
 
-    // Phải phụ thuộc vào 'posts' (để chạy sau khi API trả về)
-    // và 'selectedTab' (để đảm bảo đúng tab)
+        const { type, postId } = pendingAction;
+        
+        // Tìm post trong danh sách (danh sách này đã được lọc bằng q=postId)
+        const postToOpen = posts.find(p => p.id === postId);
+
+        // Guard 3: Phải tìm thấy post
+        if (!postToOpen) {
+            console.warn(`Pending Action: Không tìm thấy Post #${postId} (Backend đã hỗ trợ tìm 'q' bằng ID chưa?)`);
+            dispatch(clearPendingAction()); // Xóa action
+            return;
+        }
+
+        // Mọi thứ OK -> Thực thi hành động
+        if (type === 'report') {
+            openReports(postToOpen.id);
+        } else if (type === 'review') {
+            onOpenDetail(postToOpen);
+        }
+        
+        // Quan trọng: Xóa action khỏi global state sau khi đã dùng
+        dispatch(clearPendingAction());
+
+        // Và xóa param khỏi URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("reportPostId");
+        newParams.delete("reviewPostId");
+        setSearchParams(newParams, { replace: true });
+
     }, [
-        searchParams, 
-        posts, 
-        selectedTab, 
-        setSearchParams, 
-        onOpenDetail, // Đã stable với useCallback
-        openReports   // Đã stable với useCallback
+        pendingAction,  // 1. Chạy khi có action
+        posts,          // 2. Chạy khi 'posts' thay đổi
+        loadingList,    // 3. Chạy khi 'loadingList' thay đổi
+        dispatch,
+        onOpenDetail,
+        openReports,
+        searchParams,
+        setSearchParams
     ]);
 
     /* =============== KPI calc =============== */
@@ -593,7 +634,9 @@ export default function AdminPostsMUI() {
                     rows={3}
                     placeholder="Ví dụ: Ảnh của bạn bị mờ, vui lòng cập nhật lại..."
                     value={warningDlg.message}
-                    onChange={(e) => setWarningDlg((s) => ({ ...s, message: e.target.value }))}
+                    onChange={(e) => {
+                       setWarningDlg((s) => ({ ...s, message: e.target.value }))
+                    }}
                     helperText={
                         warningDlg.message.trim().length < 10
                         ? "Vui lòng nhập tối thiểu 10 ký tự"

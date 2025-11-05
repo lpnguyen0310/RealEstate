@@ -512,6 +512,7 @@ const initialState = {
     loadingFavorites: false,
     errorFavorites: null,
     currentFavoriteUsers: [],
+    pendingAction: null,
 };
 
 const propertySlice = createSlice({
@@ -557,6 +558,12 @@ const propertySlice = createSlice({
             state.forYouList = [];
             state.forYouLoading = false; state.forYouError = null;
             state.forYouSource = null;
+        },
+        setPendingAction: (state, action) => {
+            state.pendingAction = action.payload; // payload: { type, postId }
+        },
+        clearPendingAction: (state) => {
+            state.pendingAction = null;
         },
     },
     extraReducers: (b) => {
@@ -756,5 +763,5 @@ export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
 
 /* ===================== EXPORTS ===================== */
 
-export const { setPage, setSize, setSort, clearProperties, clearCurrentProperty, clearFavorites, clearForYou } = propertySlice.actions;
+export const { setPage, setSize, setSort, clearProperties, clearCurrentProperty, clearFavorites, clearForYou, setPendingAction, clearPendingAction } = propertySlice.actions;
 export default propertySlice.reducer;

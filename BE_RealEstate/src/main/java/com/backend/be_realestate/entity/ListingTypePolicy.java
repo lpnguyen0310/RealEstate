@@ -36,8 +36,14 @@ public class ListingTypePolicy extends BaseEntity {
 
     // SLA xác thực/duyệt
     @Column(name="verify_sla_minutes", nullable=false)
-    private Integer verifySlaMinutes;
-    // 240 | 120 | 30
+    private Integer verifySlaMinutes;    // 240 | 120 | 30
+
+    @Column(name="image_description", length=100)
+    private String imageDescription; // "1 ảnh nhỏ", "1 ảnh vừa + 3 ảnh nhỏ", "2 lớn + 1 vừa + 2 nhỏ"
+
+    @Column(name="show_on_list", nullable=false)
+    private Boolean showOnList = false; // false = "Không hiển thị", true = "Hiển thị trang danh sách"
+
     @OneToMany(mappedBy = "listingTypePolicy", fetch = FetchType.LAZY)
     private List<PropertyEntity> properties;
 }

@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +68,7 @@ public class PropertyServiceImpl implements IPropertyService {
     private final NotificationServiceImpl notificationService;
     private final SavedPropertyRepository savedPropertyRepository;
     private final UserConverter userConverter;
+    private final SimpMessagingTemplate messagingTemplate;
 
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String TZ_OFFSET = "+07:00";
@@ -298,6 +300,14 @@ public class PropertyServiceImpl implements IPropertyService {
 
         // 6. LƯU VÀO DB
         var saved = propertyRepository.save(property);
+
+        try {
+            log.info("Đang gửi tín hiệu WS refresh đến /topic/admin/properties (do user update)");
+            messagingTemplate.convertAndSend("/topic/admin/properties", "user_update");
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi tín hiệu WS refresh admin: {}", e.getMessage());
+        }
+
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
     private void applyRequestToEntity(PropertyEntity property,

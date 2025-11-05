@@ -53,6 +53,17 @@ public class PricingCatalogServiceImpl implements PricingCatalogService {
         if (dto.getPackageType() == null)
             throw new BadRequestException("Thiếu packageType");
 
+        // 1. Kiểm tra giá gốc (nếu có) phải lớn hơn giá bán
+        if (dto.getPriceOriginal() != null && dto.getPriceOriginal() < dto.getPrice()) {
+            throw new BadRequestException("Giá gốc (priceOriginal) phải lớn hơn hoặc bằng giá bán (price)");
+        }
+
+        // 2. Kiểm tra thời hạn (durationDays)
+        // (Bạn có thể bỏ qua nếu cho phép gói không có thời hạn)
+        if (dto.getDurationDays() == null || dto.getDurationDays() <= 0) {
+            throw new BadRequestException("Thời hạn (durationDays) phải lớn hơn 0");
+        }
+
         boolean isCombo = PackageType.valueOf(dto.getPackageType()) == PackageType.COMBO;
         if (isCombo && (dto.getItems() == null || dto.getItems().isEmpty()))
             throw new BadRequestException("COMBO phải có ít nhất 1 item");

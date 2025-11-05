@@ -43,6 +43,8 @@ export default function ReportModal({ postId, visible, onCancel }) {
       formData.append("timestamp", timestamp);
       formData.append("signature", signature);
       formData.append("folder", folder);
+      formData.append("use_filename", "true");
+      formData.append("unique_filename", "false");
 
       // Tự xây dựng uploadUrl dựa trên cloudName
       const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;

@@ -14,6 +14,7 @@ import com.backend.be_realestate.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,7 @@ public class ReportServiceImpl implements ReportService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final PropertyAuditRepository propertyAuditRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Lấy tên của role Admin từ file application.properties
@@ -101,6 +103,13 @@ public class ReportServiceImpl implements ReportService {
         // 8. GỬI THÔNG BÁO CHO ADMIN (LOGIC CỦA BẠN)
         // Gửi thông báo ngay cả khi đây mới là báo cáo đầu tiên
         notifyAdminsOfNewReport(property, currentUser, savedReport);
+
+        try {
+            log.info("Đang gửi tín hiệu WS refresh đến /topic/admin/properties");
+            messagingTemplate.convertAndSend("/topic/admin/properties", "new_report");
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi tín hiệu WS refresh admin: {}", e.getMessage());
+        }
 
         log.info("Hoàn tất xử lý báo cáo cho bài đăng ID: {}", property.getId());
     }
@@ -214,6 +223,13 @@ public class ReportServiceImpl implements ReportService {
         propertyAuditRepository.save(auditLog);
 
         propertyRepository.save(property);
+
+        try {
+            log.info("Đang gửi tín hiệu WS refresh đến /topic/admin/properties (sau khi gửi cảnh báo)");
+            messagingTemplate.convertAndSend("/topic/admin/properties", "warning_sent");
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi tín hiệu WS refresh admin: {}", e.getMessage());
+        }
 
         // === KẾT THÚC SỬA ĐỔI ===
 

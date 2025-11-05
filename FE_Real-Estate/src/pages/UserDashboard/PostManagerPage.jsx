@@ -14,6 +14,8 @@ import {
     fetchMyPropertyCountsThunk,
     setPage,
     setSize,
+    setPendingAction,  
+    clearPendingAction, 
 } from "@/store/propertySlice";
 
 import {
@@ -82,12 +84,16 @@ export default function PostManagerPage() {
         size,
         totalElements,
         counts,
+        pendingAction, 
+        rawLoading
     } = useSelector((s) => ({
         list: s.property.myList,
         page: s.property.myPage,
         size: s.property.mySize,
         totalElements: s.property.myTotalElements,
         counts: s.property.counts,
+        pendingAction: s.property.pendingAction, 
+        rawLoading: s.property.loading,        
     }));
 
     // ---- local ui states ----
@@ -109,17 +115,89 @@ export default function PostManagerPage() {
 
     /* ========== URL -> STATE ========== */
     useEffect(() => {
-        const urlStatus = searchParams.get("tab") || "active";
-        const urlPage = parseNumber(searchParams.get("page")) ?? 1;
-        const urlSize = parseNumber(searchParams.get("size")) ?? size;
+        const qp = Object.fromEntries(searchParams.entries());
+        const warnId = qp.warnedPostId ? Number(qp.warnedPostId) : null;
+        const viewId = qp.viewPostId ? Number(qp.viewPostId) : null;
 
+        let urlStatus = qp.tab || "active";
+
+        // 1. Kiểm tra và ghi sổ hành động chờ
+        if (warnId) {
+            dispatch(setPendingAction({ type: 'warn', postId: warnId }));
+            urlStatus = 'warned'; // Ép chuyển sang tab 'warned'
+        } else if (viewId) {
+            dispatch(setPendingAction({ type: 'view', postId: viewId }));
+            urlStatus = 'active'; // Ép chuyển sang tab 'active' (nơi bài đăng được duyệt)
+        }
+
+        // 2. Set state từ URL (hoặc từ giá trị đã ép)
         setStatus(urlStatus);
         setFilters(parseFiltersFromSearch(searchParams));
 
+        const urlPage = parseNumber(qp.page) ?? 1;
+        const urlSize = parseNumber(qp.size) ?? size;
+
         if (urlPage - 1 !== page) dispatch(setPage(Math.max(0, urlPage - 1)));
         if (urlSize !== size && urlSize != null) dispatch(setSize(urlSize));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams]);
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, dispatch]);
+
+    /* ========== XỬ LÝ HÀNH ĐỘNG CHỜ (Highlight / Mở Modal) ========== */
+    useEffect(() => {
+        // Guard 1: Phải có hành động
+        if (!pendingAction) return;
+        
+        // Guard 2: Phải chờ list tải xong
+        if (rawLoading || !list || list.length === 0) {
+            return; // Chờ list tải xong
+        }
+
+        const { type, postId } = pendingAction;
+        const post = list.find(p => p.id === postId);
+
+        // Guard 3: Phải tìm thấy post
+        if (!post) {
+            console.warn(`Pending Action: Không tìm thấy Post #${postId} trong tab ${status}.`);
+            dispatch(clearPendingAction()); // Xóa action
+            return;
+        }
+
+        // Mọi thứ OK -> Thực thi hành động
+        if (type === 'warn') {
+            handleOpenWarning(post.latestWarningMessage);
+        } else if (type === 'view') {
+            setHighlightedId(post.id); // Kích hoạt highlight
+        }
+
+        // Dọn dẹp action
+        dispatch(clearPendingAction());
+
+        // Dọn dẹp URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("warnedPostId");
+        newParams.delete("viewPostId");
+        setSearchParams(newParams, { replace: true });
+
+    }, [
+        pendingAction,
+        list,
+        rawLoading, // <-- Lấy từ useSelector
+        status,
+        dispatch,
+        handleOpenWarning,
+        searchParams,
+        setSearchParams
+    ]);
+
+    // Giữ lại logic timer để TẮT highlight
+    useEffect(() => {
+        if (!highlightedId) return;
+        const highlightTimer = setTimeout(() => {
+            setHighlightedId(null);
+        }, 10000); // Giữ 10s của bạn
+        return () => clearTimeout(highlightTimer);
+    }, [highlightedId]);
 
     /* ========== STATE -> FETCH ========== */
     useEffect(() => {
@@ -131,77 +209,6 @@ export default function PostManagerPage() {
         dispatch(fetchMyPropertyCountsThunk());
     }, [dispatch]);
 
-    useEffect(() => {
-        const warnId = searchParams.get("warnedPostId");
-        if (!warnId) return;
-
-        if (list && list.length > 0 && status === 'warned') {
-            const postToWarn = list.find(p => p.id === Number(warnId));
-            if (postToWarn) {
-                handleOpenWarning(postToWarn.latestWarningMessage);
-                const newParams = new URLSearchParams(searchParams);
-                newParams.delete("warnedPostId");
-                setSearchParams(newParams, { replace: true });
-            }
-        }
-    }, [searchParams, list, status, setSearchParams, handleOpenWarning]); // 💡 Bổ sung handleOpenWarning vào dependency array
-
-    // src/pages/dashboard/posts/PostManagerPage.jsx
-
-   // src/pages/dashboard/posts/PostManagerPage.jsx
-// Thay thế toàn bộ 3 useEffect liên quan đến highlightedId bằng đoạn này
-
-    useEffect(() => {
-        const viewIdParam = searchParams.get("viewPostId");
-        
-        // Thoát nếu không có param hoặc list chưa load, HOẶC highlight đã được bật
-        if (!viewIdParam || !list || list.length === 0 || highlightedId == viewIdParam) {
-            return;
-        }
-        
-        console.log("--- DEBUG HIGHLIGHT (Tìm và Set) ---");
-
-        const postToView = list.find(p => p.id == viewIdParam);
-
-        if (postToView) {
-            console.log("✅ SUCCESS: Đã tìm thấy postToView. ID:", postToView.id);
-            
-            // 1. Kích hoạt Highlight (VĨNH VIỄN)
-            setHighlightedId(postToView.id);
-
-            // 2. Xóa param khỏi URL ngay lập tức (để không chạy lại)
-            const newParams = new URLSearchParams(searchParams);
-            newParams.delete("viewPostId");
-            console.log("⭐ Xóa viewPostId khỏi URL");
-            setSearchParams(newParams, { replace: true });
-
-        } else {
-            console.log("❌ INFO: Không tìm thấy post trong list hiện tại.");
-        }
-        console.log("--- END DEBUG ---");
-
-    // Giữ lại dependencies để đảm bảo logic chạy khi list hoặc URL thay đổi
-    }, [searchParams, list, status, highlightedId, setSearchParams]);
-
-useEffect(() => {
-        // 1. Chỉ chạy khi có ID đang được highlight
-        if (!highlightedId) return;
-
-        console.log("⏳ Bật Timer: Tắt highlight theo thời gian Animation (3.5s)");
-
-        // 2. Set timer để xóa highlight
-        const highlightTimer = setTimeout(() => {
-            console.log("⏲️ Timer Hết: Tắt highlight sau khi Animation kết thúc.");
-            setHighlightedId(null);
-        }, 10000); // Đảm bảo khớp với 3.5s trong CSS
-        
-        // 3. Trả về hàm cleanup
-        return () => {
-            clearTimeout(highlightTimer);
-        };
-
-    // Dependency chỉ còn highlightedId
-    }, [highlightedId]);
 
     /* ========== STATE -> URL ========== */
     const pushUrl = (next = {}) => {
@@ -214,7 +221,6 @@ useEffect(() => {
         setSearchParams(params, { replace: false });
     };
 
-    const rawLoading = useSelector((s) => s.property.loading);
     const [delayedLoading, setDelayedLoading] = useState(false);
 
     useEffect(() => {
