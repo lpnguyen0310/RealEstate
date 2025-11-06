@@ -4,6 +4,7 @@ import lombok.Data;
 
 @Data
 public class PackageItemDTO {
-    private String listingType;
+    private Long id;
     private Integer quantity;
+    private ListingPackageDTO childPackage;
 }

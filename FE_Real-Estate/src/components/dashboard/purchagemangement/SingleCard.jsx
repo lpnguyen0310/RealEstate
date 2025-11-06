@@ -24,7 +24,7 @@ export default function SingleCard({ item, value = 0, onChange }) {
 
                 <div className="text-[13px] text-gray-600 leading-tight">
                     <div>{item.desc}</div>
-                    <div>{item.note}</div>
+                    {/* <div>{item.note}</div> */}
                 </div>
 
                 <div

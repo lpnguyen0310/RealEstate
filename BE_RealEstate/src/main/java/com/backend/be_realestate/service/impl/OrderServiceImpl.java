@@ -171,18 +171,48 @@ public class OrderServiceImpl implements OrderService {
     // ... (Giữ nguyên creditItemsFromOrderItem, updateUserInventory)
     private void creditItemsFromOrderItem(UserEntity user, OrderItemEntity orderItem) {
         if (orderItem.getItemType() == ItemType.SINGLE) {
+            // Logic cho Gói Lẻ (SINGLE) vẫn đúng, giữ nguyên
             String itemType = orderItem.getListingType().name();
             int quantityToAdd = orderItem.getQty();
             updateUserInventory(user, itemType, quantityToAdd);
         }
         else if (orderItem.getItemType() == ItemType.COMBO) {
-            ListingPackage comboPackage = listingPackageRepository.findByCode(orderItem.getProductCode())
-                    .orElseThrow(() -> new IllegalStateException("Không tìm thấy thông tin gói combo: " + orderItem.getProductCode()));
+
+            // ===== BẮT ĐẦU LOGIC MỚI CHO COMBO =====
+
+            // Dùng ProductId (Long) để tìm Gói Combo, an toàn hơn dùng Code (String)
+            ListingPackage comboPackage = listingPackageRepository.findById(orderItem.getProductId())
+                    .orElseThrow(() -> new IllegalStateException("Không tìm thấy thông tin gói combo ID: " + orderItem.getProductId()));
+
+            // Duyệt qua các PackageItem (các mục con đã trỏ đến Gói Lẻ)
             for (PackageItem itemInCombo : comboPackage.getItems()) {
-                String itemType = itemInCombo.getListingType().name();
+
+                // 1. Lấy ra "Gói Lẻ" (childPackage) mà admin đã chọn
+                // (Giả sử PackageItem đã được sửa để có getChildPackage())
+                ListingPackage childPackage = itemInCombo.getChildPackage();
+
+                if (childPackage == null) {
+                    log.error("PackageItem ID: {} không trỏ đến childPackage hợp lệ.", itemInCombo.getId());
+                    continue;
+                }
+
+                // 2. Lấy "Loại tin gốc" (Enum) từ Gói Lẻ đó
+                ListingType itemTypeEnum = childPackage.getListingType();
+
+                if (itemTypeEnum == null) {
+                    log.error("Gói Lẻ (ID: {}) trong combo (ID: {}) không có ListingType (Enum)", childPackage.getId(), comboPackage.getId());
+                    continue; // Bỏ qua nếu gói lẻ không hợp lệ
+                }
+
+                String itemType = itemTypeEnum.name();
+
+                // 3. Nhân số lượng của Gói Lẻ VỚI số lượng combo mà user mua
                 int quantityToAdd = itemInCombo.getQuantity() * orderItem.getQty();
+
+                // 4. Cộng vào kho (Logic kho cũ vẫn hoạt động)
                 updateUserInventory(user, itemType, quantityToAdd);
             }
+            // ===== KẾT THÚC LOGIC MỚI =====
         }
     }
     private void updateUserInventory(UserEntity user, String itemType, int quantityToAdd) {
@@ -485,21 +515,45 @@ public class OrderServiceImpl implements OrderService {
 // Dùng để trừ vật phẩm khi hoàn tiền đơn PACKAGE_PURCHASE
     private void debitItemsFromOrderItem(UserEntity user, OrderItemEntity orderItem) {
         if (orderItem.getItemType() == ItemType.SINGLE) {
+            // Logic Gói Lẻ (SINGLE) vẫn đúng, giữ nguyên
             String itemType = orderItem.getListingType().name();
             int quantityToRemove = -orderItem.getQty(); // Dùng số âm
             updateUserInventory(user, itemType, quantityToRemove);
         }
         else if (orderItem.getItemType() == ItemType.COMBO) {
-            ListingPackage comboPackage = listingPackageRepository.findByCode(orderItem.getProductCode())
-                    .orElseThrow(() -> new IllegalStateException("Không tìm thấy thông tin gói" +
-                            " combo: " + orderItem.getProductCode()));
+
+            // ===== BẮT ĐẦU LOGIC MỚI CHO COMBO (Hoàn tiền) =====
+
+            ListingPackage comboPackage = listingPackageRepository.findById(orderItem.getProductId())
+                    .orElseThrow(() -> new IllegalStateException("Không tìm thấy thông tin gói combo ID: " + orderItem.getProductId()));
 
             for (PackageItem itemInCombo : comboPackage.getItems()) {
-                String itemType = itemInCombo.getListingType().name();
-                // Dùng số âm
+
+                // 1. Lấy ra "Gói Lẻ" (childPackage)
+                ListingPackage childPackage = itemInCombo.getChildPackage();
+
+                if (childPackage == null) {
+                    log.error("PackageItem ID: {} không trỏ đến childPackage hợp lệ. (Khi hoàn tiền)", itemInCombo.getId());
+                    continue;
+                }
+
+                // 2. Lấy "Loại tin gốc" (Enum) từ Gói Lẻ đó
+                ListingType itemTypeEnum = childPackage.getListingType();
+
+                if (itemTypeEnum == null) {
+                    log.error("Gói Lẻ (ID: {}) trong combo (ID: {}) không có ListingType (Enum). (Khi hoàn tiền)", childPackage.getId(), comboPackage.getId());
+                    continue;
+                }
+
+                String itemType = itemTypeEnum.name();
+
+                // 3. Tính số lượng cần TRỪ (dùng số âm)
                 int quantityToRemove = -(itemInCombo.getQuantity() * orderItem.getQty());
+
+                // 4. Trừ khỏi kho
                 updateUserInventory(user, itemType, quantityToRemove);
             }
+            // ===== KẾT THÚC LOGIC MỚI =====
         }
     }
     @Override

@@ -20,21 +20,26 @@ const typeLabel = (code) => {
     return code || "Loại tin";
 };
 
-// summary an toàn: vẫn chạy dù mảng rỗng / phần tử thiếu field
+// summary an toàn: chạy với Mô hình 2
 const comboSummary = (items = []) => {
-    if (!Array.isArray(items) || items.length === 0) return "";
-    const order = { PREMIUM: 0, VIP: 1 };
-    return items
-        .filter(Boolean)
-        .sort((a, b) => (order[a?.typeCode ?? "ZZZ"] ?? 9) - (order[b?.typeCode ?? "ZZZ"] ?? 9))
-        .map((it) => {
-            const qty = Number(it?.qty ?? 0);
-            if (!qty) return null;
-            const label = String(typeLabel(it?.typeCode ?? "")).toLowerCase(); // chống undefined
-            return `${qty} ${label}`;
-        })
-        .filter(Boolean)
-        .join(", ");
+    if (!Array.isArray(items) || items.length === 0) return "";
+    
+    // Logic mới: Đếm số lượng của từng 'code' (VIP_1, PRM_1...)
+    const counts = {};
+    items.forEach(it => {
+        // it.childPackage = { id: 20, code: "VIP_1", name: "Tin VIP", listingType: "VIP" }
+        const child = it?.childPackage; 
+        if (child && it.quantity > 0) {
+            // Ưu tiên Tên ("Tin VIP")
+            const label = child.name || typeLabel(child.listingType) || child.code; 
+            counts[label] = (counts[label] || 0) + it.quantity;
+        }
+    });
+
+    // Chuyển { "Tin VIP": 5, "Tin Premium": 3 } thành "5 tin vip, 3 tin premium"
+    return Object.entries(counts)
+        .map(([label, qty]) => `${qty} ${label.toLowerCase()}`)
+        .join(", ");
 };
 
 const Chevron = ({ open }) => (
@@ -141,21 +146,24 @@ export default function PaymentCard({
                                     {isCombo && open && (
                                         <div className="mt-2 pl-8">
                                             <div className="flex flex-wrap gap-1.5">
-                                                {comboItems.filter(Boolean).map((c, idx) => {
-                                                    const code = c?.typeCode ?? "";
-                                                    const qtyC = Number(c?.qty) || 0;
-                                                    return (
-                                                        <span
-                                                            key={idx}
-                                                            className={
-                                                                "px-2 py-[2px] rounded-full text-[11px] font-semibold " +
-                                                                chipClassByCode(code)
-                                                            }
-                                                        >
-                                                            {typeLabel(code)} × {qtyC}
-                                                        </span>
-                                                    );
-                                                })}
+                                                {comboItems.filter(Boolean).map((c, idx) => {
+                                                    const child = c?.childPackage;
+                                                    const name = child?.name ?? "Gói lẻ";
+                                                    const typeCode = child?.listingType ?? ""; 
+                                                    const qtyC = Number(c?.quantity) || 0;
+                                                    return (
+                                                        <span
+                                                            key={idx}
+                                                            className={
+                                                                "px-2 py-[2px] rounded-full text-[11px] font-semibold " +
+                                                                chipClassByCode(typeCode) // <-- Dùng typeCode để lấy màu
+                                                            }
+                                                        >
+                                                            {/* Hiển thị Tên (name) x Số lượng */}
+                                                                {name} × {qtyC}
+                                                            </span>
+                                                        );
+                                                    })}
                                             </div>
                                             {it?.sub && <div className="text-[12px] text-[#7A8AA1] mt-1">{it.sub}</div>}
                                         </div>

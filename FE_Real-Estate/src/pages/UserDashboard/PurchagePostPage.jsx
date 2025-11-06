@@ -76,7 +76,10 @@ export default function PurchagePostPage() {
                 const itemInfo = ALL_ITEMS.find(item => item.id.toString() === itemId);
                 if (!itemInfo) return null;
                 const codeToSend = itemInfo._raw?.code || itemInfo.id;
-                return { code: codeToSend, qty: qty[itemId] };
+                return { 
+                    code: itemInfo._raw.code, // Luôn gửi 'code' (VD: "VIP_1" hoặc "COMBO_FAST")
+                    qty: qty[itemId] 
+                }
             })
             .filter(Boolean);
 

@@ -39,9 +39,12 @@ const fromBackendCombo = (pkg) => {
     salePrice: pkg.price,
     durationDays: pkg.durationDays,
     items: (pkg.items || []).map((it) => ({
-      typeCode: it.listingType,
-      qty: it.quantity,
-    })),
+        // Giờ chúng ta lưu ID của gói lẻ (childPackage)
+        typeCode: it.childPackage?.id, // <-- Lấy ID
+        qty: it.quantity,
+        // (Lưu thêm tên để hiển thị)
+        _childPackageName: it.childPackage?.name || "Gói không rõ" 
+    })),
     isActive: pkg.isActive,
     createdAt: pkg.createdAt,
   };
@@ -72,9 +75,10 @@ const toBackendCombo = (cb) => ({
   price: cb.salePrice,
   durationDays: cb.durationDays,
   items: (cb.items || []).map((it) => ({
-    listingType: it.typeCode,
-    quantity: it.qty,
-  })),
+      // Gửi object { id: ... } mà BE mới cần
+      childPackage: { id: it.typeCode }, // typeCode giờ là ID của gói lẻ
+      quantity: it.qty,
+  })),
   isActive: cb.isActive,
   packageType: "COMBO",
   listingType: null,

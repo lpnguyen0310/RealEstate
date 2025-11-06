@@ -2,6 +2,8 @@
 import api from "@/api/axios"; // DÙNG CHUNG instance đã có interceptors
 
 export async function fetchPricingCatalog() {
-  const res = await api.get("/pricing/catalog"); // baseURL '/api' đã set trong api/axios.js
+  const res = await api.get("/pricing/catalog", {
+    params: { active: true }
+  });
   return res?.data?.data ?? [];
 }
