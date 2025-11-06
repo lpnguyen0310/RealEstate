@@ -132,4 +132,12 @@ public class PropertySpecification {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    public static Specification<PropertyEntity> hasCity(Long cityId) {
+        return (root, query, cb) -> {
+            if (cityId == null) return cb.conjunction(); // không lọc nếu không có cityId
+            return cb.equal(root.get("city").get("id"), cityId);
+        };
+    }
+
 }

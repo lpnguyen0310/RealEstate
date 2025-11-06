@@ -20,20 +20,25 @@ const typeLabel = (code) => {
     return code || "Loại tin";
 };
 
-// summary an toàn: vẫn chạy dù mảng rỗng / phần tử thiếu field
-const comboSummary = (items = []) => {
+// ✅ Tóm tắt combo có nhân với số lượng combo được chọn (multiplier)
+// ✅ GỘP SỐ LƯỢNG CỦA COMBO * q, hỗ trợ cả qty | quantity
+const comboSummary = (items = [], multiplier = 1) => {
     if (!Array.isArray(items) || items.length === 0) return "";
+    const m = Number(multiplier) || 1;
     const order = { PREMIUM: 0, VIP: 1 };
-    return items
-        .filter(Boolean)
-        .sort((a, b) => (order[a?.typeCode ?? "ZZZ"] ?? 9) - (order[b?.typeCode ?? "ZZZ"] ?? 9))
-        .map((it) => {
-            const qty = Number(it?.qty ?? 0);
-            if (!qty) return null;
-            const label = String(typeLabel(it?.typeCode ?? "")).toLowerCase(); // chống undefined
-            return `${qty} ${label}`;
-        })
-        .filter(Boolean)
+
+    // Tính tổng theo typeCode
+    const totalByType = {};
+    for (const it of items) {
+        if (!it || !it.typeCode) continue;
+        const base = Number(it.qty ?? it.quantity ?? 0);
+        if (!base) continue;
+        totalByType[it.typeCode] = (totalByType[it.typeCode] || 0) + base * m;
+    }
+
+    return Object.entries(totalByType)
+        .sort(([a], [b]) => (order[a] ?? 9) - (order[b] ?? 9))
+        .map(([type, total]) => `${total} tin ${typeLabel(type).replace(/^Tin\s+/i, "")}`)
         .join(", ");
 };
 
@@ -101,14 +106,13 @@ export default function PaymentCard({
                             const price = Number(it?.price) || 0;
                             const lineTotal = q * price;
 
-                            // _raw.items có thể undefined / không phải array
                             const comboItems = Array.isArray(it?._raw?.items) ? it._raw.items : [];
                             const isCombo = comboItems.length > 0;
                             const open = !!openMap[id];
 
                             return (
                                 <div key={id} className="text-[14px]">
-                                    {/* Row chính */}
+                                    {/* ===== Row chính (có nút mở/đóng) ===== */}
                                     <div className="flex items-center">
                                         <div className="flex-1 text-[#2B3A55] font-medium">
                                             <div className="flex items-center gap-1.5">
@@ -130,34 +134,36 @@ export default function PaymentCard({
                                         <div className="w-28 text-right text-[#2B3A55]">{fmt(lineTotal)}</div>
                                     </div>
 
-                                    {/* Hàng tóm tắt (khi đóng) */}
+                                    {/* ===== Tóm tắt khi đóng (✅ nhân với q) ===== */}
                                     {isCombo && !open && (
                                         <div className="pl-8 mt-0.5 text-[12px] text-[#7A8AA1]">
-                                            {comboSummary(comboItems)}
+                                            {comboSummary(comboItems, q)}   {/* ⬅️ nhớ truyền q */}
                                         </div>
                                     )}
-
-                                    {/* Hàng chi tiết (khi mở) */}
+                                    {/* ===== Chi tiết khi mở: mỗi loại 1 chip (✅ nhân với q) ===== */}
                                     {isCombo && open && (
-                                        <div className="mt-2 pl-8">
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {comboItems.filter(Boolean).map((c, idx) => {
-                                                    const code = c?.typeCode ?? "";
-                                                    const qtyC = Number(c?.qty) || 0;
+                                        <div className="mt-2 pl-8 space-y-1">
+                                            {comboItems
+                                                .filter((c) => c && c.typeCode && Number(c?.qty ?? c?.quantity ?? 0) > 0)
+                                                .map((c, idx) => {
+                                                    const base = Number(c?.qty ?? c?.quantity ?? 0);
                                                     return (
-                                                        <span
+                                                        <div
                                                             key={idx}
                                                             className={
-                                                                "px-2 py-[2px] rounded-full text-[11px] font-semibold " +
-                                                                chipClassByCode(code)
+                                                                "inline-block px-3 py-[3px] rounded-full text-[12px] font-semibold " +
+                                                                chipClassByCode(c.typeCode)
                                                             }
                                                         >
-                                                            {typeLabel(code)} × {qtyC}
-                                                        </span>
+                                                            {typeLabel(c.typeCode)} × {base * q}
+                                                        </div>
                                                     );
                                                 })}
-                                            </div>
-                                            {it?.sub && <div className="text-[12px] text-[#7A8AA1] mt-1">{it.sub}</div>}
+
+
+                                            {it?.sub && (
+                                                <div className="text-[12px] text-[#7A8AA1] mt-1">{it.sub}</div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -217,12 +223,20 @@ export default function PaymentCard({
 
             {/* Phương thức thanh toán */}
             <div className="border-t border-dashed border-gray-200 my-4 pt-4">
-                <h4 className="font-medium text-[#1a3b7c] mb-3 text-base">Chọn phương thức thanh toán:</h4>
-                <Radio.Group onChange={(e) => setPaymentMethod(e.target.value)} value={paymentMethod} className="w-full">
+                <h4 className="font-medium text-[#1a3b7c] mb-3 text-base">
+                    Chọn phương thức thanh toán:
+                </h4>
+                <Radio.Group
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    value={paymentMethod}
+                    className="w-full"
+                >
                     <Space direction="vertical" className="w-full">
                         <Radio value="balance" disabled={!canPayWithBalance}>
                             Thanh toán bằng số dư
-                            {!canPayWithBalance && total > 0 && <span className="text-xs text-red-500 ml-2">(Không đủ)</span>}
+                            {!canPayWithBalance && total > 0 && (
+                                <span className="text-xs text-red-500 ml-2">(Không đủ)</span>
+                            )}
                         </Radio>
                         <Radio value="online">Thanh toán trực tuyến (Thẻ quốc tế)</Radio>
                     </Space>
@@ -256,10 +270,16 @@ export default function PaymentCard({
             <button
                 disabled={total === 0 || disabled}
                 onClick={onPay}
-                className={`mt-4 w-full h-[48px] rounded-xl text-white font-semibold transition-colors duration-200 ${total <= 0 || disabled ? "bg-[#93a3bd] cursor-not-allowed" : "bg-[#0f2f63] hover:bg-[#0c2550]"
+                className={`mt-4 w-full h-[48px] rounded-xl text-white font-semibold transition-colors duration-200 ${total <= 0 || disabled
+                    ? "bg-[#93a3bd] cursor-not-allowed"
+                    : "bg-[#0f2f63] hover:bg-[#0c2550]"
                     }`}
             >
-                {disabled ? "Đang xử lý..." : paymentMethod === "balance" ? "Xác nhận trừ số dư" : "Tiếp tục Thanh toán"}
+                {disabled
+                    ? "Đang xử lý..."
+                    : paymentMethod === "balance"
+                        ? "Xác nhận trừ số dư"
+                        : "Tiếp tục Thanh toán"}
             </button>
         </div>
     );

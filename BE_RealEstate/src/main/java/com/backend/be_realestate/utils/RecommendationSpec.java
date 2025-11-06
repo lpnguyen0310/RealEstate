@@ -95,4 +95,14 @@ public final class RecommendationSpec {
                 b.toPredicate(root, cq, cb)
         );
     }
+
+    public static Specification<PropertyEntity> inCityIds(Collection<Long> cityIds) {
+        if (cityIds == null || cityIds.isEmpty()) return null;
+        return (root, cq, cb) -> root.get("city").get("id").in(cityIds);
+    }
+
+    public static Specification<PropertyEntity> cityIdEquals(Long cityId) {
+        if (cityId == null) return null;
+        return (root, cq, cb) -> cb.equal(root.get("city").get("id"), cityId);
+    }
 }

@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/favorites").permitAll()
                         .requestMatchers("/api/orders/**").permitAll()
                         .requestMatchers("/api/support/**").permitAll()
+                        .requestMatchers("/api/locations/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // bật oauth2 login

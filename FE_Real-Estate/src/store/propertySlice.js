@@ -503,6 +503,10 @@ function mapPublicPropertyToCard(p) {
         listingType: p.listing_type || p.listingType,
     };
 }
+
+/* ===================== SLOT MAPPER ===================== */
+
+// Map tên slot → các key trong state
 const slotKey = (slot = "list") =>
 ({
     // Trang search (mặc định)

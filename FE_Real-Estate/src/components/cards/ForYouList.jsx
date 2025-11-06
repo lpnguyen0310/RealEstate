@@ -9,8 +9,7 @@ import PropertyCardSkeleton from "./skeletion/PropertyCardSkeleton";
 import { fetchPropertiesThunk } from "@/store/propertySlice";
 
 // ====== API chọn Tỉnh/Thành phố (chỉnh path cho đúng) ======
-import { getProvinces } from "@/api/provinces";
-// File locationApi của bạn đã có:
+import { locationApi } from "@/api/locationApi";// File locationApi của bạn đã có:
 //   - getProvinces(signal) -> [{ id, name }]
 
 const MIN_SKELETON_MS = 2000; // giữ skeleton tối thiểu 2s
@@ -198,8 +197,8 @@ export default function ForYouList() {
     if (!showModal) return;
     let abort = new AbortController();
     if (provinces.length === 0) {
-      setLoadingProv(true);
-      getProvinces(abort.signal)
+      locationApi
+        .getCities()
         .then((list) => setProvinces(list))
         .catch(() => { })
         .finally(() => setLoadingProv(false));
@@ -232,6 +231,7 @@ export default function ForYouList() {
           priceTo: priceRange[1],
           areaFrom: areaRange[0],
           areaTo: areaRange[1],
+          cityId: provinceId, 
         })
       ).unwrap();
 
@@ -406,7 +406,7 @@ export default function ForYouList() {
       {/* Kết quả */}
       {effectiveHasData && !showSkeleton && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x={[18]} gap-y-[24px] px-1 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4  gap-x-[18px] gap-y-[24px] px-1 mt-6">
             {visibleList.map((item) => (
               <Link key={item.id} to={`/real-estate/${item.id}`} className="block group">
                 <PropertyCard item={item} />
