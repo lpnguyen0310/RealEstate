@@ -9,7 +9,7 @@ import {
 export default function UserStats({
     data = { saved: 0, messages: 0, posts: 0, tours: 0 },
     loading = false,
-    onClickCard, // (key) => void
+    onClickCard,
 }) {
     const items = [
         {
@@ -44,7 +44,7 @@ export default function UserStats({
 
     if (loading) {
         return (
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
                 {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="rounded-2xl p-5 bg-gray-100 animate-pulse h-[108px]" />
                 ))}
@@ -53,14 +53,14 @@ export default function UserStats({
     }
 
     return (
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
             {items.map((s) => (
                 <button
                     key={s.key}
                     type="button"
                     onClick={() => onClickCard?.(s.key)}
                     className={[
-                        "rounded-2xl p-5 text-white bg-gradient-to-r",
+                        "rounded-2xl p-4 sm:p-5 text-white bg-gradient-to-r",
                         s.gradient,
                         "shadow-[0_8px_24px_rgba(13,47,97,0.08)]",
                         "transition duration-200 hover:-translate-y-1",
@@ -70,14 +70,14 @@ export default function UserStats({
                     ].join(" ")}
                 >
                     <div className="flex items-center justify-between">
-                        <div className="text-[30px] opacity-90">{s.icon}</div>
+                        <div className="text-[26px] sm:text-[30px] opacity-90">{s.icon}</div>
                         <div className="text-right">
-                            <div className="text-[24px] font-extrabold leading-none">
+                            <div className="text-[20px] sm:text-[24px] font-extrabold leading-none">
                                 {Number.isFinite(+s.value)
                                     ? Number(s.value).toLocaleString("vi-VN")
                                     : s.value ?? 0}
                             </div>
-                            <div className="text-[14px] opacity-90">{s.label}</div>
+                            <div className="text-[12px] sm:text-[14px] opacity-90">{s.label}</div>
                         </div>
                     </div>
                 </button>

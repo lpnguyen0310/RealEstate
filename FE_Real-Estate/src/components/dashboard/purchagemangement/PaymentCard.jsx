@@ -106,14 +106,13 @@ export default function PaymentCard({
                             const price = Number(it?.price) || 0;
                             const lineTotal = q * price;
 
-                            // _raw.items có thể undefined / không phải array
                             const comboItems = Array.isArray(it?._raw?.items) ? it._raw.items : [];
                             const isCombo = comboItems.length > 0;
                             const open = !!openMap[id];
 
                             return (
                                 <div key={id} className="text-[14px]">
-                                    {/* Row chính */}
+                                    {/* ===== Row chính (có nút mở/đóng) ===== */}
                                     <div className="flex items-center">
                                         <div className="flex-1 text-[#2B3A55] font-medium">
                                             <div className="flex items-center gap-1.5">
@@ -135,14 +134,13 @@ export default function PaymentCard({
                                         <div className="w-28 text-right text-[#2B3A55]">{fmt(lineTotal)}</div>
                                     </div>
 
-                                    {/* Hàng tóm tắt (khi đóng) */}
+                                    {/* ===== Tóm tắt khi đóng (✅ nhân với q) ===== */}
                                     {isCombo && !open && (
                                         <div className="pl-8 mt-0.5 text-[12px] text-[#7A8AA1]">
-                                            {comboSummary(comboItems)}
+                                            {comboSummary(comboItems, q)}   {/* ⬅️ nhớ truyền q */}
                                         </div>
                                     )}
-
-                                    {/* Hàng chi tiết (khi mở) */}
+                                    {/* ===== Chi tiết khi mở: mỗi loại 1 chip (✅ nhân với q) ===== */}
                                     {isCombo && open && (
                                         <div className="mt-2 pl-8">
                                             <div className="flex flex-wrap gap-1.5">
@@ -225,12 +223,20 @@ export default function PaymentCard({
 
             {/* Phương thức thanh toán */}
             <div className="border-t border-dashed border-gray-200 my-4 pt-4">
-                <h4 className="font-medium text-[#1a3b7c] mb-3 text-base">Chọn phương thức thanh toán:</h4>
-                <Radio.Group onChange={(e) => setPaymentMethod(e.target.value)} value={paymentMethod} className="w-full">
+                <h4 className="font-medium text-[#1a3b7c] mb-3 text-base">
+                    Chọn phương thức thanh toán:
+                </h4>
+                <Radio.Group
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    value={paymentMethod}
+                    className="w-full"
+                >
                     <Space direction="vertical" className="w-full">
                         <Radio value="balance" disabled={!canPayWithBalance}>
                             Thanh toán bằng số dư
-                            {!canPayWithBalance && total > 0 && <span className="text-xs text-red-500 ml-2">(Không đủ)</span>}
+                            {!canPayWithBalance && total > 0 && (
+                                <span className="text-xs text-red-500 ml-2">(Không đủ)</span>
+                            )}
                         </Radio>
                         <Radio value="online">Thanh toán trực tuyến (Thẻ quốc tế)</Radio>
                     </Space>
@@ -264,10 +270,16 @@ export default function PaymentCard({
             <button
                 disabled={total === 0 || disabled}
                 onClick={onPay}
-                className={`mt-4 w-full h-[48px] rounded-xl text-white font-semibold transition-colors duration-200 ${total <= 0 || disabled ? "bg-[#93a3bd] cursor-not-allowed" : "bg-[#0f2f63] hover:bg-[#0c2550]"
+                className={`mt-4 w-full h-[48px] rounded-xl text-white font-semibold transition-colors duration-200 ${total <= 0 || disabled
+                    ? "bg-[#93a3bd] cursor-not-allowed"
+                    : "bg-[#0f2f63] hover:bg-[#0c2550]"
                     }`}
             >
-                {disabled ? "Đang xử lý..." : paymentMethod === "balance" ? "Xác nhận trừ số dư" : "Tiếp tục Thanh toán"}
+                {disabled
+                    ? "Đang xử lý..."
+                    : paymentMethod === "balance"
+                        ? "Xác nhận trừ số dư"
+                        : "Tiếp tục Thanh toán"}
             </button>
         </div>
     );

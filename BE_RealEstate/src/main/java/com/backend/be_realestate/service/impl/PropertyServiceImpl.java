@@ -94,16 +94,26 @@ public class PropertyServiceImpl implements IPropertyService {
         Double priceTo      = params.get("priceTo")   != null ? Double.parseDouble(params.get("priceTo"))   : null;
         Float areaFrom      = params.get("areaFrom")  != null ? Float.parseFloat(params.get("areaFrom"))    : null;
         Float areaTo        = params.get("areaTo")    != null ? Float.parseFloat(params.get("areaTo"))      : null;
+        Long cityId         = params.get("cityId")    != null ? Long.parseLong(params.get("cityId"))        : null;
 
-        // kwMode: all (mặc định) / any
         boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
 
-        Specification<PropertyEntity> spec =
-                PropertySpecification.hasKeyword(keyword, matchAll)
-                        .and(PropertySpecification.hasPropertyType(propertyType))
-                        .and(PropertySpecification.hasCategorySlug(categorySlug))
-                        .and(PropertySpecification.priceBetween(priceFrom, priceTo))
-                        .and(PropertySpecification.areaBetween(areaFrom, areaTo));
+        // ✅ BẮT ĐẦU TẠO SPEC
+        Specification<PropertyEntity> spec = Specification
+                .where(PropertySpecification.isPublished());
+        // ✅ Nếu có cityId thì ưu tiên city, bỏ keyword
+        if (cityId != null) {
+            spec = spec.and(PropertySpecification.hasCity(cityId));
+        } else {
+            spec = spec.and(PropertySpecification.hasKeyword(keyword, matchAll));
+        }
+
+        // ✅ Các điều kiện còn lại
+        spec = spec
+                .and(PropertySpecification.hasPropertyType(propertyType))
+                .and(PropertySpecification.hasCategorySlug(categorySlug))
+                .and(PropertySpecification.priceBetween(priceFrom, priceTo))
+                .and(PropertySpecification.areaBetween(areaFrom, areaTo));
 
         Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
         return resultPage.map(propertyMapper::toPropertyCardDTO);
@@ -506,138 +516,153 @@ public class PropertyServiceImpl implements IPropertyService {
     }
 
 
-    @Transactional(readOnly = true)
-    @Override
-        public List<PropertyCardDTO> getRecommendations(Long userId, int limit) {
-        log.info("[Reco] userId={}, limit={}", userId, limit);
+        @Transactional(readOnly = true)
+        @Override
+            public List<PropertyCardDTO> getRecommendations(Long userId, int limit) {
+            log.info("[Reco] userId={}, limit={}", userId, limit);
 
-        // 1) Các tin đã lưu + loại BĐS ưa thích
-        List<Long> savedIds = savedPropertyRepository.findPropertyIdsByUser(userId);
-        log.info("[Reco] savedIds={}", savedIds);
+            // 1) IDs đã lưu + loại BĐS ưa thích
+            List<Long> savedIds = savedPropertyRepository.findPropertyIdsByUser(userId);
+            log.info("[Reco] savedIds={}", savedIds);
 
-        List<PropertyType> favTypes = savedPropertyRepository.topPropertyTypes(userId).stream()
-                .map(r -> (PropertyType) r[0])  // r[0] là PropertyType
-                .limit(3)
-                .toList();
-        if (favTypes == null || favTypes.isEmpty()) {
-            favTypes = List.of(PropertyType.sell, PropertyType.rent);
-        } else {
-            // gộp thêm 2 loại cơ bản nếu chưa có
-            Set<PropertyType> all = new HashSet<>(favTypes);
-            all.add(PropertyType.sell);
-            all.add(PropertyType.rent);
-            favTypes = new ArrayList<>(all);
-        }
-        final List<PropertyType> finalFavTypes = List.copyOf(favTypes);
-
-        log.info("[Reco] favTypes={}", favTypes);
-
-        // 2) Lấy min/max price & min/max area từ các tin đã lưu
-        Double minPrice = null, maxPrice = null;
-        Float  minArea  = null, maxArea  = null;
-
-        List<Object[]> rows = savedPropertyRepository.priceAreaMinMax(userId);
-        if (rows != null && !rows.isEmpty()) {
-            Object[] r = rows.get(0);
-            if (r != null && r.length == 4) {
-                minPrice = toD(r[0]);
-                maxPrice = toD(r[1]);
-                Double minAreaD = toD(r[2]);
-                Double maxAreaD = toD(r[3]);
-                minArea = minAreaD == null ? null : minAreaD.floatValue();
-                maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
+            List<PropertyType> favTypes = savedPropertyRepository.topPropertyTypes(userId).stream()
+                    .map(r -> (PropertyType) r[0])
+                    .limit(3)
+                    .toList();
+            if (favTypes == null || favTypes.isEmpty()) {
+                favTypes = List.of(PropertyType.sell, PropertyType.rent);
+            } else {
+                Set<PropertyType> all = new HashSet<>(favTypes);
+                all.add(PropertyType.sell);
+                all.add(PropertyType.rent);
+                favTypes = new ArrayList<>(all);
             }
+            final List<PropertyType> finalFavTypes = List.copyOf(favTypes);
+            log.info("[Reco] favTypes={}", favTypes);
+
+            // 2) Min/Max price & area từ các tin đã lưu
+            Double minPrice = null, maxPrice = null;
+            Float  minArea  = null, maxArea  = null;
+
+            List<Object[]> rows = savedPropertyRepository.priceAreaMinMax(userId);
+            if (rows != null && !rows.isEmpty()) {
+                Object[] r = rows.get(0);
+                if (r != null && r.length == 4) {
+                    minPrice = toD(r[0]);
+                    maxPrice = toD(r[1]);
+                    Double minAreaD = toD(r[2]);
+                    Double maxAreaD = toD(r[3]);
+                    minArea = minAreaD == null ? null : minAreaD.floatValue();
+                    maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
+                }
+            }
+            if (minPrice != null && maxPrice != null && minPrice.equals(maxPrice)) minPrice = 0d;
+            if (minArea  != null && maxArea  != null && minArea.equals(maxArea))   minArea  = 0f;
+
+            log.info("[Reco] min/max: price[{}, {}], area[{}, {}]", minPrice, maxPrice, minArea, maxArea);
+
+            boolean priceOk = (minPrice != null && maxPrice != null && minPrice >= 0 && maxPrice > 0 && minPrice <= maxPrice);
+            boolean areaOk  = (minArea  != null && maxArea  != null && minArea  >= 0 && maxArea  > 0  && minArea  <= maxArea);
+
+            if (!(priceOk || areaOk)) {
+                log.info("[Reco] noSignal (neither price nor area valid) → return empty list");
+                return Collections.emptyList();
+            }
+
+            // 3) Top City (ưa thích)
+            List<Long> favCityIds = savedPropertyRepository.topCityIds(userId).stream()
+                    .map(r -> (Long) r[0])
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .limit(3)
+                    .toList();
+            log.info("[Reco] favCityIds={}", favCityIds);
+            final Set<Long> favCitySet = new HashSet<>(favCityIds); // dùng cho scoring
+
+            // 4) Base spec (status/type/not-in-saved) + OR(price,area)
+            Specification<PropertyEntity> base = Specification.where(RecommendationSpec.statusPublished());
+
+            if (!finalFavTypes.isEmpty()) {
+                base = base.and(RecommendationSpec.inPropertyTypes(finalFavTypes));
+            }
+            if (!savedIds.isEmpty()) {
+                base = base.and(RecommendationSpec.notInIds(savedIds));
+            }
+
+            Specification<PropertyEntity> priceSpec = priceOk ? RecommendationSpec.priceBetween(minPrice, maxPrice) : null;
+            Specification<PropertyEntity> areaSpec  = areaOk  ? RecommendationSpec.areaBetween(minArea, maxArea)     : null;
+            base = base.and(RecommendationSpec.orSafe(priceSpec, areaSpec));
+
+            // 5) Tìm ứng viên: PASS 1 (ưu tiên city ưa thích)
+            int pageSize = Math.max(limit * 3, 24);
+            List<PropertyEntity> candidates;
+
+            if (!favCityIds.isEmpty()) {
+                Specification<PropertyEntity> withCity = base.and(RecommendationSpec.inCityIds(favCityIds));
+                candidates = new ArrayList<>(
+                        propertyRepository
+                                .findAll(withCity, PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "postedAt")))
+                                .getContent()
+                );
+                log.info("[Reco] candidates (withCity)={}", candidates.stream().map(PropertyEntity::getId).toList());
+
+                // fallback nếu thiếu
+                if (candidates.size() < limit) {
+                    List<PropertyEntity> extra = propertyRepository
+                            .findAll(base, PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "postedAt")))
+                            .getContent();
+                    Set<Long> seen = candidates.stream().map(PropertyEntity::getId).collect(Collectors.toSet());
+                    for (PropertyEntity e : extra) {
+                        if (seen.add(e.getId())) candidates.add(e); // ✅ giờ add được
+                        if (candidates.size() >= pageSize) break;
+                    }
+                    log.info("[Reco] candidates fallback merged size={}", candidates.size());
+                }
+            } else {
+                candidates = new ArrayList<>(
+                        propertyRepository
+                                .findAll(base, PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "postedAt")))
+                                .getContent()
+                );
+                log.info("[Reco] candidates (no favCity)={}", candidates.stream().map(PropertyEntity::getId).toList());
+            }
+
+
+            if (candidates.isEmpty()) return Collections.emptyList();
+
+            // 6) Scoring (thêm boost city)
+            final double priceCenter = priceOk ? median(minPrice, maxPrice) : 0d;
+            final double areaCenter  = areaOk  ? median(
+                    minArea  == null ? null : minArea.doubleValue(),
+                    maxArea  == null ? null : maxArea.doubleValue()
+            ) : 0d;
+
+            List<PropertyEntity> ranked = candidates.stream()
+                    .sorted((x, y) -> Double.compare(
+                            scoreRangeAware(y, finalFavTypes, favCitySet, priceCenter, areaCenter),
+                            scoreRangeAware(x, finalFavTypes, favCitySet, priceCenter, areaCenter)
+                    ))
+                    .limit(limit)
+                    .toList();
+
+            log.info("[Reco] ranked={}", ranked.stream().map(PropertyEntity::getId).toList());
+            return ranked.stream().map(propertyMapper::toPropertyCardDTO).toList();
         }
-
-        /* ⚡ BỔ SUNG: nếu chỉ lưu 1 tin => min == max thì mở dải từ 0 */
-        if (minPrice != null && maxPrice != null && minPrice.equals(maxPrice)) {
-            minPrice = 0d;
-        }
-        if (minArea != null && maxArea != null && minArea.equals(maxArea)) {
-            minArea = 0f;
-        }
-        log.info("[Reco] min/max: price[{}, {}], area[{}, {}]", minPrice, maxPrice, minArea, maxArea);
-
-        // 3) Kiểm tra "tín hiệu" — chỉ cần 1 trong 2 hợp lệ (priceOk || areaOk)
-        boolean priceOk = (minPrice != null && maxPrice != null && minPrice >= 0 && maxPrice > 0 && minPrice <= maxPrice);
-        boolean areaOk  = (minArea  != null && maxArea  != null && minArea  >= 0 && maxArea  > 0  && minArea  <= maxArea);
-
-        if (!(priceOk || areaOk)) {
-            log.info("[Reco] noSignal (neither price nor area valid) → return empty list");
-            return Collections.emptyList();
-        }
-
-        // 4) Build specification: CHỈ CẦN 1 trong 2 (price OR area)
-        Specification<PropertyEntity> spec = Specification.where(RecommendationSpec.statusPublished());
-
-        if (!favTypes.isEmpty()) {
-            spec = spec.and(RecommendationSpec.inPropertyTypes(favTypes));
-        }
-        if (!savedIds.isEmpty()) {
-            spec = spec.and(RecommendationSpec.notInIds(savedIds));
-        }
-
-        Specification<PropertyEntity> priceSpec = null;
-        Specification<PropertyEntity> areaSpec  = null;
-
-        if (priceOk) {
-            priceSpec = RecommendationSpec.priceBetween(minPrice, maxPrice);
-            // Hoặc siết biên trên bằng exclusive:
-            // priceSpec = RecommendationSpec.priceBetweenExclusive(minPrice, maxPrice);
-        }
-        if (areaOk) {
-            areaSpec = RecommendationSpec.areaBetween(minArea, maxArea);
-            // Hoặc exclusive:
-            // areaSpec = RecommendationSpec.areaBetweenExclusive(minArea, maxArea);
-        }
-
-        Specification<PropertyEntity> priceOrArea = RecommendationSpec.orSafe(priceSpec, areaSpec);
-        spec = spec.and(priceOrArea);
-
-        // 5) Lấy ứng viên (ưu tiên bài mới)
-        int pageSize = Math.max(limit * 3, 24);
-        List<PropertyEntity> candidates = propertyRepository
-                .findAll(spec, PageRequest.of(0, pageSize, Sort.by(DESC, "postedAt")))
-                .getContent();
-
-        log.info("[Reco] candidates={}", candidates.stream().map(PropertyEntity::getId).toList());
-        if (candidates.isEmpty()) {
-            log.info("[Reco] empty candidates → return empty list");
-            return Collections.emptyList();
-        }
-
-        // 6) Chấm điểm trong phạm vi đã lọc (ưu tiên gần median giá/diện tích)
-        final double priceCenter = priceOk ? median(minPrice, maxPrice) : 0d;
-        final double areaCenter  = areaOk  ? median(
-                minArea  == null ? null : minArea.doubleValue(),
-                maxArea  == null ? null : maxArea.doubleValue()
-        ) : 0d;
-
-        List<PropertyEntity> ranked = candidates.stream()
-                .sorted((x, y) -> Double.compare(
-                        scoreRangeAware(y, finalFavTypes, priceCenter, areaCenter),
-                        scoreRangeAware(x, finalFavTypes, priceCenter, areaCenter)
-                ))
-                .limit(limit)
-                .toList();
-
-        log.info("[Reco] ranked={}", ranked.stream().map(PropertyEntity::getId).toList());
-        return ranked.stream().map(propertyMapper::toPropertyCardDTO).toList();
-    }
     private double scoreRangeAware(PropertyEntity p,
                                    List<PropertyType> favTypes,
+                                   Set<Long> favCityIds,
                                    double priceCenter,
                                    double areaCenter) {
         double s = 0.0;
 
-        // (1) GIÁ — ưu tiên gần "tâm" dải (median)
+        // (1) GIÁ — ưu tiên gần median
         if (priceCenter > 0 && p.getPrice() != null && p.getPrice() > 0) {
-            double denom = Math.max(1d, priceCenter * 0.25);   // hẹp hơn để sát tâm hơn
+            double denom = Math.max(1d, priceCenter * 0.25);
             double close = Math.max(0, 1 - Math.abs(p.getPrice() - priceCenter) / denom);
             s += close * 2.4;
         }
 
-        // (2) DIỆN TÍCH — ưu tiên gần "tâm" dải
+        // (2) DIỆN TÍCH — ưu tiên gần median
         if (areaCenter > 0 && p.getArea() > 0) {
             double denom = Math.max(1d, areaCenter * 0.25);
             double close = Math.max(0, 1 - Math.abs(p.getArea() - areaCenter) / denom);
@@ -665,6 +690,14 @@ public class PropertyServiceImpl implements IPropertyService {
             s += recency * 0.2;
         }
 
+        // (6) City ưa thích → BOOST
+        try {
+            Long cId = (p.getCity() != null) ? p.getCity().getId() : null;
+            if (cId != null && favCityIds != null && favCityIds.contains(cId)) {
+                s += 1.1;  // hệ số boost city
+            }
+        } catch (Exception ignore) {}
+
         return s;
     }
 
@@ -674,7 +707,6 @@ public class PropertyServiceImpl implements IPropertyService {
         if (b == null) return a;
         return (a + b) / 2.0;
     }
-
     /* =========================================================
      * KPI / PENDING
      * ========================================================= */

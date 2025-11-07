@@ -1,5 +1,6 @@
+// src/hooks/useVNLocations.js
 import { useEffect, useRef, useState, useCallback } from "react";
-import { getProvinces, getDistrictsByProvinceId, getWardsByDistrictId } from "@/api/provinces";
+import { locationApi } from "@/api/locationApi";
 
 export default function useVNLocations(enabled = true) {
     const [provinces, setProvinces] = useState([]);
@@ -11,42 +12,56 @@ export default function useVNLocations(enabled = true) {
     const provinceCtrl = useRef(null);
     const districtCtrl = useRef(null);
 
+    // --- Load provinces (cities) ---
     useEffect(() => {
         if (!enabled) return;
         let alive = true;
-        const ctrl = new AbortController();
-        getProvinces(ctrl.signal)
-            .then((p) => alive && setProvinces(p))
-            .catch(() => { });
-        return () => { alive = false; ctrl.abort?.(); };
+        (async () => {
+            try {
+                const data = await locationApi.getCities();
+                if (alive) setProvinces(data || []);
+            } catch (err) {
+                console.error("Failed to load provinces:", err);
+            }
+        })();
+        return () => { alive = false; };
     }, [enabled]);
 
-    const loadDistricts = useCallback((provinceId) => {
-        setDistricts([]); setWards([]);
-        provinceCtrl.current?.abort?.();
-        provinceCtrl.current = new AbortController();
-        setLoadingDistricts(true);
-        getDistrictsByProvinceId(provinceId, provinceCtrl.current.signal)
-            .then(setDistricts)
-            .catch(() => { })
-            .finally(() => setLoadingDistricts(false));
-    }, []);
-
-    const loadWards = useCallback((districtId) => {
+    // --- Load districts by city ---
+    const loadDistricts = useCallback(async (cityId) => {
+        if (!cityId) return;
+        setDistricts([]);
         setWards([]);
-        districtCtrl.current?.abort?.();
-        districtCtrl.current = new AbortController();
-        setLoadingWards(true);
-        getWardsByDistrictId(districtId, districtCtrl.current.signal)
-            .then(setWards)
-            .catch(() => { })
-            .finally(() => setLoadingWards(false));
+        setLoadingDistricts(true);
+        try {
+            const data = await locationApi.getDistricts(cityId);
+            setDistricts(data || []);
+        } catch (err) {
+            console.error("Failed to load districts:", err);
+        } finally {
+            setLoadingDistricts(false);
+        }
     }, []);
 
-    // ⬇️ Tiện ích: nạp sẵn theo ID (dùng khi edit)
-    const reloadAllByIds = useCallback(async (provinceId, districtId) => {
-        if (!provinceId) return;
-        await loadDistricts(provinceId);
+    // --- Load wards by district ---
+    const loadWards = useCallback(async (districtId) => {
+        if (!districtId) return;
+        setWards([]);
+        setLoadingWards(true);
+        try {
+            const data = await locationApi.getWards(districtId);
+            setWards(data || []);
+        } catch (err) {
+            console.error("Failed to load wards:", err);
+        } finally {
+            setLoadingWards(false);
+        }
+    }, []);
+
+    // --- Reload both (for edit mode) ---
+    const reloadAllByIds = useCallback(async (cityId, districtId) => {
+        if (!cityId) return;
+        await loadDistricts(cityId);
         if (districtId) await loadWards(districtId);
     }, [loadDistricts, loadWards]);
 

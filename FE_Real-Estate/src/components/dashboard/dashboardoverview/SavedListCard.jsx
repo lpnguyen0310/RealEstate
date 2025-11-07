@@ -10,20 +10,21 @@ export default function SavedListCard({
     maxItems = 5,
     onViewAll,
     onItemClick,
+    emptyHint = "Chưa có tin nào được lưu",
 }) {
     const shown = items.slice(0, maxItems);
 
     return (
         <div className="rounded-2xl bg-[#f5f7fb] p-4 border border-[#e8edf6]">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[16px] font-bold text-[#1c396a] leading-none">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-[15px] sm:text-[16px] font-bold text-[#1c396a] leading-none">
                     {title}
                 </h3>
                 <button
                     type="button"
                     onClick={onViewAll}
-                    className="text-[13px] text-[#3b7cff] hover:underline leading-none"
+                    className="text-[12px] sm:text-[13px] text-[#3b7cff] hover:underline leading-none"
                 >
                     Xem tất cả
                 </button>
@@ -32,8 +33,8 @@ export default function SavedListCard({
             {/* Body */}
             <div className="flex flex-col gap-3">
                 {shown.length === 0 ? (
-                    <div className="text-[14px] text-gray-500 bg-white rounded-xl p-4 border border-[#eef2f8] text-center">
-                        Chưa có tin nào được lưu
+                    <div className="text-[13px] sm:text-[14px] text-gray-500 bg-white rounded-xl p-4 border border-[#eef2f8] text-center">
+                        {emptyHint}
                     </div>
                 ) : (
                     shown.map((it) => (
@@ -55,12 +56,12 @@ export default function SavedListCard({
 
                             {/* Nội dung */}
                             <div className="flex-1 min-w-0">
-                                <div className="text-[14px] font-semibold text-[#1c396a] truncate">
+                                <div className="text-[13px] sm:text-[14px] font-semibold text-[#1c396a] truncate">
                                     {it.title || "Không có tiêu đề"}
                                 </div>
-                                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-gray-500">
+                                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] sm:text-[12px] text-gray-500">
                                     {it.subtitle && (
-                                        <span className="truncate max-w-[140px]" title={it.subtitle}>
+                                        <span className="truncate max-w-[140px] sm:max-w-[180px]" title={it.subtitle}>
                                             {it.subtitle}
                                         </span>
                                     )}
@@ -70,16 +71,14 @@ export default function SavedListCard({
                                         </span>
                                     )}
                                     {it.savedAgo && (
-                                        <span className="whitespace-nowrap">
-                                            • Đã lưu {it.savedAgo}
-                                        </span>
+                                        <span className="whitespace-nowrap">• Đã lưu {it.savedAgo}</span>
                                     )}
                                 </div>
                             </div>
 
                             {/* Type badge */}
                             {it.type && (
-                                <span className="text-[12px] px-2 py-1 rounded-md bg-[#f0f4ff] text-[#375a8b] whitespace-nowrap font-medium">
+                                <span className="text-[11px] sm:text-[12px] px-2 py-1 rounded-md bg-[#f0f4ff] text-[#375a8b] whitespace-nowrap font-medium">
                                     {it.type}
                                 </span>
                             )}

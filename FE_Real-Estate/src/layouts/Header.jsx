@@ -1,7 +1,19 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Flex, Badge, Dropdown, Button, message } from "antd";
-import { BellOutlined } from "@ant-design/icons";
+import {
+  Flex,
+  Dropdown,
+  Button,
+  message,
+  Drawer,
+  Collapse,
+  Divider,
+} from "antd";
+import {
+  MenuOutlined,
+  CloseOutlined,
+  RightOutlined,
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import React from "react";
 
@@ -34,6 +46,10 @@ export default function Header() {
 
   const [hoverKey, setHoverKey] = React.useState(null);
   const [authUiLoading, setAuthUiLoading] = React.useState(false);
+
+  // ===== Mobile state =====
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [activePanelKeys, setActivePanelKeys] = React.useState([]);
 
   const handleLogout = async () => {
     try {
@@ -70,9 +86,47 @@ export default function Header() {
     </div>
   );
 
+  // ===== Mobile: panels for NAVS =====
+  const mobilePanels = (NAVS || []).map((grp) => ({
+    key: grp.key,
+    label: (
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-[15px] text-gray-900">{grp.label}</span>
+      </div>
+    ),
+    children: (
+      <div className="flex flex-col gap-1">
+        {(grp.items || []).map((it) => (
+          <button
+            key={it.to + it.text}
+            onClick={() => {
+              setMobileOpen(false);
+              nav(`/search?type=${grp.key}&category=${encodeURIComponent(it.to)}`);
+            }}
+            className="flex items-center justify-between w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50"
+          >
+            <span className="text-[14px] text-gray-800">{it.text}</span>
+            <RightOutlined className="text-[10px] text-gray-400" />
+          </button>
+        ))}
+        <Divider className="!my-2" />
+        <button
+          onClick={() => {
+            setMobileOpen(false);
+            nav(`/search?type=${grp.key}`);
+          }}
+          className="w-full text-left px-3 py-2 rounded-lg bg-[#fff1ef] text-[#d6402c] font-medium"
+        >
+          Xem tất cả {grp.label.toLowerCase()}
+        </button>
+      </div>
+    ),
+  }));
+
   return (
     <>
-      <header className="sticky top-0 z-50 mx-auto bg-white border-b border-gray-200 w-full px-4 py-2">
+      {/* ===== Desktop header (giữ nguyên) ===== */}
+      <header className="sticky top-0 z-50 mx-auto bg-white border-b border-gray-200 w-full px-4 py-2 hidden lg:block">
         <Flex align="center" justify="space-between" className="mx-auto w-full h-[72px] px-4">
           {/* --- LEFT: Logo + Nav --- */}
           <Flex align="center" gap={32}>
@@ -134,12 +188,7 @@ export default function Header() {
             justify="space-evenly"
           >
             <FavoritePostList />
-
-            {/* <Badge count={2} size="small" offset={[-2, 6]}>
-              <BellOutlined className="text-[25px] text-gray-800 cursor-pointer hover:text-[#d6402c]" />
-            </Badge> */}
             <NotificationBell />
-            
             <UserDropDownHeader
               user={user}
               loadingUser={loadingAuth || authUiLoading}
@@ -147,7 +196,6 @@ export default function Header() {
               onRegisterClick={() => dispatch(openRegisterModal())}
               onLogout={handleLogout}
             />
-
             <Button
               className="!h-12 !px-6 !rounded-lg border-gray-200 hover:!border-gray-300 hover:!bg-gray-50 font-medium text-[#d6402c] bg-[#fff1ef]"
               onClick={() => {
@@ -160,6 +208,166 @@ export default function Header() {
             </Button>
           </Flex>
         </Flex>
+      </header>
+
+      {/* ===== Mobile/Tablet header (≤ lg) ===== */}
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 w-full px-3 py-2 lg:hidden">
+        <div className="flex items-center justify-between h-[56px]">
+          {/* Left: Hamburger + Logo */}
+          <div className="flex items-center gap-3">
+            <button
+              aria-label="Mở menu"
+              onClick={() => setMobileOpen(true)}
+              className="p-2 rounded-lg hover:bg-gray-100 active:scale-95 transition"
+            >
+              <MenuOutlined className="text-[20px]" />
+            </button>
+
+            <a href="/" className="flex items-center h-full">
+              <img
+                src="/src/assets/logo2.svg"
+                alt="logo"
+                className="w-[130px] h-[40px] object-contain"
+              />
+            </a>
+          </div>
+
+          {/* Right: actions rút gọn */}
+          <div className="flex items-center gap-2">
+            {/* Tuỳ trường hợp bạn muốn ẩn Favorite trong mobile, có thể để nguyên */}
+            <div className="hidden sm:block">
+              <FavoritePostList />
+            </div>
+
+            <NotificationBell />
+
+            <UserDropDownHeader
+              user={user}
+              compact
+              loadingUser={loadingAuth || authUiLoading}
+              onLoginClick={() => dispatch(openLoginModal())}
+              onRegisterClick={() => dispatch(openRegisterModal())}
+              onLogout={handleLogout}
+            />
+
+            <Button
+              size="small"
+              className="!h-9 !px-3 !rounded-md border-gray-200 hover:!border-gray-300 hover:!bg-gray-50 font-medium text-[#d6402c] bg-[#fff1ef]"
+              onClick={() => {
+                if (user) nav("/dashboard/posts");
+                else dispatch(openLoginModal());
+              }}
+              disabled={loadingAuth}
+            >
+              Đăng tin
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile Drawer */}
+        <Drawer
+          title={
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[16px]">Danh mục</span>
+              <button
+                aria-label="Đóng"
+                onClick={() => setMobileOpen(false)}
+                className="p-2 rounded-lg hover:bg-gray-100"
+              >
+                <CloseOutlined />
+              </button>
+            </div>
+          }
+          placement="left"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          width={Math.min(window.innerWidth * 0.86, 360)}
+          bodyStyle={{ padding: 12 }}
+        >
+          {/* Quick entry */}
+          <div className="flex items-center gap-2 mb-3">
+            <Button
+              className="flex-1 !h-10 !rounded-lg"
+              onClick={() => {
+                setMobileOpen(false);
+                nav("/search");
+              }}
+            >
+              Tìm kiếm
+            </Button>
+            <Button
+              type="primary"
+              className="flex-1 !h-10 !rounded-lg !bg-[#d6402c]"
+              onClick={() => {
+                setMobileOpen(false);
+                if (user) nav("/dashboard/posts");
+                else dispatch(openLoginModal());
+              }}
+            >
+              Đăng tin
+            </Button>
+          </div>
+
+          <Divider className="!my-3" />
+
+          {/* NAV groups */}
+          <Collapse
+            bordered={false}
+            activeKey={activePanelKeys}
+            onChange={(keys) => setActivePanelKeys(keys)}
+            expandIconPosition="end"
+            items={mobilePanels}
+          />
+
+          <Divider className="!my-3" />
+
+          {/* Auth actions (khi chưa đăng nhập) */}
+          {!user && (
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                className="!h-10 !rounded-lg"
+                onClick={() => {
+                  setMobileOpen(false);
+                  dispatch(openLoginModal());
+                }}
+              >
+                Đăng nhập
+              </Button>
+              <Button
+                className="!h-10 !rounded-lg"
+                onClick={() => {
+                  setMobileOpen(false);
+                  dispatch(openRegisterModal());
+                }}
+              >
+                Đăng ký
+              </Button>
+            </div>
+          )}
+
+          {/* User actions (đã đăng nhập) */}
+          {user && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button
+                className="!h-10 !rounded-lg"
+                onClick={() => {
+                  setMobileOpen(false);
+                  nav("/dashboard");
+                }}
+              >
+                Bảng điều khiển
+              </Button>
+              <Button
+                danger
+                className="!h-10 !rounded-lg"
+                onClick={handleLogout}
+                loading={loadingAuth}
+              >
+                Đăng xuất
+              </Button>
+            </div>
+          )}
+        </Drawer>
       </header>
 
       {/* --- Modals --- */}

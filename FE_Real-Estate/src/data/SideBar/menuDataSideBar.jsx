@@ -17,7 +17,7 @@ export const MENUS = [
     { to: "/dashboard", text: "Tổng quan", icon: <HomeOutlined /> },
     { to: "/dashboard/purchase", text: "Mua tin", icon: <CreditCardOutlined /> },
     { to: "/dashboard/posts", text: "Tin đăng", icon: <FileTextOutlined /> },
-    { to: "/dashboard/customers", text: "Khách mua/thuê", icon: <TeamOutlined /> },
+    // { to: "/dashboard/customers", text: "Khách mua/thuê", icon: <TeamOutlined /> },
     { to: "/dashboard/account", text: "Quản lý hồ sơ", icon: <ThunderboltOutlined /> },
     { to: "/dashboard/orders", text: "Quản lý đơn hàng", icon: <ScheduleOutlined /> },
     { to: "/dashboard/transactions", text: "Lịch sử giao dịch", icon: <DollarCircleOutlined /> },

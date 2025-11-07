@@ -6,3 +6,4 @@ export { default as VideoLibrarySection } from "./VideoLibrarySection";
 export {default as AmenitiesSection} from "./AmenitiesSection";
 export {default as ContactInfoSection} from "./ContactInfoSection";
 export { default as PostPreviewSection } from "./PostPreviewSection";
+export { default as OwnerAndConstructionSection } from "./OwnerAndConstructionSection";

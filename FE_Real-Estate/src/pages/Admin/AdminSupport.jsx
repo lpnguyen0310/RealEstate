@@ -18,15 +18,18 @@ const formatBytes = (b = 0) => {
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const TabBtn = ({ active, children, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`px-3 py-1.5 rounded-lg text-sm transition ${active
-            ? "bg-indigo-600 text-white"
-            : "bg-white text-gray-700 hover:bg-gray-50 border"
-            }`}
-    >
-        {children}
-    </button>
+  <button
+    onClick={onClick}
+    className={[
+      "px-3 py-1.5 rounded-lg text-sm transition border",
+      active
+        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+        : "bg-white text-gray-700 hover:bg-gray-50 border-gray-300"
+    ].join(" ")}
+    aria-pressed={active}
+  >
+    <span className={active ? "text-white" : "text-inherit"}>{children}</span>
+  </button>
 );
 
 function Toast({ open, type = "success", message, onClose }) {
@@ -408,6 +411,41 @@ export default function AdminSupport() {
     /* ===================== Nhận realtime message ===================== */
     useEffect(() => {
         if (!wsIncoming || !sel?.id) return;
+        // 0) Bỏ qua tín hiệu bóng đẩy từ slice khi vừa click Send
+        if (wsIncoming._optimistic) return;
+
+        // 1) Nếu server báo về bản "thay thế bóng" → thay vì append, ta replace
+        if (wsIncoming._replaceClientMsgId) {
+            const repId = wsIncoming._replaceClientMsgId;
+            const idx = pendingByClientIdRef.current.get(repId);
+            if (typeof idx === "number") {
+                const mapped = mapMessage(wsIncoming);
+                setMsgs((prev) => {
+                    const next = prev.slice();
+                    next[idx] = mapped;
+                    return next;
+                });
+                pendingByClientIdRef.current.delete(repId);
+                const sid = String(wsIncoming.messageId || wsIncoming.id || "");
+                if (sid) seenServerIdsRef.current.add(sid);
+                // cập nhật preview sidebar
+                setList((p) =>
+                    p
+                        .map((cv) =>
+                            cv.id === sel.id
+                                ? { ...cv, lastMessage: mapped.content || "[Tệp]", updatedAt: Date.now(), unread: 0 }
+                                : cv
+                        )
+                        .sort((a, b) => b.updatedAt - a.updatedAt)
+                );
+                // scroll xuống
+                setTimeout(() => {
+                    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+                }, 0);
+                return; // ✅ kết thúc nhánh thay thế
+            }
+            // nếu không tìm thấy bóng, tiếp tục xuống như bình thường (append) nhưng sẽ được dedupe bởi serverId
+        }
 
         const m = mapMessage(wsIncoming);
         if (!m.conversationId || m.conversationId !== sel.id) return;

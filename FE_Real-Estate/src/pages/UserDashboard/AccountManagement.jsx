@@ -1,10 +1,9 @@
 // src/pages/AccountManagement.jsx
 import React, { useMemo, useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Tabs, Space, Typography, Affix, Button, Spin, message } from "antd";
-import { SaveOutlined } from "@ant-design/icons";
+import { Tabs, Space, Typography, Button, Spin, message } from "antd";
+import { SaveOutlined, ArrowLeftOutlined, CreditCardOutlined } from "@ant-design/icons";
 
-// MUI
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
 import Dialog from "@mui/material/Dialog";
@@ -12,145 +11,102 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 
-// --- REDUX ---
 import { useDispatch, useSelector } from "react-redux";
-import {
-    fetchMyProfile,
-    updateMyProfileThunk,
-    clearProfile,
-} from "@/store/profileSlice";
+import { fetchMyProfile, updateMyProfileThunk, clearProfile } from "@/store/profileSlice";
 
-// --- CLOUDINARY ---
 import { getUploadSignature, uploadToCloudinary } from "@/api/cloudinary";
 
-// --- Components ---
 import AccountSummaryCard from "@/components/dashboard/usermanager/AccountSummaryCard";
 import EditInfoForm from "@/components/dashboard/usermanager/account/EditInfoForm";
 import AccountSettingsPanel from "@/components/dashboard/usermanager/account/AccountSettingsPanel";
 import ProBrokerBlank from "@/components/dashboard/usermanager/account/ProBrokerBlank";
 import TopUpForm from "@/components/payments/TopUpForm";
-
-// ⭐️ THAY ĐỔI: Import StripeCheckout (giữ nguyên đường dẫn của bạn)
 import StripeCheckout from "@/components/dashboard/purchagemangement/Checkout/StripeCheckout";
 
-// ⭐️ THAY ĐỔI: Import API nạp tiền thật
-import { createTopUpIntent } from "@/api/paymentApi"; 
+import { createTopUpIntent } from "@/api/paymentApi";
 
-
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 export default function AccountManagement() {
     const { refetchUser: refetchUserLayout } = useOutletContext() || {};
-
     const dispatch = useDispatch();
-    const { data: profileData, status, error } = useSelector((state) => state.profile);
+    const { data: profileData, status, error } = useSelector((s) => s.profile);
     const isLoading = status === "loading";
-     useEffect(() => {
-        console.log("--- Profile Data Update ---");
-        console.log("Status:", status);
-        console.log("Data:", profileData);
-        console.log("Error:", error);
-    }, [profileData, status, error]); // Chạy khi profileData, status, hoặc error thay đổi
-    // Snackbar MUI
+
+    // Snackbar
     const [alert, setAlert] = useState({ open: false, message: "", severity: "success" });
-    const handleCloseAlert = (event, reason) => {
+    const handleCloseAlert = (_, reason) => {
         if (reason === "clickaway") return;
         setAlert((s) => ({ ...s, open: false }));
     };
 
-    // Dialog MUI
+    // Dialog
     const [openSuccessDialog, setOpenSuccessDialog] = useState(false);
     const closeSuccessDialog = () => setOpenSuccessDialog(false);
 
-    // useEffect fetch/clear profile
     useEffect(() => {
-        if (status === "idle") {
-            dispatch(fetchMyProfile());
-        }
+        if (status === "idle") dispatch(fetchMyProfile());
     }, [dispatch, status]);
 
-    useEffect(() => {
-        return () => {
-            dispatch(clearProfile());
-        };
-    }, [dispatch]);
-
+    useEffect(() => () => dispatch(clearProfile()), [dispatch]);
 
     const [activeTab, setActiveTab] = useState("edit");
-    
-    // ⭐️ THAY ĐỔI: State panel
-    // data sẽ chứa { clientSecret, orderId, amount }
-    const [panel, setPanel] = useState({ 
-        view: "manage", // "manage" | "topup" | "stripe"
-        data: null
-    });
+    const [panel, setPanel] = useState({ view: "manage", data: null });
 
-    // useMemo summary
     const summary = useMemo(() => {
-        const user = profileData;
-        if (!user) return {};
+        const u = profileData;
+        if (!u) return {};
         const username =
-            user.fullName ||
-            `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
-            user.email ||
-            "Người dùng";
-        const points = user.points ?? 0;
-        const postBalance = user.mainBalance ?? 0;   
-        const promoBalance = user.bonusBalance ?? 0;
-        const identityAccount =
-            user.identityCode || `BDS${(user.id ?? "USER").toString().padStart(8, "0")}`;
-        const isNewIdentity = !user.identityCode;
-        return { username, points, postBalance, promoBalance, identityAccount, isNewIdentity };
+            u.fullName || `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email || "Người dùng";
+        return {
+            username,
+            points: u.points ?? 0,
+            postBalance: u.mainBalance ?? 0,
+            promoBalance: u.bonusBalance ?? 0,
+            identityAccount: u.identityCode || `BDS${(u.id ?? "USER").toString().padStart(8, "0")}`,
+            isNewIdentity: !u.identityCode,
+        };
     }, [profileData]);
 
-    // Hàm điều hướng
     const openTopUp = () => setPanel({ view: "topup", data: null });
     const backToManage = () => setPanel({ view: "manage", data: null });
 
-    
-    // ====== LƯU FORM ======
-    const handleSaveSubmit = (payload) => {
-        return dispatch(updateMyProfileThunk(payload))
+    const handleSaveSubmit = (payload) =>
+        dispatch(updateMyProfileThunk(payload))
             .unwrap()
-            .then(() => {
-                setOpenSuccessDialog(true);
-            })
+            .then(() => setOpenSuccessDialog(true))
             .catch((err) => {
-                const errorMessage = err?.message || "Lỗi không xác định khi lưu.";
-                setAlert({ open: true, message: `Lưu thất bại: ${errorMessage}`, severity: "error" });
+                setAlert({
+                    open: true,
+                    message: `Lưu thất bại: ${err?.message || "Lỗi không xác định."}`,
+                    severity: "error",
+                });
                 throw err;
             });
-    };
 
-    // ====== UPLOAD AVATAR ======
     const handleAvatarUpload = async (file) => {
         if (!file) return;
-        const uploadMessageKey = "avatar-upload";
-        message.loading({ content: "Đang tải ảnh lên...", key: uploadMessageKey, duration: 0 });
-
+        const key = "avatar-upload";
+        message.loading({ content: "Đang tải ảnh lên...", key, duration: 0 });
         try {
             const sig = await getUploadSignature("avatars");
-            const cloudinaryResponse = await uploadToCloudinary(file, sig);
-            const avatarUrl = cloudinaryResponse?.secure_url;
-            if (!avatarUrl) throw new Error("Không nhận được URL ảnh từ Cloudinary.");
-
-            await dispatch(updateMyProfileThunk({ avatar: avatarUrl })).unwrap();
-
-            message.destroy(uploadMessageKey);
+            const res = await uploadToCloudinary(file, sig);
+            const url = res?.secure_url;
+            if (!url) throw new Error("Không nhận được URL ảnh từ Cloudinary.");
+            await dispatch(updateMyProfileThunk({ avatar: url })).unwrap();
+            message.destroy(key);
             setAlert({ open: true, message: "Cập nhật avatar thành công!", severity: "success" });
-        } catch (error) {
-            console.error("Lỗi upload avatar:", error);
-            message.destroy(uploadMessageKey);
+        } catch (e) {
+            message.destroy(key);
             setAlert({
                 open: true,
-                message: `Lỗi: ${error.message || "Không thể cập nhật avatar."}`,
+                message: `Lỗi: ${e.message || "Không thể cập nhật avatar."}`,
                 severity: "error",
             });
-            throw error;
+            throw e;
         }
     };
-    
-    // useEffect báo lỗi
+
     useEffect(() => {
         if (status === "failed" && !profileData) {
             setAlert({
@@ -162,60 +118,35 @@ export default function AccountManagement() {
         }
     }, [status, error, dispatch, profileData]);
 
-    // ⭐️ THAY ĐỔI: Cập nhật handler onContinue
-    const handleTopUpContinue = async (amount, method, invoiceValues, options) => {
+    const handleTopUpContinue = async (amount, method) => {
         if (method === "visa") {
-            const topUpMessageKey = "topup-create-order";
+            const key = "topup-create-order";
             try {
-                message.loading({
-                    content: "Đang tạo đơn nạp tiền...",
-                    key: topUpMessageKey,
-                    duration: 0,
-                });
-                
-                // 1. Gọi API nạp tiền thật
-                // Chúng ta cần BE trả về { clientSecret, orderId }
-                const paymentData = await createTopUpIntent(amount);
-                
-                if (!paymentData?.clientSecret) {
-                    throw new Error("Không thể tạo mã thanh toán từ server.");
-                }
-                if (!paymentData?.orderId) {
-                    // Cảnh báo nếu BE quên trả về orderId
-                    console.warn("API nạp tiền không trả về 'orderId'. Modal thành công sẽ không hiển thị mã đơn.");
-                }
-
-                message.destroy(topUpMessageKey);
-
-                // 2. Chuyển sang panel Stripe và truyền props mới
+                message.loading({ content: "Đang tạo đơn nạp tiền...", key, duration: 0 });
+                const paymentData = await createTopUpIntent(amount); // => { clientSecret, orderId }
+                if (!paymentData?.clientSecret) throw new Error("Không thể tạo mã thanh toán từ server.");
+                message.destroy(key);
                 setPanel({
                     view: "stripe",
-                    data: {
-                        clientSecret: paymentData.clientSecret, // Prop mới cho StripeCheckout
-                        orderId: paymentData.orderId, // Prop cho Inner (để poll và hiển thị)
-                        amount: amount,
-                    },
+                    data: { clientSecret: paymentData.clientSecret, orderId: paymentData.orderId, amount },
                 });
-
-            } catch (err) {
-                message.destroy(topUpMessageKey);
+            } catch (e) {
+                message.destroy(key);
                 setAlert({
                     open: true,
-                    message: `Lỗi: ${err.message || "Không thể khởi tạo thanh toán."}`,
+                    message: `Lỗi: ${e.message || "Không thể khởi tạo thanh toán."}`,
                     severity: "error",
                 });
             }
-        } else {
-            // Xử lý các PTTT khác (giữ nguyên)
-            setAlert({
-                open: true,
-                message: `Tiếp tục nạp ${amount?.toLocaleString("vi-VN")}đ qua ${method}`,
-                severity: "info",
-            });
+            return;
         }
+        setAlert({
+            open: true,
+            message: `Tiếp tục nạp ${amount?.toLocaleString("vi-VN")}đ qua ${method}`,
+            severity: "info",
+        });
     };
 
-    // Handler khi Stripe báo thanh toán thành công
     const handlePaymentSuccess = () => {
         setAlert({
             open: true,
@@ -229,48 +160,51 @@ export default function AccountManagement() {
         }, 1000);
     };
 
-
-    // render loading/error
     if (status === "loading" && !profileData) {
         return (
-            <div className="w-full h-[400px] grid place-items-center">
+            <div className="w-full h-[420px] grid place-items-center">
                 <Spin size="large" />
             </div>
         );
     }
     if (status === "failed" && !profileData) {
         return (
-            <div className="w-full h-[400px] grid place-items-center text-red-500">
-                Lỗi: Không thể tải thông tin tài khoản. (Xem thông báo chi tiết dưới góc màn hình)
+            <div className="w-full h-[420px] grid place-items-center text-red-500">
+                Lỗi: Không thể tải thông tin tài khoản.
             </div>
         );
     }
 
     return (
-        <section className="w-full max-w-[1100px] mx-auto px-4 md:px-1">
-            <div className="grid grid-cols-1 md:grid-cols-[320px_minmax(0,1fr)] gap-6">
-                {/* LEFT */}
-                <div>
-                    <Affix offsetTop={16}>
-                        <AccountSummaryCard
-                            username={summary.username}
-                            points={summary.points}
-                            postBalance={summary.postBalance}
-                            promoBalance={summary.promoBalance}
-                            identityAccount={summary.identityAccount}
-                            isNewIdentity={summary.isNewIdentity}
-                            onTopUp={openTopUp}
-                        />
-                    </Affix>
+        <section className="w-full">
+            {/* Thêm md:items-start để 2 cột luôn căn đỉnh */}
+            <div className="md:flex md:items-start md:gap-6 lg:gap-7">
+                {/* LEFT – sticky theo cột trái */}
+                <div className="md:w-[360px] md:shrink-0 md:pt-2 md:self-start md:sticky md:top-4">
+                    <AccountSummaryCard
+                        username={summary.username}
+                        points={summary.points}
+                        postBalance={summary.postBalance}
+                        promoBalance={summary.promoBalance}
+                        identityAccount={summary.identityAccount}
+                        isNewIdentity={summary.isNewIdentity}
+                        onTopUp={openTopUp}
+                    />
                 </div>
 
                 {/* RIGHT */}
-                <div>
+                <div className="md:flex-1 min-w-0">
                     {panel.view === "manage" ? (
-                        <>
-                            {/* --- Panel Quản lý (Tabs) --- */}
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 md:p-4">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="px-4 pt-4 pb-2 border-b border-gray-100">
+                                <Title level={4} className="!m-0">Quản lý hồ sơ</Title>
+                                <Text type="secondary">Cập nhật thông tin, cài đặt tài khoản và nâng cấp PRO</Text>
+                            </div>
+
+                            {/* Tắt scroll anchoring NGAY TẠI ĐÂY */}
+                            <div className="p-3 md:p-4" style={{ overflowAnchor: "none" }}>
                                 <Tabs
+                                    destroyInactiveTabPane
                                     activeKey={activeTab}
                                     onChange={setActiveTab}
                                     className="tabs-elevated"
@@ -289,7 +223,12 @@ export default function AccountManagement() {
                                         {
                                             key: "settings",
                                             label: "Cài đặt tài khoản",
-                                            children: <AccountSettingsPanel user={profileData} onChanged={refetchUserLayout} />,
+                                            children: (
+                                                <AccountSettingsPanel
+                                                    user={profileData}
+                                                    onChanged={refetchUserLayout}
+                                                />
+                                            ),
                                         },
                                         {
                                             key: "pro",
@@ -303,64 +242,67 @@ export default function AccountManagement() {
                                         },
                                     ]}
                                 />
-                            </div>
 
-                            {/* Nút "Lưu thay đổi" */}
-                            {activeTab === "edit" && (
-                                <Affix offsetBottom={24}>
-                                    <div className="w-full flex justify-end">
-                                        <Button
-                                            type="primary"
-                                            size="large"
-                                            icon={<SaveOutlined />}
-                                            loading={isLoading}
-                                            onClick={() => document.getElementById("edit-info-submit")?.click()}
-                                        >
-                                            Lưu thay đổi
-                                        </Button>
+                                {/* Footer lưu thay đổi – sticky trong card, cũng tắt anchoring ở đây */}
+                                {activeTab === "edit" && (
+                                    <div className="sticky bottom-0 z-30" style={{ overflowAnchor: "none" }}>
+                                        <div className="-mx-3 md:-mx-4 px-3 md:px-4 pb-3">
+                                            <div className="bg-white/85 backdrop-blur rounded-xl border border-gray-200 shadow-lg p-2 flex justify-end">
+                                                <Button
+                                                    type="primary"
+                                                    size="large"
+                                                    icon={<SaveOutlined />}
+                                                    loading={isLoading}
+                                                    className="rounded-lg"
+                                                    onClick={() => document.getElementById("edit-info-submit")?.click()}
+                                                >
+                                                    Lưu thay đổi
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
-                                </Affix>
-                            )}
-                        </>
-                    ) : panel.view === "topup" ? (
-                        // --- Panel Nạp tiền (TopUpForm) ---
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 md:p-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <Title level={3} className="!m-0">
-                                    Nạp tiền vào tài khoản
-                                </Title>
-                                <Button onClick={backToManage}>Quay lại quản lý</Button>
+                                )}
                             </div>
-                            <TopUpForm
-                                user={profileData}
-                                onContinue={handleTopUpContinue} // Dùng handler đã cập nhật
-                            />
+                        </div>
+                    ) : panel.view === "topup" ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="px-4 pt-4 pb-2 border-b border-gray-100 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Button type="text" icon={<ArrowLeftOutlined />} onClick={backToManage}>
+                                        Quay lại
+                                    </Button>
+                                    <Title level={4} className="!m-0">Nạp tiền vào tài khoản</Title>
+                                </div>
+                            </div>
+                            <div className="p-3 md:p-4">
+                                <TopUpForm user={profileData} onContinue={handleTopUpContinue} />
+                            </div>
                         </div>
                     ) : (
-                        // --- Panel Thanh toán (Stripe) ---
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 md:p-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <Title level={3} className="!m-0">
-                                    Thanh toán qua Thẻ
-                                </Title>
-                                <Button onClick={openTopUp}>Đổi phương thức khác</Button>
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="px-4 pt-4 pb-2 border-b border-gray-100 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Button type="text" icon={<ArrowLeftOutlined />} onClick={openTopUp}>
+                                        Đổi phương thức
+                                    </Button>
+                                    <Title level={4} className="!m-0">Thanh toán qua Thẻ</Title>
+                                </div>
+                                <CreditCardOutlined className="text-gray-400" />
                             </div>
-                            
-                            {/* ⭐️ THAY ĐỔI: Truyền props mới vào StripeCheckout */}
-                            <StripeCheckout
-                                // Kịch bản Nạp tiền: Truyền 'clientSecret'
-                                clientSecret={panel.data.clientSecret} 
-                                // Props chung cho Inner
-                                orderId={panel.data.orderId}
-                                amount={panel.data.amount}
-                                onPaid={handlePaymentSuccess}
-                            />
+                            <div className="p-3 md:p-4">
+                                <StripeCheckout
+                                    clientSecret={panel.data.clientSecret}
+                                    orderId={panel.data.orderId}
+                                    amount={panel.data.amount}
+                                    onPaid={handlePaymentSuccess}
+                                />
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Snackbar và Dialog */}
+            {/* Notifications */}
             <Snackbar
                 open={alert.open}
                 autoHideDuration={6000}
@@ -372,19 +314,12 @@ export default function AccountManagement() {
                 </MuiAlert>
             </Snackbar>
 
-            <Dialog
-                open={openSuccessDialog}
-                onClose={closeSuccessDialog}
-                aria-labelledby="update-success-title"
-            >
+            {/* Success dialog */}
+            <Dialog open={openSuccessDialog} onClose={closeSuccessDialog} aria-labelledby="update-success-title">
                 <DialogTitle id="update-success-title">Cập nhật thành công</DialogTitle>
-                <DialogContent>
-                    Thông tin tài khoản của bạn đã được lưu.
-                </DialogContent>
+                <DialogContent>Thông tin tài khoản của bạn đã được lưu.</DialogContent>
                 <DialogActions>
-                    <Button onClick={closeSuccessDialog} type="primary">
-                        Đóng
-                    </Button>
+                    <Button onClick={closeSuccessDialog} type="primary">Đóng</Button>
                 </DialogActions>
             </Dialog>
         </section>

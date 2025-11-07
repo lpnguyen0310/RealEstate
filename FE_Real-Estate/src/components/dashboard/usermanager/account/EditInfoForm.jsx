@@ -1,3 +1,4 @@
+// src/components/dashboard/usermanager/account/EditInfoForm.jsx
 import React, { useMemo, useState, useEffect } from "react";
 import { Card, Form, Input, Button, Upload, Space, Typography, Divider, Select } from "antd";
 import { PlusOutlined, LoadingOutlined } from "@ant-design/icons";
@@ -6,81 +7,70 @@ const { Title, Text } = Typography;
 const { Item } = Form;
 const MAX_PHONES = 5;
 
-// Bỏ onChanged vì không cần nữa
 export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) {
   const [form] = Form.useForm();
-  const [uploading, setUploading] = useState(false); // State để quản lý loading của Upload
+  const [uploading, setUploading] = useState(false);
 
-  // (useMemo tính initialValues giữ nguyên)
   const initialValues = useMemo(() => {
     if (!initialData) return {};
-    const profile = initialData; // Dữ liệu profile nằm ngay cấp đầu
+    const p = initialData;
     return {
-      fullName: initialData.fullName,
-      personalTaxCode: profile?.personalTaxCode,
-      email: initialData.email,
-      __mainPhone: initialData.phone,
-      phones: profile?.additionalPhones || [],
-      buyerName: profile?.buyerName || initialData.fullName,
-      invoiceEmail: profile?.invoiceEmail || initialData.email,
-      companyName: profile?.companyName,
-      companyTaxCode: profile?.companyTaxCode,
-      cccd: profile?.citizenId,
-      dvqhns: profile?.dvqhns,
-      passport: profile?.passport,
-      address: profile?.address || "VN",
+      fullName: p.fullName,
+      personalTaxCode: p.personalTaxCode,
+      email: p.email,
+      __mainPhone: p.phone,
+      phones: p.additionalPhones || [],
+      buyerName: p.buyerName || p.fullName,
+      invoiceEmail: p.invoiceEmail || p.email,
+      companyName: p.companyName,
+      companyTaxCode: p.companyTaxCode,
+      cccd: p.citizenId,
+      dvqhns: p.dvqhns,
+      passport: p.passport,
+      address: p.address || "VN",
     };
   }, [initialData]);
 
-  // useEffect để cập nhật form khi data tải xong (giữ nguyên)
   useEffect(() => {
     if (initialData) {
-      form.resetFields(); // Reset trước khi set
+      form.resetFields();
       form.setFieldsValue(initialValues);
     }
   }, [initialValues, initialData, form]);
 
-  // --- HÀM TRUNG GIAN ĐỂ GỌI UPLOAD TỪ CHA ---
-  // customRequest của antd Upload sẽ gọi hàm này
   const customUploadRequest = async ({ file, onSuccess, onError }) => {
-    setUploading(true); // Bắt đầu loading (cho UI của Upload)
+    setUploading(true);
     try {
-      // Gọi hàm onUploadAvatar (từ AccountManagement)
       await onUploadAvatar?.(file);
-      onSuccess?.("ok"); // Báo cho antd Upload là thành công
-    } catch (error) {
-      onError?.(error); // Báo cho antd Upload là thất bại
+      onSuccess?.("ok");
+    } catch (e) {
+      onError?.(e);
     } finally {
-      setUploading(false); // Kết thúc loading (cho UI của Upload)
+      setUploading(false);
     }
   };
 
-  // --- COMPONENT UPLOAD AVATAR (HIỂN THỊ ẢNH) ---
   const RenderUploadAvatar = () => {
-    const currentAvatarUrl = initialData?.avatar; // Lấy URL avatar từ Redux data
+    const currentAvatarUrl = initialData?.avatar;
+    const box = { width: 128, height: 128 };
 
     return (
       <Upload
         name="avatar"
         listType="picture-circle"
-        className="avatar-uploader"
         showUploadList={false}
         customRequest={customUploadRequest}
         disabled={uploading}
+        style={box}
       >
         {currentAvatarUrl ? (
           <img
             src={currentAvatarUrl}
             alt="Avatar"
-            style={{
-              width: "100%",
-              height: "100%",
-              borderRadius: "50%",
-              objectFit: "cover",
-            }}
+            style={{ ...box, borderRadius: "50%", objectFit: "cover" }}
           />
         ) : (
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", width: box.width }}>
             {uploading ? <LoadingOutlined /> : <PlusOutlined />}
             <div style={{ marginTop: 8 }}>{uploading ? "Đang tải..." : "Tải ảnh"}</div>
           </div>
@@ -89,7 +79,6 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
     );
   };
 
-  // Hàm submit form (text)
   const handleFinish = (values) => {
     const payload = {
       fullName: values.fullName,
@@ -109,40 +98,48 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
   };
 
   return (
-    <div className="max-w-[700px]">
-      <Card variant="borderless">
-        <Title level={5} className="!mt-0">
-          Thông tin cá nhân
-        </Title>
+    // Giữ mép thẳng với phần nội dung bên phải, không quá hẹp
+    <div className="w-full max-w-[960px] mx-auto">
+      <Card variant="borderless" className="!shadow-none">
+        {/* Header */}
+        <div className="mb-4">
+          <Title level={5} className="!mt-0 !mb-1">Thông tin cá nhân</Title>
+          <Text type="secondary">Điền đầy đủ để hoàn thiện hồ sơ của bạn.</Text>
+        </div>
 
-        <div className="my-4 flex justify-center">
+        {/* Avatar center, cách đều trên dưới */}
+        <div className="flex justify-center py-2">
           <RenderUploadAvatar />
         </div>
 
         <Form layout="vertical" form={form} onFinish={handleFinish}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* ==== HÀNG 1: Họ tên / Mã số thuế ==== */}
+          <div className="grid grid-cols-12 gap-x-6 gap-y-4">
             <Item
+              className="col-span-12 md:col-span-6"
               label="Họ và tên"
               name="fullName"
               rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
             >
               <Input />
             </Item>
-            <Item label="Mã số thuế cá nhân" name="personalTaxCode">
+
+            <Item className="col-span-12 md:col-span-6" label="Mã số thuế cá nhân" name="personalTaxCode">
               <Input />
             </Item>
           </div>
 
-          <Divider />
+          <Divider className="!my-6" />
 
-          <Title level={5}>Thông tin liên hệ</Title>
-          <div className="grid grid-cols-1 gap-4">
-            <Item label="Số điện thoại chính" name="__mainPhone">
+          {/* ==== THÔNG TIN LIÊN HỆ ==== */}
+          <Title level={5} className="!mb-3">Thông tin liên hệ</Title>
+          <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+            <Item className="col-span-12" label="Số điện thoại chính" name="__mainPhone">
               <Input disabled />
             </Item>
 
-            {/* Số điện thoại phụ */}
-            <div>
+            {/* Phones phụ: full width, item cùng mép */}
+            <div className="col-span-12">
               <Form.List name="phones">
                 {(fields, { add, remove }) => (
                   <>
@@ -157,20 +154,12 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
 
                     <div className="space-y-2">
                       {fields.map((field) => (
-                        <Space key={field.key} align="start">
-                          <Form.Item
-                            {...field}
-                            rules={[{ max: 20, message: "Số quá dài" }]}
-                          >
-                            <Input
-                              placeholder="Số điện thoại phụ"
-                              style={{ width: 320 }}
-                            />
+                        <div key={field.key} className="flex items-start gap-2">
+                          <Form.Item {...field} className="!mb-0" rules={[{ max: 20, message: "Số quá dài" }]}>
+                            <Input placeholder="Số điện thoại phụ" className="w-[320px] max-w-full" />
                           </Form.Item>
-                          <Button type="text" danger onClick={() => remove(field.name)}>
-                            Xoá
-                          </Button>
-                        </Space>
+                          <Button type="text" danger onClick={() => remove(field.name)}>Xoá</Button>
+                        </div>
                       ))}
                     </div>
                   </>
@@ -178,54 +167,59 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
               </Form.List>
             </div>
 
-            {/* Email + xác thực */}
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-end gap-3">
-              <Form.Item
-                label="Email"
-                name="email"
-                className="!mb-0"
-                rules={[{ type: "email", message: "Email không hợp lệ" }]}
-              >
-                <Input placeholder="Nhập email" />
-              </Form.Item>
-              <Form.Item className="!mb-0">
-                <Button className="h-[40px]" onClick={() => window?.alert?.("Chức năng xác thực (demo).")}>
-                  Xác thực
-                </Button>
-              </Form.Item>
-            </div>
+            {/* Email + nút xác thực: canh hàng, mép phải thẳng */}
+            <Form.Item
+              className="col-span-12 md:col-span-9 !mb-0"
+              label="Email"
+              name="email"
+              rules={[{ type: "email", message: "Email không hợp lệ" }]}
+            >
+              <Input placeholder="Nhập email" />
+            </Form.Item>
+            <Form.Item className="col-span-12 md:col-span-3 !mb-0 md:flex md:items-end">
+              <Button className="h-[40px] w-full md:w-auto" onClick={() => window?.alert?.("Chức năng xác thực (demo).")}>
+                Xác thực
+              </Button>
+            </Form.Item>
           </div>
 
-          <Divider />
+          <Divider className="!my-6" />
 
-          <Title level={5}>Thông tin xuất hoá đơn</Title>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Item label="Họ tên người mua hàng" name="buyerName">
+          {/* ==== THÔNG TIN XUẤT HOÁ ĐƠN ==== */}
+          <Title level={5} className="!mb-3">Thông tin xuất hoá đơn</Title>
+          <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+            <Item className="col-span-12 md:col-span-6" label="Họ tên người mua hàng" name="buyerName">
               <Input />
             </Item>
+
             <Item
+              className="col-span-12 md:col-span-6"
               label="Email nhận hoá đơn"
               name="invoiceEmail"
               rules={[{ type: "email", message: "Email không hợp lệ" }]}
             >
               <Input />
             </Item>
-            <Item label="Tên đơn vị (Tên công ty)" name="companyName" className="md:col-span-2">
+
+            <Item className="col-span-12" label="Tên đơn vị (Tên công ty)" name="companyName">
               <Input />
             </Item>
-            <Item label="Mã số thuế" name="companyTaxCode">
+
+            <Item className="col-span-12 md:col-span-6" label="Mã số thuế" name="companyTaxCode">
               <Input />
             </Item>
-            <Item label="Căn cước công dân" name="cccd">
+            <Item className="col-span-12 md:col-span-6" label="Căn cước công dân" name="cccd">
               <Input />
             </Item>
-            <Item label="Mã số ĐVQHNS" name="dvqhns">
+
+            <Item className="col-span-12 md:col-span-6" label="Mã số ĐVQHNS" name="dvqhns">
               <Input />
             </Item>
-            <Item label="Số hộ chiếu" name="passport">
+            <Item className="col-span-12 md:col-span-6" label="Số hộ chiếu" name="passport">
               <Input />
             </Item>
-            <Item label="Địa chỉ" name="address" className="md:col-span-2">
+
+            <Item className="col-span-12" label="Địa chỉ" name="address">
               <Select
                 options={[
                   { label: "Việt Nam", value: "VN" },
@@ -237,7 +231,8 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
             </Item>
           </div>
 
-          <div className="text-sm text-gray-600 space-y-1 mt-2">
+          {/* Notes */}
+          <div className="text-sm text-gray-600 space-y-1 mt-3">
             <div>• Xuất hoá đơn trong ngày cho tất cả giao dịch nộp tiền.</div>
             <div>• Vui lòng nhập chính xác, bạn chịu trách nhiệm về thông tin cung cấp.</div>
             <div>• Thắc mắc hoá đơn: 1900 1881 (trước 18h).</div>

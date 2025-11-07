@@ -55,12 +55,14 @@ export default function WebSocketListener() {
         if (!evt) return;
 
         // cố gắng rút conversationId từ nhiều cấu trúc payload
-        const cidFromEvt =
-          evt?.conversationId ??
-          evt?.conversation?.id ??
-          evt?.data?.conversationId ??
-          evt?.data?.conversation?.id ??
-          null;
+       const cidFromEvt =
+         evt?.conversationId ??
+         evt?.conversation?.id ??
+        evt?.data?.conversationId ??
+         evt?.data?.conversation?.id ??
+       evt?.message?.conversationId ??
+         evt?.data?.message?.conversationId ??
+         null;
 
         // Nếu đúng hội thoại đang mở → bỏ qua ở kênh broadcast
         if (

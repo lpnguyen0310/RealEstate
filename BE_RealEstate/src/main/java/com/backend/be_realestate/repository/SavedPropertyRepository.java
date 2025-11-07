@@ -77,5 +77,13 @@ public interface SavedPropertyRepository extends JpaRepository<SavedPropertyEnti
         """, nativeQuery = true)
     List<Object[]> priceAreaMinMax(@Param("userId") Long userId);
 
-
+    @Query("""
+       select p.city.id, count(p.id)
+       from SavedPropertyEntity sp
+       join sp.property p
+       where sp.user.userId = :uid and p.city.id is not null
+       group by p.city.id
+       order by count(p.id) desc
+       """)
+    List<Object[]> topCityIds(@Param("uid") Long userId);
 }

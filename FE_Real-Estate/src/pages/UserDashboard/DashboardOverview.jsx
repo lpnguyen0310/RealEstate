@@ -18,23 +18,26 @@ import {
   selectPostsReport,
 } from "@/store/propertySlice";
 
-// === Favorites (đọc trực tiếp từ favoriteSlice) ===
-import { selectList as selectFavList, selectIds as selectFavIds } from "@/store/favoriteSlice";
+// Favorites (đọc trực tiếp từ favoriteSlice)
+import {
+  selectList as selectFavList,
+  selectIds as selectFavIds,
+} from "@/store/favoriteSlice";
 
 export default function DashboardOverview() {
   const nav = useNavigate();
   const dispatch = useDispatch();
   const { user: reduxUser } = useOutletContext();
 
-  // ===== Load "tin của tôi" cho dashboard =====
+  // Load "tin của tôi" cho dashboard
   useEffect(() => {
     dispatch(fetchMyPropertiesThunk({ page: 0, size: 20, sort: "postedAt,desc" }));
   }, [dispatch]);
 
-  // ===== User info =====
+  // User info
   const user = useMemo(() => {
     if (!reduxUser) {
-      return { name: "Người dùng", email: "", phone: "", avatarUrl: "" };
+      return { name: "Người dùng", email: "", phone: "", avatarUrl: "", balance: 0 };
     }
     const name =
       reduxUser.fullName ||
@@ -46,11 +49,12 @@ export default function DashboardOverview() {
       email: reduxUser.email || "",
       phone: reduxUser.phone || reduxUser.phoneNumber || "",
       avatarUrl: reduxUser.avatarUrl || "",
+      balance: reduxUser.balance ?? 0,
     };
   }, [reduxUser]);
 
-  // ===== Favorites (REAL DATA từ Redux) =====
-  const favList = useSelector(selectFavList); // [{ id, title, thumb, href, priceDisplay, displayAddress, savedAgo, listingType, ...}]
+  // Favorites (REAL DATA từ Redux)
+  const favList = useSelector(selectFavList); // [{id,title,thumb,href,priceDisplay,displayAddress,...}]
   const favCount = useSelector(selectFavIds).length;
 
   // Convert to SavedListCard items (lấy tối đa 5 tin)
@@ -69,7 +73,7 @@ export default function DashboardOverview() {
     [favList]
   );
 
-  // ===== Stats (REAL saved count) =====
+  // Stats (REAL saved count)
   const stats = useMemo(
     () => ({
       saved: favCount ?? 0,
@@ -80,10 +84,10 @@ export default function DashboardOverview() {
     [favCount]
   );
 
-  // ===== Report (REAL from Redux) =====
+  // Report (REAL from Redux)
   const report = useSelector(selectPostsReport);
 
-  // ===== Other blocks tạm =====
+  // Other blocks tạm
   const sellSummary = { views: 0, interactions: 0, potential: 0 };
   const rentSummary = { views: 0, interactions: 0, potential: 0 };
 
@@ -96,8 +100,8 @@ export default function DashboardOverview() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header hồ sơ (đọc từ Redux qua Outlet) */}
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header hồ sơ */}
       <UserHeader user={user} />
 
       {/* Thống kê tổng quan */}
@@ -112,22 +116,29 @@ export default function DashboardOverview() {
         }}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Báo cáo tin đăng — đã nối data thật */}
-        <PostsReportCard data={report} />
+      {/* Mobile ưu tiên Saved / Notifications trước, Report sau */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+        <div className="order-2 md:order-1">
+          <SavedListCard
+            items={savedItems}
+            emptyHint="Bạn chưa lưu tin nào — hãy khám phá và lưu những tin bạn thích!"
+            onItemClick={(it) => it.href && nav(it.href)}
+            onViewAll={() => nav("/tin-da-luu")}
+            maxItems={5}
+          />
+        </div>
 
-        <SavedListCard
-          items={savedItems}
-          emptyHint="Bạn chưa lưu tin nào — hãy khám phá và lưu những tin bạn thích!"
-          onItemClick={(it) => it.href && nav(it.href)}
-          onViewAll={() => nav("/tin-da-luu")}
-          maxItems={5}
-        />
+        <div className="order-3 md:order-2">
+          <NotificationsCard items={notifications} />
+        </div>
 
-        <NotificationsCard items={notifications} />
+        <div className="order-1 md:order-3">
+          {/* Báo cáo tin đăng — đã nối data thật */}
+          <PostsReportCard data={report} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
         <div className="lg:col-span-5">
           <PostTypeSummary sell={sellSummary} rent={rentSummary} />
         </div>
@@ -137,8 +148,8 @@ export default function DashboardOverview() {
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold mb-3">Tổng quan</h1>
-        <p>Xin chào! Đây là bảng điều khiển của bạn.</p>
+        <h1 className="text-2xl font-semibold mb-2 sm:mb-3">Tổng quan</h1>
+        <p className="text-sm sm:text-base">Xin chào! Đây là bảng điều khiển của bạn.</p>
       </div>
     </div>
   );
