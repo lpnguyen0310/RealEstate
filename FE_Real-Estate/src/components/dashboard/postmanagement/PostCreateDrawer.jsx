@@ -1,6 +1,12 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { Drawer, Button, Switch, Tooltip, Tag, Spin, Modal, message } from "antd";
-import { CloseOutlined, InfoCircleOutlined, CreditCardOutlined } from "@ant-design/icons";
+import {
+    Drawer, Button, Switch, Tooltip, Tag, Spin, Modal, message,
+    Card, Form, Input, DatePicker, Select
+} from "antd";
+import {
+    CloseOutlined, InfoCircleOutlined, CreditCardOutlined,
+    UploadOutlined, HolderOutlined, DeleteOutlined, PlusOutlined
+} from "@ant-design/icons";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 
@@ -21,11 +27,13 @@ import {
     AmenitiesSection,
     ContactInfoSection,
     PostPreviewSection,
+    OwnerAndConstructionSection
 } from "./CreatePostSection";
 import PostTypeSection from "./PostTypeDrawer";
 
-// import { validateField } from "@/utils/validators";
 import { useVNLocations, useAddressSuggestions, useListingTypes } from "@/hooks";
+import { uploadMany } from "@/api/cloudinary";
+import dayjs from "dayjs";
 
 /* ================= Header ================= */
 const Header = React.memo(function Header({ step, onClose, isEdit }) {
@@ -93,8 +101,20 @@ function mapDetailToFormData(d) {
         listingTypePolicyId: d.listingTypePolicyId ?? null,
         authorName: d.authorName || "",
         authorEmail: d.authorEmail || "",
+
+        // ====== NEW (section gộp) ======
+        ownerAuth: {
+            isOwner: d.ownerAuth?.isOwner ?? true,
+            ownerName: d.ownerAuth?.ownerName ?? d.ownerName ?? "",
+            idNumber: d.ownerAuth?.idNumber ?? "",
+            issueDate: d.ownerAuth?.issueDate ? dayjs(d.ownerAuth.issueDate) : null,
+            issuePlace: d.ownerAuth?.issuePlace ?? "",
+            relationship: d.ownerAuth?.relationship ?? "",
+        },
+        constructionImages: Array.isArray(d.constructionImages) ? d.constructionImages : [],
     };
 }
+
 function createInitialForm() {
     return {
         title: "", description: "", categoryId: "",
@@ -108,9 +128,23 @@ function createInitialForm() {
         direction: "",
         listingType: null,
         listingTypePolicyId: null,
+
+        // ====== NEW (section gộp) ======
+        ownerAuth: {
+            isOwner: true,
+            ownerName: "",
+            idNumber: "",
+            issueDate: null,
+            issuePlace: "",
+            relationship: "",
+        },
+        constructionImages: [],
     };
 }
 
+/* ========== SECTION GỘP: Chính chủ + Ảnh xây dựng ========== */
+
+/* ================= MAIN: PostCreateDrawer ================= */
 export default function PostCreateDrawer({
     open,
     onClose,
@@ -130,12 +164,10 @@ export default function PostCreateDrawer({
     }));
 
     const upperStatus = (currentProperty?.status || "").toUpperCase();
-
     const isDraft = upperStatus === "DRAFT";
-    // 3. 'needsResubmit = true' NẾU status là WARNED hoặc REJECTED
     const needsResubmit = upperStatus === "WARNED" || upperStatus === "REJECTED";
 
-    const posting = useSelector((s) => s.property?.creating); // dùng chung cho create/update
+    const posting = useSelector((s) => s.property?.creating);
 
     const [step, setStep] = useState("form");
     const [loading, setLoading] = useState(false);
@@ -145,10 +177,8 @@ export default function PostCreateDrawer({
     const [formData, setFormData] = useState(createInitialForm);
     const [errors, setErrors] = useState({});
 
-    // modal khi edit mà hết lượt
     const [showPromptEdit, setShowPromptEdit] = useState(false);
 
-    // helper tên hiển thị từ user
     const displayNameFromUser = useCallback(
         (u) =>
             u?.fullName ||
@@ -175,11 +205,10 @@ export default function PostCreateDrawer({
         return m;
     }, [invItems]);
 
-    /* ---- Gộp reset + prefill contact (CREATE) hoặc fetch detail (EDIT) ---- */
+    /* ---- Reset + prefill contact (CREATE) hoặc fetch detail (EDIT) ---- */
     useEffect(() => {
         if (!open) return;
 
-        // TẠO MỚI
         if (!editingId) {
             setStep("form");
             setLoading(false);
@@ -206,7 +235,7 @@ export default function PostCreateDrawer({
         setStep("form");
     }, [open, editingId, user, displayNameFromUser, dispatch]);
 
-    /* ===== Khi đã có currentProperty (luồng edit) -> map ra form + merge contact ===== */
+    /* ===== Khi có currentProperty (edit) -> map ra form + merge contact ===== */
     useEffect(() => {
         if (!open || !editingId || !currentProperty) return;
         const mapped = mapDetailToFormData(currentProperty);
@@ -260,8 +289,7 @@ export default function PostCreateDrawer({
     const onFieldChange = useCallback((name, value) => {
         setFormData((p) => ({ ...p, [name]: value }));
         setErrors((prev) => {
-            // const msg = validateField(name, value);
-            const msg = null; // disabling inline validation
+            const msg = null; // tắt inline validation
             const next = { ...prev };
             if (msg) next[name] = msg; else delete next[name];
             return next;
@@ -289,9 +317,6 @@ export default function PostCreateDrawer({
         ];
 
         const msgMap = {
-            // provinceId: "Vui lòng chọn Tỉnh/Thành phố",
-            // districtId: "Vui lòng chọn Quận/Huyện",
-            // wardId: "Vui lòng chọn Phường/Xã",
             suggestedAddress: "Vui lòng chọn Địa chỉ đề xuất",
             position: "Vui lòng chọn Vị trí",
             landArea: "Vui lòng nhập Diện tích đất",
@@ -302,6 +327,15 @@ export default function PostCreateDrawer({
         for (const k of required) {
             if (isEmpty(formData[k])) requiredErrs[k] = msgMap[k] || "Trường này là bắt buộc";
         }
+
+        // (Tuỳ chọn) bắt buộc owner khi là chính chủ:
+        // if (formData.ownerAuth?.isOwner) {
+        //   const oe = {};
+        //   if (!formData.ownerAuth?.ownerName?.trim()) oe.ownerName = "Nhập họ tên";
+        //   if (!formData.ownerAuth?.idNumber?.trim())  oe.idNumber  = "Nhập CMND/CCCD";
+        //   if (Object.keys(oe).length) requiredErrs.ownerAuth = oe;
+        // }
+
         if (Object.keys(requiredErrs).length) {
             setErrors((prev) => ({ ...prev, ...requiredErrs }));
             return;
@@ -318,15 +352,14 @@ export default function PostCreateDrawer({
     /* ===== ACTION: UPDATE (isEdit) ===== */
     const onUpdate = useCallback(async () => {
         try {
-            // Map id -> listingType
             const idToType = {};
             (listingTypes || []).forEach((x) => (idToType[x.id] = x.listingType));
             const selectedType =
                 idToType[postTypeId ?? formData.listingTypePolicyId] || formData.listingType || null;
             const isVipLike = selectedType === "VIP" || selectedType === "PREMIUM";
-            const isChangingType = selectedType && selectedType !== formData.listingType; // khác với gói hiện tại
+            const isChangingType = selectedType && selectedType !== formData.listingType;
             const leftQty = isVipLike ? (invMap?.[selectedType] ?? 0) : Infinity;
-            // ❗ Nếu đang CHUYỂN sang VIP/PREMIUM mà hết lượt -> chặn và mở modal
+
             if (isVipLike && isChangingType && leftQty <= 0) {
                 setShowPromptEdit(true);
                 return;
@@ -337,10 +370,6 @@ export default function PostCreateDrawer({
                 listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
             };
 
-            // === 💡 LOGIC MỚI ===
-            // 1. Chỉ set 'submitMode' là "publish" NẾU bài đăng đang bị 'WARNED' hoặc 'REJECTED'
-            //    Nếu là 'PUBLISHED' (Đang đăng), 'submitMode' sẽ là 'undefined',
-            //    backend sẽ tự hiểu là giữ nguyên trạng thái.
             const submitMode = needsResubmit ? "publish" : undefined;
 
             await dispatch(
@@ -348,22 +377,19 @@ export default function PostCreateDrawer({
                     id: editingId,
                     formData: payload,
                     listingTypePolicyId: payload.listingTypePolicyId,
-                    submitMode: submitMode // 👈 Dùng biến điều kiện
+                    submitMode
                 })
             ).unwrap();
             message.success("Cập nhật tin thành công!");
-            onCreated?.();       // refresh list ngoài
-            onClose?.();         // đóng drawer
+            onCreated?.();
+            onClose?.();
         } catch (e) {
             message.error(e || "Cập nhật tin thất bại");
         }
-        // === 💡 2. THÊM 'needsResubmit' VÀO DEPENDENCY ARRAY ===
     }, [dispatch, editingId, formData, postTypeId, onCreated, onClose, listingTypes, invMap, needsResubmit]);
-
 
     const onPublishDraft = useCallback(async () => {
         try {
-            // map id -> listingType text
             const idToType = {};
             (listingTypes || []).forEach((x) => (idToType[x.id] = x.listingType));
             const selectedType =
@@ -411,7 +437,8 @@ export default function PostCreateDrawer({
                                 await dispatch(
                                     createPropertyThunk({
                                         formData: payload,
-                                        listingTypePolicyId: payload.listingTypePolicyId, submitMode: "draft", // 👈 quan trọng
+                                        listingTypePolicyId: payload.listingTypePolicyId,
+                                        submitMode: "draft",
                                     })
                                 ).unwrap();
                                 message.success("Đã lưu nháp!");
@@ -456,13 +483,11 @@ export default function PostCreateDrawer({
                     </div>
                 </div>
             );
-
         }
+
         return (
             <FooterType
                 setStep={setStep}
-                autoRepost={autoRepost}
-                setAutoRepost={setAutoRepost}
                 formData={formData}
                 postTypeId={postTypeId}
                 inventory={invMap}
@@ -472,7 +497,7 @@ export default function PostCreateDrawer({
         );
     }, [
         step, onClose, onSaveDraft, formData, loading, goToTypeStep,
-        autoRepost, postTypeId, invMap, listingTypes, onCreated, isEdit, posting, onUpdate
+        postTypeId, invMap, listingTypes, onCreated, isEdit, posting, onUpdate, onPublishDraft, isDraft
     ]);
 
     const showBlockingSpin = loadingDetail;
@@ -480,97 +505,114 @@ export default function PostCreateDrawer({
     return (
         <>
             <Drawer
-                key={editingId ? `edit-${editingId}` : "create"}   // 👈 force remount theo context
-                className="post-create"
+                key={editingId ? `edit-${editingId}` : "create"}
                 open={open}
                 onClose={onClose}
-                width={720}
                 placement="right"
+                width={760}
                 title={null}
                 closable={false}
                 destroyOnClose
-                footer={footerNode}
-                bodyStyle={{
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "100%",
-                    padding: 0,
-                    backgroundColor: step === "form" ? "#E9EEF8" : "#f8faff",
+                styles={{
+                    wrapper: { insetBlockStart: 24, insetBlockEnd: 24, insetInlineEnd: 24 },
+                    content: { borderRadius: 16, overflow: "hidden", boxShadow: "0 12px 36px rgba(0,0,0,0.14)" },
+                    body: { padding: 0, background: step === "form" ? "#E9EEF8" : "#f8faff" },
+                    mask: { backgroundColor: "rgba(15,23,42,.35)", backdropFilter: "blur(3px)" },
                 }}
-                maskStyle={{ backgroundColor: "rgba(15,23,42,.35)", backdropFilter: "blur(2px)" }}
             >
+                {/* Header sticky */}
                 <div className="sticky top-0 z-10">
                     <Header step={step} onClose={onClose} isEdit={isEdit} />
                 </div>
 
+                {/* Overlay loading when fetching edit detail */}
                 {showBlockingSpin && (
                     <div className="absolute inset-0 z-20 grid place-items-center bg-white/60">
                         <Spin tip="Đang tải chi tiết tin..." size="large" />
                     </div>
                 )}
 
-                {step === "form" ? (
-                    <div className="flex-1">
-                        <div className="flex-1 overflow-y-auto px-3 md:px-4 py-4 space-y-4">
-                            <TitlePostSection formData={formData} onChange={onFieldChange} errors={errors} />
-                            <TradeInfoSection formData={formData} onChange={onFieldChange} errors={errors} />
-                            <PropertyDetailSection
-                                formData={formData}
-                                setFormData={setFormData}
-                                provinces={provinces}
-                                districts={districts}
-                                wards={wards}
-                                errors={errors}
-                                onChange={onFieldChange}
-                                loadingDistricts={loadingDistricts}
-                                loadingWards={loadingWards}
-                            />
-                            <VideoLibrarySection
-                                videoUrls={formData.videoUrls}
-                                onChange={(arr) => setFormData((p) => ({ ...p, videoUrls: arr }))}
-                            />
-                            <AmenitiesSection
-                                value={formData.amenityIds}
-                                onChange={(next) => setFormData((p) => ({ ...p, amenityIds: next }))}
-                            />
-                            <ContactInfoSection
-                                value={formData.contact}
-                                onChange={(next) => setFormData((p) => ({ ...p, contact: next }))}
-                            />
+                {/* === BODY + FOOTER (sticky bottom) === */}
+                <div className="flex flex-col min-h-full">
+                    {/* CONTENT */}
+                    {step === "form" ? (
+                        <div className="flex-1">
+                            <div className="overflow-y-auto px-3 md:px-4 py-4 space-y-4 pb-3">
+                                <TitlePostSection formData={formData} onChange={onFieldChange} errors={errors} />
+                                <TradeInfoSection formData={formData} onChange={onFieldChange} errors={errors} />
+                                <PropertyDetailSection
+                                    formData={formData}
+                                    setFormData={setFormData}
+                                    provinces={provinces}
+                                    districts={districts}
+                                    wards={wards}
+                                    errors={errors}
+                                    onChange={onFieldChange}
+                                    loadingDistricts={loadingDistricts}
+                                    loadingWards={loadingWards}
+                                />
+
+                                {/* ====== SECTION GỘP: Chính chủ + Ảnh xây dựng ====== */}
+                                <OwnerAndConstructionSection
+                                    ownerValue={formData.ownerAuth}
+                                    onOwnerChange={(next) => setFormData((p) => ({ ...p, ownerAuth: next }))}
+                                    imagesValue={formData.constructionImages}
+                                    onImagesChange={(next) => setFormData((p) => ({ ...p, constructionImages: next }))}
+                                    errors={errors?.ownerAuth || {}}
+                                />
+
+                                <VideoLibrarySection
+                                    videoUrls={formData.videoUrls}
+                                    onChange={(arr) => setFormData((p) => ({ ...p, videoUrls: arr }))}
+                                />
+                                <AmenitiesSection
+                                    value={formData.amenityIds}
+                                    onChange={(next) => setFormData((p) => ({ ...p, amenityIds: next }))}
+                                />
+                                <ContactInfoSection
+                                    value={formData.contact}
+                                    onChange={(next) => setFormData((p) => ({ ...p, contact: next }))}
+                                />
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 bg-[#f8faff]">
-                        <PublicImagesSection
-                            images={formData.images}
-                            onChange={(arr) => setFormData((p) => ({ ...p, images: arr }))}
-                        />
-                        <PostTypeSection
-                            value={postTypeId ?? formData.listingTypePolicyId ?? null}
-                            currentTypeText={formData.listingType}
-                            onChange={(id) => {
-                                setPostTypeId(id);
-                                setFormData((p) => ({ ...p, listingTypePolicyId: id }));
-                            }}
-                            items={listingTypes}
-                            loading={loadingTypes}
-                            error={listingError}
-                            inventory={invMap}
-                        />
-                        <div className="rounded-2xl border border-[#e3e9f5] bg-[#f6f9ff]/40 p-4">
-                            <PostPreviewSection
-                                data={formData}
-                                postType={(function () {
-                                    const map = {}; (listingTypes || []).forEach((x) => (map[x.id] = x.listingType));
-                                    const t = map[postTypeId] || map[formData.listingTypePolicyId] || "NORMAL";
-                                    return t === "NORMAL" ? "free" : t.toLowerCase();
-                                })()}
-                                editable
-                                onImagesChange={(next) => setFormData((p) => ({ ...p, images: next }))}
-                            />
+                    ) : (
+                        <div className="flex-1">
+                            <div className="overflow-y-auto px-4 py-4 space-y-6 bg-[#f8faff] pb-24">
+                                <PublicImagesSection
+                                    images={formData.images}
+                                    onChange={(arr) => setFormData((p) => ({ ...p, images: arr }))}
+                                />
+                                <PostTypeSection
+                                    value={postTypeId ?? formData.listingTypePolicyId ?? null}
+                                    currentTypeText={formData.listingType}
+                                    onChange={(id) => {
+                                        setPostTypeId(id);
+                                        setFormData((p) => ({ ...p, listingTypePolicyId: id }));
+                                    }}
+                                    items={listingTypes}
+                                    loading={loadingTypes}
+                                    error={listingError}
+                                    inventory={invMap}
+                                />
+                                <div className="rounded-2xl border border-[#e3e9f5] bg-[#f6f9ff]/40 p-4">
+                                    <PostPreviewSection
+                                        data={formData}
+                                        postType={(function () {
+                                            const map = {}; (listingTypes || []).forEach((x) => (map[x.id] = x.listingType));
+                                            const t = map[postTypeId] || map[formData.listingTypePolicyId] || "NORMAL";
+                                            return t === "NORMAL" ? "free" : t.toLowerCase();
+                                        })()}
+                                        editable
+                                        onImagesChange={(next) => setFormData((p) => ({ ...p, images: next }))}
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {/* FOOTER (sticky bottom) */}
+                    <div className="sticky bottom-0 z-10">{footerNode}</div>
+                </div>
             </Drawer>
 
             {/* Modal nhắc mua thêm (Edit) */}
@@ -602,8 +644,6 @@ export default function PostCreateDrawer({
 /* ========== FooterType cho tạo mới ========== */
 function FooterType({
     setStep,
-    autoRepost,
-    setAutoRepost,
     formData,
     postTypeId,
     inventory = {},
@@ -626,16 +666,22 @@ function FooterType({
     const qty = isVipLike ? (inventory?.[currentType] ?? 0) : Infinity;
     const outOfStock = isVipLike && qty <= 0;
 
+    const [autoRepostVal, setAutoRepostVal] = useState(false);
+
     const handlePost = async () => {
         if (outOfStock) { setShowPrompt(true); return; }
         const payload = {
             ...formData,
             listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
-            autoRepost,
+            autoRepost: autoRepostVal,
         };
         try {
             await dispatch(
-                createPropertyThunk({ formData: payload, listingTypePolicyId: payload.listingTypePolicyId, submitMode: "publish", })
+                createPropertyThunk({
+                    formData: payload,
+                    listingTypePolicyId: payload.listingTypePolicyId,
+                    submitMode: "publish",
+                })
             ).unwrap();
             message.success("Đăng tin thành công!");
             onCreated?.();
@@ -649,7 +695,7 @@ function FooterType({
             <div className="flex items-center justify-between px-4 pb-3 pt-2 border-t border-[#e3e9f5] bg-[#f8faff]">
                 <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
                 <div className="flex items-center gap-2">
-                    <Switch checked={autoRepost} onChange={setAutoRepost} />
+                    <Switch checked={autoRepostVal} onChange={setAutoRepostVal} />
                     <span className="text-gray-700 text-sm">Tự động đăng lại</span>
                     <Tooltip title="Tự động đăng lại tin khi hết hạn">
                         <InfoCircleOutlined className="text-gray-500 text-xs" />

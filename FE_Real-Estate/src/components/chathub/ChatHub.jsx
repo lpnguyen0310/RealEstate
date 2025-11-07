@@ -49,7 +49,7 @@ export default function ChatHub({ user, size = "md" }) {
                 onClick={() => setOpen((o) => !o)}
                 style={{
                     position: "fixed",
-                    right: baseOffset.right,
+                    left: baseOffset.right,
                     bottom: baseOffset.bottom,
                     zIndex: 10000,
                 }}

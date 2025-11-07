@@ -10,9 +10,25 @@ import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined"; // <<< ĐÃ THÊM
 import { HOVER_BG, STATUS_LABEL, STATUS_CHIP_COLOR, styles } from "./constants";
-
+const shortMoney = (value) => {
+ if (value == null || isNaN(value)) return "-";
+  if (value >= 1_000_000_000) {
+   const billions = value / 1_000_000_000;
+    return billions % 1 === 0
+      ? `${billions.toFixed(0)} tỷ`
+      : `${billions.toFixed(1)} tỷ`;
+  }
+  if (value >= 1_000_000) {
+    const millions = value / 1_000_000;
+   return millions % 1 === 0
+      ? `${millions.toFixed(0)} triệu`
+      : `${millions.toFixed(1)} triệu`;
+  }
+  return value.toLocaleString("vi-VN") + " đ";
+};
 export default function PostsTable({
   rows, loading, actioningId,
   page, totalPages, start, end, totalItems, pageSize, setPage, setPageSize,
@@ -70,7 +86,7 @@ export default function PostsTable({
                     </TableCell>
 
                     <TableCell sx={styles.bodyCell}>{r.category}</TableCell>
-                    <TableCell sx={{ ...styles.bodyCell, textAlign: "right", fontWeight: 700 }}>{money(r.price)}</TableCell>
+                    <TableCell sx={{ ...styles.bodyCell, textAlign: "right", fontWeight: 700 }}>{shortMoney(r.price)}</TableCell>
 
                     <TableCell sx={styles.bodyCell}>
                       <Chip label={STATUS_LABEL[r.status] ?? r.status} color={STATUS_CHIP_COLOR[r.status] ?? "default"} size="small" />
@@ -105,7 +121,7 @@ export default function PostsTable({
                         <span>
                           <IconButton size="small" disabled={disabled}
                             onClick={() => { onOpenDetail(r); setDecision?.((s) => ({ ...s, listingType: r.listingType || "NORMAL" })); }}>
-                            <RemoveRedEyeOutlinedIcon fontSize="small" />
+                            <InfoOutlinedIcon fontSize="small" /> 
                           </IconButton>
                         </span>
                       </Tooltip>

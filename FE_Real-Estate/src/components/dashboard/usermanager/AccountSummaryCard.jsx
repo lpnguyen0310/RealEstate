@@ -1,20 +1,19 @@
 // components/AccountSummaryCard.jsx
-import { Card, Avatar, Button, Tag, Tooltip, Space, Typography, message } from "antd";
-import { UserOutlined, CopyOutlined, SafetyCertificateFilled, PlusOutlined, QuestionCircleOutlined } from "@ant-design/icons";
+import { Card, Avatar, Button, Tooltip, Typography, message, Divider, Tag } from "antd";
+import {
+  UserOutlined,
+  CopyOutlined,
+  SafetyCertificateFilled,
+  PlusOutlined,
+  QuestionCircleOutlined,
+} from "@ant-design/icons";
 import React from "react";
 
 const { Text, Title } = Typography;
 
 /**
- * AccountSummaryCard
  * Props:
- *  - username: string
- *  - points: number
- *  - postBalance: number
- *  - promoBalance: number
- *  - identityAccount: string
- *  - isNewIdentity?: boolean
- *  - onTopUp?: () => void
+ *  - username, points, postBalance, promoBalance, identityAccount, isNewIdentity, onTopUp
  */
 export default function AccountSummaryCard({
   username = "user000000",
@@ -36,78 +35,87 @@ export default function AccountSummaryCard({
 
   return (
     <Card
-      className="rounded-2xl border border-gray-100 shadow-sm"
-      bodyStyle={{ padding: 16 }}
+      className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+      bodyStyle={{ padding: 0 }}
     >
-      {/* Header: avatar + username + points */}
-      <div className="flex items-center gap-3">
-        <Avatar size={48} icon={<UserOutlined />} />
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Text className="font-medium truncate">{username}</Text>
-            <Tooltip title="Điểm dùng để đổi ưu đãi">
-              <QuestionCircleOutlined className="text-gray-400" />
-            </Tooltip>
+      {/* Banner */}
+      <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 p-4 text-white">
+        <div className="flex items-center gap-3">
+          <Avatar size={54} icon={<UserOutlined />} className="shadow-md" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Text className="!text-white !font-semibold truncate">{username}</Text>
+              <Tooltip title="Điểm dùng để đổi ưu đãi">
+                <QuestionCircleOutlined className="opacity-90" />
+              </Tooltip>
+            </div>
+            <Text className="!text-white/90 text-[13px]">{points} điểm</Text>
           </div>
-          <Text type="secondary" className="text-[13px]">{points} điểm</Text>
         </div>
       </div>
 
-      {/* Body: balances + identity */}
-      <div className="mt-4 p-4 bg-gray-50 rounded-xl">
-        <Title level={5} className="!m-0 !mb-3 text-gray-800">Số dư tài khoản</Title>
+      {/* Balances */}
+      <div className="p-4">
+        <Title level={5} className="!m-0 text-gray-900">Số dư tài khoản</Title>
 
-        <div className="space-y-2 text-[14px]">
-          <div className="flex items-center justify-between">
-            <Text className="text-gray-600">TK tin đăng</Text>
-            <Text className="font-semibold">{postBalance.toLocaleString("vi-VN")}</Text>
-          </div>
-          <div className="flex items-center justify-between">
-            <Text className="text-gray-600">TK Khuyến mãi</Text>
-            <Text className="font-semibold">{promoBalance.toLocaleString("vi-VN")}</Text>
-          </div>
-        </div>
-
-        <div className="mt-4">
-            <div className="rounded-xl bg-gray-50 border border-gray-100 p-3">
-                {/* Hàng 1: badge + label + (i) */}
-                <div className="flex items-center gap-2">
-                {isNewIdentity && (
-                    <span className="inline-flex h-5 items-center px-2 rounded-md text-[12px] font-semibold bg-red-500 text-white">
-                    Mới
-                    </span>
-                )}
-                <span className="text-[13px] text-gray-600">Số tài khoản định danh</span>
-                <Tooltip title="Tài khoản dùng để nạp/rút gắn định danh">
-                    <QuestionCircleOutlined className="text-gray-400" />
-                </Tooltip>
-                </div>
-
-                {/* Hàng 2: icon + số tài khoản + copy */}
-                <div className="mt-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-100">
-                    <SafetyCertificateFilled className="text-green-600 text-[14px]" />
-                    </span>
-
-                    <Text copyable={false} className="font-semibold select-all tracking-wide">
-                    {identityAccount}
-                    </Text>
-                </div>
-
-                <Tooltip title="Sao chép">
-                    <Button type="text" shape="circle" size="small" icon={<CopyOutlined />} onClick={copyId} />
-                </Tooltip>
-                </div>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-gray-100 bg-white p-3 hover:shadow-sm transition">
+            <div className="text-[12px] text-gray-500">TK tin đăng</div>
+            <div className="mt-1 text-lg font-semibold">
+              {postBalance.toLocaleString("vi-VN")}
             </div>
+            <Tag className="mt-2" color="blue">Sử dụng khi đăng tin</Tag>
+          </div>
+
+          <div className="rounded-xl border border-gray-100 bg-white p-3 hover:shadow-sm transition">
+            <div className="text-[12px] text-gray-500">TK khuyến mãi</div>
+            <div className="mt-1 text-lg font-semibold">
+              {promoBalance.toLocaleString("vi-VN")}
+            </div>
+            <Tag className="mt-2" color="green">Ưu đãi/hoàn tiền</Tag>
+          </div>
         </div>
 
+        {/* Identity account */}
+        <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 p-3">
+          <div className="flex items-center gap-2">
+            {isNewIdentity && (
+              <span className="inline-flex h-5 items-center px-2 rounded-md text-[12px] font-semibold bg-red-500 text-white">
+                Mới
+              </span>
+            )}
+            <span className="text-[13px] text-gray-600">Số tài khoản định danh</span>
+            <Tooltip title="Tài khoản dùng để nạp/rút gắn định danh">
+              <QuestionCircleOutlined className="text-gray-400" />
+            </Tooltip>
+          </div>
+
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-green-100">
+                <SafetyCertificateFilled className="text-green-600 text-[15px]" />
+              </span>
+              <Text className="font-semibold tracking-wide truncate">{identityAccount}</Text>
+            </div>
+            <Tooltip title="Sao chép">
+              <Button
+                type="text"
+                shape="circle"
+                size="small"
+                icon={<CopyOutlined />}
+                onClick={copyId}
+                className="hover:!bg-gray-100"
+              />
+            </Tooltip>
+          </div>
+        </div>
+
+        <Divider className="!my-4" />
 
         <Button
-          type="default"
-          danger
+          type="primary"
           icon={<PlusOutlined />}
-          className="mt-4 w-full h-10 rounded-lg font-semibold"
+          className="w-full h-10 rounded-lg font-semibold"
           onClick={onTopUp}
         >
           Nạp tiền

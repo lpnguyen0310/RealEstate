@@ -11,11 +11,7 @@ function PostCardSkeleton() {
                     <Skeleton.Image active style={{ width: "100%", height: "110px" }} />
                 </div>
                 <div className="flex-1">
-                    <Skeleton
-                        active
-                        title={{ width: "80%" }}
-                        paragraph={{ rows: 2, width: ["90%", "70%"] }}
-                    />
+                    <Skeleton active title={{ width: "80%" }} paragraph={{ rows: 2, width: ["90%", "70%"] }} />
                     <div className="mt-2 flex items-center justify-between">
                         <Skeleton.Button active size="small" style={{ width: 120 }} />
                         <Skeleton.Button active size="small" shape="round" style={{ width: 80 }} />
@@ -34,7 +30,6 @@ export default function PostList({
     onPageChange = () => { },
     onPageSizeChange = () => { },
     loading = false,
-    // 🆕 callback khi click card
     onItemClick = () => { },
     onViewWarningClick = () => { },
     highlightedId = null,
@@ -46,11 +41,15 @@ export default function PostList({
             {/* LIST */}
             <div className="space-y-4">
                 {loading
-                    ? Array.from({ length: Math.min(pageSize, 6) }).map((_, i) => (
-                        <PostCardSkeleton key={`sk-${i}`} />
-                    ))
+                    ? Array.from({ length: Math.min(pageSize, 6) }).map((_, i) => <PostCardSkeleton key={`sk-${i}`} />)
                     : items.map((p) => (
-                        <PostCard key={p.id} post={p} onOpenDetail={onItemClick} onViewWarning={onViewWarningClick} isHighlighted={p.id === highlightedId}/>
+                        <PostCard
+                            key={p.id}
+                            post={p}
+                            onOpenDetail={onItemClick}
+                            onViewWarning={onViewWarningClick}
+                            isHighlighted={p.id === highlightedId}
+                        />
                     ))}
 
                 {showEmpty && (
@@ -61,36 +60,34 @@ export default function PostList({
             </div>
 
             {/* PAGINATION BAR */}
-            <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between shadow-[0_6px_24px_rgba(13,47,97,0.04)]">
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-[0_6px_24px_rgba(13,47,97,0.04)]">
                 {/* left: page size + info */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 justify-center sm:justify-start">
                     <Select
                         value={pageSize}
                         disabled={loading}
                         onChange={(v) => onPageSizeChange(v)}
-                        options={[10, 20, 30, 50].map((n) => ({
-                            label: n.toString(),
-                            value: n,
-                        }))}
+                        options={[10, 20, 30, 50].map((n) => ({ label: n.toString(), value: n }))}
                         className="!w-[90px] [&_.ant-select-selector]:!h-10 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selection-item]:!leading-10"
                         popupMatchSelectWidth={false}
                     />
-                    <span className="text-gray-500 mt-[8px]">
-                        Hiển thị {total === 0 ? 0 : (page - 1) * pageSize + 1} đến{" "}
-                        {Math.min(page * pageSize, total)} của {total}
+                    <span className="text-gray-500">
+                        Hiển thị {total === 0 ? 0 : (page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} / {total}
                     </span>
                 </div>
 
                 {/* right: pagination */}
-                <Pagination
-                    className="flex items-center post-pagination"
-                    current={page}
-                    total={total}
-                    pageSize={pageSize}
-                    showSizeChanger={false}
-                    onChange={onPageChange}
-                    disabled={loading}
-                />
+                <div className="flex justify-center">
+                    <Pagination
+                        className="post-pagination"
+                        current={page}
+                        total={total}
+                        pageSize={pageSize}
+                        showSizeChanger={false}
+                        onChange={onPageChange}
+                        disabled={loading}
+                    />
+                </div>
             </div>
         </div>
     );

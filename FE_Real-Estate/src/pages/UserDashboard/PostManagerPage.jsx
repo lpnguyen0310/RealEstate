@@ -1,6 +1,6 @@
 // src/pages/dashboard/posts/PostManagerPage.jsx
 import { Button } from "antd";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination as SwiperPagination, Autoplay } from "swiper/modules";
@@ -25,7 +25,6 @@ import {
 
 import WarningModal from "@/components/dashboard/postmanagement/WarningModal.jsx";
 
-
 const SLIDES = [
     "https://images.unsplash.com/photo-1501183638710-841dd1904471?q=80&w=1400",
     "https://images.unsplash.com/photo-1523217582562-09d0def993a6?q=80&w=1400",
@@ -41,7 +40,7 @@ const cleanObj = (obj) => {
     });
     return out;
 };
-const parseNumber = (v) => (v == null ? undefined : (isNaN(+v) ? undefined : +v));
+const parseNumber = (v) => (v == null ? undefined : isNaN(+v) ? undefined : +v);
 
 const parseFiltersFromSearch = (sp) => {
     const obj = Object.fromEntries(sp.entries());
@@ -57,9 +56,10 @@ const parseFiltersFromSearch = (sp) => {
 };
 
 const buildSearchParams = ({ status, page, size, filters }) => {
+    // page trong URL là 1-based
     const base = cleanObj({
         tab: status && status !== "active" ? status : undefined,
-        page: page > 0 ? page + 1 : 1, // URL 1-based
+        page: page > 0 ? page + 1 : 1,
         size,
         ...cleanObj(filters),
     });
@@ -74,20 +74,14 @@ export default function PostManagerPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [warningModal, setWarningModal] = useState({ open: false, message: "" });
     const [highlightedId, setHighlightedId] = useState(null);
-    const [scrolledOnce, setScrolledOnce] = useState(false);
 
-    const {
-        list,
-        page,
-        size,
-        totalElements,
-        counts,
-    } = useSelector((s) => ({
+    const { list, page, size, totalElements, counts, loading: rawLoading } = useSelector((s) => ({
         list: s.property.myList,
         page: s.property.myPage,
         size: s.property.mySize,
         totalElements: s.property.myTotalElements,
         counts: s.property.counts,
+        loading: s.property.loading,
     }));
 
     // ---- local ui states ----
@@ -99,13 +93,12 @@ export default function PostManagerPage() {
     const [editingId, setEditingId] = useState(null);
 
     const handleOpenWarning = useCallback((message) => {
-        setWarningModal({ open: true, message: message || "" });
-    }, []); // <-- Thêm mảng dependency rỗng []
+        setWarningModal({ open: true, message: message || "" });
+    }, []);
 
-    // Bọc luôn hàm này cho nhất quán
-    const handleCloseWarning = useCallback(() => {
-        setWarningModal({ open: false, message: "" });
-    }, []); // <-- Thêm mảng dependency rỗng []
+    const handleCloseWarning = useCallback(() => {
+        setWarningModal({ open: false, message: "" });
+    }, []);
 
     /* ========== URL -> STATE ========== */
     useEffect(() => {
@@ -131,12 +124,13 @@ export default function PostManagerPage() {
         dispatch(fetchMyPropertyCountsThunk());
     }, [dispatch]);
 
+    // Đọc warnedPostId -> mở WarningModal nếu cần
     useEffect(() => {
         const warnId = searchParams.get("warnedPostId");
         if (!warnId) return;
 
-        if (list && list.length > 0 && status === 'warned') {
-            const postToWarn = list.find(p => p.id === Number(warnId));
+        if (list && list.length > 0 && status === "warned") {
+            const postToWarn = list.find((p) => p.id === Number(warnId));
             if (postToWarn) {
                 handleOpenWarning(postToWarn.latestWarningMessage);
                 const newParams = new URLSearchParams(searchParams);
@@ -144,64 +138,30 @@ export default function PostManagerPage() {
                 setSearchParams(newParams, { replace: true });
             }
         }
-    }, [searchParams, list, status, setSearchParams, handleOpenWarning]); // 💡 Bổ sung handleOpenWarning vào dependency array
+    }, [searchParams, list, status, setSearchParams, handleOpenWarning]);
 
-    // src/pages/dashboard/posts/PostManagerPage.jsx
+    // ===== Highlight 1 item bằng viewPostId trong URL rồi xoá param
+    useEffect(() => {
+        const viewIdParam = searchParams.get("viewPostId");
+        if (!viewIdParam || !list || list.length === 0 || highlightedId == viewIdParam) {
+            return;
+        }
 
-   // src/pages/dashboard/posts/PostManagerPage.jsx
-// Thay thế toàn bộ 3 useEffect liên quan đến highlightedId bằng đoạn này
+        const postToView = list.find((p) => p.id == viewIdParam);
+        if (postToView) {
+            setHighlightedId(postToView.id);
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete("viewPostId");
+            setSearchParams(newParams, { replace: true });
+        }
+    }, [searchParams, list, highlightedId, setSearchParams]);
 
-    useEffect(() => {
-        const viewIdParam = searchParams.get("viewPostId");
-        
-        // Thoát nếu không có param hoặc list chưa load, HOẶC highlight đã được bật
-        if (!viewIdParam || !list || list.length === 0 || highlightedId == viewIdParam) {
-            return;
-        }
-        
-        console.log("--- DEBUG HIGHLIGHT (Tìm và Set) ---");
-
-        const postToView = list.find(p => p.id == viewIdParam);
-
-        if (postToView) {
-            console.log("✅ SUCCESS: Đã tìm thấy postToView. ID:", postToView.id);
-            
-            // 1. Kích hoạt Highlight (VĨNH VIỄN)
-            setHighlightedId(postToView.id);
-
-            // 2. Xóa param khỏi URL ngay lập tức (để không chạy lại)
-            const newParams = new URLSearchParams(searchParams);
-            newParams.delete("viewPostId");
-            console.log("⭐ Xóa viewPostId khỏi URL");
-            setSearchParams(newParams, { replace: true });
-
-        } else {
-            console.log("❌ INFO: Không tìm thấy post trong list hiện tại.");
-        }
-        console.log("--- END DEBUG ---");
-
-    // Giữ lại dependencies để đảm bảo logic chạy khi list hoặc URL thay đổi
-    }, [searchParams, list, status, highlightedId, setSearchParams]);
-
-useEffect(() => {
-        // 1. Chỉ chạy khi có ID đang được highlight
-        if (!highlightedId) return;
-
-        console.log("⏳ Bật Timer: Tắt highlight theo thời gian Animation (3.5s)");
-
-        // 2. Set timer để xóa highlight
-        const highlightTimer = setTimeout(() => {
-            console.log("⏲️ Timer Hết: Tắt highlight sau khi Animation kết thúc.");
-            setHighlightedId(null);
-        }, 10000); // Đảm bảo khớp với 3.5s trong CSS
-        
-        // 3. Trả về hàm cleanup
-        return () => {
-            clearTimeout(highlightTimer);
-        };
-
-    // Dependency chỉ còn highlightedId
-    }, [highlightedId]);
+    // Tắt highlight sau 10s (khớp CSS animation dài)
+    useEffect(() => {
+        if (!highlightedId) return;
+        const t = setTimeout(() => setHighlightedId(null), 10000);
+        return () => clearTimeout(t);
+    }, [highlightedId]);
 
     /* ========== STATE -> URL ========== */
     const pushUrl = (next = {}) => {
@@ -214,14 +174,13 @@ useEffect(() => {
         setSearchParams(params, { replace: false });
     };
 
-    const rawLoading = useSelector((s) => s.property.loading);
+    // Skeleton min duration
     const [delayedLoading, setDelayedLoading] = useState(false);
-
     useEffect(() => {
         if (rawLoading) {
             setDelayedLoading(true);
         } else {
-            const t = setTimeout(() => setDelayedLoading(false), 2000);
+            const t = setTimeout(() => setDelayedLoading(false), 1200);
             return () => clearTimeout(t);
         }
     }, [rawLoading]);
@@ -229,7 +188,6 @@ useEffect(() => {
     // 🆕 mở Drawer chi tiết từ card
     const handleOpenDetail = (id) => {
         if (!id) return;
-        console.log('Open detail id=', id)
         setEditingId(id);
         setOpenCreate(true);
     };
@@ -243,38 +201,53 @@ useEffect(() => {
     const handleEndHighlight = useCallback(() => {
         setHighlightedId(null);
     }, []);
-    
+
+    // —— Tối ưu autoplay khi tab bị ẩn
+    const swiperAutoplayRef = useRef(null);
+    useEffect(() => {
+        const onVis = () => {
+            const inst = swiperAutoplayRef.current;
+            if (!inst) return;
+            if (document.hidden) inst.stop();
+            else inst.start();
+        };
+        document.addEventListener("visibilitychange", onVis);
+        return () => document.removeEventListener("visibilitychange", onVis);
+    }, []);
 
     return (
         <div>
-            {/* Banner */}
-            <div className="rounded-2xl bg-gradient-to-r from-[#1B264F] to-[#1D5DCB] py-5 md:py-6 px-6 md:px-8 text-white mb-8 flex flex-col md:flex-row items-center justify-between">
-                <div className="flex-1 max-w-[540px] space-y-3">
-                    <h2 className="text-[26px] font-bold">Badongsan.vn</h2>
-                    <h3 className="text-[20px] font-semibold">Nền tảng Đăng tin Bất động sản Thế hệ mới</h3>
-                    <p className="text-gray-200 leading-relaxed">
-                        Đăng tin tìm kiếm khách hàng, quản lý danh mục bất động sản, gợi ý
-                        thông minh giỏ hàng phù hợp cho khách hàng mục tiêu.
+            {/* Banner (responsive) */}
+            <div className="rounded-2xl bg-gradient-to-r from-[#1B264F] to-[#1D5DCB] py-4 md:py-6 px-4 md:px-8 text-white mb-6 md:mb-8 flex flex-col md:flex-row items-center justify-between">
+                <div className="flex-1 w-full md:max-w-[540px] space-y-2 md:space-y-3">
+                    <h2 className="text-[22px] md:text-[26px] font-bold">Badongsan.vn</h2>
+                    <h3 className="text-[16px] md:text-[20px] font-semibold">
+                        Nền tảng Đăng tin Bất động sản Thế hệ mới
+                    </h3>
+                    <p className="text-gray-200 text-[13px] md:text-[14px] leading-relaxed">
+                        Đăng tin tìm kiếm khách hàng, quản lý danh mục bất động sản, gợi ý thông minh giỏ hàng phù hợp cho khách hàng mục tiêu.
                     </p>
                     <Button
                         type="primary"
                         icon={<PlusOutlined />}
                         size="large"
-                        className="mt-2 bg-[#FFD43B] text-[#1B264F] font-semibold hover:bg-[#ffe480] border-none"
+                        className="mt-1 md:mt-2 bg-[#FFD43B] text-[#1B264F] font-semibold hover:bg-[#ffe480] border-none"
                         onClick={() => {
-                            setEditingId(null);       // tạo mới
+                            setEditingId(null); // tạo mới
                             setOpenCreate(true);
                         }}
                     >
                         Đăng tin mới
                     </Button>
                 </div>
-                <div className="flex-1 w-full mt-6 md:mt-0 md:ml-10 max-w-[720px]">
+
+                <div className="flex-1 w-full mt-4 md:mt-0 md:ml-10 max-w-[720px]">
                     <Swiper
                         modules={[SwiperPagination, Autoplay]}
                         pagination={{ clickable: true }}
-                        autoplay={{ delay: 3000 }}
+                        autoplay={{ delay: 3000, disableOnInteraction: false }}
                         loop
+                        onAutoplay={(autoplay) => (swiperAutoplayRef.current = autoplay)}
                         className="rounded-xl overflow-hidden"
                     >
                         {SLIDES.map((src, i) => (
@@ -282,7 +255,8 @@ useEffect(() => {
                                 <img
                                     src={src}
                                     alt={`slide-${i + 1}`}
-                                    className="w-full h-[260px] md:h-[300px] object-cover rounded-xl"
+                                    className="w-full h-[200px] sm:h-[240px] md:h-[300px] object-cover rounded-xl"
+                                    loading="lazy"
                                 />
                             </SwiperSlide>
                         ))}
@@ -334,7 +308,6 @@ useEffect(() => {
                         dispatch(setPage(0));
                         pushUrl({ size: n, page: 0 });
                     }}
-                    // 🆕 truyền callback click item
                     onItemClick={(id) => {
                         handleEndHighlight(); // Tắt highlight trước khi mở Drawer
                         handleOpenDetail(id);
@@ -358,7 +331,8 @@ useEffect(() => {
                 editingId={editingId}
                 isEdit={!!editingId}
             />
-            <WarningModal 
+
+            <WarningModal
                 open={warningModal.open}
                 onClose={handleCloseWarning}
                 message={warningModal.message}

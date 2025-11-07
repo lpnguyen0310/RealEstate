@@ -2,6 +2,7 @@
 package com.backend.be_realestate.repository.specification;
 
 import com.backend.be_realestate.entity.PropertyEntity;
+import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.enums.PropertyType;
 import jakarta.persistence.criteria.Expression;
 import org.springframework.data.jpa.domain.Specification;
@@ -76,9 +77,16 @@ public class PropertySpecification {
     }
 
 
+    public static Specification<PropertyEntity> isPublished() {
+        return (root, query, cb) -> cb.equal(root.get("status"), PropertyStatus.PUBLISHED);
+    }
 
-
-
+    public static Specification<PropertyEntity> notExpired() {
+        return (root, query, cb) -> cb.or(
+                cb.isNull(root.get("expiresAt")),
+                cb.greaterThan(root.get("expiresAt"), cb.currentTimestamp())
+        );
+    }
 
     // --- Phương thức bạn đã có ---
     public static Specification<PropertyEntity> hasPropertyType(String propertyType) {

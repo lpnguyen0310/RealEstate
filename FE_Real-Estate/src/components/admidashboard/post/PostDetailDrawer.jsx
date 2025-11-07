@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback,useMemo } from "react";
+// src/components/.../PostDetailDrawer.jsx
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
     Drawer, Box, Stack, Avatar, Typography, Divider, Chip, Button,
-    Card, CardContent, Grid, TextField, Tooltip,Alert, AlertTitle
+    Card, CardContent, Grid, TextField, Tooltip, Alert, AlertTitle
 } from "@mui/material";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
@@ -12,6 +13,7 @@ import { STATUS_LABEL, STATUS_CHIP_COLOR } from "./constants";
 import ImageViewer from "./ImageViewer";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 
+/* ---------- Row helper ---------- */
 function Row({ label, value }) {
     return (
         <Stack direction="row" justifyContent="space-between" gap={2}>
@@ -21,7 +23,7 @@ function Row({ label, value }) {
     );
 }
 
-// helper hiển thị icon/màu cho audit item
+/* ---------- icon/màu cho audit ---------- */
 function getAuditMeta(type) {
     const t = (type || "").toUpperCase();
     switch (t) {
@@ -60,26 +62,15 @@ export default function PostDetailDrawer({
     const isRejectable = isPending;
 
     const resubmitInfo = useMemo(() => {
-        // 1. Chỉ kiểm tra nếu tin đang "Chờ duyệt"
-        if (!isPending) {
-            return { isResubmit: false, fromStatus: null };
-        }
-        
-        // 2. Tìm trong lịch sử (audit) xem có hành động nào
-        //    KHÔNG PHẢI là 'APPROVED' (tức là 'REJECTED' hoặc 'WARNED')
+        if (!isPending) return { isResubmit: false, fromStatus: null };
         const lastBadAction = (detail.audit || []).find(
-            a => (a.type || "").toUpperCase() !== 'APPROVED'
+            (a) => (a.type || "").toUpperCase() !== "APPROVED"
         );
-
         if (lastBadAction) {
             const type = (lastBadAction.type || "").toUpperCase();
-             // 3. Nếu tìm thấy, đánh dấu là "duyệt lại"
-             return { isResubmit: true, fromStatus: type };
+            return { isResubmit: true, fromStatus: type };
         }
-        
-        // 4. Nếu không, đây là tin mới
         return { isResubmit: false, fromStatus: null };
-
     }, [isPending, detail.audit]);
 
     const listingChipColor =
@@ -94,7 +85,7 @@ export default function PostDetailDrawer({
         }
     }, [open, detail?.policyDurationDays, decision.durationDays, setDecision]);
 
-    // modal xác nhận Từ chối (gọi cha để mở dialog nhập lý do)
+    // modal xác nhận Từ chối
     const [rejectConfirm, setRejectConfirm] = useState({ open: false, loading: false });
     const openRejectConfirm = useCallback(() => setRejectConfirm({ open: true, loading: false }), []);
     const closeRejectConfirm = useCallback(() => setRejectConfirm({ open: false, loading: false }), []);
@@ -108,231 +99,266 @@ export default function PostDetailDrawer({
         }
     }, [detail?.id, onReject, onClose, closeRejectConfirm]);
 
-    // ưu tiên lý do từ chối từ item (nếu đã bị từ chối), fallback redux decision
     const rejectReasonValue = (detail.rejectReason ?? decision.reason ?? "").toString();
 
     return (
-        <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 650 } }}>
-            <Box sx={{ p: 2 }}>
-                {/* Header */}
-                <Stack direction="row" spacing={1.5} alignItems="center" mb={1}>
-                    <Avatar sx={{ bgcolor: "#e6f0ff", color: "#3059ff", fontWeight: 700, width: 48, height: 48 }}>
-                        <ArticleOutlinedIcon />
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                        <Typography fontWeight={700}>{detail.title}</Typography>
-                        <Typography fontSize={13} color="#7a8aa1">
-                            #{detail.id} • {STATUS_LABEL[detail.status]}
-                        </Typography>
-                    </Box>
-                    <Button
+        <Drawer
+            anchor="right"
+            open={open}
+            onClose={onClose}
+            // 👇 MUI: bo góc + cách lề + chiều cao hợp lý để scroll
+            PaperProps={{
+                sx: {
+                    width: 650,
+                    borderRadius: 3,            // ~ 24px (tùy theme)
+                    mt: 3, mb: 3, mr: 3,        // margin top/bottom/right
+                    overflow: "hidden",         // giữ bo góc
+                    display: "flex",
+                    maxHeight: "calc(100vh - 48px)", // trừ margin 24*2
+                    boxShadow: "0 12px 36px rgba(0,0,0,0.14)",
+                    bgcolor: "#fff",
+                },
+            }}
+            ModalProps={{
+                BackdropProps: {
+                    sx: {
+                        backgroundColor: "rgba(15,23,42,0.35)",
+                        backdropFilter: "blur(3px)",
+                    },
+                },
+            }}
+        >
+            {/* Khung dọc – để header cố định, content cuộn */}
+            <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+                {/* Header sticky */}
+                <Box
+                    sx={{
+                        p: 2,
+                        borderBottom: "1px solid #e3e9f5",
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 1,
+                        bgcolor: "#fff",
+                    }}
+                >
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Avatar sx={{ bgcolor: "#e6f0ff", color: "#3059ff", fontWeight: 700, width: 48, height: 48 }}>
+                            <ArticleOutlinedIcon />
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography fontWeight={700} noWrap title={detail.title}>{detail.title}</Typography>
+                            <Typography fontSize={13} color="#7a8aa1">
+                                #{detail.id} • {STATUS_LABEL[detail.status]}
+                            </Typography>
+                        </Box>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<OpenInNewIcon />}
+                            onClick={() => window.open(`/posts/${detail.id}`, "_blank")}
+                        >
+                            Mở trên FE
+                        </Button>
+                    </Stack>
+                </Box>
+
+                {/* Content scrollable */}
+                <Box sx={{ p: 2, flex: 1, minHeight: 0, overflowY: "auto" }}>
+                    {resubmitInfo.isResubmit && (
+                        <Alert severity="info" icon={<InfoOutlinedIcon />} sx={{ mb: 2, borderRadius: 2 }}>
+                            <AlertTitle sx={{ fontWeight: 600 }}>Tin đăng được gửi duyệt lại</AlertTitle>
+                            Tin này đã được người dùng cập nhật lại sau khi bị
+                            <b>{resubmitInfo.fromStatus === "WARNED" ? " Cảnh báo" : " Từ chối"}</b>. Vui lòng kiểm tra kỹ các thay đổi.
+                        </Alert>
+                    )}
+
+                    {/* Hình ảnh */}
+                    <ImageViewer images={detail.images} />
+
+                    {/* Thông tin chính */}
+                    <Card sx={{ borderRadius: 2, mt: 2 }}>
+                        <CardContent sx={{ p: 2 }}>
+                            <Grid container spacing={1.5}>
+                                <Grid item xs={12} sm={6}>
+                                    <Row label="Giá" value={money(detail.price)} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Row label="Diện tích" value={`${detail.area ?? "-"} m²`} />
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                    <Row
+                                        label="Loại tin"
+                                        value={
+                                            <Tooltip title="Loại tin do người đăng chọn hoặc theo chính sách gói.">
+                                                <Chip
+                                                    label={detail.listingType || "NORMAL"}
+                                                    color={listingChipColor}
+                                                    size="small"
+                                                    variant="filled"
+                                                />
+                                            </Tooltip>
+                                        }
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                    <Row
+                                        label="Trạng thái"
+                                        value={<Chip label={STATUS_LABEL[detail.status]} color={STATUS_CHIP_COLOR[detail.status]} size="small" />}
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <Row label="Địa chỉ" value={detail.displayAddress || "-"} />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Row label="Mô tả" value={detail.description || "-"} />
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </Card>
+
+                    {/* Quyết định duyệt */}
+                    <Divider sx={{ my: 2 }}>Quyết định duyệt</Divider>
+
+                    <Card
                         variant="outlined"
-                        size="small"
-                        startIcon={<OpenInNewIcon />}
-                        onClick={() => window.open(`/posts/${detail.id}`, "_blank")}
+                        sx={{
+                            borderRadius: 2,
+                            borderColor: "#e3e9f1",
+                            bgcolor: "#fafbff",
+                            boxShadow: "inset 0 0 4px rgba(0,0,0,0.05)",
+                            p: 2.5,
+                        }}
                     >
-                        Mở trên FE
-                    </Button>
-                </Stack>
-
-                <Divider sx={{ my: 1.5 }} />
-
-                {resubmitInfo.isResubmit && (
-                    <Alert 
-                        severity="info" 
-                        icon={<InfoOutlinedIcon />} 
-                        sx={{ mb: 2, borderRadius: 2 }}
-                    >
-                        <AlertTitle sx={{ fontWeight: 600 }}>
-                            Tin đăng được gửi duyệt lại
-                        </AlertTitle>
-                        Tin này đã được người dùng cập nhật lại sau khi bị 
-                        <b> {resubmitInfo.fromStatus === 'WARNED' ? ' Cảnh báo' : ' Từ chối'}</b>.
-                        Vui lòng kiểm tra kỹ các thay đổi.
-                    </Alert>
-                )}
-
-                {/* Hình ảnh */}
-                <ImageViewer images={detail.images} />
-
-                {/* Thông tin chính */}
-                <Card sx={{ borderRadius: 2, mt: 2 }}>
-                    <CardContent sx={{ p: 2 }}>
-                        <Grid container spacing={1.5}>
-                            <Grid item xs={12} sm={6}>
-                                <Row label="Giá" value={money(detail.price)} />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <Row label="Diện tích" value={`${detail.area ?? "-"} m²`} />
+                        <Grid container spacing={2.5}>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    size="small"
+                                    label="Thời hạn gói (ngày)"
+                                    value={`${decision.durationDays || detail?.policyDurationDays || "-"}`}
+                                    InputProps={{ readOnly: true }}
+                                    fullWidth
+                                />
                             </Grid>
 
-                            <Grid item xs={12} sm={6}>
-                                <Row
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    size="small"
                                     label="Loại tin"
-                                    value={
-                                        <Tooltip title="Loại tin do người đăng chọn hoặc theo chính sách gói.">
-                                            <Chip label={detail.listingType || "NORMAL"} color={listingChipColor} size="small" variant="filled" />
-                                        </Tooltip>
+                                    value={detail.listingType || "NORMAL"}
+                                    InputProps={{ readOnly: true }}
+                                    fullWidth
+                                />
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <TextField
+                                    label={isRejected ? "Lý do từ chối" : "Lý do từ chối (nhập khi bấm Từ chối)"}
+                                    value={rejectReasonValue}
+                                    onChange={(e) => setDecision({ reason: e.target.value })}
+                                    multiline
+                                    minRows={3}
+                                    placeholder={isRejected ? "—" : "Nhập lý do ở bước Từ chối"}
+                                    fullWidth
+                                    InputProps={{ readOnly: isRejected }}
+                                    helperText={
+                                        isRejected
+                                            ? "Tin đã bị từ chối. Lý do hiển thị ở đây."
+                                            : "Lý do sẽ được yêu cầu khi xác nhận Từ chối."
                                     }
                                 />
                             </Grid>
 
-                            <Grid item xs={12} sm={6}>
-                                <Row
-                                    label="Trạng thái"
-                                    value={<Chip label={STATUS_LABEL[detail.status]} color={STATUS_CHIP_COLOR[detail.status]} size="small" />}
-                                />
-                            </Grid>
-
                             <Grid item xs={12}>
-                                <Row label="Địa chỉ" value={detail.displayAddress || "-"} />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <Row label="Mô tả" value={detail.description || "-"} />
-                            </Grid>
-                        </Grid>
-                    </CardContent>
-                </Card>
-
-                {/* Quyết định duyệt - UI nâng cấp */}
-                <Divider sx={{ my: 2 }}>Quyết định duyệt</Divider>
-
-                <Card
-                    variant="outlined"
-                    sx={{
-                        borderRadius: 2,
-                        borderColor: "#e3e9f1",
-                        bgcolor: "#fafbff",
-                        boxShadow: "inset 0 0 4px rgba(0,0,0,0.05)",
-                        p: 2.5,
-                    }}
-                >
-                    <Grid container spacing={2.5}>
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                size="small"
-                                label="Thời hạn gói (ngày)"
-                                value={`${decision.durationDays || detail?.policyDurationDays || "-"}`}
-                                InputProps={{ readOnly: true }}
-                                fullWidth
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                size="small"
-                                label="Loại tin"
-                                value={detail.listingType || "NORMAL"}
-                                InputProps={{ readOnly: true }}
-                                fullWidth
-                            />
-                        </Grid>
-
-                        <Grid item xs={12}>
-                            <TextField
-                                label={isRejected ? "Lý do từ chối" : "Lý do từ chối (nhập khi bấm Từ chối)"}
-                                value={rejectReasonValue}
-                                onChange={(e) => setDecision({ reason: e.target.value })}
-                                multiline
-                                minRows={3}
-                                placeholder={isRejected ? "—" : "Nhập lý do ở bước Từ chối"}
-                                fullWidth
-                                InputProps={{ readOnly: isRejected }}
-                                helperText={
-                                    isRejected
-                                        ? "Tin đã bị từ chối. Lý do hiển thị ở đây."
-                                        : "Lý do sẽ được yêu cầu khi xác nhận Từ chối."
-                                }
-                            />
-                        </Grid>
-
-                        <Grid item xs={12}>
-                            <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 1 }}>
-                                <Button
-                                    variant="contained"
-                                    startIcon={<CheckCircleOutlineIcon />}
-                                    disabled={busy || !isApprovable}
-                                    sx={{
-                                        px: 3,
-                                        fontWeight: 600,
-                                        borderRadius: 2,
-                                        textTransform: "none",
-                                        bgcolor: "#2563eb",
-                                        "&:hover": { bgcolor: "#1e40af" },
-                                    }}
-                                    onClick={() => {
-                                        onApprove(detail.id);
-                                        onClose();
-                                    }}
-                                >
-                                    Duyệt
-                                </Button>
-                                <Button
-                                    color="error"
-                                    variant="outlined"
-                                    startIcon={<HighlightOffOutlinedIcon />}
-                                    disabled={busy || !isRejectable}
-                                    sx={{
-                                        px: 3,
-                                        fontWeight: 600,
-                                        borderRadius: 2,
-                                        textTransform: "none",
-                                        borderColor: "#ef4444",
-                                        color: "#ef4444",
-                                        "&:hover": { bgcolor: "#fee2e2", borderColor: "#dc2626" },
-                                    }}
-                                    onClick={openRejectConfirm}
-                                >
-                                    Từ chối
-                                </Button>
-                            </Stack>
-                        </Grid>
-                    </Grid>
-                </Card>
-
-                {/* Lịch sử */}
-                <Divider sx={{ my: 2 }}>Lịch sử</Divider>
-                <Card sx={{ borderRadius: 2 }}>
-                    <CardContent sx={{ p: 2 }}>
-                        <Stack spacing={1.2}>
-                            {(detail.audit || []).map((i, idx) => {
-                                const { color, Icon, label } = getAuditMeta(i.type);
-                                return (
-                                    <Card
-                                        key={idx}
-                                        variant="outlined"
+                                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 1 }}>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<CheckCircleOutlineIcon />}
+                                        disabled={busy || !isApprovable}
                                         sx={{
-                                            borderRadius: 1.5,
-                                            borderColor: "#e6eaf2",
-                                            p: 1.2,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 1.2,
-                                            bgcolor: "#fafafa",
+                                            px: 3,
+                                            fontWeight: 600,
+                                            borderRadius: 2,
+                                            textTransform: "none",
+                                            bgcolor: "#2563eb",
+                                            "&:hover": { bgcolor: "#1e40af" },
+                                        }}
+                                        onClick={() => {
+                                            onApprove(detail.id);
+                                            onClose();
                                         }}
                                     >
-                                        <Icon sx={{ fontSize: 18, color }} />
-                                        <Box flex={1}>
-                                            <Typography variant="body2" sx={{ fontWeight: 700, color }}>
-                                                {label}
+                                        Duyệt
+                                    </Button>
+                                    <Button
+                                        color="error"
+                                        variant="outlined"
+                                        startIcon={<HighlightOffOutlinedIcon />}
+                                        disabled={busy || !isRejectable}
+                                        sx={{
+                                            px: 3,
+                                            fontWeight: 600,
+                                            borderRadius: 2,
+                                            textTransform: "none",
+                                            borderColor: "#ef4444",
+                                            color: "#ef4444",
+                                            "&:hover": { bgcolor: "#fee2e2", borderColor: "#dc2626" },
+                                        }}
+                                        onClick={openRejectConfirm}
+                                    >
+                                        Từ chối
+                                    </Button>
+                                </Stack>
+                            </Grid>
+                        </Grid>
+                    </Card>
+
+                    {/* Lịch sử */}
+                    <Divider sx={{ my: 2 }}>Lịch sử</Divider>
+                    <Card sx={{ borderRadius: 2 }}>
+                        <CardContent sx={{ p: 2 }}>
+                            <Stack spacing={1.2}>
+                                {(detail.audit || []).map((i, idx) => {
+                                    const { color, Icon, label } = getAuditMeta(i.type);
+                                    return (
+                                        <Card
+                                            key={idx}
+                                            variant="outlined"
+                                            sx={{
+                                                borderRadius: 1.5,
+                                                borderColor: "#e6eaf2",
+                                                p: 1.2,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1.2,
+                                                bgcolor: "#fafafa",
+                                            }}
+                                        >
+                                            <Icon sx={{ fontSize: 18, color }} />
+                                            <Box flex={1}>
+                                                <Typography variant="body2" sx={{ fontWeight: 700, color }}>
+                                                    {label}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                                                    {i.message || "Không có ghi chú"}
+                                                    {i.by ? <>&nbsp;•&nbsp;<em>{i.by}</em></> : null}
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                                                {fmtDate ? fmtDate(i.at) : i.at}
                                             </Typography>
-                                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                                {i.message || "Không có ghi chú"}
-                                                {i.by ? <>&nbsp;•&nbsp;<em>{i.by}</em></> : null}
-                                            </Typography>
-                                        </Box>
-                                        <Typography variant="caption" sx={{ color: "text.disabled" }}>
-                                            {fmtDate ? fmtDate(i.at) : i.at}
-                                        </Typography>
-                                    </Card>
-                                );
-                            })}
-                            {!(detail.audit || []).length && (
-                                <Typography color="text.secondary">Chưa có lịch sử</Typography>
-                            )}
-                        </Stack>
-                    </CardContent>
-                </Card>
+                                        </Card>
+                                    );
+                                })}
+                                {!(detail.audit || []).length && (
+                                    <Typography color="text.secondary">Chưa có lịch sử</Typography>
+                                )}
+                            </Stack>
+                        </CardContent>
+                    </Card>
+                </Box>
             </Box>
 
             {/* Modal xác nhận từ chối */}

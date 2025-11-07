@@ -2,20 +2,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import { Button, Modal, Slider, message, Select, Spin } from "antd";
-import { DownOutlined, UpOutlined } from "@ant-design/icons";
+import { Button, Modal, Slider, message, Select, Spin, Grid } from "antd";
+import { DownOutlined, UpOutlined, AimOutlined } from "@ant-design/icons";
 import PropertyCard from "./PropertyCard";
 import PropertyCardSkeleton from "./skeletion/PropertyCardSkeleton";
 import { fetchPropertiesThunk } from "@/store/propertySlice";
+import { locationApi } from "@/api/locationApi";
 
-// ====== API chọn Tỉnh/Thành phố (chỉnh path cho đúng) ======
-import { locationApi } from "@/api/locationApi";// File locationApi của bạn đã có:
-//   - getProvinces(signal) -> [{ id, name }]
-
-const MIN_SKELETON_MS = 2000; // giữ skeleton tối thiểu 2s
+const MIN_SKELETON_MS = 2000;
 const SS_NS = "fy_interest_state";
 
-// Chuẩn hoá item public → shape dùng bởi <PropertyCard />
 function normalizePublicItem(p = {}) {
   const imgs = Array.isArray(p.images)
     ? p.images
@@ -40,75 +36,58 @@ function normalizePublicItem(p = {}) {
     image: p.image,
     title: p.title,
     description: p.description,
-
     price: p.price,
     pricePerM2,
     postedAt: p.postedAt,
     photos: p.photos,
-
-    // address
     addressMain:
       p.addressMain || p.addressFull || p.addressShort || p.displayAddress || p.address || "",
     addressShort: p.addressShort || "",
     addressFull: p.addressFull || "",
-
-    // specs
     area: p.area,
     bed: p.bed ?? p.bedrooms,
     bath: p.bath ?? p.bathrooms,
-
     agent: p.agent,
     type: p.type,
     category: p.category,
-
-    // badge
-    listingType, // "PREMIUM" | "VIP" | "NORMAL"
+    listingType,
   };
 }
 
 export default function ForYouList() {
   const dispatch = useDispatch();
-  const { forYouList, forYouError, forYouSource, forYouLoading } = useSelector((s) => s.property);
+  const { forYouList, forYouError, forYouSource, forYouLoading } = useSelector(
+    (s) => s.property
+  );
   const authUser = useSelector((s) => s.auth.user);
   const userId = authUser?.id || authUser?.userId || null;
 
-  // ===== Derived keys =====
   const userKey = userId ? `${SS_NS}:${userId}` : null;
 
-  // ===== UI state =====
   const [expanded, setExpanded] = useState(false);
   const [minDelayDone, setMinDelayDone] = useState(false);
   const [showModal, setShowModal] = useState(false);
-
-  // chặn fetch lặp ForYou theo userId
   const [fetchedForUserId, setFetchedForUserId] = useState(null);
-
-  // giữ skeleton tối thiểu cho luồng ForYou
   const [forYouLocalLoading, setForYouLocalLoading] = useState(false);
 
-  // ====== LOCATION: chỉ Tỉnh/TP ======
   const [provinces, setProvinces] = useState([]);
   const [loadingProv, setLoadingProv] = useState(false);
   const [provinceId, setProvinceId] = useState(undefined);
   const [provinceName, setProvinceName] = useState("");
-
-  // Modal form (persisted)
   const [priceRange, setPriceRange] = useState([1_000_000_000, 5_000_000_000]);
   const [areaRange, setAreaRange] = useState([30, 120]);
-
-  // Kết quả theo sở thích (persisted)
   const [interestResults, setInterestResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchRequested, setSearchRequested] = useState(false);
 
-  // ====== Reset guard khi đổi user ======
+  const screens = Grid.useBreakpoint();
+  const modalWidth = 640; // cố định 640px
+
   useEffect(() => {
-    // đổi user → reset lần fetch
     setFetchedForUserId(null);
     setExpanded(false);
   }, [userId]);
 
-  // ====== Hydrate từ sessionStorage theo user ======
   useEffect(() => {
     if (!userKey) return;
     try {
@@ -118,19 +97,15 @@ export default function ForYouList() {
         if (Array.isArray(saved?.priceRange)) setPriceRange(saved.priceRange);
         if (Array.isArray(saved?.areaRange)) setAreaRange(saved.areaRange);
         if (Array.isArray(saved?.items)) setInterestResults(saved.items);
-
         if (saved?.provinceId) {
           setProvinceId(saved.provinceId);
           setProvinceName(saved.provinceName || "");
         }
         setSearchRequested(Boolean(saved?.keyword));
-      } else {
-        setInterestResults([]);
-      }
+      } else setInterestResults([]);
     } catch { }
   }, [userKey]);
 
-  // ====== (tuỳ chọn) Dọn namespace khi logout ======
   useEffect(() => {
     if (userId) return;
     try {
@@ -141,21 +116,15 @@ export default function ForYouList() {
     setInterestResults([]);
   }, [userId]);
 
-  // Min delay mượt skeleton (trường hợp chưa có gì để render)
   useEffect(() => {
     const t = setTimeout(() => setMinDelayDone(true), MIN_SKELETON_MS);
     return () => clearTimeout(t);
   }, []);
 
-  // Personalized có thật sự tồn tại?
   const hasPersonalized =
     forYouSource === "personalized" && Array.isArray(forYouList) && forYouList.length > 0;
-
-  // Danh sách để hiển thị
   const effectiveList = hasPersonalized ? forYouList : interestResults;
   const effectiveHasData = Array.isArray(effectiveList) && effectiveList.length > 0;
-
-  // Hiện skeleton khi: đang search, hoặc đang giữ min-delay cho ForYou, hoặc đang fetch ForYou đúng user, hoặc chưa có data & chưa qua min-delay
   const showSkeleton =
     searching ||
     forYouLocalLoading ||
@@ -167,7 +136,6 @@ export default function ForYouList() {
     [expanded, effectiveList]
   );
 
-  // ===== Auto-fetch For You: chỉ 1 lần / userId, và giữ skeleton tối thiểu =====
   useEffect(() => {
     if (!userId) return;
     if (fetchedForUserId === userId) return;
@@ -192,11 +160,11 @@ export default function ForYouList() {
     });
   }, [dispatch, userId, fetchedForUserId]);
 
-  // ===== Nạp provinces khi mở modal (lazy load) =====
   useEffect(() => {
     if (!showModal) return;
     let abort = new AbortController();
     if (provinces.length === 0) {
+      setLoadingProv(true);
       locationApi
         .getCities()
         .then((list) => setProvinces(list))
@@ -204,16 +172,15 @@ export default function ForYouList() {
         .finally(() => setLoadingProv(false));
     }
     return () => abort.abort();
-  }, [showModal]); // chỉ khi mở modal
+  }, [showModal, provinces.length]);
 
-  // ===== Search theo Tỉnh/TP — giữ skeleton tối thiểu & persist per user =====
   const handleSearch = async () => {
     if (!provinceName) {
       message.warning("Vui lòng chọn Tỉnh/Thành phố.");
       return;
     }
 
-    const keyword = provinceName; // chỉ dùng tên Tỉnh/TP làm keyword
+    const keyword = provinceName;
     setSearchRequested(true);
     setSearching(true);
     setShowModal(false);
@@ -231,7 +198,7 @@ export default function ForYouList() {
           priceTo: priceRange[1],
           areaFrom: areaRange[0],
           areaTo: areaRange[1],
-          cityId: provinceId, 
+          cityId: provinceId,
         })
       ).unwrap();
 
@@ -239,27 +206,24 @@ export default function ForYouList() {
         payload?.content ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
       const mapped = (items || []).map(normalizePublicItem);
 
-      // Persist theo user
-      try {
-        if (userKey) {
-          sessionStorage.setItem(
-            userKey,
-            JSON.stringify({
-              keyword,
-              priceRange,
-              areaRange,
-              items: mapped,
-              ts: Date.now(),
-              provinceId,
-              provinceName,
-            })
-          );
-        }
-      } catch { }
+      if (userKey) {
+        sessionStorage.setItem(
+          userKey,
+          JSON.stringify({
+            keyword,
+            priceRange,
+            areaRange,
+            items: mapped,
+            ts: Date.now(),
+            provinceId,
+            provinceName,
+          })
+        );
+      }
 
       setInterestResults(mapped);
       setExpanded(false);
-    } catch (err) {
+    } catch {
       message.error("Không thể tải dữ liệu theo lựa chọn của bạn.");
     } finally {
       const elapsed = performance.now() - start;
@@ -268,11 +232,12 @@ export default function ForYouList() {
     }
   };
 
-  // ===== Guards =====
   if (!userId) {
     return (
       <section className="mt-10 text-center text-gray-600">
-        <h2 className="text-2xl font-bold text-[#1b2a57] mb-2">Bất động sản dành cho tôi</h2>
+        <h2 className="text-2xl font-bold text-[#1b2a57] mb-2">
+          Bất động sản dành cho tôi
+        </h2>
         <p>Vui lòng đăng nhập để xem các gợi ý cá nhân hóa.</p>
       </section>
     );
@@ -280,7 +245,6 @@ export default function ForYouList() {
 
   return (
     <section className="mt-10">
-      {/* HEADER */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-[#1b2a57]">Bất động sản dành cho tôi</h2>
         {hasPersonalized && (
@@ -290,14 +254,6 @@ export default function ForYouList() {
         )}
       </div>
 
-      {/* Lỗi personalized */}
-      {forYouError && !hasPersonalized && (
-        <div className="text-red-500 text-center mb-4">
-          Lỗi khi tải gợi ý cá nhân hóa: {forYouError}
-        </div>
-      )}
-
-      {/* Empty state lần đầu (không hiển thị khi đang search) */}
       {!hasPersonalized && interestResults.length === 0 && !searching && !searchRequested && (
         <div className="text-center py-14 bg-[#f8fafc] rounded-2xl shadow-inner">
           <h3 className="text-xl font-semibold text-[#1b2a57] mb-2">Chào mừng bạn!</h3>
@@ -315,11 +271,40 @@ export default function ForYouList() {
         </div>
       )}
 
-      {/* Modal chọn sở thích */}
+      {/* ===== MODAL ===== */}
       <Modal
-        title="Cá nhân hóa gợi ý bất động sản"
+        title={
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#eaf1ff]">
+              <AimOutlined className="text-[#1f5fbf]" />
+            </span>
+            <div>
+              <div className="text-[17px] font-semibold text-[#1b2a57]">
+                Cá nhân hóa gợi ý bất động sản
+              </div>
+              <div className="text-[12px] text-gray-500 -mt-0.5">
+                Chọn khu vực, khoảng giá và diện tích để nhận gợi ý phù hợp
+              </div>
+            </div>
+          </div>
+        }
         open={showModal}
         onCancel={() => setShowModal(false)}
+        centered
+        width={modalWidth}
+        destroyOnClose
+        maskClosable={false}
+        bodyStyle={{
+          background: "#fff",
+          maxHeight: "75vh",
+          overflowY: "auto",
+          paddingBottom: 24,
+        }}
+        style={{
+          borderRadius: 18,
+          overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        }}
         footer={[
           <Button key="cancel" onClick={() => setShowModal(false)}>
             Hủy
@@ -329,16 +314,17 @@ export default function ForYouList() {
             type="primary"
             loading={searching}
             onClick={handleSearch}
-            style={{ background: "#1f5fbf" }}
+            style={{ background: "#1f5fbf", borderRadius: 8, fontWeight: 600 }}
           >
             Xem gợi ý
           </Button>,
         ]}
       >
-        <div className="space-y-5">
-          {/* TỈNH / THÀNH PHỐ */}
+        <div className="space-y-7">
           <div>
-            <label className="block font-medium mb-1">Tỉnh / Thành phố</label>
+            <label className="block text-sm font-medium text-[#1b2a57] mb-1.5">
+              Tỉnh / Thành phố
+            </label>
             <Select
               showSearch
               allowClear
@@ -348,6 +334,7 @@ export default function ForYouList() {
                 setProvinceId(val);
                 setProvinceName(option?.label ?? "");
               }}
+              size="large"
               style={{ width: "100%" }}
               options={provinces.map((p) => ({ value: p.id, label: p.name }))}
               loading={loadingProv}
@@ -358,43 +345,62 @@ export default function ForYouList() {
             />
           </div>
 
-          {/* GIÁ */}
-          <div>
-            <label className="block font-medium mb-1">Khoảng giá (VND)</label>
-            <Slider
-              range
-              min={500_000_000}
-              max={100_000_000_000} // 100 tỷ
-              step={500_000_000}
-              tooltip={{ formatter: (v) => `${(v / 1e9).toFixed(1)} tỷ` }}
-              value={priceRange}
-              onChange={(val) => setPriceRange(val)}
-            />
-            <div className="text-sm text-gray-500">
-              {(priceRange[0] / 1e9).toFixed(1)} tỷ - {(priceRange[1] / 1e9).toFixed(1)} tỷ
+          {/* === GIÁ === */}
+          <div className="p-5 rounded-xl border border-[#dde4ef] bg-[#f3f6fb]">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-[#1b2a57]">Khoảng giá (VND)</label>
+              <span className="text-xs text-gray-600 font-semibold">
+                {(priceRange[0] / 1e9).toFixed(1)} tỷ – {(priceRange[1] / 1e9).toFixed(1)} tỷ
+              </span>
+            </div>
+            <div className="mx-auto w-[100%]">
+              <Slider
+                range
+                min={500_000_000}
+                max={100_000_000_000}
+                step={500_000_000}
+                tooltip={{ formatter: (v) => `${(v / 1e9).toFixed(1)} tỷ` }}
+                value={priceRange}
+                onChange={(val) => setPriceRange(val)}
+                trackStyle={[{ backgroundColor: "#1f5fbf", height: 6 }]}
+                handleStyle={[
+                  { borderColor: "#1f5fbf", backgroundColor: "#1f5fbf" },
+                  { borderColor: "#1f5fbf", backgroundColor: "#1f5fbf" },
+                ]}
+                railStyle={{ backgroundColor: "#c3d3f0", height: 6 }}
+              />
             </div>
           </div>
 
-          {/* DIỆN TÍCH */}
-          <div>
-            <label className="block font-medium mb-1">Diện tích (m²)</label>
-            <Slider
-              range
-              min={10}
-              max={1000} // 1000 m²
-              step={5}
-              tooltip={{ formatter: (v) => `${v} m²` }}
-              value={areaRange}
-              onChange={(val) => setAreaRange(val)}
-            />
-            <div className="text-sm text-gray-500">
-              {areaRange[0]} m² - {areaRange[1]} m²
+          {/* === DIỆN TÍCH === */}
+          <div className="p-5 rounded-xl border border-[#dde4ef] bg-[#f3f6fb]">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-[#1b2a57]">Diện tích (m²)</label>
+              <span className="text-xs text-gray-600 font-semibold">
+                {areaRange[0]} m² – {areaRange[1]} m²
+              </span>
+            </div>
+            <div className="mx-auto w-[100%]">
+              <Slider
+                range
+                min={10}
+                max={1000}
+                step={5}
+                tooltip={{ formatter: (v) => `${v} m²` }}
+                value={areaRange}
+                onChange={(val) => setAreaRange(val)}
+                trackStyle={[{ backgroundColor: "#1f5fbf", height: 6 }]}
+                handleStyle={[
+                  { borderColor: "#1f5fbf", backgroundColor: "#1f5fbf" },
+                  { borderColor: "#1f5fbf", backgroundColor: "#1f5fbf" },
+                ]}
+                railStyle={{ backgroundColor: "#c3d3f0", height: 6 }}
+              />
             </div>
           </div>
         </div>
       </Modal>
 
-      {/* SKELETON */}
       {showSkeleton && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1 mt-6">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -403,10 +409,9 @@ export default function ForYouList() {
         </div>
       )}
 
-      {/* Kết quả */}
       {effectiveHasData && !showSkeleton && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4  gap-x-[18px] gap-y-[24px] px-1 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[18px] gap-y-[24px] px-1 mt-6">
             {visibleList.map((item) => (
               <Link key={item.id} to={`/real-estate/${item.id}`} className="block group">
                 <PropertyCard item={item} />

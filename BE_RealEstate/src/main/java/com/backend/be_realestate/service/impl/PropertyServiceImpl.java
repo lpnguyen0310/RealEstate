@@ -97,8 +97,8 @@ public class PropertyServiceImpl implements IPropertyService {
         boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
 
         // ✅ BẮT ĐẦU TẠO SPEC
-        Specification<PropertyEntity> spec = Specification.where(null);
-
+        Specification<PropertyEntity> spec = Specification
+                .where(PropertySpecification.isPublished());
         // ✅ Nếu có cityId thì ưu tiên city, bỏ keyword
         if (cityId != null) {
             spec = spec.and(PropertySpecification.hasCity(cityId));

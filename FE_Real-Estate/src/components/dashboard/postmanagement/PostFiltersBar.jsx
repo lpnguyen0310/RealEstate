@@ -5,10 +5,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import { DatePicker as AntDatePicker } from "antd";
 
-import {
-    AREA_OPTIONS,
-    PRICE_PRESETS,
-} from "@/data/PostManagementData/FilterData";
+import { AREA_OPTIONS, PRICE_PRESETS } from "@/data/PostManagementData/FilterData";
 
 /* ====== UI tokens ====== */
 const PILL_RADIUS = 50;
@@ -27,12 +24,8 @@ const TF_PILL = {
         padding: "12px 16px",
         lineHeight: "20px",
     },
-    "& .MuiInputLabel-outlined": {
-        transform: "translate(16px, 11px) scale(1)",
-    },
-    "& .MuiInputLabel-outlined.MuiInputLabel-shrink": {
-        transform: "translate(14px, -6px) scale(0.75)",
-    },
+    "& .MuiInputLabel-outlined": { transform: "translate(16px, 11px) scale(1)" },
+    "& .MuiInputLabel-outlined.MuiInputLabel-shrink": { transform: "translate(14px, -6px) scale(0.75)" },
     "& .MuiInputLabel-root": { color: "#94a3b8" },
     "& .MuiSelect-icon": { right: 12 },
 };
@@ -66,7 +59,7 @@ const fmtVN = (v) =>
 
 export default function PostFilters({ onSearch, onCreate }) {
     // ====== states ======
-    const [keyword, setKeyword] = useState("");      // q
+    const [keyword, setKeyword] = useState(""); // q
     const [area, setArea] = useState("");
     const [expireDate, setExpireDate] = useState(null); // dayjs | null
 
@@ -97,7 +90,7 @@ export default function PostFilters({ onSearch, onCreate }) {
     // ====== actions ======
     const submit = () => {
         onSearch?.({
-            q: keyword?.trim() || undefined,                 // từ khóa
+            q: keyword?.trim() || undefined,
             area: area || undefined,
             areaMin: areaMin === "" ? undefined : Number(areaMin),
             areaMax: areaMax === "" ? undefined : Number(areaMax),
@@ -116,6 +109,8 @@ export default function PostFilters({ onSearch, onCreate }) {
         setPriceMax("");
         setPriceLabel("Khoảng giá");
         setExpireDate(null);
+        setOpenArea(false);
+        setOpenPrice(false);
         onSearch?.({});
     };
 
@@ -143,12 +138,10 @@ export default function PostFilters({ onSearch, onCreate }) {
                 />
             </div>
             <div className="mt-3 flex justify-end gap-2">
-                <MUIButton size="small" variant="text" sx={{ textTransform: "none", minHeight: 32 }}
-                    onClick={() => { setAreaMin(""); setAreaMax(""); }}>
+                <MUIButton size="small" variant="text" sx={{ textTransform: "none", minHeight: 32 }} onClick={() => { setAreaMin(""); setAreaMax(""); }}>
                     Xoá
                 </MUIButton>
-                <MUIButton size="small" variant="contained" sx={{ ...BTN_PRIMARY_SX, height: 32 }}
-                    onClick={() => setOpenArea(false)}>
+                <MUIButton size="small" variant="contained" sx={{ ...BTN_PRIMARY_SX, height: 32 }} onClick={() => setOpenArea(false)}>
                     OK
                 </MUIButton>
             </div>
@@ -156,7 +149,7 @@ export default function PostFilters({ onSearch, onCreate }) {
     );
 
     const priceContent = (
-        <div className="w:[340px] md:w-[340px] w-[300px] p-1">
+        <div className="w-[300px] md:w-[340px] p-1">
             <div className="mb-2 text-sm text-gray-500">Khoảng giá (VNĐ)</div>
             <div className="flex items-center gap-2">
                 <TextField
@@ -164,7 +157,10 @@ export default function PostFilters({ onSearch, onCreate }) {
                     type="number"
                     size="small"
                     value={priceMin}
-                    onChange={(e) => { setPriceMin(e.target.value); setPriceLabel("Khoảng giá"); }}
+                    onChange={(e) => {
+                        setPriceMin(e.target.value);
+                        setPriceLabel("Khoảng giá");
+                    }}
                     sx={{ width: "100%", "& .MuiInputBase-root": { height: 36, borderRadius: 10 } }}
                 />
                 <span className="text-gray-400">—</span>
@@ -173,7 +169,10 @@ export default function PostFilters({ onSearch, onCreate }) {
                     type="number"
                     size="small"
                     value={priceMax}
-                    onChange={(e) => { setPriceMax(e.target.value); setPriceLabel("Khoảng giá"); }}
+                    onChange={(e) => {
+                        setPriceMax(e.target.value);
+                        setPriceLabel("Khoảng giá");
+                    }}
                     sx={{ width: "100%", "& .MuiInputBase-root": { height: 36, borderRadius: 10 } }}
                 />
             </div>
@@ -201,16 +200,15 @@ export default function PostFilters({ onSearch, onCreate }) {
                     size="small"
                     variant="text"
                     sx={{ textTransform: "none", minHeight: 32 }}
-                    onClick={() => { setPriceMin(""); setPriceMax(""); setPriceLabel("Khoảng giá"); }}
+                    onClick={() => {
+                        setPriceMin("");
+                        setPriceMax("");
+                        setPriceLabel("Khoảng giá");
+                    }}
                 >
                     Xoá
                 </MUIButton>
-                <MUIButton
-                    size="small"
-                    variant="contained"
-                    sx={{ ...BTN_PRIMARY_SX, height: 32 }}
-                    onClick={() => setOpenPrice(false)}
-                >
+                <MUIButton size="small" variant="contained" sx={{ ...BTN_PRIMARY_SX, height: 32 }} onClick={() => setOpenPrice(false)}>
                     OK
                 </MUIButton>
             </div>
@@ -218,7 +216,7 @@ export default function PostFilters({ onSearch, onCreate }) {
     );
 
     return (
-        <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 md:p-5">
+        <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 md:p-5">
             <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap">
                 {/* Từ khóa */}
                 <div className="basis-[260px] xl:basis-[240px] grow">
@@ -227,6 +225,7 @@ export default function PostFilters({ onSearch, onCreate }) {
                         variant="outlined"
                         value={keyword}
                         onChange={(e) => setKeyword(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
                         fullWidth
                         sx={TF_PILL}
                     />
@@ -309,13 +308,11 @@ export default function PostFilters({ onSearch, onCreate }) {
                         format="DD/MM/YYYY"
                         placeholder="Ngày hết hạn"
                         allowClear
-                        className={`w-full
-              !h-11 !rounded-full !border !border-gray-200 !px-4
+                        className={`w-full !h-11 !rounded-full !border !border-gray-200 !px-4
               [&_.ant-picker-input>input]:!h-11
               [&_.ant-picker-input>input]:!leading-[44px]
               [&_.ant-picker-input>input::placeholder]:!text-gray-400
-              [&_.ant-picker-suffix]:!text-gray-400
-            `}
+              [&_.ant-picker-suffix]:!text-gray-400`}
                     />
                 </div>
 
@@ -325,21 +322,11 @@ export default function PostFilters({ onSearch, onCreate }) {
                         Xoá lọc
                     </MUIButton>
 
-                    <MUIButton
-                        variant="contained"
-                        startIcon={<SearchIcon />}
-                        sx={BTN_PRIMARY_SX}
-                        onClick={submit}
-                    >
+                    <MUIButton variant="contained" startIcon={<SearchIcon />} sx={BTN_PRIMARY_SX} onClick={submit}>
                         Tìm Kiếm
                     </MUIButton>
 
-                    <MUIButton
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        sx={BTN_PRIMARY_SX}
-                        onClick={onCreate}
-                    >
+                    <MUIButton variant="contained" startIcon={<AddIcon />} sx={BTN_PRIMARY_SX} onClick={onCreate}>
                         Tạo Mới
                     </MUIButton>
                 </div>
