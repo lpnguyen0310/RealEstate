@@ -158,7 +158,7 @@ export default function AdminPostsMUI() {
             dispatch(fetchCountsThunk());
         }, 250);
         return () => clearTimeout(t);
-    }, [dispatch, q, category, listingType]);
+    }, [dispatch]);
 
     /* =============== REALTIME WS =============== */
     useEffect(() => {

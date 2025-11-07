@@ -12,5 +12,6 @@ public class OrderDTO {
     private Long discount;     // VND
     private Long total;        // VND
     private List<OrderItemDTO> items;
+    private String type;
     private String createdAt;
 }

@@ -45,6 +45,8 @@ export default function OrderTable({
             <TableHead sx={{ backgroundColor: "#f3f7ff" }}>
               <TableRow>
                 <TableCell sx={styles.headCell}>Mã đơn hàng</TableCell>
+                {/* ===== 1. THÊM HEADER MỚI ===== */}
+                <TableCell sx={styles.headCell}>Nội dung đơn hàng</TableCell>
                 <TableCell sx={styles.headCell}>Trạng thái</TableCell>
                 <TableCell sx={styles.headCell}>Ngày tạo</TableCell>
                 <TableCell sx={styles.headCell}>Số tiền</TableCell>
@@ -56,7 +58,8 @@ export default function OrderTable({
               {data.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    /* ===== 2. SỬA COLSPAN ===== */
+                    colSpan={6}
                     align="center"
                     sx={{
                       py: 6,
@@ -68,9 +71,9 @@ export default function OrderTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                data.map((row) => ( // ✨ ĐÃ SỬA LẠI TÊN FIELD TRONG ĐÂY
+                data.map((row) => (
                   <TableRow
-                    key={row.orderId} // Sửa từ `row.code`
+                    key={row.orderId}
                     hover
                     sx={{
                       "& td": { transition: "background-color 140ms ease" },
@@ -80,11 +83,25 @@ export default function OrderTable({
                     onClick={() => onRowClick?.(row)}
                   >
                     <TableCell sx={styles.bodyCell}>{row.orderId}</TableCell>
+
+                    {/* ===== 3. THÊM CELL MỚI ===== */}
+                    <TableCell sx={styles.bodyCell}>
+                    {
+                      row.type === 'TOP_UP' 
+                        // 1. Nếu type là TOP_UP, hiển thị "Nạp tiền"
+                        ? <span >Nạp tiền tài khoản</span>
+                        // 2. Ngược lại (là PACKAGE_PURCHASE), dùng logic cũ
+                        : (!row.items || row.items.length === 0)
+                          ? <span style={{ color: "#9e9e9e" }}>---</span>
+                          : row.items.map(item => `${item.title} (x${item.qty})`).join(', ')
+                    }
+                  </TableCell>
+
                     <TableCell sx={styles.bodyCell}>
                       <span
                         style={{
                           color:
-                            row.status === "PENDING_PAYMENT" // Sửa lại logic màu
+                            row.status === "PENDING_PAYMENT"
                               ? "#f28c38"
                               : row.status === "PAID"
                                 ? "#1aa260"
@@ -92,15 +109,11 @@ export default function OrderTable({
                           fontWeight: 600,
                         }}
                       >
-                        {/* Sửa lại logic dịch status */}
                         {row.status === 'PAID' ? 'Thành công' : row.status === 'PENDING_PAYMENT' ? 'Đang xử lý' : 'Đã hủy'}
                       </span>
                     </TableCell>
-                    {/* Thêm format ngày tháng */}
                     <TableCell sx={styles.bodyCell}>{dayjs(row.createdAt).format('DD/MM/YYYY HH:mm')}</TableCell>
-                    {/* Sửa từ `row.amount` thành `row.total` và format */}
                     <TableCell sx={styles.bodyCell}>{row.total.toLocaleString('vi-VN')} VND</TableCell>
-                     {/* Sửa từ `row.createdBy` thành `row.userName` */}
                     <TableCell sx={styles.bodyCell}>{row.userName}</TableCell>
                   </TableRow>
                 ))
@@ -124,7 +137,14 @@ export default function OrderTable({
               size="small"
               value={pageSize}
               onChange={(e) => onPageSizeChange?.(e.target.value)}
-              sx={{ /* ... styles của bạn ... */ }}
+              sx={{
+                height: 40,
+                minWidth: 96,
+                borderRadius: "12px",
+                "& .MuiOutlinedInput-notchedOutline": { borderColor: "#d7deec" },
+                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff" },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff", borderWidth: 1.4 },
+              }}
             >
               {[10, 20, 50].map((v) => (
                 <MenuItem key={v} value={v}>
@@ -148,7 +168,31 @@ export default function OrderTable({
                   previous: () => <span style={{ padding: "0 10px" }}>Trước</span>,
                   next: () => <span style={{ padding: "0 10px" }}>Tiếp Theo</span>,
                 }}
-                sx={{ /* ... styles của bạn ... */ }}
+                sx={{
+                  outline: "none",
+                  "&:focus": { outline: "none" },
+                  "&.Mui-focusVisible": { outline: "none", boxShadow: "none" },
+                  height: 40,
+                  minWidth: 40,
+                  px: 1.5,
+                  borderRadius: "12px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  "&.MuiPaginationItem-root": { border: "1px solid #e5e7eb" },
+                  "&.Mui-selected": {
+                    bgcolor: "#415a8c",
+                    color: "#fff",
+                    borderColor: "transparent",
+                    "&:hover": { bgcolor: "#415a8c" },
+                  },
+                  "&.MuiPaginationItem-previousNext": {
+                    bgcolor: "#e9eaee",
+                    color: "#6b7280",
+                    border: "none",
+                    "&:hover": { bgcolor: "#dfe2e8" },
+                    "&.Mui-disabled": { opacity: 0.6 },
+                  },
+                }}
               />
             )}
             sx={{
