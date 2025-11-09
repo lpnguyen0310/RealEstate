@@ -1,53 +1,124 @@
-import { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
+import { Box, Stack, Typography, ButtonBase } from "@mui/material";
+import "@fontsource-variable/inter";
+
+const FONT_STACK =
+    `"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif`;
 
 export default function PostStatusTabs({
     activeKey = "active",
     onChange = () => { },
     counts = {},
-    withCard = true,
-    className = "",
 }) {
     const TABS = useMemo(
         () => [
-            { key: "active", label: "Đang Đăng", badgeColor: "bg-emerald-100 text-emerald-700", activeBg: "bg-[#13284b] text-white" },
-            { key: "pending", label: "Chờ Duyệt", badgeColor: "bg-amber-100  text-amber-700", activeBg: "bg-[#13284b] text-white" },
-            { key: "draft", label: "Nháp", badgeColor: "bg-indigo-100 text-indigo-700", activeBg: "bg-[#13284b] text-white" },
-            { key: "rejected", label: "Bị Từ Chối", badgeColor: "bg-rose-100   text-rose-700", activeBg: "bg-[#13284b] text-white" },
-            { key: "expired", label: "Hết Hạn", badgeColor: "bg-gray-300   text-gray-700", activeBg: "bg-[#13284b] text-white" },
-            { key: "expiringSoon", label: "Sắp Hết Hạn", badgeColor: "bg-orange-100 text-orange-700", activeBg: "bg-[#13284b] text-white" },
-            { key: "hidden", label: "Đã Ẩn", badgeColor: "bg-gray-200   text-gray-700", activeBg: "bg-[#13284b] text-white" },
-            { key: "warned", label: "Bị Cảnh Cáo", badgeColor: "bg-yellow-100 text-yellow-700", activeBg: "bg-[#13284b] text-white" },
+            { key: "active", label: "Đang Đăng", badgeBg: "#d1fae5" },
+            { key: "pending", label: "Chờ Duyệt", badgeBg: "#fde68a" },
+            { key: "draft", label: "Nháp", badgeBg: "#e0e7ff" },
+            { key: "rejected", label: "Bị Từ Chối", badgeBg: "#fecdd3" },
+            { key: "expired", label: "Hết Hạn", badgeBg: "#cbd5e1" },
+            { key: "expiringSoon", label: "Sắp hết hạn", badgeBg: "#fed7aa" },
+            { key: "hidden", label: "Đã Ẩn", badgeBg: "#e5e7eb" },
+            { key: "warned", label: "Bị Cảnh Cáo", badgeBg: "#fef08a" },
         ],
         []
     );
 
+    const handleSelect = useCallback(
+        (key) => (e) => {
+            e.preventDefault();
+            onChange?.(key);
+        },
+        [onChange]
+    );
+
     return (
-        <div className={`w-full ${className}`}>
-            <div className="flex gap-3 overflow-x-auto no-scrollbar py-2">
+        <Box
+            role="tablist"
+            aria-label="Trạng thái bài đăng"
+            sx={{
+                fontFamily: FONT_STACK,
+                width: "100%",
+                maxWidth: "100%",
+                minWidth: 0,
+                overflowX: "auto",                   // luôn cho cuộn ngang khi tràn
+                overflowY: "hidden",
+                pb: { xs: 0.5, sm: 0 },
+                scrollSnapType: { xs: "x mandatory", sm: "none" }, // snap chỉ mobile
+                WebkitOverflowScrolling: "touch",
+                "&::-webkit-scrollbar": { height: 0 },
+                scrollbarWidth: "none",
+            }}
+        >
+            <Stack
+                direction="row"
+                spacing={1.5}
+                sx={{
+                    display: "inline-flex",
+                    minWidth: "max-content",           // tạo nhu cầu cuộn theo nội dung
+                }}
+            >
                 {TABS.map((t) => {
-                    const isActive = activeKey === t.key;
-                    const count = counts?.[t.key] ?? 0;
+                    const active = activeKey === t.key;
+                    const raw = counts?.[t.key] ?? 0;
+                    const display = raw > 99 ? "99+" : raw;
 
                     return (
-                        <button
+                        <ButtonBase
                             key={t.key}
+                            onClick={handleSelect(t.key)}
+                            component="button"
                             type="button"
-                            onClick={() => onChange(t.key)}
-                            className={[
-                                "group inline-flex items-center gap-2 rounded-xl px-4 py-2 transition font-semibold",
-                                "focus:outline-none focus:ring-2 focus:ring-[#1d4b8f]/30",
-                                isActive ? "bg-[#13284b] !text-white border border-transparent"
-                                    : "bg-white text-[#13284b] border border-black/20 hover:bg-slate-50",
-                            ].join(" ")}
+                            role="tab"
+                            aria-selected={active}
+                            sx={{
+                                flex: "0 0 auto",
+                                scrollSnapAlign: { xs: "start", sm: "none" },
+                                userSelect: "none",
+                                cursor: "pointer",
+                                px: 2,
+                                py: 0.875,
+                                borderRadius: "16px",
+                                border: "1px solid #e5e7eb",
+                                bgcolor: active ? "#0f2350" : "#fff",
+                                color: active ? "#fff" : "#111827",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 1,
+                                boxShadow: active ? "0 2px 6px rgba(15,35,80,.25)" : "none",
+                                outline: "none",
+                                height: 36,
+                                whiteSpace: "nowrap",
+                                "&:focus-visible": {
+                                    boxShadow:
+                                        "0 0 0 3px rgba(15, 35, 80, 0.35), 0 2px 6px rgba(15,35,80,.25)",
+                                },
+                            }}
                         >
-                            <span className="font-semibold whitespace-nowrap">{t.label}</span>
-                            <span className={["text-xs font-bold rounded-md px-2 py-0.5", isActive ? "bg-white/90 text-[#13284b]" : t.badgeColor].join(" ")}>
-                                {count}
-                            </span>
-                        </button>
+                            <Typography sx={{ fontFamily: "inherit" }} fontWeight={700} fontSize={13.5}>
+                                {t.label}
+                            </Typography>
+                            <Box
+                                sx={{
+                                    fontFamily: "inherit",
+                                    ml: 0.25,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    px: 1,
+                                    lineHeight: "18px",
+                                    height: 18,
+                                    borderRadius: "8px",
+                                    color: "#0f2350",
+                                    bgcolor: active ? "#e6edf9" : t.badgeBg || "#eef2f7",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {display}
+                            </Box>
+                        </ButtonBase>
                     );
                 })}
-            </div>
-        </div>
+            </Stack>
+        </Box>
     );
 }

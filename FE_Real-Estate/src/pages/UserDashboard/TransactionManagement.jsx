@@ -44,31 +44,43 @@ export default function TransactionsManagement() {
   };
 
   return (
-    <Stack spacing={2.5}>
-      <TxTabs
-        active={tabKey}
-        counts={counts}
-        onChange={(k) => { setTabKey(k); setPage(1); }}
-      />
+    <section className="w-full min-w-0">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4">
+        {/* Tabs: kéo ngang trên mobile nhờ overflow-x trong component */}
+        <TxTabs
+          active={tabKey}
+          counts={counts}
+          onChange={(k) => {
+            setTabKey(k);
+            setPage(1);
+          }}
+        />
 
-      {loading && <div>Đang tải giao dịch…</div>}
-      {error && <div className="text-red-600">Lỗi: {error}</div>}
+        <Stack spacing={2}>
+          {loading && <div>Đang tải giao dịch…</div>}
+          {error && <div className="text-red-600">Lỗi: {error}</div>}
 
-      <TransactionTable
-        data={pageData}
-        page={page}
-        pageSize={pageSize}
-        totalItems={total}
-        onPageChange={setPage}
-        onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-        onRowClick={handleRowClick}
-      />
+          {/* Bảng kéo ngang trên mobile (đã xử lý trong TransactionTable) */}
+          <TransactionTable
+            data={pageData}
+            page={page}
+            pageSize={pageSize}
+            totalItems={total}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setPage(1);
+            }}
+            onRowClick={handleRowClick}
+          />
+        </Stack>
+      </div>
 
       <TransactionDetailModal
         open={open}
         onClose={() => setOpen(false)}
         tx={selectedTx}
       />
-    </Stack>
+    </section>
   );
 }

@@ -177,10 +177,10 @@ export default function AccountManagement() {
 
     return (
         <section className="w-full">
-            {/* Thêm md:items-start để 2 cột luôn căn đỉnh */}
-            <div className="md:flex md:items-start md:gap-6 lg:gap-7">
-                {/* LEFT – sticky theo cột trái */}
-                <div className="md:w-[360px] md:shrink-0 md:pt-2 md:self-start md:sticky md:top-4">
+            {/* Grid 1 cột trên mobile, 2 cột từ lg */}
+            <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:gap-7 lg:grid-cols-[360px_minmax(0,1fr)]">
+                {/* LEFT – sticky chỉ khi >= lg */}
+                <div className="lg:sticky lg:top-4 lg:self-start">
                     <AccountSummaryCard
                         username={summary.username}
                         points={summary.points}
@@ -192,8 +192,8 @@ export default function AccountManagement() {
                     />
                 </div>
 
-                {/* RIGHT */}
-                <div className="md:flex-1 min-w-0">
+                {/* RIGHT – rất quan trọng: min-w-0 để AntD Tabs không đẩy tràn ngang */}
+                <div className="min-w-0">
                     {panel.view === "manage" ? (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
                             <div className="px-4 pt-4 pb-2 border-b border-gray-100">
@@ -201,13 +201,15 @@ export default function AccountManagement() {
                                 <Text type="secondary">Cập nhật thông tin, cài đặt tài khoản và nâng cấp PRO</Text>
                             </div>
 
-                            {/* Tắt scroll anchoring NGAY TẠI ĐÂY */}
-                            <div className="p-3 md:p-4" style={{ overflowAnchor: "none" }}>
+                            {/* Tắt scroll anchoring và đảm bảo không tràn ngang */}
+                            <div className="p-3 md:p-4 overflow-x-hidden" style={{ overflowAnchor: "none" }}>
                                 <Tabs
                                     destroyInactiveTabPane
                                     activeKey={activeTab}
                                     onChange={setActiveTab}
-                                    className="tabs-elevated"
+                                    className="tabs-elevated max-w-full"
+                                    tabBarGutter={8}
+                                    tabBarStyle={{ margin: 0 }}
                                     items={[
                                         {
                                             key: "edit",
@@ -243,7 +245,7 @@ export default function AccountManagement() {
                                     ]}
                                 />
 
-                                {/* Footer lưu thay đổi – sticky trong card, cũng tắt anchoring ở đây */}
+                                {/* Footer lưu thay đổi – bọc để không gây tràn */}
                                 {activeTab === "edit" && (
                                     <div className="sticky bottom-0 z-30" style={{ overflowAnchor: "none" }}>
                                         <div className="-mx-3 md:-mx-4 px-3 md:px-4 pb-3">
@@ -302,7 +304,7 @@ export default function AccountManagement() {
                 </div>
             </div>
 
-            {/* Notifications */}
+            {/* Snackbar & Dialog giữ nguyên */}
             <Snackbar
                 open={alert.open}
                 autoHideDuration={6000}
@@ -314,7 +316,6 @@ export default function AccountManagement() {
                 </MuiAlert>
             </Snackbar>
 
-            {/* Success dialog */}
             <Dialog open={openSuccessDialog} onClose={closeSuccessDialog} aria-labelledby="update-success-title">
                 <DialogTitle id="update-success-title">Cập nhật thành công</DialogTitle>
                 <DialogContent>Thông tin tài khoản của bạn đã được lưu.</DialogContent>
@@ -323,5 +324,6 @@ export default function AccountManagement() {
                 </DialogActions>
             </Dialog>
         </section>
+
     );
 }

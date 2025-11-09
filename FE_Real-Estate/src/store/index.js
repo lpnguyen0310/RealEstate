@@ -16,6 +16,7 @@ import supportReducer from "./supportSlice"; // 👈 thêm
 import { notificationApi } from "@/services/notificationApi";
 import {reportApi} from "@/services/reportApiSlice";
 import { listenerMiddleware } from "./listenerMiddleware";
+import { adminListingPackageApiSlice } from "@/services/adminListingPackageApiSlice";
 
 export const store = configureStore({
   reducer: {
@@ -35,12 +36,14 @@ export const store = configureStore({
     // 1. THÊM DÒNG NÀY (Reducer):
     // Để Redux biết cách lưu trữ data của notificationApi (cache, loading, error)
     [notificationApi.reducerPath]: notificationApi.reducer,
-    [reportApi.reducerPath]: reportApi.reducer
+    [reportApi.reducerPath]: reportApi.reducer,
+    [adminListingPackageApiSlice.reducerPath]: adminListingPackageApiSlice.reducer,
   },
 
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
       .concat(notificationApi.middleware)
       .concat(reportApi.middleware)
+      .concat(adminListingPackageApiSlice.middleware)
       .prepend(listenerMiddleware.middleware),
 });

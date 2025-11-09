@@ -3,5 +3,8 @@
   --primary-color: #00b14f;
   --header-button-dark: #161f29;
 }
+/* global.css */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 

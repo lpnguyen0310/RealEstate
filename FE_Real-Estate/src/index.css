@@ -18,3 +18,7 @@
   border-radius: 12px;
   /* khớp UI, có thể bỏ */
 }
+
+/* global.css */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

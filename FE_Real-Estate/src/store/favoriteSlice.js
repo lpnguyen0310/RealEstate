@@ -32,13 +32,13 @@ function timeAgo(ts) {
 /* ============ Thunks ============ */
 // Lấy danh sách id đã lưu từ server → hợp nhất với local
 export const hydrateFavorites = createAsyncThunk(
-    "favorite/hydrate",
-    async (_, { getState, rejectWithValue }) => { // Thêm getState
-        try {
+"favorite/hydrate",
+async (_, { getState, rejectWithValue }) => { // Thêm getState
+try {
             // Lấy IDs từ local (đã tải khi khởi tạo slice)
             const localIds = selectIds(getState()); 
             
-            const serverIds = await favoriteApi.getIds(); // [1, 2, 3]
+const serverIds = await favoriteApi.getIds(); // [1, 2, 3]
             
             // Hợp nhất IDs từ server và local
             const mergedIds = Array.from(new Set([...localIds, ...(serverIds || [])]));
@@ -50,14 +50,14 @@ export const hydrateFavorites = createAsyncThunk(
             
             const details = await favoriteApi.getDetails(mergedIds); // Trả về [{id, title, ...}]
 
-            return { details }; // Trả về chi tiết thay vì chỉ IDs
+return { details }; // Trả về chi tiết thay vì chỉ IDs
 
-        } catch (e) {
-            // Nếu lỗi (chưa đăng nhập/mất mạng), trả về null details để không ảnh hưởng list local
+} catch (e) {
+// Nếu lỗi (chưa đăng nhập/mất mạng), trả về null details để không ảnh hưởng list local
             console.error("Hydration failed (network error or not logged in):", e);
-            return { details: null }; 
-        }
-    }
+return { details: null }; 
+}
+}
 );
 
 // Toggle có gọi API (optimistic + rollback)
@@ -142,21 +142,21 @@ const favoriteSlice = createSlice({
         },
     },
     extraReducers: (b) => {
-        b.addCase(hydrateFavorites.fulfilled, (state, { payload }) => {
-            const details = payload?.details;
-            if (Array.isArray(details)) {
-                const existingMap = new Map(state.list.map(x => [x.id, x]));
-                const mergedList = details.map(d => ({
+b.addCase(hydrateFavorites.fulfilled, (state, { payload }) => {
+const details = payload?.details;
+if (Array.isArray(details)) {
+const existingMap = new Map(state.list.map(x => [x.id, x]));
+const mergedList = details.map(d => ({
                     ...d,
                     thumb: (d.imageUrls && d.imageUrls.length > 0) ? d.imageUrls[0] : (existingMap.get(d.id)?.thumb ?? ""),
                     href: `/real-estate/${d.id}`, 
-                    savedAt: existingMap.get(d.id)?.savedAt ?? Date.now(),
+savedAt: existingMap.get(d.id)?.savedAt ?? Date.now(),
                 }));
-                state.list = mergedList.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
-                state.ids = state.list.map(x => x.id);
-                saveLS(state.list);
-            }
-        });
+state.list = mergedList.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+state.ids = state.list.map(x => x.id);
+saveLS(state.list);
+}
+});
     }
 });
 

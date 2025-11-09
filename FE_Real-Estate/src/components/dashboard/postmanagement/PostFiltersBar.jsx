@@ -1,8 +1,16 @@
 import { useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { TextField, MenuItem, Button as MUIButton, Popover } from "@mui/material";
+import {
+    TextField,
+    MenuItem,
+    Button as MUIButton,
+    Popover,
+    Drawer,
+    useMediaQuery,
+} from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
+import FilterListIcon from "@mui/icons-material/FilterList";
 import { DatePicker as AntDatePicker } from "antd";
 
 import { AREA_OPTIONS, PRICE_PRESETS } from "@/data/PostManagementData/FilterData";
@@ -24,8 +32,12 @@ const TF_PILL = {
         padding: "12px 16px",
         lineHeight: "20px",
     },
-    "& .MuiInputLabel-outlined": { transform: "translate(16px, 11px) scale(1)" },
-    "& .MuiInputLabel-outlined.MuiInputLabel-shrink": { transform: "translate(14px, -6px) scale(0.75)" },
+    "& .MuiInputLabel-outlined": {
+        transform: "translate(16px, 11px) scale(1)",
+    },
+    "& .MuiInputLabel-outlined.MuiInputLabel-shrink": {
+        transform: "translate(14px, -6px) scale(0.75)",
+    },
     "& .MuiInputLabel-root": { color: "#94a3b8" },
     "& .MuiSelect-icon": { right: 12 },
 };
@@ -58,6 +70,8 @@ const fmtVN = (v) =>
         : `${Math.round(v / 1_000_000)} triệu`;
 
 export default function PostFilters({ onSearch, onCreate }) {
+    const isMobile = useMediaQuery("(max-width: 768px)");
+
     // ====== states ======
     const [keyword, setKeyword] = useState(""); // q
     const [area, setArea] = useState("");
@@ -70,11 +84,14 @@ export default function PostFilters({ onSearch, onCreate }) {
     const [priceMax, setPriceMax] = useState("");
     const [priceLabel, setPriceLabel] = useState("Khoảng giá");
 
-    // popovers
+    // popovers (desktop)
     const [openArea, setOpenArea] = useState(false);
     const [openPrice, setOpenPrice] = useState(false);
     const areaAnchorRef = useRef(null);
     const priceAnchorRef = useRef(null);
+
+    // mobile sheet
+    const [sheetOpen, setSheetOpen] = useState(false);
 
     const prettyPrice = useMemo(() => {
         if (priceLabel !== "Khoảng giá") return priceLabel;
@@ -98,6 +115,7 @@ export default function PostFilters({ onSearch, onCreate }) {
             priceMax: priceMax === "" ? undefined : Number(priceMax),
             expireDate: expireDate ? dayjs(expireDate).format("YYYY-MM-DD") : undefined,
         });
+        if (isMobile) setSheetOpen(false);
     };
 
     const reset = () => {
@@ -109,12 +127,10 @@ export default function PostFilters({ onSearch, onCreate }) {
         setPriceMax("");
         setPriceLabel("Khoảng giá");
         setExpireDate(null);
-        setOpenArea(false);
-        setOpenPrice(false);
         onSearch?.({});
     };
 
-    // ====== popover contents ======
+    // ====== popover contents (desktop) ======
     const areaContent = (
         <div className="w-[280px] p-1">
             <div className="mb-2 text-sm text-gray-500">Diện tích (m²)</div>
@@ -138,10 +154,23 @@ export default function PostFilters({ onSearch, onCreate }) {
                 />
             </div>
             <div className="mt-3 flex justify-end gap-2">
-                <MUIButton size="small" variant="text" sx={{ textTransform: "none", minHeight: 32 }} onClick={() => { setAreaMin(""); setAreaMax(""); }}>
+                <MUIButton
+                    size="small"
+                    variant="text"
+                    sx={{ textTransform: "none", minHeight: 32 }}
+                    onClick={() => {
+                        setAreaMin("");
+                        setAreaMax("");
+                    }}
+                >
                     Xoá
                 </MUIButton>
-                <MUIButton size="small" variant="contained" sx={{ ...BTN_PRIMARY_SX, height: 32 }} onClick={() => setOpenArea(false)}>
+                <MUIButton
+                    size="small"
+                    variant="contained"
+                    sx={{ ...BTN_PRIMARY_SX, height: 32 }}
+                    onClick={() => setOpenArea(false)}
+                >
                     OK
                 </MUIButton>
             </div>
@@ -149,7 +178,7 @@ export default function PostFilters({ onSearch, onCreate }) {
     );
 
     const priceContent = (
-        <div className="w-[300px] md:w-[340px] p-1">
+        <div className="w:[340px] md:w-[340px] w-[300px] p-1">
             <div className="mb-2 text-sm text-gray-500">Khoảng giá (VNĐ)</div>
             <div className="flex items-center gap-2">
                 <TextField
@@ -208,15 +237,203 @@ export default function PostFilters({ onSearch, onCreate }) {
                 >
                     Xoá
                 </MUIButton>
-                <MUIButton size="small" variant="contained" sx={{ ...BTN_PRIMARY_SX, height: 32 }} onClick={() => setOpenPrice(false)}>
+                <MUIButton
+                    size="small"
+                    variant="contained"
+                    sx={{ ...BTN_PRIMARY_SX, height: 32 }}
+                    onClick={() => setOpenPrice(false)}
+                >
                     OK
                 </MUIButton>
             </div>
         </div>
     );
 
+    /* ===================== RENDER ===================== */
+
+    // ------- MOBILE: chỉ Search + nút Bộ lọc -------
+    if (isMobile) {
+        return (
+            <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4">
+                <div className="flex flex-col gap-3">
+                    {/* Search input */}
+                    <TextField
+                        label="Từ khóa"
+                        variant="outlined"
+                        value={keyword}
+                        onChange={(e) => setKeyword(e.target.value)}
+                        fullWidth
+                        sx={TF_PILL}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") submit();
+                        }}
+                    />
+
+                    {/* Row: Bộ lọc + Tìm kiếm */}
+                    <div className="flex items-center gap-2">
+                        <MUIButton
+                            variant="outlined"
+                            startIcon={<FilterListIcon />}
+                            sx={{ ...BTN_OUTLINED_SX, flex: 1 }}
+                            onClick={() => setSheetOpen(true)}
+                        >
+                            Bộ lọc
+                        </MUIButton>
+                        <MUIButton
+                            variant="contained"
+                            startIcon={<SearchIcon />}
+                            sx={{ ...BTN_PRIMARY_SX, flex: 1 }}
+                            onClick={submit}
+                        >
+                            Tìm kiếm
+                        </MUIButton>
+                    </div>
+                </div>
+
+                {/* Bottom Sheet: toàn bộ filter nâng cao */}
+                <Drawer
+                    anchor="bottom"
+                    open={sheetOpen}
+                    onClose={() => setSheetOpen(false)}
+                    PaperProps={{
+                        sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, p: 2 },
+                    }}
+                >
+                    <div className="max-w-screen-md mx-auto w-full">
+                        <div className="h-1.5 w-10 bg-gray-300 rounded-full mx-auto mb-3" />
+
+                        {/* Khu vực */}
+                        <div className="mb-3">
+                            <TextField
+                                label="Khu vực"
+                                variant="outlined"
+                                select
+                                value={area}
+                                onChange={(e) => setArea(e.target.value)}
+                                fullWidth
+                                sx={TF_PILL}
+                            >
+                                {AREA_OPTIONS.map((opt) => (
+                                    <MenuItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </div>
+
+                        {/* Diện tích */}
+                        <div className="mb-3">
+                            <div className="mb-2 text-sm text-gray-500">Diện tích (m²)</div>
+                            <div className="flex items-center gap-2">
+                                <TextField
+                                    label="Từ"
+                                    type="number"
+                                    size="small"
+                                    value={areaMin}
+                                    onChange={(e) => setAreaMin(e.target.value)}
+                                    sx={{ width: "100%", "& .MuiInputBase-root": { height: 44, borderRadius: 14 } }}
+                                />
+                                <span className="text-gray-400">—</span>
+                                <TextField
+                                    label="Đến"
+                                    type="number"
+                                    size="small"
+                                    value={areaMax}
+                                    onChange={(e) => setAreaMax(e.target.value)}
+                                    sx={{ width: "100%", "& .MuiInputBase-root": { height: 44, borderRadius: 14 } }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Khoảng giá */}
+                        <div className="mb-3">
+                            <div className="mb-2 text-sm text-gray-500">Khoảng giá (VNĐ)</div>
+                            <div className="flex items-center gap-2">
+                                <TextField
+                                    label="Giá từ"
+                                    type="number"
+                                    size="small"
+                                    value={priceMin}
+                                    onChange={(e) => {
+                                        setPriceMin(e.target.value);
+                                        setPriceLabel("Khoảng giá");
+                                    }}
+                                    sx={{ width: "100%", "& .MuiInputBase-root": { height: 44, borderRadius: 14 } }}
+                                />
+                                <span className="text-gray-400">—</span>
+                                <TextField
+                                    label="đến"
+                                    type="number"
+                                    size="small"
+                                    value={priceMax}
+                                    onChange={(e) => {
+                                        setPriceMax(e.target.value);
+                                        setPriceLabel("Khoảng giá");
+                                    }}
+                                    sx={{ width: "100%", "& .MuiInputBase-root": { height: 44, borderRadius: 14 } }}
+                                />
+                            </div>
+
+                            {/* Presets */}
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                {PRICE_PRESETS.map((p) => (
+                                    <MUIButton
+                                        key={p.key}
+                                        variant="outlined"
+                                        sx={{ ...BTN_OUTLINED_SX, height: 40, borderRadius: 12 }}
+                                        onClick={() => {
+                                            setPriceMin(p.min ?? "");
+                                            setPriceMax(p.max ?? "");
+                                            setPriceLabel(p.label);
+                                        }}
+                                    >
+                                        {p.label}
+                                    </MUIButton>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Ngày hết hạn */}
+                        <div className="mb-3">
+                            <AntDatePicker
+                                value={expireDate}
+                                onChange={setExpireDate}
+                                format="DD/MM/YYYY"
+                                placeholder="Ngày hết hạn"
+                                allowClear
+                                className={`w-full
+                  !h-11 !rounded-full !border !border-gray-200 !px-4
+                  [&_.ant-picker-input>input]:!h-11
+                  [&_.ant-picker-input>input]:!leading-[44px]
+                  [&_.ant-picker-input>input::placeholder]:!text-gray-400
+                  [&_.ant-picker-suffix]:!text-gray-400
+                `}
+                            />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="mt-4 flex items-center gap-2">
+                            <MUIButton variant="outlined" sx={{ ...BTN_OUTLINED_SX, flex: 1 }} onClick={reset}>
+                                Xoá lọc
+                            </MUIButton>
+                            <MUIButton
+                                variant="contained"
+                                startIcon={<SearchIcon />}
+                                sx={{ ...BTN_PRIMARY_SX, flex: 1 }}
+                                onClick={submit}
+                            >
+                                Áp dụng
+                            </MUIButton>
+                        </div>
+                    </div>
+                </Drawer>
+            </div>
+        );
+    }
+
+    // ------- DESKTOP: layout đầy đủ như cũ -------
     return (
-        <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-3 md:p-5">
+        <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 md:p-5">
             <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap">
                 {/* Từ khóa */}
                 <div className="basis-[260px] xl:basis-[240px] grow">
@@ -225,9 +442,11 @@ export default function PostFilters({ onSearch, onCreate }) {
                         variant="outlined"
                         value={keyword}
                         onChange={(e) => setKeyword(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
                         fullWidth
                         sx={TF_PILL}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") submit();
+                        }}
                     />
                 </div>
 
@@ -308,11 +527,13 @@ export default function PostFilters({ onSearch, onCreate }) {
                         format="DD/MM/YYYY"
                         placeholder="Ngày hết hạn"
                         allowClear
-                        className={`w-full !h-11 !rounded-full !border !border-gray-200 !px-4
+                        className={`w-full
+              !h-11 !rounded-full !border !border-gray-200 !px-4
               [&_.ant-picker-input>input]:!h-11
               [&_.ant-picker-input>input]:!leading-[44px]
               [&_.ant-picker-input>input::placeholder]:!text-gray-400
-              [&_.ant-picker-suffix]:!text-gray-400`}
+              [&_.ant-picker-suffix]:!text-gray-400
+            `}
                     />
                 </div>
 
@@ -322,11 +543,21 @@ export default function PostFilters({ onSearch, onCreate }) {
                         Xoá lọc
                     </MUIButton>
 
-                    <MUIButton variant="contained" startIcon={<SearchIcon />} sx={BTN_PRIMARY_SX} onClick={submit}>
+                    <MUIButton
+                        variant="contained"
+                        startIcon={<SearchIcon />}
+                        sx={BTN_PRIMARY_SX}
+                        onClick={submit}
+                    >
                         Tìm Kiếm
                     </MUIButton>
 
-                    <MUIButton variant="contained" startIcon={<AddIcon />} sx={BTN_PRIMARY_SX} onClick={onCreate}>
+                    <MUIButton
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        sx={BTN_PRIMARY_SX}
+                        onClick={onCreate}
+                    >
                         Tạo Mới
                     </MUIButton>
                 </div>

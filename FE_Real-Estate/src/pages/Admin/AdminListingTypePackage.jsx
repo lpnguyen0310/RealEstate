@@ -8,7 +8,7 @@ import {
     DialogContent,
     DialogTitle,
     Divider,
-    FormControl,    
+    FormControl,
     FormControlLabel,
     IconButton,
     InputAdornment,
@@ -29,7 +29,10 @@ import {
     Paper,
     Pagination,
     PaginationItem,
+    LinearProgress, // ← thêm để hiển thị loading mượt hơn
 } from "@mui/material";
+import Snackbar from "@mui/material/Snackbar";
+import MuiAlert from "@mui/material/Alert";
 import {
     Add as AddIcon,
     Delete as DeleteIcon,
@@ -37,8 +40,14 @@ import {
     Refresh as RefreshIcon,
     Search as SearchIcon,
 } from "@mui/icons-material";
+import {
+    useGetActiveCatalogQuery,
+    useUpsertListingTypeMutation,
+    useUpsertComboMutation,
+    useDeletePackageMutation,
+} from "@/services/adminListingPackageApiSlice";
 
-/* =================== UI COLORS & TABLE STYLES (giống UsersTable) =================== */
+/* =================== UI COLORS & TABLE STYLES =================== */
 const UI = {
     headBg: "#f3f7ff",
     rowHover: "#e7f0ff",
@@ -47,17 +56,14 @@ const UI = {
     selectedPage: "#415a8c",
     prevNextBg: "#e9eaee",
 };
-const tableSX = {
-    mt: 2,
-    borderRadius: "12px",
-    border: `1px solid ${UI.border}`,
-    overflow: "hidden",
+
+// Chỉ giữ lại style cho thead/tbody (không set overflow ở đây)
+const tableSXHeadBody = {
     "& table": { borderCollapse: "separate", borderSpacing: 0 },
     "& thead th": {
         backgroundColor: UI.headBg,
         fontWeight: 800,
-        fontFamily: "'Inter', system-ui",   // ← font
-
+        fontFamily: "'Inter', system-ui",
         color: "#143a78",
         letterSpacing: 0.2,
         borderBottom: `1px solid ${UI.cellBorder}`,
@@ -76,104 +82,8 @@ const tableSX = {
     },
 };
 
-/* =========================================================
-   MOCK DATA LAYER (UI only). Replace with real API later.
-   ========================================================= */
-let _ltId = 3;
-let _listingTypes = [
-    { id: 1, code: "NORMAL", name: "Tin Thường", description: "Đăng tin cơ bản", price: 0, maxDays: 7, highlightFactor: 1, isActive: true, createdAt: "2025-10-01T10:00:00Z" },
-    { id: 2, code: "VIP", name: "Tin VIP", description: "Đầy đủ thông tin, x10 lượt xem", price: 35000, maxDays: 15, highlightFactor: 5, isActive: true, createdAt: "2025-10-05T10:00:00Z" },
-    { id: 3, code: "PREMIUM", name: "Tin Premium", description: "Hiển thị ấn tượng, x50 lượt xem", price: 100000, maxDays: 30, highlightFactor: 10, isActive: true, createdAt: "2025-10-10T10:00:00Z" },
-];
-
-let _cbId = 3;
-let _combos = [
-    { id: 1, name: "Combo Trải nghiệm", description: "Phù hợp dùng thử", originalPrice: 125000, discountPercent: 21, salePrice: Math.round((125000 * (100 - 21)) / 100), items: [{ typeCode: "VIP", qty: 1 }, { typeCode: "PREMIUM", qty: 1 }], isActive: true, createdAt: "2025-10-01T10:00:00Z" },
-    { id: 2, name: "Combo Tăng tốc", description: "Lựa chọn nhiều nhất", originalPrice: 550000, discountPercent: 27, salePrice: Math.round((550000 * (100 - 27)) / 100), items: [{ typeCode: "VIP", qty: 5 }, { typeCode: "PREMIUM", qty: 2 }], isActive: true, createdAt: "2025-10-05T10:00:00Z" },
-    { id: 3, name: "Combo Dẫn đầu", description: "Giá hời nhất", originalPrice: 1500000, discountPercent: 33, salePrice: Math.round((1500000 * (100 - 33)) / 100), items: [{ typeCode: "PREMIUM", qty: 10 }], isActive: false, createdAt: "2025-10-10T10:00:00Z" },
-];
-
-const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
-const api = {
-    listingTypes: {
-        async list({ q, isActive } = {}) {
-            await delay();
-            let rows = [..._listingTypes];
-            if (q) {
-                const s = q.toLowerCase();
-                rows = rows.filter(
-                    (x) =>
-                        x.name.toLowerCase().includes(s) ||
-                        (x.description || "").toLowerCase().includes(s) ||
-                        (x.code || "").toLowerCase().includes(s)
-                );
-            }
-            if (isActive !== undefined && isActive !== null) rows = rows.filter((x) => x.isActive === isActive);
-            return rows;
-        },
-        async create(payload) {
-            await delay();
-            _ltId += 1;
-            const row = { id: _ltId, createdAt: new Date().toISOString(), ...payload };
-            _listingTypes = [row, ..._listingTypes];
-            return row;
-        },
-        async update(id, patch) {
-            await delay();
-            const i = _listingTypes.findIndex((x) => x.id === id);
-            if (i < 0) throw new Error("Not found");
-            _listingTypes[i] = { ..._listingTypes[i], ...patch };
-            return _listingTypes[i];
-        },
-        async remove(id) {
-            await delay();
-            _listingTypes = _listingTypes.filter((x) => x.id !== id);
-            return { ok: true };
-        },
-    },
-    combos: {
-        async list({ q, isActive } = {}) {
-            await delay();
-            let rows = [..._combos];
-            if (q) {
-                const s = q.toLowerCase();
-                rows = rows.filter(
-                    (x) =>
-                        x.name.toLowerCase().includes(s) ||
-                        (x.description || "").toLowerCase().includes(s)
-                );
-            }
-            if (isActive !== undefined && isActive !== null) rows = rows.filter((x) => x.isActive === isActive);
-            return rows;
-        },
-        async create(payload) {
-            await delay();
-            _cbId += 1;
-            const row = { id: _cbId, createdAt: new Date().toISOString(), ...payload };
-            _combos = [row, ..._combos];
-            return row;
-        },
-        async update(id, patch) {
-            await delay();
-            const i = _combos.findIndex((x) => x.id === id);
-            if (i < 0) throw new Error("Not found");
-            _combos[i] = { ..._combos[i], ...patch };
-            return _combos[i];
-        },
-        async remove(id) {
-            await delay();
-            _combos = _combos.filter((x) => x.id !== id);
-            return { ok: true };
-        },
-    },
-};
-
 /* ================= Helpers ================= */
 const fmtVND = (n) => (n ?? 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
-const typeNameByCode = (code) => {
-    const t = _listingTypes.find((x) => x.code === code);
-    return t ? t.name : code;
-};
 const sumQty = (items = []) => (items || []).reduce((acc, cur) => acc + Number(cur.qty || 0), 0);
 
 /* ============== Reusable Confirm Dialog ============== */
@@ -197,12 +107,26 @@ function ConfirmDialog({ open, title, content, confirmText = "Xác nhận", canc
 /* ================= Dialogs: Create/Edit ================= */
 function ListingTypeDialog({ open, onClose, initial, onSave }) {
     const isEdit = !!initial;
+
     const [form, setForm] = useState(
         initial || { code: "", name: "", description: "", price: 0, maxDays: 7, highlightFactor: 1, isActive: true }
     );
+
     useEffect(() => {
         if (open) {
-            setForm(initial || { code: "", name: "", description: "", price: 0, maxDays: 7, highlightFactor: 1, isActive: true });
+            const defaultType = "NORMAL";
+            setForm(
+                initial || {
+                    code: "",
+                    name: "",
+                    description: "",
+                    price: 0,
+                    maxDays: 7,
+                    highlightFactor: 1,
+                    isActive: true,
+                    listingType: defaultType,
+                }
+            );
         }
     }, [open, initial]);
 
@@ -211,74 +135,216 @@ function ListingTypeDialog({ open, onClose, initial, onSave }) {
             <DialogTitle>{isEdit ? "Sửa gói đăng lẻ" : "Thêm gói đăng lẻ"}</DialogTitle>
             <DialogContent dividers>
                 <Stack spacing={2} mt={1}>
-                    <TextField label="Mã gói (code)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
-                    <TextField label="Tên gói" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                    <TextField label="Mô tả" value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} multiline minRows={2} />
+                    <TextField
+                        label="Mã gói (code)"
+                        value={form.code}
+                        onChange={(e) => setForm({ ...form, code: e.target.value })}
+                        required
+                    />
+                    <FormControl fullWidth required>
+                        <InputLabel>Loại tin (ListingType)</InputLabel>
+                        <Select
+                            label="Loại tin (ListingType)"
+                            value={form.listingType}
+                            onChange={(e) => setForm({ ...form, listingType: e.target.value })}
+                        >
+                            <MenuItem value="NORMAL">Tin Thường (NORMAL)</MenuItem>
+                            <MenuItem value="VIP">Tin VIP (VIP)</MenuItem>
+                            <MenuItem value="PREMIUM">Tin Premium (PREMIUM)</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <TextField
+                        label="Tên gói"
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        required
+                    />
+                    <TextField
+                        label="Mô tả"
+                        value={form.description || ""}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        multiline
+                        minRows={2}
+                    />
                     <Stack direction="row" spacing={2}>
-                        <TextField label="Giá (VND)" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value || 0) })} fullWidth InputProps={{ startAdornment: <InputAdornment position="start">₫</InputAdornment> }} />
-                        <TextField label="Số ngày tối đa" type="number" value={form.maxDays} onChange={(e) => setForm({ ...form, maxDays: Number(e.target.value || 1) })} fullWidth />
+                        <TextField
+                            label="Giá (VND)"
+                            type="number"
+                            value={form.price}
+                            onChange={(e) => setForm({ ...form, price: Number(e.target.value || 0) })}
+                            fullWidth
+                            InputProps={{ startAdornment: <InputAdornment position="start">₫</InputAdornment> }}
+                        />
+                        <TextField
+                            label="Số ngày tối đa"
+                            type="number"
+                            value={form.maxDays}
+                            onChange={(e) => setForm({ ...form, maxDays: Number(e.target.value || 1) })}
+                            fullWidth
+                        />
                     </Stack>
                     <Stack direction="row" spacing={2} alignItems="center">
-                        <TextField label="Hệ số nổi bật (x)" type="number" value={form.highlightFactor} onChange={(e) => setForm({ ...form, highlightFactor: Number(e.target.value || 1) })} fullWidth />
-                        <FormControlLabel control={<Switch checked={!!form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />} label="Kích hoạt" />
+                        <TextField
+                            label="Hệ số nổi bật (x)"
+                            type="number"
+                            value={form.highlightFactor}
+                            onChange={(e) => setForm({ ...form, highlightFactor: Number(e.target.value || 1) })}
+                            fullWidth
+                        />
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={!!form.isActive}
+                                    onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+                                />
+                            }
+                            label="Kích hoạt"
+                        />
                     </Stack>
                 </Stack>
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Hủy</Button>
-                <Button variant="contained" onClick={() => onSave(form)} disabled={!form.code || !form.name}>Lưu</Button>
+                <Button variant="contained" onClick={() => onSave(form)} disabled={!form.code || !form.name}>
+                    Lưu
+                </Button>
             </DialogActions>
         </Dialog>
     );
 }
 
-function ComboDialog({ open, onClose, initial, onSave }) {
+function ComboDialog({ open, onClose, initial, onSave, listingTypes = [] }) {
     const isEdit = !!initial;
+    const defaultChildPackageId = listingTypes.length > 0 ? listingTypes[0].id : null;
+
     const [form, setForm] = useState(
-        initial || { name: "", description: "", originalPrice: 0, discountPercent: 0, salePrice: 0, isActive: true, items: [{ typeCode: "VIP", qty: 1 }] }
+        initial || {
+            code: "",
+            name: "",
+            description: "",
+            originalPrice: 0,
+            discountPercent: 0,
+            salePrice: 0,
+            durationDays: 30,
+            isActive: true,
+            items: [{ typeCode: defaultChildPackageId, qty: 1 }],
+        }
     );
-    const allowedCodes = new Set(["VIP", "PREMIUM"]);
 
     useEffect(() => {
         if (open) {
-            const base = initial || { name: "", description: "", originalPrice: 0, discountPercent: 0, salePrice: 0, isActive: true, items: [{ typeCode: "VIP", qty: 1 }] };
-            const items = (base.items || []).filter((it) => allowedCodes.has(it.typeCode));
-            setForm({ ...base, items: items.length ? items : [{ typeCode: "VIP", qty: 1 }] });
-        }
-    }, [open, initial]);
+            const defaultId = listingTypes.length > 0 ? listingTypes[0].id : null;
+            const base =
+                initial || {
+                    code: "",
+                    name: "",
+                    description: "",
+                    originalPrice: 0,
+                    discountPercent: 0,
+                    salePrice: 0,
+                    durationDays: 30,
+                    isActive: true,
+                    items: [{ typeCode: defaultId, qty: 1 }],
+                };
 
-    const recalcSale = (originalPrice, discountPercent) => Math.max(0, Math.round(Number(originalPrice || 0) * (100 - Number(discountPercent || 0)) / 100));
+            const validListingTypeIds = new Set(listingTypes.map((lt) => lt.id));
+            const items = (base.items || []).filter((it) => validListingTypeIds.has(it.typeCode));
+
+            setForm({ ...base, items: items.length ? items : [{ typeCode: defaultId, qty: 1 }] });
+        }
+    }, [open, initial, listingTypes]);
+
+    const recalcSale = (originalPrice, discountPercent) =>
+        Math.max(0, Math.round(Number(originalPrice || 0) * (100 - Number(discountPercent || 0)) / 100));
+
     const updateField = (patch) => {
         const next = { ...form, ...patch };
         next.salePrice = recalcSale(next.originalPrice, next.discountPercent);
         setForm(next);
     };
 
-    const addRow = () => setForm({ ...form, items: [...(form.items || []), { typeCode: "VIP", qty: 1 }] });
+    const addRow = () => {
+        const defaultId = listingTypes.length > 0 ? listingTypes[0].id : null;
+        setForm({ ...form, items: [...(form.items || []), { typeCode: defaultId, qty: 1 }] });
+    };
+
     const removeRow = (idx) => setForm({ ...form, items: form.items.filter((_, i) => i !== idx) });
-    const changeRow = (idx, patch) => setForm({ ...form, items: form.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) });
+    const changeRow = (idx, patch) =>
+        setForm({ ...form, items: form.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) });
 
     const totalPosts = sumQty(form.items);
+
+    const validListingTypeIds = useMemo(() => new Set(listingTypes.map((lt) => lt.id)), [listingTypes]);
+
     const saveDisabled =
+        !form.code ||
         !form.name ||
         form.originalPrice < 0 ||
         form.discountPercent < 0 ||
         form.discountPercent > 100 ||
-        !form.items || form.items.length === 0 ||
-        form.items.some((it) => !allowedCodes.has(it.typeCode) || !it.qty || it.qty <= 0);
+        !form.items ||
+        form.items.length === 0 ||
+        form.items.some((it) => !validListingTypeIds.has(it.typeCode) || !it.qty || it.qty <= 0);
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
             <DialogTitle>{isEdit ? "Sửa gói Combo" : "Thêm gói Combo"}</DialogTitle>
             <DialogContent dividers>
                 <Stack spacing={2} mt={1}>
-                    <TextField label="Tên combo" value={form.name} onChange={(e) => updateField({ name: e.target.value })} required />
-                    <TextField label="Mô tả" value={form.description || ""} onChange={(e) => updateField({ description: e.target.value })} multiline minRows={2} />
+                    <TextField
+                        label="Tên combo"
+                        value={form.name}
+                        onChange={(e) => updateField({ name: e.target.value })}
+                        required
+                    />
+                    <TextField
+                        label="Mã combo (code)"
+                        value={form.code}
+                        onChange={(e) => updateField({ code: e.target.value })}
+                        required
+                    />
+                    <TextField
+                        label="Mô tả"
+                        value={form.description || ""}
+                        onChange={(e) => updateField({ description: e.target.value })}
+                        multiline
+                        minRows={2}
+                    />
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                        <TextField label="Giá gốc" type="number" value={form.originalPrice} onChange={(e) => updateField({ originalPrice: Number(e.target.value || 0) })} fullWidth InputProps={{ startAdornment: <InputAdornment position="start">₫</InputAdornment> }} />
-                        <TextField label="% khuyến mãi" type="number" value={form.discountPercent} onChange={(e) => { let v = Number(e.target.value || 0); if (v < 0) v = 0; if (v > 100) v = 100; updateField({ discountPercent: v }); }} fullWidth InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
+                        <TextField
+                            label="Giá gốc"
+                            type="number"
+                            value={form.originalPrice}
+                            onChange={(e) => updateField({ originalPrice: Number(e.target.value || 0) })}
+                            fullWidth
+                            InputProps={{ startAdornment: <InputAdornment position="start">₫</InputAdornment> }}
+                        />
+                        <TextField
+                            label="% khuyến mãi"
+                            type="number"
+                            value={form.discountPercent}
+                            onChange={(e) => {
+                                let v = Number(e.target.value || 0);
+                                if (v < 0) v = 0;
+                                if (v > 100) v = 100;
+                                updateField({ discountPercent: v });
+                            }}
+                            fullWidth
+                            InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                        />
+                        <TextField
+                            label="Thời hạn (ngày)"
+                            type="number"
+                            value={form.durationDays}
+                            onChange={(e) => updateField({ durationDays: Number(e.target.value || 1) })}
+                            sx={{ minWidth: 120 }}
+                        />
                         <TextField label="Giá bán (tự tính)" value={fmtVND(form.salePrice)} fullWidth InputProps={{ readOnly: true }} />
-                        <FormControlLabel sx={{ ml: { xs: 0, sm: 2 } }} control={<Switch checked={!!form.isActive} onChange={(e) => updateField({ isActive: e.target.checked })} />} label="Kích hoạt" />
+                        <FormControlLabel
+                            sx={{ ml: { xs: 0, sm: 2 } }}
+                            control={<Switch checked={!!form.isActive} onChange={(e) => updateField({ isActive: e.target.checked })} />}
+                            label="Kích hoạt"
+                        />
                     </Stack>
 
                     <Divider textAlign="left">Thành phần trong Combo</Divider>
@@ -289,13 +355,23 @@ function ComboDialog({ open, onClose, initial, onSave }) {
                                 <FormControl sx={{ minWidth: 220 }} fullWidth>
                                     <InputLabel>Loại tin</InputLabel>
                                     <Select label="Loại tin" value={it.typeCode} onChange={(e) => changeRow(idx, { typeCode: e.target.value })}>
-                                        {_listingTypes.filter((t) => t.code === "VIP" || t.code === "PREMIUM").map((t) => (
-                                            <MenuItem key={t.code} value={t.code}>{t.name} ({t.code})</MenuItem>
+                                        {listingTypes.map((t) => (
+                                            <MenuItem key={t.id} value={t.id}>
+                                                {t.name} ({t.code})
+                                            </MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>
-                                <TextField label="Số lượng" type="number" sx={{ width: 160 }} value={it.qty} onChange={(e) => changeRow(idx, { qty: Math.max(1, Number(e.target.value || 1)) })} />
-                                <IconButton color="error" onClick={() => removeRow(idx)}><DeleteIcon /></IconButton>
+                                <TextField
+                                    label="Số lượng"
+                                    type="number"
+                                    sx={{ width: 160 }}
+                                    value={it.qty}
+                                    onChange={(e) => changeRow(idx, { qty: Math.max(1, Number(e.target.value || 1)) })}
+                                />
+                                <IconButton color="error" onClick={() => removeRow(idx)}>
+                                    <DeleteIcon />
+                                </IconButton>
                             </Stack>
                         ))}
 
@@ -311,13 +387,15 @@ function ComboDialog({ open, onClose, initial, onSave }) {
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Hủy</Button>
-                <Button variant="contained" onClick={() => onSave(form)} disabled={saveDisabled}>Lưu</Button>
+                <Button variant="contained" onClick={() => onSave(form)} disabled={saveDisabled}>
+                    Lưu
+                </Button>
             </DialogActions>
         </Dialog>
     );
 }
 
-/* ================= PrettyPagination giống UsersTable ================= */
+/* ================= PrettyPagination ================= */
 function PrettyPagination({ count, page, rowsPerPage, onPageChange, onRowsPerPageChange }) {
     const totalPages = Math.max(1, Math.ceil(count / Math.max(1, rowsPerPage)));
     const start = count === 0 ? 0 : page * rowsPerPage + 1;
@@ -345,7 +423,11 @@ function PrettyPagination({ count, page, rowsPerPage, onPageChange, onRowsPerPag
                         "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff", borderWidth: 1.4 },
                     }}
                 >
-                    {[10, 20, 50].map((v) => (<MenuItem key={v} value={v}>{v}</MenuItem>))}
+                    {[10, 20, 50].map((v) => (
+                        <MenuItem key={v} value={v}>
+                            {v}
+                        </MenuItem>
+                    ))}
                 </Select>
                 <Typography fontSize={13} color="#7a8aa1">
                     Hiển thị {start} đến {end} của {count}
@@ -401,8 +483,26 @@ function PrettyPagination({ count, page, rowsPerPage, onPageChange, onRowsPerPag
 
 /* ================= Main Page ================= */
 export default function AdminListingTypePackage() {
+    const {
+        data: catalogData, // { listingTypes, combos }
+        isLoading,
+        isFetching,
+        refetch,
+    } = useGetActiveCatalogQuery();
+
+    const [upsertListingType] = useUpsertListingTypeMutation();
+    const [upsertCombo] = useUpsertComboMutation();
+    const [deletePackage] = useDeletePackageMutation();
+
     /* Listing Types state */
-    const [ltRows, setLtRows] = useState([]);
+    const ltRows = catalogData?.listingTypes || [];
+    const cbRows = catalogData?.combos || [];
+
+    const getPackageNameById = (id) => {
+        const t = ltRows.find((x) => x.id === id);
+        return t ? t.name : id;
+    };
+
     const [ltSearch, setLtSearch] = useState("");
     const [ltActive, setLtActive] = useState("all");
     const [ltDialogOpen, setLtDialogOpen] = useState(false);
@@ -412,7 +512,6 @@ export default function AdminListingTypePackage() {
     const [ltDeleteTarget, setLtDeleteTarget] = useState(null);
 
     /* Combos state */
-    const [cbRows, setCbRows] = useState([]);
     const [cbSearch, setCbSearch] = useState("");
     const [cbActive, setCbActive] = useState("all");
     const [cbDialogOpen, setCbDialogOpen] = useState(false);
@@ -421,40 +520,73 @@ export default function AdminListingTypePackage() {
     const [cbRowsPerPage, setCbRowsPerPage] = useState(10);
     const [cbDeleteTarget, setCbDeleteTarget] = useState(null);
 
-    const loadListingTypes = async () => {
-        const isActive = ltActive === "all" ? null : ltActive === "active" ? true : false;
-        const rows = await api.listingTypes.list({ q: ltSearch.trim(), isActive });
-        setLtRows(rows);
-    };
-    const loadCombos = async () => {
-        const isActive = cbActive === "all" ? null : cbActive === "active" ? true : false;
-        const rows = await api.combos.list({ q: cbSearch.trim(), isActive });
-        setCbRows(rows);
+    const [alert, setAlert] = useState({ open: false, message: "", severity: "success" });
+    const handleCloseAlert = (_, reason) => {
+        if (reason === "clickaway") return;
+        setAlert((s) => ({ ...s, open: false }));
     };
 
-    useEffect(() => {
-        loadListingTypes();
-        loadCombos();
-    }, []);
+    const filteredLtRows = useMemo(() => {
+        const query = ltSearch.toLowerCase().trim();
+        return (ltRows || []).filter((pkg) => {
+            if (ltActive === "active" && !pkg.isActive) return false;
+            if (ltActive === "inactive" && pkg.isActive) return false;
+            if (
+                query &&
+                !pkg.name.toLowerCase().includes(query) &&
+                !pkg.code.toLowerCase().includes(query) &&
+                !(pkg.description || "").toLowerCase().includes(query)
+            ) {
+                return false;
+            }
+            return true;
+        });
+    }, [ltRows, ltSearch, ltActive]);
 
-    /* ======== Listing columns ======== */
+    const filteredCbRows = useMemo(() => {
+        const query = cbSearch.toLowerCase().trim();
+        return (cbRows || []).filter((pkg) => {
+            if (cbActive === "active" && !pkg.isActive) return false;
+            if (cbActive === "inactive" && pkg.isActive) return false;
+            if (query && !pkg.name.toLowerCase().includes(query) && !(pkg.description || "").toLowerCase().includes(query)) {
+                return false;
+            }
+            return true;
+        });
+    }, [cbRows, cbSearch, cbActive]);
+
+    /* ======== Listing columns (responsive) ======== */
     const listingColumns = useMemo(
         () => [
             { key: "id", label: "ID", sx: { width: 80 } },
             { key: "code", label: "Code", sx: { width: 120 } },
             { key: "name", label: "Tên gói" },
-            { key: "price", label: "Giá", render: (r) => fmtVND(r.price), sx: { width: 140, textAlign: "right" } },
-            { key: "maxDays", label: "Ngày tối đa", render: (r) => <Chip label={`${r.maxDays} ngày`} size="small" />, sx: { width: 140 } },
-            { key: "highlightFactor", label: "Hệ số nổi bật", render: (r) => <Chip color="warning" label={`x${r.highlightFactor}`} size="small" />, sx: { width: 160 } },
+            {
+                key: "price",
+                label: "Giá",
+                render: (r) => fmtVND(r.price),
+                sx: { width: 140, textAlign: "right", display: { xs: "none", sm: "table-cell" } },
+            },
+            {
+                key: "maxDays",
+                label: "Ngày tối đa",
+                render: (r) => <Chip label={`${r.maxDays} ngày`} size="small" />,
+                sx: { width: 140, display: { xs: "none", sm: "table-cell" } },
+            },
+            {
+                key: "highlightFactor",
+                label: "Hệ số nổi bật",
+                render: (r) => <Chip color="warning" label={`x${r.highlightFactor}`} size="small" />,
+                sx: { width: 160, display: { xs: "none", md: "table-cell" } },
+            },
             {
                 key: "isActive",
                 label: "Trạng thái",
                 render: (r) => (
                     <Switch
                         checked={!!r.isActive}
-                        onChange={async (e) => {
-                            await api.listingTypes.update(r.id, { isActive: e.target.checked });
-                            loadListingTypes();
+                        onChange={(e) => {
+                            upsertListingType({ ...r, isActive: e.target.checked });
                         }}
                     />
                 ),
@@ -483,7 +615,7 @@ export default function AdminListingTypePackage() {
         []
     );
 
-    /* ======== Combo columns ======== */
+    /* ======== Combo columns (responsive) ======== */
     const comboColumns = useMemo(
         () => [
             { key: "id", label: "ID", sx: { width: 80 } },
@@ -496,44 +628,40 @@ export default function AdminListingTypePackage() {
                         <Chip label="Trống" size="small" />
                     ) : (
                         <Stack direction="row" spacing={1} flexWrap="wrap">
-                            {r.items.map((it, i) => {
-                                const color =
-                                    it.typeCode === "VIP"
-                                        ? "warning"
-                                        : it.typeCode === "PREMIUM"
-                                            ? "primary"
-                                            : "default";
-                                return (
-                                    <Chip
-                                        key={i}
-                                        color={color}
-                                        label={`${typeNameByCode(it.typeCode)} × ${it.qty}`}
-                                        size="small"
-                                        sx={{
-                                            mb: 0.5,
-                                            fontWeight: 600,
-                                            color: color === "default" ? "#333" : "#fff",
-                                        }}
-                                    />
-                                );
-                            })}
+                            {r.items.map((it, i) => (
+                                <Chip key={i} label={`${getPackageNameById(it.typeCode)} × ${it.qty}`} size="small" sx={{ mb: 0.5 }} />
+                            ))}
                         </Stack>
                     ),
-
+                sx: { display: { xs: "none", sm: "table-cell" } },
             },
             { key: "total", label: "Tổng số tin", render: (r) => <Chip label={sumQty(r.items)} size="small" />, sx: { width: 140 } },
-            { key: "originalPrice", label: "Giá gốc", render: (r) => fmtVND(r.originalPrice), sx: { width: 140, textAlign: "right" } },
-            { key: "discountPercent", label: "% KM", render: (r) => <Chip color="info" label={`${r.discountPercent}%`} size="small" />, sx: { width: 100 } },
-            { key: "salePrice", label: "Giá bán", render: (r) => <Chip color="success" label={fmtVND(r.salePrice)} size="small" />, sx: { width: 140 } },
+            {
+                key: "originalPrice",
+                label: "Giá gốc",
+                render: (r) => fmtVND(r.originalPrice),
+                sx: { width: 140, textAlign: "right", display: { xs: "none", sm: "table-cell" } },
+            },
+            {
+                key: "discountPercent",
+                label: "% KM",
+                render: (r) => <Chip color="info" label={`${r.discountPercent}%`} size="small" />,
+                sx: { width: 100, display: { xs: "none", md: "table-cell" } },
+            },
+            {
+                key: "salePrice",
+                label: "Giá bán",
+                render: (r) => <Chip color="success" label={fmtVND(r.salePrice)} size="small" />,
+                sx: { width: 140 },
+            },
             {
                 key: "isActive",
                 label: "Trạng thái",
                 render: (r) => (
                     <Switch
                         checked={!!r.isActive}
-                        onChange={async (e) => {
-                            await api.combos.update(r.id, { isActive: e.target.checked });
-                            loadCombos();
+                        onChange={(e) => {
+                            upsertCombo({ ...r, isActive: e.target.checked });
                         }}
                     />
                 ),
@@ -564,41 +692,89 @@ export default function AdminListingTypePackage() {
 
     /* ======== Handlers ======== */
     const saveListingType = async (data) => {
-        if (ltEditing) await api.listingTypes.update(ltEditing.id, data);
-        else await api.listingTypes.create(data);
-        setLtDialogOpen(false);
-        setLtEditing(null);
-        loadListingTypes();
+        try {
+            const saved = await upsertListingType(data).unwrap();
+            setLtDialogOpen(false);
+            setLtEditing(null);
+            setAlert({ open: true, message: `Đã lưu "${saved.data.name}" thành công!`, severity: "success" });
+        } catch (err) {
+            console.error("Failed to save listing type:", err);
+            setAlert({ open: true, message: err.data?.message || "Lưu gói lẻ thất bại", severity: "error" });
+        }
     };
 
     const saveCombo = async (data) => {
-        const salePrice = Math.max(0, Math.round(Number(data.originalPrice || 0) * (100 - Number(data.discountPercent || 0)) / 100));
+        const salePrice = Math.max(
+            0,
+            Math.round(Number(data.originalPrice || 0) * (100 - Number(data.discountPercent || 0)) / 100)
+        );
         const payload = { ...data, salePrice };
-        if (cbEditing) await api.combos.update(cbEditing.id, payload);
-        else await api.combos.create(payload);
-        setCbDialogOpen(false);
-        setCbEditing(null);
-        loadCombos();
+        try {
+            const saved = await upsertCombo(payload).unwrap();
+            setCbDialogOpen(false);
+            setCbEditing(null);
+            setAlert({ open: true, message: `Đã lưu "${saved.data.name}" thành công!`, severity: "success" });
+        } catch (err) {
+            console.error("Failed to save combo:", err);
+            setAlert({ open: true, message: err.data?.message || "Lưu combo thất bại", severity: "error" });
+        }
+    };
+
+    const handleDeleteListingType = async () => {
+        const nameToDelete = ltDeleteTarget?.name || "Gói";
+        try {
+            await deletePackage(ltDeleteTarget.id).unwrap();
+            setLtDeleteTarget(null);
+            setAlert({ open: true, message: `Đã xóa "${nameToDelete}"`, severity: "success" });
+        } catch (err) {
+            console.error("Failed to delete package:", err);
+            setAlert({ open: true, message: err.data?.message || "Xóa thất bại", severity: "error" });
+        }
+    };
+
+    const handleDeleteCombo = async () => {
+        const nameToDelete = cbDeleteTarget?.name || "Combo";
+        try {
+            await deletePackage(cbDeleteTarget.id).unwrap();
+            setCbDeleteTarget(null);
+            setAlert({ open: true, message: `Đã xóa "${nameToDelete}"`, severity: "success" });
+        } catch (err) {
+            console.error("Failed to delete package:", err);
+            setAlert({ open: true, message: err.data?.message || "Xóa thất bại", severity: "error" });
+        }
     };
 
     /* ================= Render ================= */
+    if (isLoading) return <Typography>Đang tải dữ liệu...</Typography>;
+
     return (
         <Stack spacing={4}>
             {/* Listing Types */}
-            <Paper elevation={1}>
-                <Box p={2}>
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between">
+            <Paper elevation={0} sx={{ backgroundColor: "#fff", borderRadius: "14px", border: "1px solid #e8edf6", boxShadow: "0 6px 18px rgba(13,47,97,0.06)" }}>
+                {isFetching && <LinearProgress />}
+                <Box p={{ xs: 1.5, md: 2 }}>
+                    <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={2}
+                        alignItems={{ xs: "stretch", md: "center" }}
+                        justifyContent="space-between"
+                    >
                         <Typography variant="h6">Quản lý Gói đăng lẻ</Typography>
-                        <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1}
+                            alignItems={{ xs: "stretch", sm: "center" }}
+                            sx={{ width: { xs: "100%", md: "auto" } }}
+                        >
                             <TextField
                                 size="small"
                                 placeholder="Tìm theo tên, mô tả, code…"
                                 value={ltSearch}
                                 onChange={(e) => setLtSearch(e.target.value)}
                                 InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-                                sx={{ width: 320 }}
+                                sx={{ width: { xs: "100%", sm: 320 } }}
                             />
-                            <FormControl size="small" sx={{ minWidth: 160 }}>
+                            <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                                 <InputLabel>Trạng thái</InputLabel>
                                 <Select label="Trạng thái" value={ltActive} onChange={(e) => setLtActive(e.target.value)}>
                                     <MenuItem value="all">Tất cả</MenuItem>
@@ -607,7 +783,9 @@ export default function AdminListingTypePackage() {
                                 </Select>
                             </FormControl>
                             <Tooltip title="Tải lại">
-                                <IconButton onClick={loadListingTypes}><RefreshIcon /></IconButton>
+                                <IconButton onClick={refetch} disabled={isFetching}>
+                                    <RefreshIcon />
+                                </IconButton>
                             </Tooltip>
                             <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setLtEditing(null); setLtDialogOpen(true); }}>
                                 Thêm gói
@@ -615,18 +793,29 @@ export default function AdminListingTypePackage() {
                         </Stack>
                     </Stack>
 
-                    <TableContainer sx={tableSX}>
-                        <Table size="small">
+                    {/* Table: cuộn ngang + stickyHeader */}
+                    <TableContainer
+                        sx={{
+                            mt: 2,
+                            borderRadius: "12px",
+                            border: `1px solid ${UI.cellBorder}`,
+                            overflow: "auto",
+                            maxWidth: "100%",
+                        }}
+                    >
+                        <Table size="small" stickyHeader sx={{ minWidth: 860, ...tableSXHeadBody }}>
                             <TableHead>
                                 <TableRow>
                                     {listingColumns.map((c) => (
-                                        <TableCell key={c.key} sx={c.sx}>{c.label}</TableCell>
+                                        <TableCell key={c.key} sx={c.sx}>
+                                            {c.label}
+                                        </TableCell>
                                     ))}
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {ltRows.slice(ltPage * ltRowsPerPage, ltPage * ltRowsPerPage + ltRowsPerPage).map((r) => (
-                                    <TableRow key={r.id}>
+                                {filteredLtRows.slice(ltPage * ltRowsPerPage, ltPage * ltRowsPerPage + ltRowsPerPage).map((r) => (
+                                    <TableRow key={r.id} hover>
                                         {listingColumns.map((c) => (
                                             <TableCell key={c.key} sx={c.sx}>
                                                 {c.render ? c.render(r) : r[c.key]}
@@ -634,35 +823,56 @@ export default function AdminListingTypePackage() {
                                         ))}
                                     </TableRow>
                                 ))}
+                                {filteredLtRows.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={listingColumns.length} align="center" sx={{ py: 6, color: "#7a8aa1", bgcolor: "#fff" }}>
+                                            Không có dữ liệu
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </TableContainer>
 
                     <PrettyPagination
-                        count={ltRows.length}
+                        count={filteredLtRows.length}
                         page={ltPage}
                         rowsPerPage={ltRowsPerPage}
                         onPageChange={(p) => setLtPage(p)}
-                        onRowsPerPageChange={(rpp) => { setLtRowsPerPage(rpp); setLtPage(0); }}
+                        onRowsPerPageChange={(rpp) => {
+                            setLtRowsPerPage(rpp);
+                            setLtPage(0);
+                        }}
                     />
                 </Box>
             </Paper>
 
             {/* Combos */}
-            <Paper elevation={1}>
-                <Box p={2}>
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between">
+            <Paper elevation={0} sx={{ backgroundColor: "#fff", borderRadius: "14px", border: "1px solid #e8edf6", boxShadow: "0 6px 18px rgba(13,47,97,0.06)" }}>
+                {isFetching && <LinearProgress />}
+                <Box p={{ xs: 1.5, md: 2 }}>
+                    <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={2}
+                        alignItems={{ xs: "stretch", md: "center" }}
+                        justifyContent="space-between"
+                    >
                         <Typography variant="h6">Quản lý Gói Combo</Typography>
-                        <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1}
+                            alignItems={{ xs: "stretch", sm: "center" }}
+                            sx={{ width: { xs: "100%", md: "auto" } }}
+                        >
                             <TextField
                                 size="small"
                                 placeholder="Tìm theo tên, mô tả…"
                                 value={cbSearch}
                                 onChange={(e) => setCbSearch(e.target.value)}
                                 InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-                                sx={{ width: 320 }}
+                                sx={{ width: { xs: "100%", sm: 320 } }}
                             />
-                            <FormControl size="small" sx={{ minWidth: 160 }}>
+                            <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 160 } }}>
                                 <InputLabel>Trạng thái</InputLabel>
                                 <Select label="Trạng thái" value={cbActive} onChange={(e) => setCbActive(e.target.value)}>
                                     <MenuItem value="all">Tất cả</MenuItem>
@@ -671,7 +881,9 @@ export default function AdminListingTypePackage() {
                                 </Select>
                             </FormControl>
                             <Tooltip title="Tải lại">
-                                <IconButton onClick={loadCombos}><RefreshIcon /></IconButton>
+                                <IconButton onClick={refetch} disabled={isFetching}>
+                                    <RefreshIcon />
+                                </IconButton>
                             </Tooltip>
                             <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCbEditing(null); setCbDialogOpen(true); }}>
                                 Thêm combo
@@ -679,18 +891,28 @@ export default function AdminListingTypePackage() {
                         </Stack>
                     </Stack>
 
-                    <TableContainer sx={tableSX}>
-                        <Table size="small">
+                    <TableContainer
+                        sx={{
+                            mt: 2,
+                            borderRadius: "12px",
+                            border: `1px solid ${UI.cellBorder}`,
+                            overflow: "auto",
+                            maxWidth: "100%",
+                        }}
+                    >
+                        <Table size="small" stickyHeader sx={{ minWidth: 860, ...tableSXHeadBody }}>
                             <TableHead>
                                 <TableRow>
                                     {comboColumns.map((c) => (
-                                        <TableCell key={c.key} sx={c.sx}>{c.label}</TableCell>
+                                        <TableCell key={c.key} sx={c.sx}>
+                                            {c.label}
+                                        </TableCell>
                                     ))}
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {cbRows.slice(cbPage * cbRowsPerPage, cbPage * cbRowsPerPage + cbRowsPerPage).map((r) => (
-                                    <TableRow key={r.id}>
+                                {filteredCbRows.slice(cbPage * cbRowsPerPage, cbPage * cbRowsPerPage + cbRowsPerPage).map((r) => (
+                                    <TableRow key={r.id} hover>
                                         {comboColumns.map((c) => (
                                             <TableCell key={c.key} sx={c.sx}>
                                                 {c.render ? c.render(r) : r[c.key]}
@@ -698,16 +920,26 @@ export default function AdminListingTypePackage() {
                                         ))}
                                     </TableRow>
                                 ))}
+                                {filteredCbRows.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={comboColumns.length} align="center" sx={{ py: 6, color: "#7a8aa1", bgcolor: "#fff" }}>
+                                            Không có dữ liệu
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </TableContainer>
 
                     <PrettyPagination
-                        count={cbRows.length}
+                        count={filteredCbRows.length}
                         page={cbPage}
                         rowsPerPage={cbRowsPerPage}
                         onPageChange={(p) => setCbPage(p)}
-                        onRowsPerPageChange={(rpp) => { setCbRowsPerPage(rpp); setCbPage(0); }}
+                        onRowsPerPageChange={(rpp) => {
+                            setCbRowsPerPage(rpp);
+                            setCbPage(0);
+                        }}
                     />
                 </Box>
             </Paper>
@@ -715,42 +947,59 @@ export default function AdminListingTypePackage() {
             {/* Dialogs */}
             <ListingTypeDialog
                 open={ltDialogOpen}
-                onClose={() => { setLtDialogOpen(false); setLtEditing(null); }}
+                onClose={() => {
+                    setLtDialogOpen(false);
+                    setLtEditing(null);
+                }}
                 initial={ltEditing}
                 onSave={saveListingType}
             />
             <ComboDialog
                 open={cbDialogOpen}
-                onClose={() => { setCbDialogOpen(false); setCbEditing(null); }}
+                onClose={() => {
+                    setCbDialogOpen(false);
+                    setCbEditing(null);
+                }}
                 initial={cbEditing}
                 onSave={saveCombo}
+                listingTypes={ltRows}
             />
 
             {/* Confirm delete dialogs */}
             <ConfirmDialog
                 open={!!ltDeleteTarget}
                 title="Xác nhận xoá gói đăng lẻ"
-                content={ltDeleteTarget ? `Bạn có chắc muốn xoá "${ltDeleteTarget.name}" (code: ${ltDeleteTarget.code})? Hành động không thể hoàn tác.` : ""}
+                content={
+                    ltDeleteTarget
+                        ? `Bạn có chắc muốn xoá "${ltDeleteTarget.name}" (code: ${ltDeleteTarget.code})? Hành động không thể hoàn tác.`
+                        : ""
+                }
                 onClose={() => setLtDeleteTarget(null)}
-                onConfirm={async () => {
-                    await api.listingTypes.remove(ltDeleteTarget.id);
-                    setLtDeleteTarget(null);
-                    loadListingTypes();
-                }}
+                onConfirm={handleDeleteListingType}
                 confirmText="Xoá"
             />
             <ConfirmDialog
                 open={!!cbDeleteTarget}
                 title="Xác nhận xoá gói Combo"
-                content={cbDeleteTarget ? `Bạn có chắc muốn xoá combo "${cbDeleteTarget.name}"? Hành động không thể hoàn tác.` : ""}
+                content={
+                    cbDeleteTarget ? `Bạn có chắc muốn xoá combo "${cbDeleteTarget.name}"? Hành động không thể hoàn tác.` : ""
+                }
                 onClose={() => setCbDeleteTarget(null)}
-                onConfirm={async () => {
-                    await api.combos.remove(cbDeleteTarget.id);
-                    setCbDeleteTarget(null);
-                    loadCombos();
-                }}
+                onConfirm={handleDeleteCombo}
                 confirmText="Xoá"
             />
+
+            {/* Alert */}
+            <Snackbar
+                open={alert.open}
+                autoHideDuration={6000}
+                onClose={handleCloseAlert}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                <MuiAlert onClose={handleCloseAlert} severity={alert.severity} sx={{ width: "100%" }} variant="filled">
+                    {alert.message}
+                </MuiAlert>
+            </Snackbar>
         </Stack>
     );
 }

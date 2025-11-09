@@ -36,6 +36,7 @@ const initialState = {
         reason: "",
         listingType: "NORMAL",
     },
+    pendingAction: null,
 };
 
 // ================== THUNKS ==================
@@ -238,6 +239,13 @@ const adminPostsSlice = createSlice({
         },
         setDecision: (s, a) => {
             s.decision = { ...s.decision, ...a.payload };
+        },
+
+        setPendingAction: (s, a) => {
+            s.pendingAction = a.payload;
+        },
+        clearPendingAction: (s) => {
+            s.pendingAction = null;
         },
 
         // internal helper giống bumpCounts
@@ -446,6 +454,8 @@ export const {
     openDetail,
     closeDetail,
     setDecision,
+    setPendingAction,
+    clearPendingAction,
     bumpCounts,
 } = adminPostsSlice.actions;
 

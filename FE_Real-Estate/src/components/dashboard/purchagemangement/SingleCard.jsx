@@ -8,7 +8,7 @@ export default function SingleCard({ item, value = 0, onChange }) {
                 {item.tag && (
                     <span
                         className={[
-                            "absolute -top-12 -right-8 z-10",
+                            "absolute -top-10 -right-6 sm:-top-12 sm:-right-8 z-10",
                             "px-3 h-7 inline-flex items-center rounded-full text-xs font-medium text-white",
                             item.tag === "Hiệu suất" ? "bg-amber-500" : "bg-orange-500",
                             "shadow-[0_8px_16px_rgba(0,0,0,0.15)]",
@@ -20,17 +20,13 @@ export default function SingleCard({ item, value = 0, onChange }) {
                     </span>
                 )}
 
-                <h3 className="text-[18px] font-semibold">{item.title}</h3>
+                <h3 className="text-[16px] sm:text-[18px] font-semibold">{item.title}</h3>
 
-                <div className="text-[13px] text-gray-600 leading-tight">
+                <div className="text-[12px] sm:text-[13px] text-gray-600 leading-tight">
                     <div>{item.desc}</div>
-                    <div>{item.note}</div>
                 </div>
 
-                <div
-                    className={`text-[15px] ${item.price === 0 ? "text-green-600" : "text-[#1a3b7c]"
-                        } font-medium`}
-                >
+                <div className={`text-[14px] sm:text-[15px] ${item.price === 0 ? "text-green-600" : "text-[#1a3b7c]"} font-medium`}>
                     {item.price === 0 ? "Miễn phí" : `${item.price.toLocaleString()} VNĐ`}
                 </div>
 

@@ -60,7 +60,7 @@ export default function ReportDetailsModalUpdated({
   postId,
   reports = [], // Giả sử mỗi report có 1 'id' duy nhất
   onClose,
-  onLockPost,      
+  onLockPost,
   onDeleteReports, // Đổi tên từ onDismissReports -> onDeleteReports
   onSendWarning,
 }) {

@@ -93,18 +93,18 @@ export const reportApi = createApi({
     }),
 
     deleteSelectedReports: builder.mutation({
-      // arg là object: { postId: Long, reportIds: List<Long> }
-      query: ({ postId, reportIds }) => ({
-        // SỬ DỤNG METHOD: "DELETE"
-        url: `/reports/delete-selected/post/${postId}`, 
-        method: "DELETE",
-        data: reportIds, // Gửi danh sách ID làm Body
-      }),
-      // Khi xóa report thành công, invalidate tag để tự động reload danh sách reports
-      invalidatesTags: (result, error, { postId }) => [
-        { type: "AdminReports", id: postId }
-      ],
-    }),
+// arg là object: { postId: Long, reportIds: List<Long> }
+query: ({ postId, reportIds }) => ({
+// SỬ DỤNG METHOD: "DELETE"
+url: `/reports/delete-selected/post/${postId}`, 
+method: "DELETE",
+data: reportIds, // Gửi danh sách ID làm Body
+}),
+// Khi xóa report thành công, invalidate tag để tự động reload danh sách reports
+invalidatesTags: (result, error, { postId }) => [
+{ type: "AdminReports", id: postId }
+],
+}),
 
   }),
 });

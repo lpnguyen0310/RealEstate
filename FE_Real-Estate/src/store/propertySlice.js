@@ -593,6 +593,7 @@ const initialState = {
     loadingFavorites: false,
     errorFavorites: null,
     currentFavoriteUsers: [],
+    pendingAction: null,
 };
 
 const propertySlice = createSlice({
@@ -663,6 +664,12 @@ const propertySlice = createSlice({
             state.similarNewsList = [];
             state.similarNewsLoading = false;
             state.similarNewsError = null;
+        },
+        setPendingAction: (state, action) => {
+            state.pendingAction = action.payload; // payload: { type, postId }
+        },
+        clearPendingAction: (state) => {
+            state.pendingAction = null;
         },
     },
     extraReducers: (b) => {
@@ -905,7 +912,7 @@ export const {
     clearProperties,
     clearCurrentProperty,
     clearFavorites,
-    clearForYou,
+    clearForYou, setPendingAction, clearPendingAction,
     clearHomeSlots,
 } = propertySlice.actions;
 

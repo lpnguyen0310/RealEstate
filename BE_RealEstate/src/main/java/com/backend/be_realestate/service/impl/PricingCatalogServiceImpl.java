@@ -25,9 +25,19 @@ public class PricingCatalogServiceImpl implements PricingCatalogService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ListingPackageDTO> getActiveCatalog() {
-        return packageRepo.findAllByIsActiveTrueOrderBySortOrderAscIdAsc()
-                .stream()
+    public List<ListingPackageDTO> getCatalog(Boolean active) {
+
+        List<ListingPackage> packages;
+
+        if (active == null) {
+            // Nếu React gửi "all" (active = null) -> Lấy tất cả
+            packages = packageRepo.findAllWithItems(); // <-- (Hàm mới, sẽ thêm ở Repository)
+        } else {
+            // Nếu React gửi true/false -> Lọc theo trạng thái
+            packages = packageRepo.findAllActiveWithItems(active); // <-- (Hàm mới, sẽ thêm ở Repository)
+        }
+
+        return packages.stream()
                 .map(converter::toDto)
                 .toList();
     }
@@ -52,6 +62,17 @@ public class PricingCatalogServiceImpl implements PricingCatalogService {
             throw new BadRequestException("Giá phải >= 0");
         if (dto.getPackageType() == null)
             throw new BadRequestException("Thiếu packageType");
+
+        // 1. Kiểm tra giá gốc (nếu có) phải lớn hơn giá bán
+        if (dto.getPriceOriginal() != null && dto.getPriceOriginal() < dto.getPrice()) {
+            throw new BadRequestException("Giá gốc (priceOriginal) phải lớn hơn hoặc bằng giá bán (price)");
+        }
+
+        // 2. Kiểm tra thời hạn (durationDays)
+        // (Bạn có thể bỏ qua nếu cho phép gói không có thời hạn)
+        if (dto.getDurationDays() == null || dto.getDurationDays() <= 0) {
+            throw new BadRequestException("Thời hạn (durationDays) phải lớn hơn 0");
+        }
 
         boolean isCombo = PackageType.valueOf(dto.getPackageType()) == PackageType.COMBO;
         if (isCombo && (dto.getItems() == null || dto.getItems().isEmpty()))

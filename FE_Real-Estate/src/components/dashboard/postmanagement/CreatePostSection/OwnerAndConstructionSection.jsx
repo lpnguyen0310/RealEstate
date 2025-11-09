@@ -173,6 +173,17 @@ export default function OwnerAndConstructionSection({
             inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
             sx={{ "& .MuiOutlinedInput-root": inputRootSx }}
           />
+          <TextField
+            size="small"
+            required
+            label="Số điện thoại liên hệ"
+            value={v.phoneNumber || ""}
+            onChange={(e) => setOwner("phoneNumber", e.target.value)}
+            error={!!errors.phoneNumber}
+            helperText={errors.phoneNumber || ""}
+            sx={{ "& .MuiOutlinedInput-root": inputRootSx }}
+          />
+
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mt: 1 }}>

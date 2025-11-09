@@ -200,20 +200,41 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             String[] tokens = q.trim().toLowerCase().split("\\s+");
             for (String token : tokens) {
                 String kw = "%" + token + "%";
+
+                // Cố gắng parse token thành Long (để tìm theo ID)
+                Long parsedTokenId = null;
+                try {
+                    parsedTokenId = Long.parseLong(token);
+                } catch (NumberFormatException e) {
+                    // token không phải là số, bỏ qua
+                }
+
+                final Long finalId = parsedTokenId; // Sẽ là null nếu không phải số
+
                 spec = spec.and((root, cq, cb) -> {
                     Join<PropertyEntity, ?> userJoin = root.join("user", JoinType.LEFT);
                     Join<PropertyEntity, ?> catJoin = root.join("category", JoinType.LEFT);
 
-                    return cb.or(
-                            cb.like(cb.lower(root.get("title")), kw),
-                            cb.like(cb.lower(root.get("description")), kw),
-                            cb.like(cb.lower(root.get("displayAddress")), kw),
-                            cb.like(cb.lower(root.get("addressStreet")), kw),
-                            cb.like(cb.lower(root.get("position")), kw),
-                            cb.like(cb.lower(catJoin.get("name")), kw),
-                            cb.like(cb.lower(userJoin.get("firstName")), kw),
-                            cb.like(cb.lower(userJoin.get("lastName")), kw)
-                    );
+                    // Dùng List để thêm điều kiện một cách linh hoạt
+                    List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+
+                    // (1) Thêm tất cả các điều kiện LIKE văn bản như cũ
+                    predicates.add(cb.like(cb.lower(root.get("title")), kw));
+                    predicates.add(cb.like(cb.lower(root.get("description")), kw));
+                    predicates.add(cb.like(cb.lower(root.get("displayAddress")), kw));
+                    predicates.add(cb.like(cb.lower(root.get("addressStreet")), kw));
+                    predicates.add(cb.like(cb.lower(root.get("position")), kw));
+                    predicates.add(cb.like(cb.lower(catJoin.get("name")), kw));
+                    predicates.add(cb.like(cb.lower(userJoin.get("firstName")), kw));
+                    predicates.add(cb.like(cb.lower(userJoin.get("lastName")), kw));
+
+                    // (2) NẾU token là một số, THÊM điều kiện tìm chính xác theo ID
+                    if (finalId != null) {
+                        predicates.add(cb.equal(root.get("id"), finalId));
+                    }
+
+                    // Trả về một OR của tất cả các điều kiện
+                    return cb.or(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
                 });
             }
         }

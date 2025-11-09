@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  Box, Drawer, Paper, Stack, Avatar, Typography, Chip, LinearProgress,
-  List, ListItem, ListItemIcon, ListItemText, Button,
+Box, Drawer, Paper, Stack, Avatar, Typography, Chip, LinearProgress,
+List, ListItem, ListItemIcon, ListItemText, Button,
 } from "@mui/material";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import LocalOfferOutlinedIcon from "@mui/icons-material/LocalOfferOutlined";
@@ -17,126 +17,126 @@ import { fmtDateOrder, fmtVND } from "@/utils/validators";
 import { adminOrdersApi } from "@/api/adminApi/adminOrdersApi"; 
 
 function InfoBlock({ label, value }) {
-  return (
-    <Box sx={{ minWidth: 160 }}>
-      <Typography variant="caption" color="text.secondary">{label}</Typography>
-      <Typography fontWeight={700}>{value}</Typography>
-    </Box>
-  );
+return (
+<Box sx={{ minWidth: 160 }}>
+<Typography variant="caption" color="text.secondary">{label}</Typography>
+<Typography fontWeight={700}>{value}</Typography>
+</Box>
+);
 }
 
 export default function OrderDetailDrawer({ open, onClose, orderId }) {
-  const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState(null);
+const [loading, setLoading] = useState(false);
+const [detail, setDetail] = useState(null);
 
-  const fetchDetail = useCallback(async () => {
-    // [KIỂM TRA AN TOÀN] Đảm bảo ID là số hợp lệ
-    if (!orderId || isNaN(Number(orderId))) {
+const fetchDetail = useCallback(async () => {
+// [KIỂM TRA AN TOÀN] Đảm bảo ID là số hợp lệ
+if (!orderId || isNaN(Number(orderId))) {
         setDetail(null); // Reset nếu ID không hợp lệ
         return;
     } 
     
-    setLoading(true);
-    try { 
+setLoading(true);
+try { 
         // GỌI API THỰC TẾ
         setDetail(await adminOrdersApi.getById(orderId)); 
     }
-    catch (e) { 
+catch (e) { 
         console.error("Lỗi khi tải chi tiết đơn hàng:", e);
-        message.error("Không tải được chi tiết đơn hàng."); 
-    }
-    finally { setLoading(false); }
-  }, [orderId]);
+message.error("Không tải được chi tiết đơn hàng."); 
+}
+finally { setLoading(false); }
+}, [orderId]);
 
-  // GỌI API khi Drawer mở HOẶC orderId thay đổi
-  useEffect(() => { if (open) fetchDetail(); }, [open, fetchDetail]);
+// GỌI API khi Drawer mở HOẶC orderId thay đổi
+useEffect(() => { if (open) fetchDetail(); }, [open, fetchDetail]);
 
-  const MB = detail ? METHOD_BADGE[detail.method] : null;
+const MB = detail ? METHOD_BADGE[detail.method] : null;
   const fmtOrderId = (id) => `ORD-${String(id).padStart(6, "0")}`;
 
-  return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 480 } }}>
-      <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column", gap: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <ReceiptLongOutlinedIcon /><Typography variant="h6">Chi tiết đơn hàng</Typography>
-        </Stack>
+return (
+<Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 480 } }}>
+<Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column", gap: 2 }}>
+<Stack direction="row" alignItems="center" spacing={1}>
+<ReceiptLongOutlinedIcon /><Typography variant="h6">Chi tiết đơn hàng</Typography>
+</Stack>
 
-        {loading && <LinearProgress />}
+{loading && <LinearProgress />}
 
-        {detail && (
-          <>
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
+{detail && (
+<>
+<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+<Stack direction="row" alignItems="center" spacing={2}>
                 {/* [FIX] Dùng fullName và phone từ DTO */}
-                <Avatar src={detail.user?.avatar} />
-                <Box>
-                  <Typography fontWeight={700}>{detail.user?.fullName}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {detail.user?.email} • {detail.user?.phone}
-                  </Typography>
-                </Box>
-              </Stack>
+<Avatar src={detail.user?.avatar} />
+<Box>
+<Typography fontWeight={700}>{detail.user?.fullName}</Typography>
+<Typography variant="body2" color="text.secondary">
+{detail.user?.email} • {detail.user?.phone}
+</Typography>
+</Box>
+</Stack>
 
-              <Stack direction="row" spacing={1.5} sx={{ mt: 1.5, flexWrap: "wrap" }}>
-                <Chip color={STATUS_COLOR[detail.status] || "default"} label={detail.status} size="small" />
-                <Chip icon={MB ? <MB.Icon fontSize="small" /> : null} label={MB?.label || detail.method} size="small" variant="outlined" />
+<Stack direction="row" spacing={1.5} sx={{ mt: 1.5, flexWrap: "wrap" }}>
+<Chip color={STATUS_COLOR[detail.status] || "default"} label={detail.status} size="small" />
+<Chip icon={MB ? <MB.Icon fontSize="small" /> : null} label={MB?.label || detail.method} size="small" variant="outlined" />
                 {/* [FIX] Dùng primaryItem.listingType */}
-                <Chip icon={<LocalOfferOutlinedIcon />} label={detail.primaryItem?.listingType || 'N/A'} size="small" variant="outlined" />
-              </Stack>
+<Chip icon={<LocalOfferOutlinedIcon />} label={detail.primaryItem?.listingType || 'N/A'} size="small" variant="outlined" />
+</Stack>
 
-              <Stack direction="row" spacing={2} sx={{ mt: 1.5, flexWrap: "wrap" }}>
+<Stack direction="row" spacing={2} sx={{ mt: 1.5, flexWrap: "wrap" }}>
                 {/* [FIX] Dùng orderId */}
-                <InfoBlock label="Mã đơn" value={fmtOrderId(detail.orderId)} /> 
+<InfoBlock label="Mã đơn" value={fmtOrderId(detail.orderId)} /> 
                 {/* [FIX] Dùng total */}
-                <InfoBlock label="Số tiền" value={fmtVND(detail.total)} /> 
-                <InfoBlock label="Tạo lúc" value={fmtDateOrder(detail.createdAt)} />
-                <InfoBlock label="Cập nhật" value={fmtDateOrder(detail.updatedAt)} />
-              </Stack>
+<InfoBlock label="Số tiền" value={fmtVND(detail.total)} /> 
+<InfoBlock label="Tạo lúc" value={fmtDateOrder(detail.createdAt)} />
+<InfoBlock label="Cập nhật" value={fmtDateOrder(detail.updatedAt)} />
+</Stack>
 
-              {/* [FIX] meta không tồn tại trong DTO chi tiết, nên xóa hoặc tìm cách khác */}
-              {/* {detail.meta?.address && (
-                <Box sx={{ mt: 1 }}>
-                  <Typography variant="body2" color="text.secondary">{detail.meta.address}</Typography>
-                </Box>
-              )} */}
-            </Paper>
+{/* [FIX] meta không tồn tại trong DTO chi tiết, nên xóa hoặc tìm cách khác */}
+{/* {detail.meta?.address && (
+<Box sx={{ mt: 1 }}>
+<Typography variant="body2" color="text.secondary">{detail.meta.address}</Typography>
+</Box>
+)} */}
+</Paper>
 
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <Typography fontWeight={700} sx={{ mb: 1 }}>Sản phẩm/ Dịch vụ</Typography>
-              <List dense>
+<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+<Typography fontWeight={700} sx={{ mb: 1 }}>Sản phẩm/ Dịch vụ</Typography>
+<List dense>
                 {/* [FIX] items hiện đã nằm trong DTO chi tiết (OrderDTO), không phải AdminOrderListDTO */}
-                {detail.items?.map((it, idx) => (
-                  <ListItem key={idx} disableGutters>
-                    <ListItemIcon><DoneAllOutlinedIcon /></ListItemIcon>
+{detail.items?.map((it, idx) => (
+<ListItem key={idx} disableGutters>
+<ListItemIcon><DoneAllOutlinedIcon /></ListItemIcon>
                     {/* [FIX] sku/price: Nếu OrderItemDTO chỉ có title/qty/lineTotal, cần đảm bảo fmtVND không lỗi */}
-                    <ListItemText primary={`${it.title} × ${it.qty}`} secondary={`${it.itemType || 'N/A'} • ${fmtVND(it.unitPrice)}`} />
-                  </ListItem>
-                ))}
-              </List>
-            </Paper>
+<ListItemText primary={`${it.title} × ${it.qty}`} secondary={`${it.itemType || 'N/A'} • ${fmtVND(it.unitPrice)}`} />
+</ListItem>
+))}
+</List>
+</Paper>
 
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, flex: 1, overflow: "auto" }}>
-              <Typography fontWeight={700} sx={{ mb: 1 }}>Tiến trình</Typography>
-              <List dense>
+<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, flex: 1, overflow: "auto" }}>
+<Typography fontWeight={700} sx={{ mb: 1 }}>Tiến trình</Typography>
+<List dense>
                 {/* [FIX] timeline: Giả định OrderDTO chi tiết có trường timeline */}
-                {detail.timeline?.map((t) => (
-                  <ListItem key={t.key || t.label} disableGutters sx={{ alignItems: "flex-start" }}>
-                    <ListItemIcon><PendingActionsOutlinedIcon /></ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography fontWeight={700}>{t.label}</Typography>
-                          <Chip variant="outlined" size="small" label={fmtDateOrder(t.time)} />
-                        </Stack>
-                      }
-                      secondary={t.desc}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Paper>
+{detail.timeline?.map((t) => (
+<ListItem key={t.key || t.label} disableGutters sx={{ alignItems: "flex-start" }}>
+<ListItemIcon><PendingActionsOutlinedIcon /></ListItemIcon>
+<ListItemText
+primary={
+<Stack direction="row" spacing={1} alignItems="center">
+<Typography fontWeight={700}>{t.label}</Typography>
+<Chip variant="outlined" size="small" label={fmtDateOrder(t.time)} />
+</Stack>
+}
+secondary={t.desc}
+/>
+</ListItem>
+))}
+</List>
+</Paper>
 
-            <Stack direction="row" spacing={1}>
+<Stack direction="row" spacing={1}>
               {/* NÚT 1: CHỈ HIỆN KHI CHƯA THANH TOÁN */}
               {["UNPAID", "PENDING_PAYMENT"].includes(detail.status) && (
                   <Button
@@ -194,9 +194,9 @@ export default function OrderDetailDrawer({ open, onClose, orderId }) {
                   </Button>
               )}
           </Stack>
-          </>
-        )}
-      </Box>
-    </Drawer>
-  );
+</>
+)}
+</Box>
+</Drawer>
+);
 }

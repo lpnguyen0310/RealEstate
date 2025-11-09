@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +68,7 @@ public class PropertyServiceImpl implements IPropertyService {
     private final NotificationServiceImpl notificationService;
     private final SavedPropertyRepository savedPropertyRepository;
     private final UserConverter userConverter;
+    private final SimpMessagingTemplate messagingTemplate;
 
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String TZ_OFFSET = "+07:00";
@@ -96,17 +98,14 @@ public class PropertyServiceImpl implements IPropertyService {
 
         boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
 
-        // ✅ BẮT ĐẦU TẠO SPEC
+
         Specification<PropertyEntity> spec = Specification
                 .where(PropertySpecification.isPublished());
-        // ✅ Nếu có cityId thì ưu tiên city, bỏ keyword
         if (cityId != null) {
             spec = spec.and(PropertySpecification.hasCity(cityId));
         } else {
             spec = spec.and(PropertySpecification.hasKeyword(keyword, matchAll));
         }
-
-        // ✅ Các điều kiện còn lại
         spec = spec
                 .and(PropertySpecification.hasPropertyType(propertyType))
                 .and(PropertySpecification.hasCategorySlug(categorySlug))
@@ -117,6 +116,8 @@ public class PropertyServiceImpl implements IPropertyService {
         return resultPage.map(propertyMapper::toPropertyCardDTO);
     }
 
+
+
     private Pageable createPageableFromParams(Map<String, String> params) {
         int page = Integer.parseInt(params.getOrDefault("page", "0"));
         int size = Integer.parseInt(params.getOrDefault("size", "10"));
@@ -126,9 +127,8 @@ public class PropertyServiceImpl implements IPropertyService {
         return PageRequest.of(page, size, sort);
     }
 
-    /* =========================================================
-     * DETAILS
-     * ========================================================= */
+
+
     @Override
     @Transactional
     public PropertyDetailDTO getPropertyDetailById(Long id, Long currentUserId, boolean preview) {
@@ -308,6 +308,14 @@ public class PropertyServiceImpl implements IPropertyService {
 
         // 6. LƯU VÀO DB
         var saved = propertyRepository.save(property);
+
+        try {
+            log.info("Đang gửi tín hiệu WS refresh đến /topic/admin/properties (do user update)");
+            messagingTemplate.convertAndSend("/topic/admin/properties", "user_update");
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi tín hiệu WS refresh admin: {}", e.getMessage());
+        }
+
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
     }
     private void applyRequestToEntity(PropertyEntity property,

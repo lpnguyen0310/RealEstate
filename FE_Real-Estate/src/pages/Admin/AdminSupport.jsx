@@ -10,41 +10,34 @@ import { uploadMany } from "@/api/cloudinary";
 const fmt = (ts) => new Date(ts).toLocaleTimeString("vi-VN");
 const formatBytes = (b = 0) => {
     if (!b) return "0 B";
-    const k = 1024,
-        u = ["B", "KB", "MB", "GB"];
+    const k = 1024, u = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(b) / Math.log(k));
     return `${(b / Math.pow(k, i)).toFixed(1)} ${u[i]}`;
 };
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const TabBtn = ({ active, children, onClick }) => (
-  <button
-    onClick={onClick}
-    className={[
-      "px-3 py-1.5 rounded-lg text-sm transition border",
-      active
-        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-        : "bg-white text-gray-700 hover:bg-gray-50 border-gray-300"
-    ].join(" ")}
-    aria-pressed={active}
-  >
-    <span className={active ? "text-white" : "text-inherit"}>{children}</span>
-  </button>
+    <button
+        onClick={onClick}
+        className={[
+            "px-3 py-1.5 rounded-lg text-sm transition border",
+            active
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                : "bg-white text-gray-700 hover:bg-gray-50 border-gray-300",
+        ].join(" ")}
+        aria-pressed={active}
+    >
+        <span className={active ? "text-white" : "text-inherit"}>{children}</span>
+    </button>
 );
 
 function Toast({ open, type = "success", message, onClose }) {
     if (!open) return null;
     const color =
-        type === "success"
-            ? "bg-emerald-600"
-            : type === "error"
-                ? "bg-rose-600"
-                : "bg-gray-800";
+        type === "success" ? "bg-emerald-600" : type === "error" ? "bg-rose-600" : "bg-gray-800";
     return (
         <div className="fixed top-4 right-4 z-[1100]">
-            <div className={`text-white ${color} rounded-xl px-4 py-2 shadow-lg`}>
-                {message}
-            </div>
+            <div className={`text-white ${color} rounded-xl px-4 py-2 shadow-lg`}>{message}</div>
         </div>
     );
 }
@@ -69,10 +62,7 @@ function ConfirmDeleteModal({
 
     return (
         <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center">
-            <div
-                className="absolute inset-0 bg-black/40"
-                onClick={loading ? undefined : onClose}
-            />
+            <div className="absolute inset-0 bg-black/40" onClick={loading ? undefined : onClose} />
             <div className="relative w-full sm:w:[440px] sm:w-[440px] mx-3 sm:mx-0 rounded-2xl bg-white shadow-xl border border-gray-200 p-4 sm:p-6">
                 <div className="flex items-start gap-3">
                     <div className="shrink-0 h-10 w-10 grid place-items-center rounded-full bg-rose-100 text-rose-600 text-xl">
@@ -108,25 +98,17 @@ function ConfirmDeleteModal({
 /* Cloudinary helpers */
 function clThumbFromUrl(secureUrl, { w = 520, h = 520, fit = "c_fill" } = {}) {
     if (!secureUrl) return secureUrl;
-    return secureUrl.replace(
-        "/upload/",
-        `/upload/${fit},w_${w},h_${h},q_auto,f_auto/`
-    );
+    return secureUrl.replace("/upload/", `/upload/${fit},w_${w},h_${h},q_auto,f_auto/`);
 }
 function clDownloadUrl(secureUrl, filename) {
     if (!secureUrl) return secureUrl;
-    const flag = filename
-        ? `fl_attachment:${encodeURIComponent(filename)}`
-        : "fl_attachment";
+    const flag = filename ? `fl_attachment:${encodeURIComponent(filename)}` : "fl_attachment";
     return secureUrl.replace("/upload/", `/upload/${flag}/`);
 }
 function isImage(att) {
     const mime = (att?.mimeType || "").toLowerCase();
     const name = (att?.name || "").toLowerCase();
-    return (
-        mime.startsWith("image/") ||
-        /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name)
-    );
+    return mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
 }
 
 /* ===================== Chuẩn hoá dữ liệu ===================== */
@@ -139,23 +121,13 @@ function mapConversation(c) {
         status: c.status,
         assigneeId: c.assigneeId ?? null,
         unread: c.unreadForAssignee ?? c.unreadCount ?? c.unread ?? 0,
-        updatedAt: c.lastMessageAt
-            ? Date.parse(c.lastMessageAt)
-            : c.updatedAt
-                ? Date.parse(c.updatedAt)
-                : Date.now(),
+        updatedAt: c.lastMessageAt ? Date.parse(c.lastMessageAt) : c.updatedAt ? Date.parse(c.updatedAt) : Date.now(),
     };
 }
 function normalizeFromRedux(c) {
     const lmAt = c.lastMessageAt;
     const updatedAt =
-        typeof lmAt === "number"
-            ? lmAt
-            : lmAt
-                ? Date.parse(lmAt)
-                : c.updatedAt
-                    ? Date.parse(c.updatedAt)
-                    : Date.now();
+        typeof lmAt === "number" ? lmAt : lmAt ? Date.parse(lmAt) : c.updatedAt ? Date.parse(c.updatedAt) : Date.now();
 
     return {
         id: c.conversationId || c.id,
@@ -171,8 +143,7 @@ function normalizeFromRedux(c) {
 function mapMessage(m) {
     return {
         id: m.messageId || m.id,
-        clientId:
-            m.clientId || m.clientMessageId || m.client_message_id || m.clientMsgId,
+        clientId: m.clientId || m.clientMessageId || m.client_message_id || m.clientMsgId,
         role: (m.senderRole || m.role) === "ADMIN" ? "admin" : "user",
         content: m.content || m.text || "",
         ts: m.createdAt ? Date.parse(m.createdAt) : m.ts || Date.now(),
@@ -183,26 +154,17 @@ function mapMessage(m) {
             mimeType: a.mimeType || "",
         })),
         conversationId: m.conversationId,
-        reactions: Array.isArray(m.reactions)
-            ? m.reactions.map((r) => ({ userId: r.userId, emoji: r.emoji }))
-            : [],
+        reactions: Array.isArray(m.reactions) ? m.reactions.map((r) => ({ userId: r.userId, emoji: r.emoji })) : [],
     };
 }
 
 /* ===================== Filter sidebar theo tab ===================== */
 function applyTabFilter(items, tab, meId, meEmail) {
-    if (tab === "unassigned")
-        return items.filter((x) => x.status === "UNASSIGNED");
+    if (tab === "unassigned") return items.filter((x) => x.status === "UNASSIGNED");
     if (tab === "mine") {
         return items.filter((x) => {
-            const byId =
-                meId != null &&
-                x.assigneeId != null &&
-                String(x.assigneeId) === String(meId);
-            const byEmail =
-                meEmail &&
-                x.assigneeEmail &&
-                x.assigneeEmail.toLowerCase() === meEmail.toLowerCase();
+            const byId = meId != null && x.assigneeId != null && String(x.assigneeId) === String(meId);
+            const byEmail = meEmail && x.assigneeEmail && x.assigneeEmail.toLowerCase() === meEmail.toLowerCase();
             return (byId || byEmail) && x.status !== "RESOLVED";
         });
     }
@@ -211,7 +173,6 @@ function applyTabFilter(items, tab, meId, meEmail) {
 
 /* ===================== Reactions helpers ===================== */
 function groupReactions(reactions = []) {
-    // Kết quả: [{emoji, count, userIds: Set}]
     const map = new Map();
     for (const r of reactions) {
         const e = r.emoji;
@@ -224,9 +185,7 @@ function groupReactions(reactions = []) {
         g.count += 1;
         if (r.userId != null) g.userIds.add(String(r.userId));
     }
-    return Array.from(map.values()).sort(
-        (a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji)
-    );
+    return Array.from(map.values()).sort((a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji));
 }
 const DEFAULT_REACTION_SET = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 
@@ -278,8 +237,15 @@ export default function AdminSupport() {
     const seenServerIdsRef = useRef(new Set());
     const seenSigRef = useRef(new Set());
 
-    // Mở picker reaction cho message id nào
+    // Reaction picker state
     const [openReactionFor, setOpenReactionFor] = useState(null);
+
+    // ===== NEW: Mobile Sidebar (Drawer) =====
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    // đóng Drawer khi chọn hội thoại
+    useEffect(() => {
+        if (sel) setSidebarOpen(false);
+    }, [sel]);
 
     /* ===================== Load danh sách ===================== */
     useEffect(() => {
@@ -288,14 +254,8 @@ export default function AdminSupport() {
         (async () => {
             try {
                 const res = await supportApi.listConversations({ tab, q, page: 0, size: 50 });
-                const raw = Array.isArray(res?.content)
-                    ? res.content
-                    : Array.isArray(res)
-                        ? res
-                        : [];
-                const mapped = raw
-                    .map(mapConversation)
-                    .sort((a, b) => b.updatedAt - a.updatedAt);
+                const raw = Array.isArray(res?.content) ? res.content : Array.isArray(res) ? res : [];
+                const mapped = raw.map(mapConversation).sort((a, b) => b.updatedAt - a.updatedAt);
 
                 if (mounted) {
                     setList(mapped);
@@ -310,11 +270,9 @@ export default function AdminSupport() {
                                 subject: c.subject,
                                 status: c.status,
                                 assigneeId: c.assigneeId ?? null,
-                                lastMessagePreview:
-                                    c.lastMessagePreview || c.lastMessage || c.preview || "",
+                                lastMessagePreview: c.lastMessagePreview || c.lastMessage || c.preview || "",
                                 lastMessageAt: c.lastMessageAt || c.updatedAt,
-                                unreadForAssignee:
-                                    c.unreadForAssignee ?? c.unreadCount ?? c.unread ?? 0,
+                                unreadForAssignee: c.unreadForAssignee ?? c.unreadCount ?? c.unread ?? 0,
                                 unreadForCustomer: c.unreadForCustomer ?? 0,
                             }))
                         )
@@ -342,9 +300,7 @@ export default function AdminSupport() {
             );
         }
 
-        const merged = applyTabFilter(normalized, tab, me?.id, meEmail).sort(
-            (a, b) => b.updatedAt - a.updatedAt
-        );
+        const merged = applyTabFilter(normalized, tab, me?.id, meEmail).sort((a, b) => b.updatedAt - a.updatedAt);
         setList((prev) => {
             const sameLen = prev.length === merged.length;
             const same =
@@ -372,16 +328,8 @@ export default function AdminSupport() {
 
         (async () => {
             try {
-                const res = await supportApi.fetchMessages({
-                    conversationId: sel.id,
-                    page: 0,
-                    size: 50,
-                });
-                const arr = Array.isArray(res?.content)
-                    ? res.content
-                    : Array.isArray(res)
-                        ? res
-                        : [];
+                const res = await supportApi.fetchMessages({ conversationId: sel.id, page: 0, size: 50 });
+                const arr = Array.isArray(res?.content) ? res.content : Array.isArray(res) ? res : [];
                 if (mounted) {
                     const mapped = arr.map(mapMessage);
                     setMsgs(mapped);
@@ -411,10 +359,8 @@ export default function AdminSupport() {
     /* ===================== Nhận realtime message ===================== */
     useEffect(() => {
         if (!wsIncoming || !sel?.id) return;
-        // 0) Bỏ qua tín hiệu bóng đẩy từ slice khi vừa click Send
         if (wsIncoming._optimistic) return;
 
-        // 1) Nếu server báo về bản "thay thế bóng" → thay vì append, ta replace
         if (wsIncoming._replaceClientMsgId) {
             const repId = wsIncoming._replaceClientMsgId;
             const idx = pendingByClientIdRef.current.get(repId);
@@ -428,7 +374,6 @@ export default function AdminSupport() {
                 pendingByClientIdRef.current.delete(repId);
                 const sid = String(wsIncoming.messageId || wsIncoming.id || "");
                 if (sid) seenServerIdsRef.current.add(sid);
-                // cập nhật preview sidebar
                 setList((p) =>
                     p
                         .map((cv) =>
@@ -438,13 +383,11 @@ export default function AdminSupport() {
                         )
                         .sort((a, b) => b.updatedAt - a.updatedAt)
                 );
-                // scroll xuống
                 setTimeout(() => {
                     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
                 }, 0);
-                return; // ✅ kết thúc nhánh thay thế
+                return;
             }
-            // nếu không tìm thấy bóng, tiếp tục xuống như bình thường (append) nhưng sẽ được dedupe bởi serverId
         }
 
         const m = mapMessage(wsIncoming);
@@ -518,9 +461,7 @@ export default function AdminSupport() {
 
         setMsgs((prev) =>
             prev.map((m) =>
-                String(m.id) === String(messageId)
-                    ? { ...m, reactions: Array.isArray(reactions) ? reactions.slice() : [] }
-                    : m
+                String(m.id) === String(messageId) ? { ...m, reactions: Array.isArray(reactions) ? reactions.slice() : [] } : m
             )
         );
     }, [lastReactionEvent, sel?.id]);
@@ -568,8 +509,7 @@ export default function AdminSupport() {
                 url: a.url,
                 name: a.name,
                 sizeBytes: a.size,
-                mimeType:
-                    a.file?.type || (a.type === "image" ? "image/*" : "application/octet-stream"),
+                mimeType: a.file?.type || (a.type === "image" ? "image/*" : "application/octet-stream"),
             }));
         }
         const folder = sel?.id ? `support/${sel.id}` : "support";
@@ -581,8 +521,7 @@ export default function AdminSupport() {
                     url: a.url,
                     name: a.name,
                     sizeBytes: a.size,
-                    mimeType:
-                        a.file?.type || (a.type === "image" ? "image/*" : "application/octet-stream"),
+                    mimeType: a.file?.type || (a.type === "image" ? "image/*" : "application/octet-stream"),
                 };
             }
             const r = results[j++];
@@ -590,8 +529,7 @@ export default function AdminSupport() {
                 url: r.secure_url,
                 name: a.name,
                 sizeBytes: a.size,
-                mimeType:
-                    a.file?.type || (a.type === "image" ? "image/*" : "application/octet-stream"),
+                mimeType: a.file?.type || (a.type === "image" ? "image/*" : "application/octet-stream"),
                 publicId: r.public_id,
                 resourceType: r.resource_type,
             };
@@ -609,11 +547,7 @@ export default function AdminSupport() {
     async function onAssignMe() {
         if (!sel) return;
         await supportApi.assignToMe(sel.id);
-        setList((p) =>
-            p.map((c) =>
-                c.id === sel.id ? { ...c, status: "OPEN", assigneeId: meId, unread: 0 } : c
-            )
-        );
+        setList((p) => p.map((c) => (c.id === sel.id ? { ...c, status: "OPEN", assigneeId: meId, unread: 0 } : c)));
         setSel((s) => ({ ...s, status: "OPEN", assigneeId: meId }));
     }
 
@@ -641,19 +575,20 @@ export default function AdminSupport() {
                 url: a.url,
                 name: a.name,
                 size: a.size,
-                mimeType:
-                    a.file?.type || (a.type === "image" ? "image/*" : "application/octet-stream"),
+                mimeType: a.file?.type || (a.type === "image" ? "image/*" : "application/octet-stream"),
             })),
             reactions: [],
             conversationId: sel.id,
         };
 
-        dispatch(supportSliceActions.addPendingMessage({
-            conversationId: sel.id,
-            content: text,
-            clientMsgId: clientId,
-            ts: optimistic.ts,
-        }));
+        dispatch(
+            supportSliceActions.addPendingMessage({
+                conversationId: sel.id,
+                content: text,
+                clientMsgId: clientId,
+                ts: optimistic.ts,
+            })
+        );
         setMsgs((p) => {
             const next = [...p, optimistic];
             pendingByClientIdRef.current.set(clientId, next.length - 1);
@@ -690,12 +625,7 @@ export default function AdminSupport() {
                         p
                             .map((cv) =>
                                 cv.id === sel.id
-                                    ? {
-                                        ...cv,
-                                        lastMessage: mapped.content || "[Tệp]",
-                                        updatedAt: Date.now(),
-                                        unread: 0,
-                                    }
+                                    ? { ...cv, lastMessage: mapped.content || "[Tệp]", updatedAt: Date.now(), unread: 0 }
                                     : cv
                             )
                             .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -711,7 +641,6 @@ export default function AdminSupport() {
         }
     }
 
-    // Toggle/đổi/gỡ reaction (optimistic), WS sẽ đồng bộ snapshot
     async function onToggleReaction(messageId, emoji) {
         if (!messageId || !emoji) return;
         const myId = String(meId ?? "");
@@ -746,7 +675,6 @@ export default function AdminSupport() {
         }
     }
 
-    /* ====== Delete one: open modal -> confirm -> delete ====== */
     async function deleteSingle(conversationId) {
         if (!conversationId) return;
         setBusyDelete(true);
@@ -789,19 +717,16 @@ export default function AdminSupport() {
     );
 
     return (
-        <div className="h-[82vh] w-full rounded-2xl border border-gray-200 overflow-hidden bg-white min-h-0">
-            <div className="grid grid-cols-[320px_1fr] h-full min-h-0">
-                {/* Sidebar */}
-                <aside className="border-r border-gray-200 flex flex-col min-h-0">
+        <div className="w-full rounded-2xl border border-gray-200 overflow-hidden bg-white min-h-0 h-[90dvh] lg:h-[82vh]">
+            {/* ===== Responsive grid: desktop 2 cột, mobile 1 cột với Drawer sidebar ===== */}
+            <div className="h-full min-h-0 lg:grid lg:grid-cols-[320px_1fr]">
+                {/* ===== Sidebar (Desktop) ===== */}
+                <aside className="hidden lg:flex lg:flex-col lg:min-h-0 lg:border-r lg:border-gray-200">
                     <div className="px-3 py-3 border-b border-gray-200">
                         <div className="text-lg font-semibold">Hội thoại</div>
                         <div className="mt-2 flex gap-2">
                             {tabs.map((t) => (
-                                <TabBtn
-                                    key={t.key}
-                                    active={tab === t.key}
-                                    onClick={() => setTab(t.key)}
-                                >
+                                <TabBtn key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
                                     {t.label}
                                 </TabBtn>
                             ))}
@@ -828,13 +753,9 @@ export default function AdminSupport() {
 
                     <div className="flex-1 min-h-0 overflow-y-auto">
                         {loadingList ? (
-                            <div className="h-full grid place-items-center text-gray-500">
-                                Đang tải…
-                            </div>
+                            <div className="h-full grid place-items-center text-gray-500">Đang tải…</div>
                         ) : list.length === 0 ? (
-                            <div className="h-full grid place-items-center text-gray-500">
-                                Không có hội thoại
-                            </div>
+                            <div className="h-full grid place-items-center text-gray-500">Không có hội thoại</div>
                         ) : (
                             <ul className="divide-y divide-gray-100">
                                 {list.map((cv) => (
@@ -849,9 +770,7 @@ export default function AdminSupport() {
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="font-medium truncate">
-                                                        {cv.customerName}
-                                                    </div>
+                                                    <div className="font-medium truncate">{cv.customerName}</div>
                                                     {cv.unread > 0 && (
                                                         <span className="ml-1 inline-flex items-center justify-center text-[11px] px-1.5 h-5 rounded-full bg-rose-600 text-white">
                                                             {cv.unread}
@@ -859,19 +778,17 @@ export default function AdminSupport() {
                                                     )}
                                                     <span
                                                         className={`ml-auto text-[11px] px-1.5 py-0.5 rounded ${cv.status === "UNASSIGNED"
-                                                            ? "bg-amber-100 text-amber-800"
-                                                            : cv.status === "OPEN"
-                                                                ? "bg-emerald-100 text-emerald-700"
-                                                                : "bg-gray-200 text-gray-700"
+                                                                ? "bg-amber-100 text-amber-800"
+                                                                : cv.status === "OPEN"
+                                                                    ? "bg-emerald-100 text-emerald-700"
+                                                                    : "bg-gray-200 text-gray-700"
                                                             }`}
                                                     >
                                                         {cv.status}
                                                     </span>
                                                 </div>
                                                 <div className="text-xs text-gray-500">{cv.phone}</div>
-                                                <div className="text-sm text-gray-700 truncate">
-                                                    {cv.lastMessage}
-                                                </div>
+                                                <div className="text-sm text-gray-700 truncate">{cv.lastMessage}</div>
                                             </div>
                                         </button>
                                     </li>
@@ -881,10 +798,32 @@ export default function AdminSupport() {
                     </div>
                 </aside>
 
-                {/* Thread */}
-                <section className="flex flex-col min-h-0">
-                    {/* Header */}
-                    <div className="h-14 border-b border-gray-200 px-4 flex items-center gap-3">
+                {/* ===== Thread / Nội dung (Cả mobile & desktop) ===== */}
+                <section className="grid grid-rows-[56px_1fr_auto] min-h-0 h-full">
+                    {/* Header Thread */}
+                    <div className="h-14 border-b border-gray-200 px-3 sm:px-4 flex items-center gap-2 sm:gap-3">
+                        {/* Mobile: nút mở Sidebar + Back */}
+                        <div className="lg:hidden flex items-center gap-2">
+                            {!sel && (
+                                <button
+                                    onClick={() => setSidebarOpen(true)}
+                                    className="h-9 px-3 rounded-lg border bg-white text-gray-700 text-sm"
+                                    aria-label="Mở danh sách hội thoại"
+                                >
+                                    Hội thoại
+                                </button>
+                            )}
+                            {sel && (
+                                <button
+                                    onClick={() => setSel(null)}
+                                    className="h-9 px-3 rounded-lg border bg-white text-gray-700 text-sm"
+                                    aria-label="Quay lại danh sách"
+                                >
+                                    ← Quay lại
+                                </button>
+                            )}
+                        </div>
+
                         {sel ? (
                             <>
                                 <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center font-semibold">
@@ -900,39 +839,40 @@ export default function AdminSupport() {
                                             onClick={onAssignMe}
                                             className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700"
                                         >
-                                            Nhận hội thoại
+                                            Nhận
                                         </button>
                                     )}
-                                    {/* Nút Xóa hội thoại -> mở modal */}
                                     <button
                                         onClick={() => setConfirmOpen(true)}
                                         className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-sm hover:bg-rose-700 disabled:opacity-50"
                                         disabled={busyDelete}
                                         title="Xóa hội thoại này"
                                     >
-                                        Xóa hội thoại
+                                        Xóa
                                     </button>
 
-                                    {sel.status !== "RESOLVED" && (
-                                        <span className="text-xs text-gray-500">
-                                            Cập nhật: {fmt(sel.updatedAt)}
-                                        </span>
-                                    )}
+                                    <span className="hidden sm:block text-[11px] text-gray-500">
+                                        Cập nhật: {fmt(sel.updatedAt)}
+                                    </span>
                                 </div>
                             </>
                         ) : (
-                            <div className="text-gray-500">Chọn một hội thoại bên trái</div>
+                            <div className="text-gray-500 hidden lg:block">Chọn một hội thoại bên trái</div>
                         )}
                     </div>
 
-
-                    {/* ===================== Messages ===================== */}
-                    <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 bg-gray-50">
+                    {/* Messages */}
+                    <div
+                        ref={listRef}
+                        className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-3 bg-gray-50"
+                        style={{
+                            // đảm bảo không bị che bởi safe-area khi có thanh điều hướng
+                            paddingBottom: "env(safe-area-inset-bottom)",
+                        }}
+                    >
                         {sel ? (
                             loadingMsgs ? (
-                                <div className="h-full grid place-items-center text-gray-500">
-                                    Đang tải tin nhắn…
-                                </div>
+                                <div className="h-full grid place-items-center text-gray-500">Đang tải tin nhắn…</div>
                             ) : msgs.length === 0 ? (
                                 <div className="h-full grid place-items-center text-gray-500">
                                     Chưa có tin nhắn trong hội thoại này
@@ -944,52 +884,44 @@ export default function AdminSupport() {
                                     const hasText = !!(m.content || "").trim();
                                     const isAdmin = m.role === "admin";
 
-                                    // căn trái/phải cho dòng
-                                    const rowClass =
-                                        m.role === "admin" ? "flex justify-end mb-3" : "flex justify-start mb-3";
-
-                                    // bubble chỉ dành cho TEXT
+                                    const rowClass = m.role === "admin" ? "flex justify-end mb-3" : "flex justify-start mb-3";
                                     const bubbleClass = `inline-block ${m.role === "admin" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-800"
                                         } rounded-2xl px-3 py-2 whitespace-pre-wrap break-words`;
 
                                     return (
                                         <div key={m.id || m.clientId} className={rowClass}>
                                             <div
-                                                className={`flex flex-col max-w-[80%] ${m.role === "admin" ? "items-end" : "items-start"
+                                                className={`flex flex-col max-w-[88%] sm:max-w-[80%] ${m.role === "admin" ? "items-end" : "items-start"
                                                     }`}
                                             >
-                                                {/* ==== BUBBLE (CHỈ TEXT) + NÚT REACTION (bám bubble) ==== */}
+                                                {/* TEXT bubble + reaction button */}
                                                 {hasText && (
                                                     <div className="relative group inline-block">
                                                         <div className={bubbleClass}>
                                                             <div className="text-sm leading-5">{m.content}</div>
-                                                            <div className={`mt-1 text-[10px] ${isAdmin ? "text-white/70 text-right" : "text-gray-500 text-left"} whitespace-nowrap leading-none`}>
+                                                            <div
+                                                                className={`mt-1 text-[10px] ${isAdmin ? "text-white/70 text-right" : "text-gray-500 text-left"
+                                                                    } whitespace-nowrap leading-none`}
+                                                            >
                                                                 {fmt(m.ts)}
                                                             </div>
                                                         </div>
 
-                                                        {/* Nút reaction bám mép bubble */}
+                                                        {/* Reaction trigger (bám cạnh bubble) */}
                                                         <button
                                                             className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition
-                      h-7 w-7 rounded-full bg-white shadow border grid place-items-center
-                      ${m.role === "admin"
-                                                                    ? "left-0 -translate-x-full ml-2"
-                                                                    : "right-0 translate-x-full mr-2"
-                                                                }`}
+                              h-8 w-8 rounded-full bg-white shadow border grid place-items-center text-base
+                              ${m.role === "admin" ? "left-0 -translate-x-full ml-2" : "right-0 translate-x-full mr-2"}`}
                                                             title="Thả cảm xúc"
-                                                            onClick={() =>
-                                                                setOpenReactionFor((prev) => (prev === m.id ? null : m.id))
-                                                            }
+                                                            onClick={() => setOpenReactionFor((prev) => (prev === m.id ? null : m.id))}
                                                         >
                                                             👍
                                                         </button>
 
-                                                        {/* Quick picker */}
+                                                        {/* Quick picker (hover/nhấn) */}
                                                         {openReactionFor === m.id && (
                                                             <div
-                                                                className={`absolute z-50 top-1/2 -translate-y-1/2 ${m.role === "admin"
-                                                                    ? "left-0 -translate-x-full ml-3"
-                                                                    : "right-0 translate-x-full mr-3"
+                                                                className={`absolute z-50 top-1/2 -translate-y-1/2 ${m.role === "admin" ? "left-0 -translate-x-full ml-3" : "right-0 translate-x-full mr-3"
                                                                     }`}
                                                                 onMouseLeave={() => setOpenReactionFor(null)}
                                                             >
@@ -997,7 +929,7 @@ export default function AdminSupport() {
                                                                     {DEFAULT_REACTION_SET.map((em) => (
                                                                         <button
                                                                             key={em}
-                                                                            className="h-8 w-8 grid place-items-center text-lg hover:scale-110 transition"
+                                                                            className="h-9 w-9 grid place-items-center text-lg hover:scale-110 transition"
                                                                             onClick={() => onToggleReaction(m.id, em)}
                                                                         >
                                                                             {em}
@@ -1009,7 +941,7 @@ export default function AdminSupport() {
                                                     </div>
                                                 )}
 
-                                                {/* ==== GALLERY ẢNH (ngoài bubble) ==== */}
+                                                {/* IMAGE gallery (ngoài bubble) */}
                                                 {imgs.length > 0 && (
                                                     <div
                                                         className={`mt-2 grid gap-1 ${imgs.length === 1 ? "grid-cols-1" : "grid-cols-2"
@@ -1017,10 +949,9 @@ export default function AdminSupport() {
                                                     >
                                                         {imgs.map((a, idx) => {
                                                             const u = a.url;
-                                                            const thumb =
-                                                                typeof u === "string" && u.includes("/upload/")
-                                                                    ? clThumbFromUrl(u, { w: 520, h: 520 })
-                                                                    : u;
+                                                            const thumb = typeof u === "string" && u.includes("/upload/")
+                                                                ? clThumbFromUrl(u, { w: 520, h: 520 })
+                                                                : u;
                                                             const alt = a.name || `image_${idx + 1}`;
                                                             return (
                                                                 <a
@@ -1031,23 +962,18 @@ export default function AdminSupport() {
                                                                     className="block overflow-hidden rounded-xl border bg-white"
                                                                     title={alt}
                                                                 >
-                                                                    <img
-                                                                        src={thumb}
-                                                                        alt={alt}
-                                                                        className="max-h-[260px] w-full object-cover"
-                                                                    />
+                                                                    <img src={thumb} alt={alt} className="max-h-[260px] w-full object-cover" />
                                                                 </a>
                                                             );
                                                         })}
                                                     </div>
                                                 )}
 
-                                                {/* ==== FILE CARDS (ngoài bubble) ==== */}
+                                                {/* FILE cards (ngoài bubble) */}
                                                 {files.length > 0 && (
                                                     <div className="mt-2 flex flex-col gap-1 w-full">
                                                         {files.map((a, idx) => {
                                                             const href = a.url;
-                                                            // ép tải nếu là Cloudinary: fl_attachment[:filename]
                                                             const downloadUrl =
                                                                 typeof href === "string" && href.includes("/upload/")
                                                                     ? clDownloadUrl(href, a.name)
@@ -1069,7 +995,6 @@ export default function AdminSupport() {
                                                                     <span className="text-lg">{icon}</span>
                                                                     <div className="flex-1 min-w-0">
                                                                         <div className="text-sm font-medium truncate">
-                                                                            {/* Bấm vào tên: mở xem */}
                                                                             <a
                                                                                 href={href}
                                                                                 target="_blank"
@@ -1080,12 +1005,9 @@ export default function AdminSupport() {
                                                                                 {a.name || "file"}
                                                                             </a>
                                                                         </div>
-                                                                        <div className="text-xs text-gray-500">
-                                                                            {formatBytes(a.size)}
-                                                                        </div>
+                                                                        <div className="text-xs text-gray-500">{formatBytes(a.size)}</div>
                                                                     </div>
 
-                                                                    {/* Icon mở xem */}
                                                                     <a
                                                                         href={href}
                                                                         target="_blank"
@@ -1096,7 +1018,6 @@ export default function AdminSupport() {
                                                                         📂
                                                                     </a>
 
-                                                                    {/* Icon tải xuống — dùng downloadUrl để đảm bảo tải */}
                                                                     <a
                                                                         href={downloadUrl}
                                                                         download
@@ -1111,29 +1032,28 @@ export default function AdminSupport() {
                                                     </div>
                                                 )}
 
-                                                {/* ==== NÚT REACTION CHO TIN NHẮN KHÔNG CÓ TEXT ==== */}
+                                                {/* Reaction button cho msg không có text */}
                                                 {!hasText && (
                                                     <div className={`relative group mt-1 ${m.role === "admin" ? "w-full flex justify-end" : ""}`}>
                                                         <button
-                                                            className={`opacity-0 group-hover:opacity-100 transition
-                      h-7 w-7 rounded-full bg-white shadow border grid place-items-center`}
+                                                            className={`opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition
+                              h-8 w-8 rounded-full bg-white shadow border grid place-items-center`}
                                                             title="Thả cảm xúc"
-                                                            onClick={() => setOpenReactionFor(prev => (prev === m.id ? null : m.id))}
+                                                            onClick={() => setOpenReactionFor((prev) => (prev === m.id ? null : m.id))}
                                                         >
                                                             👍
                                                         </button>
 
                                                         {openReactionFor === m.id && (
                                                             <div
-                                                                className={`absolute z-50 -top-10 ${m.role === "admin" ? "right-0" : "left-0"
-                                                                    }`}
+                                                                className={`absolute z-50 -top-10 ${m.role === "admin" ? "right-0" : "left-0"}`}
                                                                 onMouseLeave={() => setOpenReactionFor(null)}
                                                             >
                                                                 <div className="rounded-2xl bg-white shadow-xl border p-1 flex gap-1">
-                                                                    {DEFAULT_REACTION_SET.map(em => (
+                                                                    {DEFAULT_REACTION_SET.map((em) => (
                                                                         <button
                                                                             key={em}
-                                                                            className="h-8 w-8 grid place-items-center text-lg hover:scale-110 transition"
+                                                                            className="h-9 w-9 grid place-items-center text-lg hover:scale-110 transition"
                                                                             onClick={() => onToggleReaction(m.id, em)}
                                                                         >
                                                                             {em}
@@ -1145,7 +1065,7 @@ export default function AdminSupport() {
                                                     </div>
                                                 )}
 
-                                                {/* ==== REACTION CHIPS (bên dưới, căn phải nếu admin) ==== */}
+                                                {/* Reaction chips */}
                                                 {(() => {
                                                     const grouped = groupReactions(m.reactions || []);
                                                     if (!grouped.length) return null;
@@ -1162,7 +1082,7 @@ export default function AdminSupport() {
                                                                 return (
                                                                     <span
                                                                         key={gr.emoji}
-                                                                        className={`px-2 h-6 inline-flex items-center gap-1 rounded-full text-xs border cursor-pointer select-none ${chipClass}`}
+                                                                        className={`px-2 h-7 inline-flex items-center gap-1 rounded-full text-xs border cursor-pointer select-none ${chipClass}`}
                                                                         onClick={() => onToggleReaction(m.id, gr.emoji)}
                                                                     >
                                                                         <span>{gr.emoji}</span>
@@ -1174,35 +1094,31 @@ export default function AdminSupport() {
                                                     );
                                                 })()}
 
-                                                {/* Nếu KHÔNG có text (chỉ ảnh/tệp), vẫn hiển thị timestamp nhỏ bên dưới */}
+                                                {/* Timestamp khi chỉ có media/file */}
                                                 {!hasText && (
-                                                    <div className="mt-1 text-[10px] text-gray-500 whitespace-nowrap leading-none">
-                                                        {fmt(m.ts)}
-                                                    </div>
+                                                    <div className="mt-1 text-[10px] text-gray-500 whitespace-nowrap leading-none">{fmt(m.ts)}</div>
                                                 )}
                                             </div>
                                         </div>
                                     );
                                 })
                             )
-                        ) : null}
+                        ) : (
+                            // Mobile: gợi ý mở sidebar
+                            <div className="h-full grid place-items-center text-gray-500 lg:hidden">
+                                Nhấn nút <b>Hội thoại</b> để chọn cuộc trò chuyện
+                            </div>
+                        )}
                     </div>
-
-
-
 
                     {/* Attachments preview (chưa gửi) */}
                     {!!attachments.length && (
-                        <div className="px-4 pb-2 bg-white max-h-40 overflow-y-auto">
-                            <div className="flex flex-wrap gap-2">
+                        <div className="px-3 sm:px-4 pb-2 bg-white max-h-36 overflow-y-auto">
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar">
                                 {attachments.map((a) =>
                                     a.type === "image" ? (
-                                        <div key={a.id} className="relative">
-                                            <img
-                                                src={a.url}
-                                                alt={a.name}
-                                                className="w-20 h-20 object-cover rounded-lg border"
-                                            />
+                                        <div key={a.id} className="relative shrink-0">
+                                            <img src={a.url} alt={a.name} className="w-20 h-20 object-cover rounded-lg border" />
                                             <button
                                                 onClick={() => removeAttachment(a.id)}
                                                 className="absolute -top-2 -right-2 bg-black/60 text-white rounded-full w-6 h-6 text-xs"
@@ -1214,7 +1130,7 @@ export default function AdminSupport() {
                                     ) : (
                                         <div
                                             key={a.id}
-                                            className="px-2 py-1 rounded-lg border text-xs flex items-center gap-2 bg-gray-50"
+                                            className="px-2 py-1 rounded-lg border text-xs flex items-center gap-2 bg-gray-50 shrink-0"
                                         >
                                             <span>📄</span>
                                             <span className="max-w-[160px] truncate">{a.name}</span>
@@ -1233,9 +1149,12 @@ export default function AdminSupport() {
                         </div>
                     )}
 
-                    {/* Input + emoji + upload */}
-                    <div className="h-auto border-t border-gray-200 p-3">
-                        <div className="relative flex items-center gap-2">
+                    {/* Input bar */}
+                    <div
+                        className="border-t border-gray-200 p-2 sm:p-3 bg-white"
+                        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+                    >
+                        <div className="relative flex items-end gap-2">
                             <textarea
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
@@ -1249,10 +1168,10 @@ export default function AdminSupport() {
                                 placeholder={sel ? "Nhập tin nhắn…" : "Chọn hội thoại để trả lời…"}
                                 disabled={!sel}
                                 className="flex-1 min-w-0 resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm
-                                focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
                             />
 
-                            {/* Emoji soạn nội dung */}
+                            {/* Emoji */}
                             <div className="relative">
                                 <button
                                     ref={emojiAnchorRef}
@@ -1271,8 +1190,8 @@ export default function AdminSupport() {
                                         <EmojiPicker
                                             onEmojiClick={(emoji) => setInput((v) => v + emoji.emoji)}
                                             theme="light"
-                                            height={360}
-                                            width={320}
+                                            height={320}
+                                            width={280}
                                             searchDisabled
                                             skinTonesDisabled
                                             lazyLoadEmojis
@@ -1284,7 +1203,7 @@ export default function AdminSupport() {
                             {/* Ảnh */}
                             <button
                                 onClick={() => imgInputRef.current?.click()}
-                                className="h-[38px] w-[38px] flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100"
+                                className="h-[38px] w-[38px] flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100 text-base"
                                 title="Gửi ảnh"
                             >
                                 🖼️
@@ -1305,7 +1224,7 @@ export default function AdminSupport() {
                             {/* File */}
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="h-[38px] w-[38px] flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100"
+                                className="h-[38px] w-[38px] flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100 text-base"
                                 title="Đính kèm tệp"
                             >
                                 📎
@@ -1326,8 +1245,7 @@ export default function AdminSupport() {
                             <button
                                 onClick={onSend}
                                 disabled={!sel || sending || (!input.trim() && attachments.length === 0)}
-                                className="h-[38px] px-4 rounded-xl bg-indigo-600 text-white text-sm font-medium
-                    hover:bg-indigo-700 disabled:opacity-50"
+                                className="h-[38px] px-4 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                             >
                                 Gửi
                             </button>
@@ -1336,7 +1254,109 @@ export default function AdminSupport() {
                 </section>
             </div>
 
-            {/* Confirm Delete Modal */}
+            {/* ===== Mobile Drawer (Sidebar) ===== */}
+            <div
+                className={`lg:hidden fixed inset-0 z-[1050] transition ${sidebarOpen ? "pointer-events-auto" : "pointer-events-none"
+                    }`}
+                aria-hidden={!sidebarOpen}
+            >
+                {/* backdrop */}
+                <div
+                    className={`absolute inset-0 bg-black/40 transition-opacity ${sidebarOpen ? "opacity-100" : "opacity-0"}`}
+                    onClick={() => setSidebarOpen(false)}
+                />
+                {/* sheet */}
+                <div
+                    className={`absolute left-0 top-0 h-full w-[86%] max-w-[360px] bg-white shadow-2xl border-r border-gray-200
+          transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+                >
+                    <div className="px-3 py-3 border-b border-gray-200 flex items-center gap-2">
+                        <div className="text-base font-semibold">Hội thoại</div>
+                        <button
+                            onClick={() => setSidebarOpen(false)}
+                            className="ml-auto h-9 px-3 rounded-lg border bg-white text-gray-700 text-sm"
+                        >
+                            Đóng
+                        </button>
+                    </div>
+
+                    <div className="px-3 py-2 border-b border-gray-200">
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                            {tabs.map((t) => (
+                                <TabBtn key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
+                                    {t.label}
+                                </TabBtn>
+                            ))}
+                        </div>
+                        <div className="mt-2">
+                            <div className="relative">
+                                <input
+                                    value={q}
+                                    onChange={(e) => setQ(e.target.value)}
+                                    placeholder="Tìm tên/điện thoại/nội dung…"
+                                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                {q && (
+                                    <button
+                                        onClick={() => setQ("")}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="h-[calc(100%-112px)] overflow-y-auto">
+                        {loadingList ? (
+                            <div className="h-full grid place-items-center text-gray-500">Đang tải…</div>
+                        ) : list.length === 0 ? (
+                            <div className="h-full grid place-items-center text-gray-500">Không có hội thoại</div>
+                        ) : (
+                            <ul className="divide-y divide-gray-100">
+                                {list.map((cv) => (
+                                    <li key={cv.id}>
+                                        <button
+                                            onClick={() => setSel(cv)}
+                                            className={`w-full text-left px-3 py-3 flex gap-3 items-start hover:bg-gray-50 transition ${sel?.id === cv.id ? "bg-indigo-50" : ""
+                                                }`}
+                                        >
+                                            <div className="shrink-0 h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center font-semibold">
+                                                {cv.customerName?.[0] || "K"}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="font-medium truncate">{cv.customerName}</div>
+                                                    {cv.unread > 0 && (
+                                                        <span className="ml-1 inline-flex items-center justify-center text-[11px] px-1.5 h-5 rounded-full bg-rose-600 text-white">
+                                                            {cv.unread}
+                                                        </span>
+                                                    )}
+                                                    <span
+                                                        className={`ml-auto text-[11px] px-1.5 py-0.5 rounded ${cv.status === "UNASSIGNED"
+                                                                ? "bg-amber-100 text-amber-800"
+                                                                : cv.status === "OPEN"
+                                                                    ? "bg-emerald-100 text-emerald-700"
+                                                                    : "bg-gray-200 text-gray-700"
+                                                            }`}
+                                                    >
+                                                        {cv.status}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-gray-500">{cv.phone}</div>
+                                                <div className="text-sm text-gray-700 truncate">{cv.lastMessage}</div>
+                                            </div>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Confirm Delete Modal + Toast */}
             <ConfirmDeleteModal
                 open={confirmOpen}
                 title="Xóa hội thoại"

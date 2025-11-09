@@ -1,14 +1,15 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
     Paper, LinearProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Checkbox, Stack, Box, Avatar, Badge, Chip, Tooltip, IconButton,
-    Pagination, PaginationItem, Typography, Select, MenuItem,
+    Pagination, PaginationItem, Typography, Select, MenuItem, Menu, ListItemIcon, ListItemText,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { STATUS_COLOR, METHOD_BADGE, HOVER_BG, styles } from "./constants";
 import { fmtDateOrder, fmtVND } from "@/utils/validators";
 
@@ -23,30 +24,50 @@ export default function OrdersTable({
     setSelected,
     onView,
     onQuickAction,
-    // optional – nếu truyền thì sẽ hiện dropdown chọn page size
     setPageSize,
 }) {
     const allChecked = rows.length > 0 && selected.length === rows.length;
     const indeterminate = selected.length > 0 && selected.length < rows.length;
 
-    const toggleAll = (e) => { if (e.target.checked) setSelected(rows.map((r) => r.orderId)); else setSelected([]); };
-    // Sửa toggleOne để sử dụng r.orderId
-    const toggleOne = (id) => {
-        // 'selected' là mảng IDs được truyền từ component cha (AdminOrder)
-        const newSelected = selected.includes(id)
-            ? selected.filter((x) => x !== id)  // Tạo mảng mới loại bỏ 'id'
-            : [...selected, id];                // Tạo mảng mới thêm 'id'
-
-        // Gửi mảng mới này về cho Redux
-        setSelected(newSelected);
+    const toggleAll = (e) => {
+        e.stopPropagation();
+        if (e.target.checked) setSelected(rows.map((r) => r.orderId));
+        else setSelected([]);
+    };
+    const toggleOne = (e, id) => {
+        e.stopPropagation();
+        const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+        setSelected(next);
     };
 
     const totalPages = Math.max(1, Math.ceil(total / (pageSize || 1)));
     const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, start + rows.length - 1);
 
-    // Hàm format ID để khớp với format cũ (ORD-000059)
     const fmtOrderId = (id) => `ORD-${String(id).padStart(6, "0")}`;
+
+    // Mobile menu state
+    const [anchorEl, setAnchorEl] = useState(null);
+    const [menuRow, setMenuRow] = useState(null);
+    const openMenu = Boolean(anchorEl);
+    const openMenuFor = (e, row) => {
+        e.stopPropagation();
+        setAnchorEl(e.currentTarget);
+        setMenuRow(row);
+    };
+    const closeMenu = () => {
+        setAnchorEl(null);
+        setMenuRow(null);
+    };
+    const runAndClose = (fn) => {
+        if (!menuRow) return;
+        fn(menuRow);
+        closeMenu();
+    };
+
+    // Shadow khi header sticky cuộn (nhẹ thôi, không bắt buộc)
+    const [scrolled, setScrolled] = useState(false);
+    const onScroll = (e) => setScrolled(e.currentTarget.scrollTop > 0);
 
     return (
         <Paper
@@ -60,33 +81,52 @@ export default function OrdersTable({
             }}
         >
             {loading && <LinearProgress />}
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
                 <TableContainer
+                    onScroll={onScroll}
                     sx={{
                         borderRadius: "10px",
-                        overflow: "hidden",
+                        overflow: "auto",
                         border: "1px solid #eef2f9",
+                        maxWidth: "100%",
                     }}
                 >
-                    <Table>
-                        <TableHead sx={{ backgroundColor: "#f3f7ff" }}>
+                    <Table size="small" stickyHeader sx={{ minWidth: 980 }}>
+                        <TableHead
+                            sx={{
+                                backgroundColor: "#f3f7ff",
+                                "& .MuiTableCell-root": {
+                                    position: "sticky",
+                                    top: 0,
+                                    background: "#f3f7ff",
+                                    zIndex: 1,
+                                    boxShadow: scrolled ? "inset 0 -1px 0 #e5e7eb, 0 2px 6px rgba(0,0,0,0.06)" : "inset 0 -1px 0 #e5e7eb",
+                                },
+                            }}
+                        >
                             <TableRow>
                                 <TableCell padding="checkbox" sx={styles.headCell}>
-                                    <Checkbox
-                                        checked={allChecked}
-                                        indeterminate={indeterminate}
-                                        onChange={toggleAll}
-                                    />
+                                    <Checkbox checked={allChecked} indeterminate={indeterminate} onChange={toggleAll} />
                                 </TableCell>
                                 <TableCell sx={styles.headCell}>Mã đơn</TableCell>
                                 <TableCell sx={styles.headCell}>Khách hàng</TableCell>
-                                <TableCell sx={styles.headCell}>Phương thức</TableCell>
-                                <TableCell sx={{ ...styles.headCell, textAlign: "right" }}>
-                                    Số tiền
+
+                                <TableCell sx={{ ...styles.headCell, display: { xs: "none", sm: "table-cell" } }}>
+                                    Phương thức
                                 </TableCell>
+
+                                <TableCell sx={{ ...styles.headCell, textAlign: "right" }}>Số tiền</TableCell>
+
                                 <TableCell sx={styles.headCell}>Trạng thái</TableCell>
-                                <TableCell sx={styles.headCell}>Tạo lúc</TableCell>
-                                <TableCell sx={styles.headCell}>Cập nhật</TableCell>
+
+                                <TableCell sx={{ ...styles.headCell, display: { xs: "none", md: "table-cell" } }}>
+                                    Tạo lúc
+                                </TableCell>
+
+                                <TableCell sx={{ ...styles.headCell, display: { xs: "none", lg: "table-cell" } }}>
+                                    Cập nhật
+                                </TableCell>
+
                                 <TableCell sx={{ ...styles.headCell, textAlign: "center" }} width={140}>
                                     Hành động
                                 </TableCell>
@@ -102,32 +142,34 @@ export default function OrdersTable({
                                 </TableRow>
                             ) : (
                                 rows.map((r) => {
-                                    // Dữ liệu từ BE: r.method (string), r.user (object), r.orderId (long), r.total (long)
                                     const MB = METHOD_BADGE[r.method];
-                                    const primaryItem = r.primaryItem; // Lấy thông tin gói chính
+                                    const primaryItem = r.primaryItem;
 
                                     return (
                                         <TableRow
-                                            key={r.orderId} // Dùng orderId làm key
+                                            key={r.orderId}
                                             hover
                                             sx={{
-                                                "& td": { transition: "background-color 140ms ease" },
+                                                "& td": { transition: "background-color 140ms ease", py: { xs: 1, sm: 1.25 } },
                                                 "&:hover td": { backgroundColor: HOVER_BG },
+                                                cursor: "pointer",
                                             }}
+                                            onClick={() => onView(r)}
                                         >
                                             <TableCell padding="checkbox" sx={styles.bodyCell}>
                                                 <Checkbox
-                                                    checked={selected.includes(r.orderId)} // Dùng orderId
-                                                    onChange={() => toggleOne(r.orderId)} // Dùng orderId
+                                                    checked={selected.includes(r.orderId)}
+                                                    onChange={(e) => toggleOne(e, r.orderId)}
+                                                    onClick={(e) => e.stopPropagation()}
                                                 />
                                             </TableCell>
 
-                                            {/* CỘT MÃ ĐƠN */}
+                                            {/* Mã đơn */}
                                             <TableCell sx={styles.bodyCell}>
                                                 <Stack direction="row" spacing={1.25} alignItems="center">
                                                     <Badge
                                                         color="primary"
-                                                        badgeContent={r.itemsCount} // itemsCount đã có
+                                                        badgeContent={r.itemsCount}
                                                         anchorOrigin={{ vertical: "top", horizontal: "right" }}
                                                     >
                                                         <Avatar sx={{ width: 32, height: 32, bgcolor: "#eef2ff", color: "#4f46e5" }}>
@@ -136,69 +178,113 @@ export default function OrdersTable({
                                                     </Badge>
                                                     <Box sx={{ minWidth: 0 }}>
                                                         <Typography fontWeight={700} noWrap>
-                                                            {fmtOrderId(r.orderId)} {/* SỬA: Dùng orderId và format */}
+                                                            {fmtOrderId(r.orderId)}
                                                         </Typography>
-                                                        <Typography fontSize={12} color="#718198">
-                                                            {primaryItem?.title} {/* SỬA: Lấy tên gói hàng chính */}
+                                                        <Typography
+                                                            fontSize={12}
+                                                            color="#718198"
+                                                            sx={{
+                                                                overflow: "hidden",
+                                                                display: "-webkit-box",
+                                                                WebkitLineClamp: 1,
+                                                                WebkitBoxOrient: "vertical",
+                                                            }}
+                                                        >
+                                                            {primaryItem?.title}
                                                         </Typography>
+
+                                                        {/* Mobile meta line: xs only */}
+                                                        <Stack
+                                                            direction="row"
+                                                            spacing={0.75}
+                                                            alignItems="center"
+                                                            sx={{ display: { xs: "flex", sm: "none" }, mt: 0.25, flexWrap: "wrap" }}
+                                                        >
+                                                            {MB && (
+                                                                <Chip
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    icon={<MB.Icon fontSize="small" />}
+                                                                    label={MB.label}
+                                                                    sx={{ height: 22 }}
+                                                                />
+                                                            )}
+                                                            <Chip
+                                                                size="small"
+                                                                color={STATUS_COLOR[r.status] || "default"}
+                                                                label={r.status}
+                                                                sx={{ height: 22 }}
+                                                            />
+                                                            <Typography variant="caption" color="#718198">
+                                                                • {fmtDateOrder(r.createdAt)}
+                                                            </Typography>
+                                                        </Stack>
                                                     </Box>
                                                 </Stack>
                                             </TableCell>
 
-                                            {/* CỘT KHÁCH HÀNG */}
+                                            {/* Khách hàng */}
                                             <TableCell sx={styles.bodyCell}>
                                                 <Stack direction="row" spacing={1} alignItems="center">
-                                                    <Avatar src={r.user?.avatar} sx={{ width: 28, height: 28 }} /> {/* Đã sửa Optional Chaining */}
-                                                    <Box>
-                                                        <Typography fontWeight={600}>{r.user?.fullName}</Typography> {/* Đã sửa Optional Chaining */}
-                                                        <Typography fontSize={12} color="#718198">{r.user?.email}</Typography> {/* Đã sửa Optional Chaining */}
+                                                    <Avatar src={r.user?.avatar} sx={{ width: 28, height: 28 }} />
+                                                    <Box sx={{ minWidth: 0 }}>
+                                                        <Typography fontWeight={600} noWrap>
+                                                            {r.user?.fullName}
+                                                        </Typography>
+                                                        <Typography fontSize={12} color="#718198" noWrap>
+                                                            {r.user?.email}
+                                                        </Typography>
                                                     </Box>
                                                 </Stack>
                                             </TableCell>
 
-                                            {/* CỘT PHƯƠNG THỨC */}
-                                            <TableCell sx={styles.bodyCell}>
+                                            {/* Phương thức (ẩn ở xs) */}
+                                            <TableCell sx={{ ...styles.bodyCell, display: { xs: "none", sm: "table-cell" } }}>
                                                 <Chip
                                                     size="small"
                                                     variant="outlined"
                                                     icon={MB ? <MB.Icon fontSize="small" /> : null}
-                                                    label={MB?.label || r.method} 
+                                                    label={MB?.label || r.method}
                                                 />
                                             </TableCell>
 
-                                            {/* CỘT SỐ TIỀN */}
+                                            {/* Số tiền */}
                                             <TableCell sx={{ ...styles.bodyCell, textAlign: "right", fontWeight: 700 }}>
-                                                {fmtVND(r.total)} {/* SỬA: Dùng r.total thay vì r.amount */}
+                                                {fmtVND(r.total)}
                                             </TableCell>
 
-                                            {/* CỘT TRẠNG THÁI */}
+                                            {/* Trạng thái */}
                                             <TableCell sx={styles.bodyCell}>
-                                                <Chip
-                                                    size="small"
-                                                    color={STATUS_COLOR[r.status] || "default"}
-                                                    label={r.status}
-                                                />
+                                                <Chip size="small" color={STATUS_COLOR[r.status] || "default"} label={r.status} />
                                             </TableCell>
 
-                                            {/* CỘT TẠO LÚC */}
-                                            <TableCell sx={styles.bodyCell}>{fmtDateOrder(r.createdAt)}</TableCell>
-                                            
-                                            {/* CỘT CẬP NHẬT */}
-                                            <TableCell sx={styles.bodyCell}>{fmtDateOrder(r.updatedAt)}</TableCell>
+                                            {/* Tạo lúc */}
+                                            <TableCell sx={{ ...styles.bodyCell, display: { xs: "none", md: "table-cell" } }}>
+                                                {fmtDateOrder(r.createdAt)}
+                                            </TableCell>
 
-                                            {/* CỘT HÀNH ĐỘNG */}
-                                            <TableCell align="center" sx={styles.bodyCell}>
-                                                <Stack direction="row" spacing={0.5} justifyContent="center">
+                                            {/* Cập nhật */}
+                                            <TableCell sx={{ ...styles.bodyCell, display: { xs: "none", lg: "table-cell" } }}>
+                                                {fmtDateOrder(r.updatedAt)}
+                                            </TableCell>
+
+                                            {/* Hành động */}
+                                            <TableCell align="center" sx={{ ...styles.bodyCell }}>
+                                                {/* Desktop ≥ md: nút trực tiếp */}
+                                                <Box sx={{ display: { xs: "none", md: "inline-flex" }, gap: 0.5 }}>
                                                     <Tooltip title="Xem chi tiết">
-                                                        <IconButton onClick={() => onView(r)} size="small">
+                                                        <IconButton onClick={(e) => { e.stopPropagation(); onView(r); }} size="small">
                                                             <InfoOutlinedIcon fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
 
-                                                    {/* QICK ACTION */}
-                                                    {["UNPAID", "PENDING_PAYMENT"].includes(r.status) && ( // Thêm PENDING_PAYMENT
+                                                    {["UNPAID", "PENDING_PAYMENT"].includes(r.status) && (
                                                         <Tooltip title="Đánh dấu đã thanh toán">
-                                                            <IconButton onClick={() => onQuickAction("paid", r)} color="success" size="small">
+                                                            <IconButton
+                                                                onClick={(e) => { e.stopPropagation(); onQuickAction("paid", r); }}
+                                                                color="success"
+                                                                size="small"
+                                                            >
                                                                 <CheckCircleOutlineOutlinedIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
@@ -206,21 +292,35 @@ export default function OrdersTable({
 
                                                     {["PAID", "PROCESSING"].includes(r.status) && (
                                                         <Tooltip title="Hoàn tiền">
-                                                            <IconButton onClick={() => onQuickAction("refund", r)} color="warning" size="small">
+                                                            <IconButton
+                                                                onClick={(e) => { e.stopPropagation(); onQuickAction("refund", r); }}
+                                                                color="warning"
+                                                                size="small"
+                                                            >
                                                                 <AutorenewOutlinedIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
 
-                                                    {/* Hủy đơn áp dụng cho hầu hết trạng thái trừ CANCELED/REFUNDED */}
                                                     {r.status !== "CANCELED" && r.status !== "REFUNDED" && (
                                                         <Tooltip title="Hủy đơn">
-                                                            <IconButton onClick={() => onQuickAction("cancel", r)} color="error" size="small">
+                                                            <IconButton
+                                                                onClick={(e) => { e.stopPropagation(); onQuickAction("cancel", r); }}
+                                                                color="error"
+                                                                size="small"
+                                                            >
                                                                 <CancelOutlinedIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
-                                                </Stack>
+                                                </Box>
+
+                                                {/* Mobile/Tablet < md: gom menu */}
+                                                <Box sx={{ display: { xs: "inline-flex", md: "none" } }}>
+                                                    <IconButton size="small" onClick={(e) => openMenuFor(e, r)}>
+                                                        <MoreVertIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Box>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -230,23 +330,44 @@ export default function OrdersTable({
                     </Table>
                 </TableContainer>
 
-                {/* Footer giống bố cục mẫu */}
-                <Box sx={{ mt: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+                {/* Footer */}
+                <Box
+                    sx={{
+                        mt: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
+                        flexWrap: "wrap",
+                    }}
+                >
                     <Box display="flex" alignItems="center" gap={1.5}>
-                        {/* setPageSize không được truyền từ AdminOrder, nên phần này sẽ không được render */}
                         {setPageSize && (
                             <Select
                                 size="small"
                                 value={pageSize}
-                                onChange={(e) => { const v = Number(e.target.value); setPageSize(v); onPageChange(1); }}
+                                onChange={(e) => {
+                                    const v = Number(e.target.value);
+                                    setPageSize(v);
+                                    onPageChange(1);
+                                }}
                                 sx={{
-                                    height: 40, minWidth: 100, borderRadius: "8px",
+                                    height: 40,
+                                    minWidth: { xs: 96, sm: 110 },
+                                    borderRadius: "8px",
                                     "& .MuiOutlinedInput-notchedOutline": { borderColor: "#d7deec" },
                                     "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff" },
-                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff", borderWidth: 1.4 },
+                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "#3059ff",
+                                        borderWidth: 1.4,
+                                    },
                                 }}
                             >
-                                {[10, 20, 50].map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+                                {[10, 20, 50].map((v) => (
+                                    <MenuItem key={v} value={v}>
+                                        {v}
+                                    </MenuItem>
+                                ))}
                             </Select>
                         )}
                         <Typography fontSize={13} color="#7a8aa1">
@@ -295,6 +416,43 @@ export default function OrdersTable({
                     />
                 </Box>
             </Box>
+
+            {/* Mobile actions menu */}
+            <Menu anchorEl={anchorEl} open={openMenu} onClose={closeMenu}>
+                <MenuItem onClick={() => runAndClose((r) => onView(r))}>
+                    <ListItemIcon>
+                        <InfoOutlinedIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Chi tiết</ListItemText>
+                </MenuItem>
+
+                {["UNPAID", "PENDING_PAYMENT"].includes(menuRow?.status || "") && (
+                    <MenuItem onClick={() => runAndClose((r) => onQuickAction("paid", r))}>
+                        <ListItemIcon>
+                            <CheckCircleOutlineOutlinedIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Đánh dấu đã thanh toán</ListItemText>
+                    </MenuItem>
+                )}
+
+                {["PAID", "PROCESSING"].includes(menuRow?.status || "") && (
+                    <MenuItem onClick={() => runAndClose((r) => onQuickAction("refund", r))}>
+                        <ListItemIcon>
+                            <AutorenewOutlinedIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Hoàn tiền</ListItemText>
+                    </MenuItem>
+                )}
+
+                {menuRow && menuRow.status !== "CANCELED" && menuRow.status !== "REFUNDED" && (
+                    <MenuItem onClick={() => runAndClose((r) => onQuickAction("cancel", r))}>
+                        <ListItemIcon>
+                            <CancelOutlinedIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Hủy đơn</ListItemText>
+                    </MenuItem>
+                )}
+            </Menu>
         </Paper>
     );
 }

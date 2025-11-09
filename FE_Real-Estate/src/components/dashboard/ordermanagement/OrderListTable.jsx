@@ -1,9 +1,21 @@
+// src/components/dashboard/ordermanagement/OrderListTable.jsx
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, Box, Typography, Select, MenuItem, Pagination, PaginationItem
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+  Pagination,
+  PaginationItem,
 } from "@mui/material";
 import { useMemo } from "react";
-import dayjs from "dayjs"; // ✨ THÊM IMPORT NÀY
+import dayjs from "dayjs";
 
 const HOVER_BG = "#dbe7ff";
 
@@ -32,84 +44,103 @@ export default function OrderTable({
         border: "1px solid #e8edf6",
         boxShadow: "0 6px 18px rgba(13,47,97,0.06)",
       }}
+      className="min-w-0"
     >
       <Box sx={{ p: 2 }}>
-        <TableContainer
-          sx={{
-            borderRadius: "10px",
-            overflow: "hidden",
-            border: "1px solid #eef2f9",
-          }}
-        >
-          <Table>
-            <TableHead sx={{ backgroundColor: "#f3f7ff" }}>
-              <TableRow>
-                <TableCell sx={styles.headCell}>Mã đơn hàng</TableCell>
-                <TableCell sx={styles.headCell}>Trạng thái</TableCell>
-                <TableCell sx={styles.headCell}>Ngày tạo</TableCell>
-                <TableCell sx={styles.headCell}>Số tiền</TableCell>
-                <TableCell sx={styles.headCell}>Tạo bởi</TableCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {data.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    align="center"
-                    sx={{
-                      py: 6,
-                      color: "#7a8aa1",
-                      backgroundColor: "#fff",
-                    }}
-                  >
-                    Không có dữ liệu
-                  </TableCell>
+        {/* Wrapper cho phép KÉO NGANG trên mobile */}
+        <Box sx={{ width: "100%", overflowX: "auto" }} className="no-scrollbar">
+          <TableContainer
+            sx={{
+              minWidth: 720, // ép bề ngang để xuất hiện kéo ngang
+              borderRadius: "10px",
+              overflow: "hidden",
+              border: "1px solid #eef2f9",
+            }}
+          >
+            <Table stickyHeader size="small">
+              <TableHead sx={{ backgroundColor: "#f3f7ff" }}>
+                <TableRow
+                  sx={{
+                    "& th": {
+                      whiteSpace: "nowrap",
+                      fontWeight: 700,
+                      fontSize: 14,
+                      color: "#1a3b7c",
+                    },
+                  }}
+                >
+                  <TableCell>Mã đơn hàng</TableCell>
+                  <TableCell>Trạng thái</TableCell>
+                  <TableCell>Ngày tạo</TableCell>
+                  <TableCell>Số tiền</TableCell>
+                  <TableCell>Tạo bởi</TableCell>
                 </TableRow>
-              ) : (
-                data.map((row) => ( // ✨ ĐÃ SỬA LẠI TÊN FIELD TRONG ĐÂY
-                  <TableRow
-                    key={row.orderId} // Sửa từ `row.code`
-                    hover
-                    sx={{
-                      "& td": { transition: "background-color 140ms ease" },
-                      "&:hover td": { backgroundColor: HOVER_BG },
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => onRowClick?.(row)}
-                  >
-                    <TableCell sx={styles.bodyCell}>{row.orderId}</TableCell>
-                    <TableCell sx={styles.bodyCell}>
-                      <span
-                        style={{
-                          color:
-                            row.status === "PENDING_PAYMENT" // Sửa lại logic màu
-                              ? "#f28c38"
-                              : row.status === "PAID"
-                                ? "#1aa260"
-                                : "#e53935",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {/* Sửa lại logic dịch status */}
-                        {row.status === 'PAID' ? 'Thành công' : row.status === 'PENDING_PAYMENT' ? 'Đang xử lý' : 'Đã hủy'}
-                      </span>
-                    </TableCell>
-                    {/* Thêm format ngày tháng */}
-                    <TableCell sx={styles.bodyCell}>{dayjs(row.createdAt).format('DD/MM/YYYY HH:mm')}</TableCell>
-                    {/* Sửa từ `row.amount` thành `row.total` và format */}
-                    <TableCell sx={styles.bodyCell}>{row.total.toLocaleString('vi-VN')} VND</TableCell>
-                     {/* Sửa từ `row.createdBy` thành `row.userName` */}
-                    <TableCell sx={styles.bodyCell}>{row.userName}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
 
-        {/* Footer: page-size + pagination */}
+              <TableBody>
+                {data.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      align="center"
+                      sx={{ py: 6, color: "#7a8aa1", backgroundColor: "#fff" }}
+                    >
+                      Không có dữ liệu
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data.map((row) => (
+                    <TableRow
+                      key={row.orderId}
+                      hover
+                      sx={{
+                        cursor: "pointer",
+                        "& td": {
+                          transition: "background-color 140ms ease",
+                          whiteSpace: "nowrap",
+                          fontSize: 14,
+                          color: "#2b3a55",
+                        },
+                        "&:hover td": { backgroundColor: HOVER_BG },
+                      }}
+                      onClick={() => onRowClick?.(row)}
+                    >
+                      <TableCell>{row.orderId}</TableCell>
+                      <TableCell>
+                        <span
+                          style={{
+                            color:
+                              row.status === "PENDING_PAYMENT"
+                                ? "#f28c38"
+                                : row.status === "PAID"
+                                  ? "#1aa260"
+                                  : "#e53935",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {row.status === "PAID"
+                            ? "Thành công"
+                            : row.status === "PENDING_PAYMENT"
+                              ? "Đang xử lý"
+                              : "Đã hủy"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {dayjs(row.createdAt).format("DD/MM/YYYY HH:mm")}
+                      </TableCell>
+                      <TableCell>
+                        {Number(row.total || 0).toLocaleString("vi-VN")} VND
+                      </TableCell>
+                      <TableCell>{row.userName}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+
+        {/* Footer: page-size + pagination (xếp dọc trên mobile) */}
         <Box
           sx={{
             mt: 2,
@@ -117,14 +148,29 @@ export default function OrderTable({
             alignItems: "center",
             justifyContent: "space-between",
             gap: 2,
+            flexDirection: { xs: "column", sm: "row" },
           }}
+          className="min-w-0"
         >
-          <Box display="flex" alignItems="center" gap={1.5}>
+          <Box
+            display="flex"
+            alignItems="center"
+            gap={1.5}
+            sx={{ width: { xs: "100%", sm: "auto" } }}
+          >
             <Select
               size="small"
               value={pageSize}
               onChange={(e) => onPageSizeChange?.(e.target.value)}
-              sx={{ /* ... styles của bạn ... */ }}
+              sx={{
+                height: 36,
+                ".MuiOutlinedInput-notchedOutline": { borderColor: "#d7deec" },
+                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff" },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#3059ff",
+                  borderWidth: 1.4,
+                },
+              }}
             >
               {[10, 20, 50].map((v) => (
                 <MenuItem key={v} value={v}>
@@ -132,7 +178,7 @@ export default function OrderTable({
                 </MenuItem>
               ))}
             </Select>
-            <Typography fontSize={13} color="#7a8aa1">
+            <Typography fontSize={13} color="#7a8aa1" noWrap>
               Hiển thị {start} đến {end} của {totalItems}
             </Typography>
           </Box>
@@ -148,11 +194,21 @@ export default function OrderTable({
                   previous: () => <span style={{ padding: "0 10px" }}>Trước</span>,
                   next: () => <span style={{ padding: "0 10px" }}>Tiếp Theo</span>,
                 }}
-                sx={{ /* ... styles của bạn ... */ }}
+                sx={{
+                  ".MuiPaginationItem-previousNext": {
+                    borderRadius: "8px",
+                    border: "1px solid #e5e9f5",
+                    bgcolor: "#fff",
+                    "&:hover": { bgcolor: "#f5f8ff" },
+                  },
+                }}
               />
             )}
             sx={{
-              "& .MuiPagination-ul": { gap: "px" },
+              width: { xs: "100%", sm: "auto" },
+              display: "flex",
+              justifyContent: { xs: "center", sm: "flex-end" },
+              "& .MuiPagination-ul": { gap: "4px" },
               "& .MuiButtonBase-root": { WebkitTapHighlightColor: "transparent" },
             }}
           />
@@ -161,8 +217,3 @@ export default function OrderTable({
     </Paper>
   );
 }
-
-const styles = {
-  headCell: { fontWeight: 600, fontSize: 14, color: "#1a3b7c" },
-  bodyCell: { fontSize: 14, color: "#2b3a55" },
-};

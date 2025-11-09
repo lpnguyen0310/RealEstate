@@ -1,4 +1,3 @@
-// src/pages/PurchagePostPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -7,8 +6,7 @@ import { createOrder, clearOrderError, payOrderByBalanceThunk } from "@/store/or
 import { fetchMyProfile } from "@/store/profileSlice";
 import { fmtVND as fmt, calcTotal } from "@/utils/countToToal";
 import { SingleCard, ComboCard, PaymentCard } from "@/components/dashboard/purchagemangement";
-import { Spin } from 'antd'; // Chỉ cần Spin từ Antd
-// Import MUI components cho Snackbar
+import { Spin } from "antd";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
 
@@ -16,67 +14,74 @@ export default function PurchagePostPage() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
-    // Lấy state giá
-    const { SINGLE, COMBOS, ALL_ITEMS, loading: pricingLoading, error: pricingError } = useSelector((s) => s.pricing);
-    // Lấy state profile
-    const { data: profileData, status: profileStatus, error: profileError } = useSelector((s) => s.profile);
-    // Lấy state order
+    // Pricing
+    const { SINGLE, COMBOS, ALL_ITEMS, loading: pricingLoading, error: pricingError } = useSelector(
+        (s) => s.pricing
+    );
+
+    // Profile
+    const { data: profileData, status: profileStatus, error: profileError } = useSelector(
+        (s) => s.profile
+    );
+
+    // Order
     const {
         loading: isCreatingOrder,
         error: createOrderError,
         payWithBalanceStatus,
-        payWithBalanceError
+        payWithBalanceError,
     } = useSelector((s) => s.orders);
 
     const [qty, setQty] = useState({});
-    const [paymentMethod, setPaymentMethod] = useState('online');
+    const [paymentMethod, setPaymentMethod] = useState("online");
     const setItem = (id, v) => setQty((s) => ({ ...s, [id]: v }));
 
-    // State và handler cho MUI Snackbar
+    // Snackbar
     const [alert, setAlert] = useState({ open: false, message: "", severity: "success" });
-    const handleCloseAlert = (event, reason) => {
+    const handleCloseAlert = (_, reason) => {
         if (reason === "clickaway") return;
         setAlert((s) => ({ ...s, open: false }));
     };
 
-    // Tải danh sách giá
+    // load pricing
     useEffect(() => {
         dispatch(loadPricing());
     }, [dispatch]);
 
-    // Tải profile nếu chưa có
+    // load profile if needed
     useEffect(() => {
-        if (profileStatus === 'idle') {
+        if (profileStatus === "idle") {
             dispatch(fetchMyProfile());
         }
     }, [dispatch, profileStatus]);
 
-    // Tính tổng tiền
+    // total
     const total = useMemo(() => calcTotal(qty, SINGLE, COMBOS), [qty, SINGLE, COMBOS]);
 
-    // Tính số dư và khả năng thanh toán
+    // balances
     const { mainBalance, bonusBalance, canPayWithBalance } = useMemo(() => {
         const main = profileData?.mainBalance ?? 0;
         const bonus = profileData?.bonusBalance ?? 0;
         return {
             mainBalance: main,
             bonusBalance: bonus,
-            canPayWithBalance: (main + bonus) >= total && total > 0
+            canPayWithBalance: main + bonus >= total && total > 0,
         };
     }, [profileData, total]);
 
-    // Xác định trạng thái loading tổng hợp
-    const isProcessingPayment = isCreatingOrder || payWithBalanceStatus === 'loading';
+    const isProcessingPayment = isCreatingOrder || payWithBalanceStatus === "loading";
 
-    // Hàm xử lý thanh toán
+    // pay handler
     const handlePayment = async () => {
         const itemsPayload = Object.keys(qty)
-            .filter(itemId => qty[itemId] > 0)
-            .map(itemId => {
-                const itemInfo = ALL_ITEMS.find(item => item.id.toString() === itemId);
+            .filter((itemId) => qty[itemId] > 0)
+            .map((itemId) => {
+                const itemInfo = ALL_ITEMS.find((item) => item.id.toString() === itemId);
                 if (!itemInfo) return null;
-                const codeToSend = itemInfo._raw?.code || itemInfo.id;
-                return { code: codeToSend, qty: qty[itemId] };
+                return {
+                    code: itemInfo._raw.code, // gửi code (VD: "VIP_1" | "COMBO_FAST")
+                    qty: qty[itemId],
+                };
             })
             .filter(Boolean);
 
@@ -85,125 +90,174 @@ export default function PurchagePostPage() {
             return;
         }
 
-        // Clear lỗi cũ
         if (createOrderError || payWithBalanceError) {
             dispatch(clearOrderError());
         }
 
-        // Xử lý thanh toán bằng số dư
-        if (paymentMethod === 'balance') {
+        // balance
+        if (paymentMethod === "balance") {
             if (!canPayWithBalance) {
-                setAlert({ open: true, message: "Số dư tài khoản không đủ để thực hiện thanh toán này.", severity: "error" });
+                setAlert({
+                    open: true,
+                    message: "Số dư tài khoản không đủ để thực hiện thanh toán này.",
+                    severity: "error",
+                });
                 return;
             }
 
-            // B1: Tạo đơn hàng
             const createOrderAction = await dispatch(createOrder(itemsPayload));
             if (createOrder.fulfilled.match(createOrderAction)) {
                 const newOrder = createOrderAction.payload;
                 const orderIdToPay = newOrder?.orderId;
-
                 if (!orderIdToPay) {
                     setAlert({ open: true, message: "Lỗi: Không nhận được ID đơn hàng sau khi tạo.", severity: "error" });
                     return;
                 }
 
-                // B2: Thanh toán bằng số dư
                 const payAction = await dispatch(payOrderByBalanceThunk(orderIdToPay));
                 if (payOrderByBalanceThunk.fulfilled.match(payAction)) {
-                    setAlert({ open: true, message: `Thanh toán đơn hàng #${orderIdToPay} bằng số dư thành công!`, severity: "success" });
+                    setAlert({
+                        open: true,
+                        message: `Thanh toán đơn hàng #${orderIdToPay} bằng số dư thành công!`,
+                        severity: "success",
+                    });
                     setQty({});
-                    dispatch(fetchMyProfile()); // Cập nhật lại số dư
-                    // navigate("/dashboard/transactions"); // Tùy chọn điều hướng
+                    dispatch(fetchMyProfile());
                 } else if (payOrderByBalanceThunk.rejected.match(payAction)) {
-                    setAlert({ open: true, message: `Lỗi thanh toán bằng số dư: ${payAction.payload || 'Lỗi không xác định'}`, severity: "error" });
+                    setAlert({
+                        open: true,
+                        message: `Lỗi thanh toán bằng số dư: ${payAction.payload || "Lỗi không xác định"}`,
+                        severity: "error",
+                    });
                 }
-            } else if (createOrder.rejected.match(createOrderAction)){
-                 setAlert({ open: true, message: `Lỗi tạo đơn hàng: ${createOrderAction.payload?.message || createOrderAction.payload || 'Lỗi không xác định'}`, severity: "error" });
+            } else if (createOrder.rejected.match(createOrderAction)) {
+                setAlert({
+                    open: true,
+                    message: `Lỗi tạo đơn hàng: ${createOrderAction.payload?.message || createOrderAction.payload || "Lỗi không xác định"
+                        }`,
+                    severity: "error",
+                });
             }
-
         }
-        // Xử lý thanh toán trực tuyến (Stripe)
-        else { // paymentMethod === 'online'
+        // online
+        else {
             const resultAction = await dispatch(createOrder(itemsPayload));
             if (createOrder.fulfilled.match(resultAction)) {
                 const newOrder = resultAction.payload;
-                 if (!newOrder?.orderId) {
-                     setAlert({ open: true, message: "Lỗi: Không nhận được ID đơn hàng để chuyển sang thanh toán.", severity: "error" });
-                     return;
-                 }
+                if (!newOrder?.orderId) {
+                    setAlert({
+                        open: true,
+                        message: "Lỗi: Không nhận được ID đơn hàng để chuyển sang thanh toán.",
+                        severity: "error",
+                    });
+                    return;
+                }
                 setQty({});
-                navigate(`/dashboard/pay?orderId=${encodeURIComponent(newOrder.orderId)}&amount=${encodeURIComponent(total)}`);
-            } else if (createOrder.rejected.match(resultAction)){
-                 setAlert({ open: true, message: `Lỗi tạo đơn hàng: ${resultAction.payload?.message || resultAction.payload || 'Lỗi không xác định'}`, severity: "error" });
+                navigate(
+                    `/dashboard/pay?orderId=${encodeURIComponent(newOrder.orderId)}&amount=${encodeURIComponent(total)}`
+                );
+            } else if (createOrder.rejected.match(resultAction)) {
+                setAlert({
+                    open: true,
+                    message: `Lỗi tạo đơn hàng: ${resultAction.payload?.message || resultAction.payload || "Lỗi không xác định"
+                        }`,
+                    severity: "error",
+                });
             }
         }
     };
 
-    // --- XỬ LÝ TRẠNG THÁI LOADING / ERROR ---
-
-    // Ưu tiên hiển thị lỗi tải giá
+    // error/loading pricing
     if (pricingError) {
-        return <div className="p-6 text-red-500">Lỗi: Không thể tải bảng giá ({pricingError}). Vui lòng thử lại.</div>;
+        return (
+            <div className="p-4 sm:p-6 text-red-500">
+                Lỗi: Không thể tải bảng giá ({pricingError}). Vui lòng thử lại.
+            </div>
+        );
     }
 
-    // Hiển thị loading nếu đang tải giá
     if (pricingLoading) {
-        return <div className="p-6 grid place-items-center h-[300px]"><Spin tip="Đang tải bảng giá..." size="large" /></div>;
+        return (
+            <div className="p-4 sm:p-6 grid place-items-center h-[260px] sm:h-[300px]">
+                <Spin tip="Đang tải bảng giá..." size="large" />
+            </div>
+        );
     }
 
-    // --- Nếu đã có dữ liệu giá, render UI chính ---
-    const profileIsReady = profileStatus === 'succeeded';
+    const profileIsReady = profileStatus === "succeeded";
 
     return (
-        // Sử dụng Fragment để chứa cả nội dung trang và Snackbar
         <>
-            <div className="grid grid-cols-12 gap-6">
-                <div className="col-span-8">
-                    {/* Phần chọn gói tin */}
-                    <div className="bg-white rounded-2xl border border-[#e8edf6] shadow-[0_10px_30px_rgba(13,47,97,0.06)] p-6">
-                        <h2 className="font-semibold text-[#1a3b7c] text-[16px] mb-4">Mua tin lẻ</h2>
-                        <div className="grid grid-cols-3 gap-4 mb-8">
-                            {SINGLE && SINGLE.map((it) => (
+            {/* Grid responsive: 1 cột trên mobile, 8/4 trên desktop */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+                {/* LEFT */}
+                <div className="lg:col-span-8">
+                    <div className="bg-white rounded-2xl border border-[#e8edf6] shadow-[0_10px_30px_rgba(13,47,97,0.06)] p-4 sm:p-6">
+                        <h2 className="font-semibold text-[#1a3b7c] text-[15px] sm:text-[16px] mb-3 sm:mb-4">
+                            Mua tin lẻ
+                        </h2>
+
+                        {/* Grid 1-2-3 theo breakpoint */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                            {SINGLE?.map((it) => (
                                 <SingleCard key={it.id} item={it} value={qty[it.id] || 0} onChange={(v) => setItem(it.id, v)} />
                             ))}
                         </div>
 
-                        <h2 className="font-semibold text-[#1a3b7c] text-[16px] mb-4">Mua theo Combo</h2>
-                        <div className="grid grid-cols-3 gap-4">
-                            {COMBOS && COMBOS.map((it) => (
+                        <h2 className="font-semibold text-[#1a3b7c] text-[15px] sm:text-[16px] mb-3 sm:mb-4">
+                            Mua theo Combo
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                            {COMBOS?.map((it) => (
                                 <ComboCard key={it.id} item={it} value={qty[it.id] || 0} onChange={(v) => setItem(it.id, v)} />
                             ))}
                         </div>
                     </div>
                 </div>
 
-                <div className="col-span-4">
-                    {/* Hiển thị loading/error của profile gần PaymentCard */}
-                    {profileStatus === 'loading' && <Spin tip="Đang tải số dư..." size="small" className="mb-2"/>}
-                    {profileStatus === 'failed' && <div className="mb-2 text-xs text-red-500">Lỗi tải số dư: {profileError}</div>}
+                {/* RIGHT */}
+                <div className="lg:col-span-4">
+                    {profileStatus === "loading" && (
+                        <Spin tip="Đang tải số dư..." size="small" className="mb-2 block" />
+                    )}
+                    {profileStatus === "failed" && (
+                        <div className="mb-2 text-xs text-red-500">Lỗi tải số dư: {profileError}</div>
+                    )}
 
                     <PaymentCard
+                        className="lg:sticky lg:top-4"          // 🔥 sticky chỉ trên desktop
                         qty={qty}
                         allItems={ALL_ITEMS || []}
                         total={total}
                         fmt={fmt}
                         onPay={handlePayment}
                         disabled={isProcessingPayment}
-                        mainBalance={profileIsReady ? mainBalance : 0}
-                        bonusBalance={profileIsReady ? bonusBalance : 0}
+                        mainBalance={profileIsReady ? profileData?.mainBalance ?? 0 : 0}
+                        bonusBalance={profileIsReady ? profileData?.bonusBalance ?? 0 : 0}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={setPaymentMethod}
                     />
 
-                    {/* Hiển thị trạng thái/lỗi của quá trình thanh toán dưới dạng text */}
-                    {isProcessingPayment && <div className="mt-3 text-center text-blue-600 font-semibold">Đang xử lý...</div>}
-                    {createOrderError && <div className="mt-3 text-xs text-red-600">Lỗi tạo đơn hàng: {typeof createOrderError === 'object' ? (createOrderError.message || JSON.stringify(createOrderError)) : createOrderError}</div>}
-                    {payWithBalanceError && <div className="mt-3 text-xs text-red-600">Lỗi thanh toán bằng số dư: {payWithBalanceError}</div>}
+                    {isProcessingPayment && (
+                        <div className="mt-3 text-center text-blue-600 font-semibold">Đang xử lý...</div>
+                    )}
+                    {createOrderError && (
+                        <div className="mt-3 text-xs text-red-600">
+                            Lỗi tạo đơn hàng:{" "}
+                            {typeof createOrderError === "object"
+                                ? createOrderError.message || JSON.stringify(createOrderError)
+                                : createOrderError}
+                        </div>
+                    )}
+                    {payWithBalanceError && (
+                        <div className="mt-3 text-xs text-red-600">
+                            Lỗi thanh toán bằng số dư: {payWithBalanceError}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* MUI Snackbar để hiển thị thông báo */}
+            {/* Snackbar */}
             <Snackbar
                 open={alert.open}
                 autoHideDuration={6000}

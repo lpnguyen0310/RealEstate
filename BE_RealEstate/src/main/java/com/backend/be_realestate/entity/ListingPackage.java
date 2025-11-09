@@ -65,19 +65,20 @@ public class ListingPackage extends BaseEntity {
     // Combo items (rỗng nếu packageType = SINGLE)
     @Builder.Default
     @OneToMany(
-            mappedBy = "pkg",
+            mappedBy = "comboPackage", // <-- SỬA "pkg" THÀNH "comboPackage"
             cascade = CascadeType.ALL,
             orphanRemoval = true,
             fetch = FetchType.LAZY
     )
     private List<PackageItem> items = new ArrayList<>();
 
+    // Sửa các hàm helper
     public void addItem(PackageItem item) {
         items.add(item);
-        item.setPkg(this);
+        item.setComboPackage(this); // <-- Sửa
     }
     public void removeItem(PackageItem item) {
         items.remove(item);
-        item.setPkg(null);
+        item.setComboPackage(null); // <-- Sửa
     }
 }

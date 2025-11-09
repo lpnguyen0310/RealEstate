@@ -28,7 +28,7 @@ const { Text } = Typography;
 const getIconForType = (type) => {
   switch (type) {
     case "POST_WARNING":
-      return <WarningOutlined className="text-red-500" />;
+return <WarningOutlined className="text-red-500" />;
     case "ORDER_PENDING":
       return <ClockCircleOutlined className="text-yellow-500" />;
     case "PACKAGE_PURCHASED":
@@ -177,13 +177,13 @@ export default function NotificationBell() {
                   />
                 }
                 title={
-                  <Text 
+<Text 
                     strong={!item.isRead} 
                     className="!mb-0 whitespace-pre-line" // <<< THÊM CLASS NÀY
                   >
-                    {item.message}
-                  </Text>
-                }
+{item.message}
+</Text>
+}
                 description={
                   <Text type="secondary" className="text-xs">
                     <TimeAgo date={item.createdAt} />

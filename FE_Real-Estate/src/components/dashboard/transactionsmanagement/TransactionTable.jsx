@@ -1,17 +1,27 @@
 // src/components/dashboard/transactionsmanagement/TransactionTable.jsx
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, Box, Typography, Select, MenuItem, Pagination, PaginationItem
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+  Pagination,
+  PaginationItem,
 } from "@mui/material";
 
 const HOVER_BG = "#eaf1ff";
 
 // ===== Helpers =====
-// Chuẩn hoá ISO có microseconds -> milliseconds (3 số) để Date parse ổn định
 const toDateSafe = (isoString) => {
   if (!isoString) return null;
-  let s = String(isoString).replace(" ", "T");         // phòng trường hợp có khoảng trắng
-  s = s.replace(/\.(\d{3})\d+/, ".$1");                // giữ 3 số mili, bỏ phần dư
+  let s = String(isoString).replace(" ", "T");
+  s = s.replace(/\.(\d{3})\d+/, ".$1"); // giữ 3 số mili
   const d = new Date(s);
   return isNaN(d) ? null : d;
 };
@@ -53,76 +63,97 @@ export default function TransactionTable({
         overflow: "hidden",
         background: "#fff",
       }}
+      className="min-w-0"
     >
-      <TableContainer>
-        <Table>
-          <TableHead sx={{ backgroundColor: "#f3f7ff" }}>
-            <TableRow>
-              <TableCell sx={s.head}>ID</TableCell>
-              <TableCell sx={s.head}>Trạng thái</TableCell>
-              <TableCell sx={s.head}>Loại giao dịch</TableCell>
-              <TableCell sx={s.head}>Số tiền</TableCell>
-              <TableCell sx={s.head}>Mã giao dịch</TableCell>
-              <TableCell sx={s.head}>Lý do</TableCell>
-              <TableCell sx={s.head}>Ngày tạo</TableCell>
-            </TableRow>
-          </TableHead>
-
-          <TableBody>
-            {data.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4, color: "#7a8aa1" }}>
-                  Không có dữ liệu
-                </TableCell>
+      {/* Wrapper cho phép kéo ngang trên mobile */}
+      <Box sx={{ width: "100%", overflowX: "auto" }} className="no-scrollbar">
+        <TableContainer
+          sx={{
+            minWidth: 880, // ép bề ngang để có vùng kéo; điều chỉnh tùy số cột
+            borderTopLeftRadius: "12px",
+            borderTopRightRadius: "12px",
+          }}
+        >
+          <Table stickyHeader size="small">
+            <TableHead sx={{ backgroundColor: "#f3f7ff" }}>
+              <TableRow
+                sx={{
+                  "& th": {
+                    whiteSpace: "nowrap",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: "#1a3b7c",
+                  },
+                }}
+              >
+                <TableCell>ID</TableCell>
+                <TableCell>Trạng thái</TableCell>
+                <TableCell>Loại giao dịch</TableCell>
+                <TableCell>Số tiền</TableCell>
+                <TableCell>Mã giao dịch</TableCell>
+                <TableCell>Lý do</TableCell>
+                <TableCell>Ngày tạo</TableCell>
               </TableRow>
-            ) : (
-              data.map((row) => (
-                <TableRow
-                  key={row.id}
-                  hover
-                  onClick={() => onRowClick?.(row)}
-                  sx={{
-                    cursor: "pointer",
-                    "& td": { transition: "background-color 120ms ease" },
-                    "&:hover td": { backgroundColor: HOVER_BG },
-                  }}
-                >
-                  <TableCell sx={s.body}>{row.id}</TableCell>
+            </TableHead>
 
-                  <TableCell sx={s.body}>
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        color:
-                          row.status === "Đang xử lý"
-                            ? "#f28c38"
-                            : row.status === "Thành công"
-                            ? "#1aa260"
-                            : "#e53935",
-                      }}
-                    >
-                      {row.status}
-                    </span>
+            <TableBody>
+              {data.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4, color: "#7a8aa1" }}>
+                    Không có dữ liệu
                   </TableCell>
-
-                  <TableCell sx={s.body}>{row.type}</TableCell>
-                  <TableCell sx={s.body}>{row.amount}</TableCell>
-
-                  {/* Dùng đúng key trả về từ API */}
-                  <TableCell sx={s.body}>{row.transactionCode}</TableCell>
-
-                  <TableCell sx={s.body}>{row.reason || "-"}</TableCell>
-
-                  {/* Format datetime theo vi-VN */}
-                  <TableCell sx={s.body}>{formatDateTimeVI(row.createdAt)}</TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              ) : (
+                data.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    hover
+                    onClick={() => onRowClick?.(row)}
+                    sx={{
+                      cursor: "pointer",
+                      "& td": {
+                        transition: "background-color 120ms ease",
+                        whiteSpace: "nowrap",
+                        fontSize: 14,
+                        color: "#2b3a55",
+                      },
+                      "&:hover td": { backgroundColor: HOVER_BG },
+                    }}
+                  >
+                    <TableCell>{row.id}</TableCell>
+                    <TableCell>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color:
+                            row.status === "Đang xử lý"
+                              ? "#f28c38"
+                              : row.status === "Thành công"
+                                ? "#1aa260"
+                                : "#e53935",
+                        }}
+                      >
+                        {row.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>{row.type}</TableCell>
+                    <TableCell>
+                      {typeof row.amount === "number"
+                        ? row.amount.toLocaleString("vi-VN")
+                        : row.amount || "-"}
+                    </TableCell>
+                    <TableCell>{row.transactionCode}</TableCell>
+                    <TableCell>{row.reason || "-"}</TableCell>
+                    <TableCell>{formatDateTimeVI(row.createdAt)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
 
-      {/* Footer */}
+      {/* Footer: responsive (xếp dọc trên mobile) */}
       <Box
         sx={{
           p: 2,
@@ -130,9 +161,11 @@ export default function TransactionTable({
           alignItems: "center",
           justifyContent: "space-between",
           gap: 2,
+          flexDirection: { xs: "column", sm: "row" },
         }}
+        className="min-w-0"
       >
-        <Box display="flex" alignItems="center" gap={1.5}>
+        <Box display="flex" alignItems="center" gap={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
           <Select
             size="small"
             value={pageSize}
@@ -155,7 +188,7 @@ export default function TransactionTable({
               </MenuItem>
             ))}
           </Select>
-          <Typography fontSize={13} color="#7a8aa1">
+          <Typography fontSize={13} color="#7a8aa1" noWrap>
             Hiển thị {start} đến {end} của {totalItems}
           </Typography>
         </Box>
@@ -198,6 +231,9 @@ export default function TransactionTable({
             />
           )}
           sx={{
+            width: { xs: "100%", sm: "auto" },
+            display: "flex",
+            justifyContent: { xs: "center", sm: "flex-end" },
             "& .MuiPagination-ul": { gap: "8px" },
             "& .MuiButtonBase-root": { WebkitTapHighlightColor: "transparent" },
           }}

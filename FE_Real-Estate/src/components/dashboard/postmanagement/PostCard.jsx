@@ -77,8 +77,8 @@ export default function PostCard({
   const dispatch = useDispatch();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const favoriteUsers = useSelector((s) => s.property.currentFavoriteUsers);
-  const isLoadingFavorites = useSelector((s) => s.property.loadingFavorites);
-  const errorFavorites = useSelector((s) => s.property.errorFavorites);
+const isLoadingFavorites = useSelector((s) => s.property.loadingFavorites);
+const errorFavorites = useSelector((s) => s.property.errorFavorites);
 
   const handleShowFavorites = (e) => {
     e.stopPropagation();
@@ -133,17 +133,17 @@ export default function PostCard({
 
   const cardRef = useRef(null);
 
-  // 💡 [THÊM MỚI] Thêm useEffect để scroll khi được highlight
-  useEffect(() => {
-    // Chỉ chạy khi isHighlighted là true VÀ ref đã được gắn
-    if (isHighlighted && cardRef.current) {
-      console.log(`✅ PostCard [${post.id}]: Đang scroll tới...`);
-      cardRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [isHighlighted, post.id]); // Phụ thuộc vào isHighlighted
+// 💡 [THÊM MỚI] Thêm useEffect để scroll khi được highlight
+useEffect(() => {
+// Chỉ chạy khi isHighlighted là true VÀ ref đã được gắn
+if (isHighlighted && cardRef.current) {
+console.log(`✅ PostCard [${post.id}]: Đang scroll tới...`);
+cardRef.current.scrollIntoView({
+behavior: "smooth",
+block: "center",
+});
+}
+}, [isHighlighted, post.id]); // Phụ thuộc vào isHighlighted
 
   return (
     <>

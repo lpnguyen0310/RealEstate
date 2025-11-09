@@ -1,3 +1,4 @@
+// src/components/dashboard/ordermanagement/TxSearchBar.jsx
 import { Stack, Paper, TextField, Button } from "@mui/material";
 import { Search, Download } from "@mui/icons-material";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
@@ -22,7 +23,12 @@ export default function TxSearchBar({
                 backgroundColor: "#fff",
             }}
         >
-            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: "100%" }}>
+            <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                alignItems={{ xs: "stretch", sm: "center" }}
+                sx={{ width: "100%" }}
+            >
                 {/* Mã đơn */}
                 <TextField
                     label="Tìm kiếm theo mã đơn hàng"
@@ -39,10 +45,13 @@ export default function TxSearchBar({
                             fontSize: 13,
                             "& .MuiOutlinedInput-notchedOutline": { borderColor: "#d7deec" },
                             "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff" },
-                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff", borderWidth: 1.4 },
+                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                borderColor: "#3059ff",
+                                borderWidth: 1.4,
+                            },
                         },
                     }}
-                    sx={{ flex: 3, minWidth: 0 }}
+                    sx={{ flex: { sm: 3 }, minWidth: 0, width: { xs: "100%", sm: "auto" } }}
                 />
 
                 {/* Ngày tạo */}
@@ -50,23 +59,31 @@ export default function TxSearchBar({
                     <DatePicker
                         label="Tìm kiếm theo ngày tạo"
                         value={date}
-                        onChange={(v) => {
-                            onDateChange?.(v);
-                        }}
+                        onChange={(v) => onDateChange?.(v)}
                         slotProps={{
                             textField: {
                                 size: "small",
                                 variant: "outlined",
                                 onKeyDown: (e) => e.key === "Enter" && onSearch?.(),
-                                InputLabelProps: { sx: { top: 3, fontSize: 13, color: "#8a93a7" } },
+                                InputLabelProps: {
+                                    sx: { top: 3, fontSize: 13, color: "#8a93a7" },
+                                },
                                 sx: {
-                                    flex: 1.2,
-                                    minWidth: 180,
+                                    flex: { sm: 1.2 },
+                                    minWidth: { xs: "100%", sm: 180 },
+                                    width: { xs: "100%", sm: "auto" },
                                     height: 40,
                                     borderRadius: "8px",
-                                    "& .MuiOutlinedInput-notchedOutline": { borderColor: "#d7deec" },
-                                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff" },
-                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#3059ff", borderWidth: 1.4 },
+                                    "& .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "#d7deec",
+                                    },
+                                    "&:hover .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "#3059ff",
+                                    },
+                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "#3059ff",
+                                        borderWidth: 1.4,
+                                    },
                                 },
                             },
                         }}
@@ -87,6 +104,7 @@ export default function TxSearchBar({
                         backgroundColor: "#0f2f63",
                         fontSize: 13,
                         textTransform: "none",
+                        width: { xs: "100%", sm: "auto" },
                         "&:hover": { backgroundColor: "#0c2550" },
                     }}
                 >
@@ -108,6 +126,7 @@ export default function TxSearchBar({
                         color: "#0f2f63",
                         fontSize: 13,
                         textTransform: "none",
+                        width: { xs: "100%", sm: "auto" },
                         "&:hover": { borderColor: "#3059ff", backgroundColor: "#f5f8ff" },
                     }}
                 >

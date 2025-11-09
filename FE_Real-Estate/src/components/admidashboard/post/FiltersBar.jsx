@@ -1,16 +1,31 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Paper, Stack, TextField, Select, MenuItem, Button } from "@mui/material";
+import {
+    Paper,
+    Stack,
+    TextField,
+    Select,
+    MenuItem,
+    Button,
+    useMediaQuery
+} from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import { CATEGORIES, LISTING_TYPES } from "./constants";
 import { categoryApi } from "@/api/categoryApi";
 
-// Menu Select: neo dưới, có scroll
+// Menu Select: neo dưới, có scroll (tối ưu cho mobile)
 const MENU_PROPS = {
     anchorOrigin: { vertical: "bottom", horizontal: "left" },
     transformOrigin: { vertical: "top", horizontal: "left" },
     disableScrollLock: true,
     PaperProps: {
-        sx: { maxHeight: 320, overflowY: "auto", mt: 0.5, borderRadius: "10px", boxShadow: "0 4px 10px rgba(0,0,0,0.1)" },
+        sx: {
+            maxHeight: { xs: "80vh", sm: 320 },
+            overflowY: "auto",
+            mt: 0.5,
+            borderRadius: "10px",
+            boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+        },
         elevation: 4,
     },
     marginThreshold: 8,
@@ -20,8 +35,11 @@ export default function FiltersBar({
     q, setQ,
     category, setCategory,
     listingType, setListingType,
-    onSearch, onReset, // vẫn giữ để dùng nút nếu muốn
+    onSearch, onReset, // optional
 }) {
+    const theme = useTheme();
+    const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+
     // local draft cho ô input
     const [localQ, setLocalQ] = useState(q || "");
 
@@ -35,7 +53,8 @@ export default function FiltersBar({
             if (next !== (q || "")) setQ(next);
         }, 300);
         return () => clearTimeout(t);
-    }, [localQ]); // eslint-disable-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [localQ]);
 
     // ====== Category từ API ======
     const [catRaw, setCatRaw] = useState([]);
@@ -79,12 +98,30 @@ export default function FiltersBar({
         return found?.label ?? v;
     };
 
+    const commitSearch = () => {
+        const next = (localQ || "").trim();
+        if (next !== (q || "")) setQ(next);
+        onSearch?.();
+    };
+
     return (
         <Paper
             elevation={0}
-            sx={{ p: 2, mt: 2, borderRadius: "14px", border: "1px solid #e8edf6", bgcolor: "#fff" }}
+            sx={{
+                p: { xs: 1.5, sm: 2 },
+                mt: 2,
+                borderRadius: "14px",
+                border: "1px solid #e8edf6",
+                bgcolor: "#fff",
+            }}
         >
-            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Stack
+                direction={isXs ? "column" : "row"}
+                spacing={isXs ? 1.25 : 2}
+                alignItems={isXs ? "stretch" : "center"}
+                flexWrap="wrap"
+                useFlexGap
+            >
                 {/* Ô search: live (debounce) */}
                 <TextField
                     size="small"
@@ -92,13 +129,9 @@ export default function FiltersBar({
                     value={localQ}
                     onChange={(e) => setLocalQ(e.target.value)}
                     onKeyDown={(e) => {
-                        // Optional: Enter cũng “commit” ngay lập tức
-                        if (e.key === "Enter") {
-                            const next = (localQ || "").trim();
-                            if (next !== (q || "")) setQ(next);
-                        }
+                        if (e.key === "Enter") commitSearch();
                     }}
-                    sx={{ width: 300 }}
+                    sx={{ width: { xs: "100%", sm: 300 } }}
                 />
 
                 {/* Loại BĐS */}
@@ -107,7 +140,7 @@ export default function FiltersBar({
                     displayEmpty
                     value={category ?? ""}
                     onChange={(e) => setCategory(e.target.value)}
-                    sx={{ minWidth: 200 }}
+                    sx={{ minWidth: { xs: "100%", sm: 200 } }}
                     renderValue={renderCategoryValue}
                     MenuProps={MENU_PROPS}
                 >
@@ -122,7 +155,9 @@ export default function FiltersBar({
                                 {c.label}
                             </MenuItem>
                         ))}
-                    {catErr && <MenuItem disabled>Không tải được danh mục (đang dùng mặc định)</MenuItem>}
+                    {catErr && (
+                        <MenuItem disabled>Không tải được danh mục (đang dùng mặc định)</MenuItem>
+                    )}
                 </Select>
 
                 {/* Loại tin */}
@@ -131,7 +166,7 @@ export default function FiltersBar({
                     displayEmpty
                     value={listingType ?? ""}
                     onChange={(e) => setListingType(e.target.value)}
-                    sx={{ minWidth: 140 }}
+                    sx={{ minWidth: { xs: "100%", sm: 140 } }}
                     renderValue={(v) => (v ? (v === "NORMAL" ? "Thường" : v) : "Loại tin")}
                     MenuProps={MENU_PROPS}
                 >
@@ -145,20 +180,29 @@ export default function FiltersBar({
                     ))}
                 </Select>
 
-                {/* Nút vẫn giữ (tuỳ bạn có dùng hay không) */}
-                <Button
-                    variant="contained"
-                    onClick={() => {
-                        const next = (localQ || "").trim();
-                        if (next !== (q || "")) setQ(next);
-                    }}
+                {/* Nút hành động */}
+                <Stack
+                    direction={isXs ? "column" : "row"}
+                    spacing={isXs ? 1 : 2}
+                    sx={{ width: isXs ? "100%" : "auto", ml: "auto" }}
                 >
-                    Tìm kiếm
-                </Button>
-
-                <Button startIcon={<RestartAltIcon />} onClick={onReset}>
-                    Xóa lọc
-                </Button>
+                    <Button
+                        fullWidth={isXs}
+                        size="small"
+                        variant="contained"
+                        onClick={commitSearch}
+                    >
+                        Tìm kiếm
+                    </Button>
+                    <Button
+                        fullWidth={isXs}
+                        size="small"
+                        startIcon={<RestartAltIcon />}
+                        onClick={onReset}
+                    >
+                        Xóa lọc
+                    </Button>
+                </Stack>
             </Stack>
         </Paper>
     );

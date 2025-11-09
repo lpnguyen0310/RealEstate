@@ -1,4 +1,3 @@
-// src/components/dashboard/postmanagement/PostList.jsx
 import { Select, Pagination, Empty, Skeleton } from "antd";
 import PostCard from "./PostCard";
 import "../../../../public/css/post_list.css";
@@ -35,11 +34,13 @@ export default function PostList({
     highlightedId = null,
 }) {
     const showEmpty = !loading && items.length === 0;
+    const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, total);
 
     return (
         <div className="space-y-4">
             {/* LIST */}
-            <div className="space-y-4">
+            <div className="space-y-4" aria-live="polite">
                 {loading
                     ? Array.from({ length: Math.min(pageSize, 6) }).map((_, i) => <PostCardSkeleton key={`sk-${i}`} />)
                     : items.map((p) => (
@@ -72,7 +73,7 @@ export default function PostList({
                         popupMatchSelectWidth={false}
                     />
                     <span className="text-gray-500">
-                        Hiển thị {total === 0 ? 0 : (page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} / {total}
+                        Hiển thị {start}–{end} / {total}
                     </span>
                 </div>
 

@@ -14,6 +14,8 @@ import {
     fetchMyPropertyCountsThunk,
     setPage,
     setSize,
+    setPendingAction,
+    clearPendingAction,
 } from "@/store/propertySlice";
 
 import {
@@ -56,7 +58,6 @@ const parseFiltersFromSearch = (sp) => {
 };
 
 const buildSearchParams = ({ status, page, size, filters }) => {
-    // page trong URL là 1-based
     const base = cleanObj({
         tab: status && status !== "active" ? status : undefined,
         page: page > 0 ? page + 1 : 1,
@@ -75,95 +76,109 @@ export default function PostManagerPage() {
     const [warningModal, setWarningModal] = useState({ open: false, message: "" });
     const [highlightedId, setHighlightedId] = useState(null);
 
-    const { list, page, size, totalElements, counts, loading: rawLoading } = useSelector((s) => ({
+    const {
+        list,
+        page,
+        size,
+        totalElements,
+        counts,
+        pendingAction,
+        rawLoading,
+    } = useSelector((s) => ({
         list: s.property.myList,
         page: s.property.myPage,
         size: s.property.mySize,
         totalElements: s.property.myTotalElements,
         counts: s.property.counts,
-        loading: s.property.loading,
+        pendingAction: s.property.pendingAction,
+        rawLoading: s.property.loading,
     }));
 
-    // ---- local ui states ----
     const [status, setStatus] = useState(searchParams.get("tab") || "active");
     const [filters, setFilters] = useState(parseFiltersFromSearch(searchParams));
     const [openCreate, setOpenCreate] = useState(false);
-
-    // 🆕 state để mở Drawer chi tiết theo ID
     const [editingId, setEditingId] = useState(null);
 
     const handleOpenWarning = useCallback((message) => {
         setWarningModal({ open: true, message: message || "" });
     }, []);
-
     const handleCloseWarning = useCallback(() => {
         setWarningModal({ open: false, message: "" });
     }, []);
 
     /* ========== URL -> STATE ========== */
     useEffect(() => {
-        const urlStatus = searchParams.get("tab") || "active";
-        const urlPage = parseNumber(searchParams.get("page")) ?? 1;
-        const urlSize = parseNumber(searchParams.get("size")) ?? size;
+        const qp = Object.fromEntries(searchParams.entries());
+        const warnId = qp.warnedPostId ? Number(qp.warnedPostId) : null;
+        const viewId = qp.viewPostId ? Number(qp.viewPostId) : null;
+
+        let urlStatus = qp.tab || "active";
+
+        if (warnId) {
+            dispatch(setPendingAction({ type: "warn", postId: warnId }));
+            urlStatus = "warned";
+        } else if (viewId) {
+            dispatch(setPendingAction({ type: "view", postId: viewId }));
+            urlStatus = "active";
+        }
 
         setStatus(urlStatus);
         setFilters(parseFiltersFromSearch(searchParams));
 
+        const urlPage = parseNumber(qp.page) ?? 1;
+        const urlSize = parseNumber(qp.size) ?? size;
+
         if (urlPage - 1 !== page) dispatch(setPage(Math.max(0, urlPage - 1)));
         if (urlSize !== size && urlSize != null) dispatch(setSize(urlSize));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams]);
+    }, [searchParams, dispatch]);
 
-    /* ========== STATE -> FETCH ========== */
+    /* ========== xử lý hành động chờ (highlight / mở modal) ========== */
     useEffect(() => {
-        dispatch(fetchMyPropertiesThunk({ page, size, status, ...filters }));
-    }, [dispatch, page, size, status, filters]);
+        if (!pendingAction) return;
+        if (rawLoading || !list || list.length === 0) return;
 
-    // Fetch counts (1 lần)
-    useEffect(() => {
-        dispatch(fetchMyPropertyCountsThunk());
-    }, [dispatch]);
+        const { type, postId } = pendingAction;
+        const post = list.find((p) => p.id === postId);
 
-    // Đọc warnedPostId -> mở WarningModal nếu cần
-    useEffect(() => {
-        const warnId = searchParams.get("warnedPostId");
-        if (!warnId) return;
-
-        if (list && list.length > 0 && status === "warned") {
-            const postToWarn = list.find((p) => p.id === Number(warnId));
-            if (postToWarn) {
-                handleOpenWarning(postToWarn.latestWarningMessage);
-                const newParams = new URLSearchParams(searchParams);
-                newParams.delete("warnedPostId");
-                setSearchParams(newParams, { replace: true });
-            }
-        }
-    }, [searchParams, list, status, setSearchParams, handleOpenWarning]);
-
-    // ===== Highlight 1 item bằng viewPostId trong URL rồi xoá param
-    useEffect(() => {
-        const viewIdParam = searchParams.get("viewPostId");
-        if (!viewIdParam || !list || list.length === 0 || highlightedId == viewIdParam) {
+        if (!post) {
+            console.warn(`Pending Action: Không tìm thấy Post #${postId} trong tab ${status}.`);
+            dispatch(clearPendingAction());
             return;
         }
 
-        const postToView = list.find((p) => p.id == viewIdParam);
-        if (postToView) {
-            setHighlightedId(postToView.id);
-            const newParams = new URLSearchParams(searchParams);
-            newParams.delete("viewPostId");
-            setSearchParams(newParams, { replace: true });
-        }
-    }, [searchParams, list, highlightedId, setSearchParams]);
+        if (type === "warn") handleOpenWarning(post.latestWarningMessage);
+        else if (type === "view") setHighlightedId(post.id);
 
-    // Tắt highlight sau 10s (khớp CSS animation dài)
+        dispatch(clearPendingAction());
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("warnedPostId");
+        newParams.delete("viewPostId");
+        setSearchParams(newParams, { replace: true });
+    }, [pendingAction, list, rawLoading, status, dispatch, handleOpenWarning, searchParams, setSearchParams]);
+
     useEffect(() => {
         if (!highlightedId) return;
         const t = setTimeout(() => setHighlightedId(null), 10000);
         return () => clearTimeout(t);
     }, [highlightedId]);
 
-    /* ========== STATE -> URL ========== */
+    /* ========== FETCH ========== */
+    useEffect(() => {
+        dispatch(fetchMyPropertiesThunk({ page, size, status, ...filters }));
+    }, [dispatch, page, size, status, filters]);
+    useEffect(() => {
+        dispatch(fetchMyPropertyCountsThunk());
+    }, [dispatch]);
+
+    const [delayedLoading, setDelayedLoading] = useState(false);
+    useEffect(() => {
+        if (rawLoading) setDelayedLoading(true);
+        else {
+            const t = setTimeout(() => setDelayedLoading(false), 1200);
+            return () => clearTimeout(t);
+        }
+    }, [rawLoading]);
+
     const pushUrl = (next = {}) => {
         const params = buildSearchParams({
             status: next.status ?? status,
@@ -174,148 +189,159 @@ export default function PostManagerPage() {
         setSearchParams(params, { replace: false });
     };
 
-    // Skeleton min duration
-    const [delayedLoading, setDelayedLoading] = useState(false);
-    useEffect(() => {
-        if (rawLoading) {
-            setDelayedLoading(true);
-        } else {
-            const t = setTimeout(() => setDelayedLoading(false), 1200);
-            return () => clearTimeout(t);
-        }
-    }, [rawLoading]);
-
-    // 🆕 mở Drawer chi tiết từ card
     const handleOpenDetail = (id) => {
         if (!id) return;
         setEditingId(id);
         setOpenCreate(true);
     };
-
-    // 🆕 đóng Drawer
     const handleCloseDrawer = () => {
         setOpenCreate(false);
         setEditingId(null);
     };
+    const handleEndHighlight = useCallback(() => setHighlightedId(null), []);
 
-    const handleEndHighlight = useCallback(() => {
-        setHighlightedId(null);
-    }, []);
-
-    // —— Tối ưu autoplay khi tab bị ẩn
+    // —— Swiper autoplay pause + bảo đảm update khi đổi kích thước
     const swiperAutoplayRef = useRef(null);
     useEffect(() => {
         const onVis = () => {
-            const inst = swiperAutoplayRef.current;
+            const inst =
+                swiperAutoplayRef.current?.$el?.[0]?.swiper || swiperAutoplayRef.current;
             if (!inst) return;
             if (document.hidden) inst.stop();
-            else inst.start();
+            else {
+                inst.update();
+                inst.start();
+            }
         };
         document.addEventListener("visibilitychange", onVis);
         return () => document.removeEventListener("visibilitychange", onVis);
     }, []);
 
     return (
-        <div>
-            {/* Banner (responsive) */}
-            <div className="rounded-2xl bg-gradient-to-r from-[#1B264F] to-[#1D5DCB] py-4 md:py-6 px-4 md:px-8 text-white mb-6 md:mb-8 flex flex-col md:flex-row items-center justify-between">
-                <div className="flex-1 w-full md:max-w-[540px] space-y-2 md:space-y-3">
-                    <h2 className="text-[22px] md:text-[26px] font-bold">Badongsan.vn</h2>
-                    <h3 className="text-[16px] md:text-[20px] font-semibold">
-                        Nền tảng Đăng tin Bất động sản Thế hệ mới
-                    </h3>
-                    <p className="text-gray-200 text-[13px] md:text-[14px] leading-relaxed">
-                        Đăng tin tìm kiếm khách hàng, quản lý danh mục bất động sản, gợi ý thông minh giỏ hàng phù hợp cho khách hàng mục tiêu.
-                    </p>
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        size="large"
-                        className="mt-1 md:mt-2 bg-[#FFD43B] text-[#1B264F] font-semibold hover:bg-[#ffe480] border-none"
-                        onClick={() => {
-                            setEditingId(null); // tạo mới
+        <section className="w-full min-w-0 overflow-x-hidden max-w-[100vw]">
+            {/* Banner — mobile 1 cột, desktop 2 cột */}
+            <div className="rounded-2xl bg-gradient-to-r from-[#1B264F] to-[#1D5DCB] text-white mb-6 md:mb-8 p-4 md:p-6 pr-4 md:pr-6 relative">
+                <div className="grid max-w-full grid-cols-1 lg:grid-cols-[minmax(0,540px)_minmax(0,1fr)] gap-4 lg:gap-8 items-center">
+                    {/* LEFT */}
+                    <div className="min-w-0">
+                        <div className="space-y-2 md:space-y-3">
+                            <h2 className="text-[22px] md:text-[26px] font-bold">Badongsan.vn</h2>
+                            <h3 className="text-[16px] md:text-[20px] font-semibold">
+                                Nền tảng Đăng tin Bất động sản Thế hệ mới
+                            </h3>
+                            <p className="text-gray-200 text-[13px] md:text-[14px] leading-relaxed">
+                                Đăng tin tìm kiếm khách hàng, quản lý danh mục bất động sản, gợi ý thông minh giỏ hàng phù hợp cho khách hàng mục tiêu.
+                            </p>
+                            <Button
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                size="large"
+                                className="mt-1 md:mt-2 bg-[#FFD43B] text-[#1B264F] font-semibold hover:bg-[#ffe480] border-none"
+                                onClick={() => {
+                                    setEditingId(null);
+                                    setOpenCreate(true);
+                                }}
+                            >
+                                Đăng tin mới
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* RIGHT — slider fix full width */}
+                    <div className="min-w-0 w-full max-w-full overflow-hidden">
+                        <Swiper
+                            modules={[SwiperPagination, Autoplay]}
+                            pagination={{ clickable: true }}
+                            autoplay={{ delay: 3000, disableOnInteraction: false }}
+                            loop
+                            onAutoplay={(autoplay) => (swiperAutoplayRef.current = autoplay)}
+                            className="rounded-xl overflow-hidden !w-full !max-w-full h-[180px] xs:h-[200px] sm:h-[240px] md:h-[300px]"
+                            style={{ width: "100%" }}
+                            slidesPerView={1}
+                            observer
+                            observeParents
+                            resizeObserver
+                            onBeforeInit={(s) => {
+                                s.params.observer = true;
+                                s.params.observeParents = true;
+                            }}
+                            onResize={(s) => s.update()}
+                            onBreakpoint={(s) => s.update()}
+                        >
+                            {SLIDES.map((src, i) => (
+                                <SwiperSlide key={i} className="min-w-0 !w-full !max-w-full h-full">
+                                    <img
+                                        src={src}
+                                        alt={`slide-${i + 1}`}
+                                        className="block w-full max-w-full h-full object-cover rounded-xl"
+                                        loading="lazy"
+                                    />
+                                </SwiperSlide>
+                            ))}
+                        </Swiper>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filters + Tabs + List: giữ cấu trúc grid như OrderManagement */}
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                {/* Filters Bar */}
+                <div className="min-w-0">
+                    <PostFilters
+                        onSearch={(f) => {
+                            const nextFilters = cleanObj(f || {});
+                            setFilters(nextFilters);
+                            dispatch(setPage(0));
+                            pushUrl({ page: 0, filters: nextFilters });
+                        }}
+                        onCreate={() => {
+                            setEditingId(null);
                             setOpenCreate(true);
                         }}
-                    >
-                        Đăng tin mới
-                    </Button>
+                    />
                 </div>
 
-                <div className="flex-1 w-full mt-4 md:mt-0 md:ml-10 max-w-[720px]">
-                    <Swiper
-                        modules={[SwiperPagination, Autoplay]}
-                        pagination={{ clickable: true }}
-                        autoplay={{ delay: 3000, disableOnInteraction: false }}
-                        loop
-                        onAutoplay={(autoplay) => (swiperAutoplayRef.current = autoplay)}
-                        className="rounded-xl overflow-hidden"
-                    >
-                        {SLIDES.map((src, i) => (
-                            <SwiperSlide key={i}>
-                                <img
-                                    src={src}
-                                    alt={`slide-${i + 1}`}
-                                    className="w-full h-[200px] sm:h-[240px] md:h-[300px] object-cover rounded-xl"
-                                    loading="lazy"
-                                />
-                            </SwiperSlide>
-                        ))}
-                    </Swiper>
+                {/* Status Tabs */}
+                <div className="min-w-0">
+                    <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] px-3 py-3 w-full max-w-full overflow-x-auto">
+                        <PostStatusTabs
+                            activeKey={status}
+                            onChange={(newStatus) => {
+                                setStatus(newStatus);
+                                dispatch(setPage(0));
+                                pushUrl({ status: newStatus, page: 0 });
+                            }}
+                            counts={counts}
+                        />
+                    </div>
                 </div>
-            </div>
 
-            {/* Filters Bar */}
-            <PostFilters
-                onSearch={(f) => {
-                    const nextFilters = cleanObj(f || {});
-                    setFilters(nextFilters);
-                    dispatch(setPage(0));
-                    pushUrl({ page: 0, filters: nextFilters });
-                }}
-                onCreate={() => {
-                    setEditingId(null);
-                    setOpenCreate(true);
-                }}
-            />
-
-            {/* Status Tabs */}
-            <div className="mt-4 bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] px-3 py-3">
-                <PostStatusTabs
-                    activeKey={status}
-                    onChange={(newStatus) => {
-                        setStatus(newStatus);
-                        dispatch(setPage(0));
-                        pushUrl({ status: newStatus, page: 0 });
-                    }}
-                    counts={counts}
-                />
-            </div>
-
-            {/* Post List + Pagination */}
-            <div className="mt-4">
-                <PostList
-                    loading={delayedLoading}
-                    items={list}
-                    total={totalElements}
-                    page={page + 1}
-                    pageSize={size}
-                    onPageChange={(p) => {
-                        dispatch(setPage(p - 1));
-                        pushUrl({ page: p - 1 });
-                    }}
-                    onPageSizeChange={(n) => {
-                        dispatch(setSize(n));
-                        dispatch(setPage(0));
-                        pushUrl({ size: n, page: 0 });
-                    }}
-                    onItemClick={(id) => {
-                        handleEndHighlight(); // Tắt highlight trước khi mở Drawer
-                        handleOpenDetail(id);
-                    }}
-                    onHighlightEnd={handleEndHighlight}
-                    onViewWarningClick={handleOpenWarning}
-                    highlightedId={highlightedId}
-                />
+                {/* Post List */}
+                <div className="min-w-0">
+                    <PostList
+                        loading={delayedLoading}
+                        items={list}
+                        total={totalElements}
+                        page={page + 1}
+                        pageSize={size}
+                        onPageChange={(p) => {
+                            dispatch(setPage(p - 1));
+                            pushUrl({ page: p - 1 });
+                        }}
+                        onPageSizeChange={(n) => {
+                            dispatch(setSize(n));
+                            dispatch(setPage(0));
+                            pushUrl({ size: n, page: 0 });
+                        }}
+                        onItemClick={(id) => {
+                            handleEndHighlight();
+                            handleOpenDetail(id);
+                        }}
+                        onHighlightEnd={handleEndHighlight}
+                        onViewWarningClick={handleOpenWarning}
+                        highlightedId={highlightedId}
+                    />
+                </div>
             </div>
 
             {/* Drawer tạo/chỉnh sửa */}
@@ -332,11 +358,7 @@ export default function PostManagerPage() {
                 isEdit={!!editingId}
             />
 
-            <WarningModal
-                open={warningModal.open}
-                onClose={handleCloseWarning}
-                message={warningModal.message}
-            />
-        </div>
+            <WarningModal open={warningModal.open} onClose={handleCloseWarning} message={warningModal.message} />
+        </section>
     );
 }
