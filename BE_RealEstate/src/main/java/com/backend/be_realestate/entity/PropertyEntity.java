@@ -11,6 +11,7 @@ import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
@@ -132,20 +133,44 @@ import java.util.List;
             private CityEntity city;
 
             @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
+            @org.hibernate.annotations.Where(clause = "image_type = 'PUBLIC'")
             @Builder.Default
-            private java.util.List<PropertyImageEntity> images = new java.util.ArrayList<>();
-            public void replaceImages(java.util.List<String> urls) {
-                this.images.clear();                 // orphanRemoval tự xoá ảnh cũ
-                if (urls == null || urls.isEmpty()) return;
+            private List<PropertyImageEntity> images = new ArrayList<>();
+
+            public void replaceImages(List<String> urls) { // PUBLIC
+                this.images.clear();
+                if (urls == null) return;
                 int i = 0;
                 for (String url : urls) {
                     var img = new PropertyImageEntity();
                     img.setProperty(this);
                     img.setImageUrl(url);
                     img.setDisplayOrder(i++);
+                    img.setImageType(PropertyImageEntity.ImageType.PUBLIC);
                     this.images.add(img);
                 }
             }
+
+
+            @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
+            @org.hibernate.annotations.Where(clause = "image_type = 'CONSTRUCTION'")
+            @Builder.Default
+            private List<PropertyImageEntity> constructionImages = new ArrayList<>();
+
+            public void replaceConstructionImages(List<String> urls) { // CONSTRUCTION
+                this.constructionImages.clear();
+                if (urls == null) return;
+                int i = 0;
+                for (String url : urls) {
+                    var img = new PropertyImageEntity();
+                    img.setProperty(this);
+                    img.setImageUrl(url);
+                    img.setDisplayOrder(i++);
+                    img.setImageType(PropertyImageEntity.ImageType.CONSTRUCTION);
+                    this.constructionImages.add(img);
+                }
+            }
+
 
             @ManyToMany
             @JoinTable(

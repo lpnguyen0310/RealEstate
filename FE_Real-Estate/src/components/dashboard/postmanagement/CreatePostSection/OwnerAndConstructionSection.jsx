@@ -1,5 +1,4 @@
-// src/components/dashboard/postmanagement/OwnerAndConstructionSection.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Box, Card, CardContent, Divider, Typography, FormControl, Select, MenuItem,
   TextField, FormHelperText, Checkbox, FormControlLabel, IconButton, Button,
@@ -12,29 +11,41 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { uploadMany } from "@/api/cloudinary";
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const phoneDigits = (s = "") => s.replace(/\D/g, "").slice(0, 11);
+
 /**
  * Props:
  *  - ownerValue: {
  *      isOwner: boolean,
  *      ownerName?: string,
+ *      phoneNumber?: string,
+ *      ownerEmail?: string,   // Gmail
  *      idNumber?: string,
  *      relationship?: string,
  *      agreed?: boolean
  *    }
  *  - onOwnerChange(nextObj)
+ *  - contactValue: { name, phone, email, zalo }   // để sync khi isOwner
+ *  - onContactChange(nextObj)
  *  - imagesValue: string[]
  *  - onImagesChange(nextArr)
- *  - errors: { ownerName?, idNumber? }
+ *  - errors: { ownerName?, phoneNumber?, ownerEmail? }
  */
 export default function OwnerAndConstructionSection({
   ownerValue,
   onOwnerChange,
+  contactValue,
+  onContactChange,
   imagesValue = [],
   onImagesChange,
   errors = {},
 }) {
   const v = ownerValue || {};
   const setOwner = (k, val) => onOwnerChange?.({ ...v, [k]: val });
+
+  // tránh autofill nhiều lần khi user đã sửa tay
+  const didAutofillRef = useRef(false);
 
   const inputRootSx = {
     borderRadius: "10px",
@@ -70,7 +81,7 @@ export default function OwnerAndConstructionSection({
     if (!files.length) return;
     setUploading(true);
     try {
-      const res = await uploadMany(files, { folder: "realestate/construction" });
+      const res = await uploadMany(files, "realestate/construction");
       const urls = (res || []).map((x) => x.secure_url || x.url).filter(Boolean);
       onImagesChange?.([...(imagesValue || []), ...urls]);
     } catch (e) {
@@ -100,6 +111,100 @@ export default function OwnerAndConstructionSection({
   };
   const onDragEnd = () => setDragIdx(null);
 
+  // ---- Autofill từ contact khi chọn "Chính chủ" ----
+  const autofillFromContact = (base = v) => {
+    // Ưu tiên giữ giá trị đang có; nếu trống mới lấp từ contact
+    const name = base.ownerName || contactValue?.name || "";
+    const phone = base.phoneNumber || contactValue?.phone || "";
+    const email = base.ownerEmail || contactValue?.email || "";
+
+    const nextOwner = {
+      ...base,
+      ownerName: name,
+      phoneNumber: phone,
+      ownerEmail: email,
+    };
+
+    onOwnerChange?.(nextOwner);
+
+    // đồng bộ sang contact để submit API cũ không phải đổi
+    onContactChange?.({
+      ...(contactValue || { name: "", phone: "", email: "", zalo: "" }),
+      name,
+      phone,
+      email,
+    });
+
+    didAutofillRef.current = true;
+  };
+
+  useEffect(() => {
+    if (v.isOwner && !didAutofillRef.current) {
+      autofillFromContact(v);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v.isOwner]);
+
+  // Local computed errors (gộp với errors từ props)
+  const localErrors = useMemo(() => {
+    const e = { ...(errors || {}) };
+    if (v.isOwner) {
+      if (!v.ownerName?.trim()) e.ownerName = e.ownerName || "Vui lòng nhập họ và tên";
+      const ph = (v.phoneNumber || "").trim();
+      if (!ph || ph.length < 9 || ph.length > 11) {
+        e.phoneNumber = e.phoneNumber || "Số điện thoại 9–11 số";
+      }
+      const em = (v.ownerEmail || "").trim();
+      if (!em || !emailRegex.test(em)) {
+        e.ownerEmail = e.ownerEmail || "Email không hợp lệ";
+      }
+    }
+    return e;
+  }, [v.isOwner, v.ownerName, v.phoneNumber, v.ownerEmail, errors]);
+
+  // Handlers gõ tay + sync contact khi là chính chủ
+  const handleOwnerName = (val) => {
+    const next = { ...v, ownerName: val };
+    onOwnerChange?.(next);
+    if (next.isOwner) {
+      onContactChange?.({
+        ...(contactValue || {}),
+        name: val,
+        phone: contactValue?.phone || next.phoneNumber || "",
+        email: (contactValue?.email || next.ownerEmail || "").trim(),
+        zalo: contactValue?.zalo || "",
+      });
+    }
+  };
+
+  const handlePhone = (val) => {
+    const next = { ...v, phoneNumber: phoneDigits(val) };
+    onOwnerChange?.(next);
+    if (next.isOwner) {
+      onContactChange?.({
+        ...(contactValue || {}),
+        phone: next.phoneNumber,
+        name: contactValue?.name || next.ownerName || "",
+        email: (contactValue?.email || next.ownerEmail || "").trim(),
+        zalo: contactValue?.zalo || "",
+      });
+    }
+  };
+
+  const handleEmail = (val) => {
+    const next = { ...v, ownerEmail: val };
+    onOwnerChange?.(next);
+    if (next.isOwner) {
+      onContactChange?.({
+        ...(contactValue || {}),
+        email: val.trim(),
+        name: contactValue?.name || next.ownerName || "",
+        phone: contactValue?.phone || next.phoneNumber || "",
+        zalo: contactValue?.zalo || "",
+      });
+    }
+  };
+
   return (
     <Card
       variant="outlined"
@@ -128,7 +233,18 @@ export default function OwnerAndConstructionSection({
             <Select
               displayEmpty
               value={v.isOwner ? "owner" : "not_owner"}
-              onChange={(e) => setOwner("isOwner", e.target.value === "owner")}
+              onChange={(e) => {
+                const isOwnerNext = e.target.value === "owner";
+                const next = { ...v, isOwner: isOwnerNext };
+                onOwnerChange?.(next);
+
+                if (isOwnerNext) {
+                  // chỉ autofill khi chuyển sang chính chủ
+                  autofillFromContact(next);
+                } else {
+                  didAutofillRef.current = false;
+                }
+              }}
               MenuProps={smallMenuProps}
             >
               <MenuItem value="owner" sx={itemSx}>Chính chủ</MenuItem>
@@ -155,35 +271,39 @@ export default function OwnerAndConstructionSection({
             required
             label="Họ và tên chủ sở hữu"
             value={v.ownerName || ""}
-            onChange={(e) => setOwner("ownerName", e.target.value)}
-            error={!!errors.ownerName}
-            helperText={errors.ownerName || ""}
+            onChange={(e) => handleOwnerName(e.target.value)}
+            error={!!localErrors.ownerName}
+            helperText={localErrors.ownerName || " "}
             sx={{ "& .MuiOutlinedInput-root": inputRootSx }}
           />
 
-          {/* CMND/CCCD */}
-          <TextField
-            size="small"
-            required
-            label="Số CMND/CCCD"
-            value={v.idNumber || ""}
-            onChange={(e) => setOwner("idNumber", e.target.value)}
-            error={!!errors.idNumber}
-            helperText={errors.idNumber || ""}
-            inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-            sx={{ "& .MuiOutlinedInput-root": inputRootSx }}
-          />
+          {/* SĐT liên hệ */}
           <TextField
             size="small"
             required
             label="Số điện thoại liên hệ"
             value={v.phoneNumber || ""}
-            onChange={(e) => setOwner("phoneNumber", e.target.value)}
-            error={!!errors.phoneNumber}
-            helperText={errors.phoneNumber || ""}
+            onChange={(e) => handlePhone(e.target.value)}
+            inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+            error={!!localErrors.phoneNumber}
+            helperText={localErrors.phoneNumber || " "}
             sx={{ "& .MuiOutlinedInput-root": inputRootSx }}
           />
 
+          {/* Gmail – chỉ hiện khi là chính chủ */}
+          {v.isOwner && (
+            <TextField
+              size="small"
+              required
+              label="Gmail"
+              placeholder="ví dụ: tenban@gmail.com"
+              value={v.ownerEmail || ""}
+              onChange={(e) => handleEmail(e.target.value.trim())}
+              error={!!localErrors.ownerEmail}
+              helperText={localErrors.ownerEmail || " "}
+              sx={{ "& .MuiOutlinedInput-root": inputRootSx, gridColumn: { xs: "auto", sm: "span 2" } }}
+            />
+          )}
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mt: 1 }}>
@@ -268,14 +388,12 @@ export default function OwnerAndConstructionSection({
                 bgcolor: "#fff",
               }}
             >
-              {/* Image */}
               <Box
                 component="img"
                 src={url}
                 alt={`construction-${i}`}
                 sx={{ width: "100%", height: 160, objectFit: "cover", display: "block" }}
               />
-              {/* Controls */}
               <Box
                 sx={{
                   position: "absolute",

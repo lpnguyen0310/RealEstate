@@ -366,6 +366,9 @@ public class PropertyServiceImpl implements IPropertyService {
         if (req.getImageUrls() != null) {
             property.replaceImages(req.getImageUrls());
         }
+        if (req.getConstructionImages() != null) {
+            property.replaceConstructionImages(req.getConstructionImages());
+        }
         if (req.getAmenityIds() != null) {
             var amenities = req.getAmenityIds().isEmpty()
                     ? java.util.Collections.<AmenityEntity>emptyList()

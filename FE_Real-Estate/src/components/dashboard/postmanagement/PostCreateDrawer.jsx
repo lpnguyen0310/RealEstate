@@ -1,4 +1,3 @@
-// src/components/dashboard/postmanagement/PostCreateDrawer.jsx
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import {
     Drawer, Button, Switch, Tooltip, Tag, Spin, Modal, message, Grid
@@ -24,7 +23,6 @@ import {
     PublicImagesSection,
     VideoLibrarySection,
     AmenitiesSection,
-    ContactInfoSection,
     PostPreviewSection,
     OwnerAndConstructionSection
 } from "./CreatePostSection";
@@ -103,10 +101,13 @@ function mapDetailToFormData(d) {
         ownerAuth: {
             isOwner: d.ownerAuth?.isOwner ?? true,
             ownerName: d.ownerAuth?.ownerName ?? d.ownerName ?? "",
+            phoneNumber: d.ownerAuth?.phoneNumber ?? d.phoneNumber ?? "",       // thêm giữ SĐT
+            ownerEmail: d.ownerAuth?.ownerEmail ?? d.ownerEmail ?? "",         // thêm giữ Gmail
             idNumber: d.ownerAuth?.idNumber ?? "",
             issueDate: d.ownerAuth?.issueDate ? dayjs(d.ownerAuth.issueDate) : null,
             issuePlace: d.ownerAuth?.issuePlace ?? "",
             relationship: d.ownerAuth?.relationship ?? "",
+            agreed: d.ownerAuth?.agreed ?? false,
         },
         constructionImages: Array.isArray(d.constructionImages) ? d.constructionImages : [],
     };
@@ -125,7 +126,17 @@ function createInitialForm() {
         direction: "",
         listingType: null,
         listingTypePolicyId: null,
-        ownerAuth: { isOwner: true, ownerName: "", idNumber: "", issueDate: null, issuePlace: "", relationship: "" },
+        ownerAuth: {
+            isOwner: true,
+            ownerName: "",
+            phoneNumber: "",
+            ownerEmail: "",
+            idNumber: "",
+            issueDate: null,
+            issuePlace: "",
+            relationship: "",
+            agreed: false,
+        },
         constructionImages: [],
     };
 }
@@ -236,7 +247,7 @@ export default function PostCreateDrawer({
             const mergedContact = {
                 name: prev.contact?.name || mapped.contact?.name || currentProperty.authorName || dn || "",
                 email: prev.contact?.email || mapped.authorEmail || currentProperty.authorEmail || user?.email || "",
-                phone: prev.contact?.phone || user?.phone || user?.phoneNumber || "",
+                phone: prev.contact?.phone || currentProperty.phoneNumber || user?.phone || user?.phoneNumber || "",
                 zalo: prev.contact?.zalo || user?.zalo || user?.zaloPhone || user?.phone || user?.phoneNumber || "",
             };
 
@@ -289,6 +300,31 @@ export default function PostCreateDrawer({
     }, [loadDistricts, loadWards]);
 
     useAddressSuggestions(formData, setFormData, provinces, districts, wards);
+
+    /* ===== Prefill ownerAuth từ contact nếu là chính chủ và các field trống ===== */
+    useEffect(() => {
+        if (!open) return;
+        setFormData((prev) => {
+            const o = prev.ownerAuth || {};
+            if (!o.isOwner) return prev;
+
+            const needName = !o.ownerName && (prev.contact?.name || "");
+            const needPhone = !o.phoneNumber && (prev.contact?.phone || "");
+            const needEmail = !o.ownerEmail && (prev.contact?.email || "");
+
+            if (!needName && !needPhone && !needEmail) return prev;
+
+            return {
+                ...prev,
+                ownerAuth: {
+                    ...o,
+                    ownerName: o.ownerName || prev.contact?.name || "",
+                    phoneNumber: o.phoneNumber || prev.contact?.phone || "",
+                    ownerEmail: o.ownerEmail || prev.contact?.email || "",
+                },
+            };
+        });
+    }, [open]);
 
     /* ===== sang bước type ===== */
     const goToTypeStep = useCallback(() => {
@@ -453,7 +489,6 @@ export default function PostCreateDrawer({
                 styles={{
                     wrapper: wrapperInsets,
                     content: {
-                        // full-height flex container để body tự co giãn/scroll
                         display: "flex",
                         flexDirection: "column",
                         borderRadius: isMobile ? 0 : 16,
@@ -465,7 +500,7 @@ export default function PostCreateDrawer({
                         background: step === "form" ? "#E9EEF8" : "#f8faff",
                         display: "flex",
                         flexDirection: "column",
-                        minHeight: 0, // CHÌA KHÓA: cho phép phần nội dung bên trong flex-1 scroll
+                        minHeight: 0,
                     },
                     mask: { backgroundColor: "rgba(15,23,42,.35)", backdropFilter: "blur(3px)" },
                 }}
@@ -509,6 +544,8 @@ export default function PostCreateDrawer({
                                     imagesValue={formData.constructionImages}
                                     onImagesChange={(next) => setFormData((p) => ({ ...p, constructionImages: next }))}
                                     errors={errors?.ownerAuth || {}}
+                                    contactValue={formData.contact}
+                                    onContactChange={(next) => setFormData((p) => ({ ...p, contact: next }))}
                                 />
 
                                 <VideoLibrarySection
@@ -519,10 +556,7 @@ export default function PostCreateDrawer({
                                     value={formData.amenityIds}
                                     onChange={(next) => setFormData((p) => ({ ...p, amenityIds: next }))}
                                 />
-                                <ContactInfoSection
-                                    value={formData.contact}
-                                    onChange={(next) => setFormData((p) => ({ ...p, contact: next }))}
-                                />
+                                {/* ĐÃ BỎ ContactInfoSection */}
                             </div>
                         </div>
                     ) : (
@@ -531,6 +565,7 @@ export default function PostCreateDrawer({
                                 <PublicImagesSection
                                     images={formData.images}
                                     onChange={(arr) => setFormData((p) => ({ ...p, images: arr }))}
+                                    appendedImages={formData.constructionImages}
                                 />
                                 <PostTypeSection
                                     value={postTypeId ?? formData.listingTypePolicyId ?? null}

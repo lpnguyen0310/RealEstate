@@ -66,7 +66,12 @@ public class PropertyConverter {
         dto.setExpiresAt(entity.getExpiresAt());
         dto.setFavoriteCount(entity.getFavoriteCount());
         dto.setLatestWarningMessage(entity.getLatestWarningMessage());
-
+        dto.setConstructionImages(
+                entity.getConstructionImages()
+                        .stream()
+                        .map(PropertyImageEntity::getImageUrl)
+                        .toList()
+        );
         // --- Listing type as String ---
         if (entity.getListingType() != null) {
             dto.setListingType(entity.getListingType().name()); // NORMAL | VIP | PREMIUM

@@ -168,6 +168,7 @@ export const createPropertyThunk = createAsyncThunk(
                     listingTypePolicyId ?? formData.listingTypePolicyId,
                 imageUrls,
                 amenityIds: formData.amenityIds || [],
+                constructionImages: formData.constructionImages || [], // CONSTRUCTION
             };
 
             const mode = submitMode?.toUpperCase() === "DRAFT" ? "DRAFT" : "PUBLISH";
@@ -279,6 +280,8 @@ export const updatePropertyThunk = createAsyncThunk(
                     listingTypePolicyId ?? formData.listingTypePolicyId,
                 imageUrls,
                 amenityIds: formData.amenityIds || [],
+                constructionImages: formData.constructionImages || [], // CONSTRUCTION
+
             };
 
             const mode = submitMode ? submitMode.toUpperCase() : undefined;

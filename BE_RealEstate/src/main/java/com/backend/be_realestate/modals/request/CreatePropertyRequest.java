@@ -47,5 +47,5 @@ public class CreatePropertyRequest {
     private Long categoryId;
     private List<Long> amenityIds;
     private List<String> imageUrls;
-
+    private List<String> constructionImages;
 }

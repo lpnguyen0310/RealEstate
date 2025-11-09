@@ -63,4 +63,5 @@ public class PropertyDTO {
     private String rejectReason;          // lấy từ audit REJECTED gần nhất
     private int reportCount;
     private String LatestWarningMessage;
+    private List<String> constructionImages;
 }
