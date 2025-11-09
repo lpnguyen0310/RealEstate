@@ -12,5 +12,7 @@ public class AgentDetailDTO {
     private String phoneMasked;
     private String phoneFull;
     private List<String> tags;
+    private Boolean isOwner;   // true: chính chủ
+    private String email;
 }
 

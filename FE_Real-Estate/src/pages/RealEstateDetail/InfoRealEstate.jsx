@@ -140,8 +140,13 @@ export default function InfoRealEstate() {
                     },
                     features: { ...DEFAULT_FEATURES, ...apiData.features },
                     map: { ...DEFAULT_MAP, ...apiData.map },
-                    agent: { ...DEFAULT_AGENT, ...apiData.agent },
-
+                    agent: {
+                        ...DEFAULT_AGENT,
+                        ...(apiData.agent || {}),
+                        tags: Array.isArray(apiData.agent?.tags)
+                            ? apiData.agent.tags
+                            : DEFAULT_AGENT.tags,
+                    },
                     // Đối với các mảng, kiểm tra nếu mảng từ API có dữ liệu thì dùng, nếu không thì dùng default
                     gallery: apiData.gallery?.length ? apiData.gallery : DEFAULT_GALLERY_IMAGES,
                     mapMeta: apiData.mapMeta?.length ? apiData.mapMeta : DEFAULT_MAP_META,
@@ -377,11 +382,18 @@ export default function InfoRealEstate() {
                                 </div>
 
                                 <div className="mt-4 flex flex-wrap gap-2">
-                                    {agent.tags.map((t) => (
-                                        <Tag key={t} color="blue">
-                                            {t}
-                                        </Tag>
-                                    ))}
+                                    {(agent?.tags || []).map((t) => {
+                                        const lc = String(t || "").toLowerCase();
+                                        let color = "blue";
+                                        if (lc.includes("đã xác thực")) color = "green";
+                                        if (lc.includes("không phải chính chủ")) color = "volcano"; // antd preset
+                                        if (lc.includes("chính chủ") && !lc.includes("không")) color = "geekblue";
+                                        return (
+                                            <Tag key={t} color={color}>
+                                                {t}
+                                            </Tag>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -394,7 +406,7 @@ export default function InfoRealEstate() {
                     <div className="text-sm text-gray-500 mb-[15px]">
                         {/* Dùng optional chaining (?.) để đảm bảo không bị lỗi nếu breadcrumb không tồn tại */}
                         {postInfo?.breadcrumb?.slice(0, 3).join(" / ")}
-                        
+
                         {/* Chỉ hiển thị phần tử thứ 4 NẾU nó tồn tại */}
                         {postInfo?.breadcrumb?.[3] && (
                             <>
@@ -543,7 +555,7 @@ export default function InfoRealEstate() {
                             }}
                             address={postInfo?.address}
                         />
-=                        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        =                        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                             {mapMeta.map(({ label, value }) => (
                                 <div key={label} className="rounded-lg border border-gray-200 p-4">
                                     <div className="text-gray-500 text-sm">{label}</div>

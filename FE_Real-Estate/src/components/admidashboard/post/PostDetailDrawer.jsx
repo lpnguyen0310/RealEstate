@@ -197,6 +197,7 @@ export default function PostDetailDrawer({
 
                             <ImageViewer images={d.images} />
 
+                            {/* Thông tin cơ bản */}
                             <Card sx={{ borderRadius: 2, mt: 2 }}>
                                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                                     <Grid container spacing={1.5}>
@@ -233,6 +234,48 @@ export default function PostDetailDrawer({
                                         <Grid item xs={12}>
                                             <Row label="Mô tả" value={d.description || "-"} />
                                         </Grid>
+                                    </Grid>
+                                </CardContent>
+                            </Card>
+
+                            {/* === THÔNG TIN NGƯỜI ĐĂNG / CHÍNH CHỦ === */}
+                            <Card sx={{ borderRadius: 2, mt: 2 }}>
+                                <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                                    <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>
+                                        Thông tin người đăng
+                                    </Typography>
+
+                                    <Grid container spacing={1.5}>
+                                        <Grid item xs={12} sm={6}>
+                                            <Row
+                                                label="Trạng thái"
+                                                value={
+                                                    <Chip
+                                                        label={d.isOwner ? "Chính chủ" : "Không chính chủ"}
+                                                        color={d.isOwner ? "success" : "warning"}
+                                                        size="small"
+                                                    />
+                                                }
+                                            />
+                                        </Grid>
+
+                                        <Grid item xs={12} sm={6}>
+                                            <Row label="Họ và tên" value={d.contactName || "-"} />
+                                        </Grid>
+
+                                        <Grid item xs={12} sm={6}>
+                                            <Row label="Số điện thoại" value={d.contactPhone || "-"} />
+                                        </Grid>
+
+                                        <Grid item xs={12} sm={6}>
+                                            <Row label="Email" value={d.contactEmail || "-"} />
+                                        </Grid>
+
+                                        {!d.isOwner && (
+                                            <Grid item xs={12} sm={6}>
+                                                <Row label="Quan hệ với chủ nhà" value={d.contactRelationship || "-"} />
+                                            </Grid>
+                                        )}
                                     </Grid>
                                 </CardContent>
                             </Card>

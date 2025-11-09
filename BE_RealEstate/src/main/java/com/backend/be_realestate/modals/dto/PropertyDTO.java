@@ -64,4 +64,9 @@ public class PropertyDTO {
     private int reportCount;
     private String LatestWarningMessage;
     private List<String> constructionImages;
+    private Boolean isOwner;             // true: chính chủ, false: không
+    private String contactName;          // tên người liên hệ
+    private String contactPhone;         // số điện thoại liên hệ
+    private String contactEmail;         // email liên hệ
+    private String contactRelationship;  // quan hệ với chủ sở hữu
 }

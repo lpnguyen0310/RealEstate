@@ -134,7 +134,7 @@ export const createPropertyThunk = createAsyncThunk(
             const uploaded = files.length ? await uploadMany(files, "properties") : [];
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
-
+            const isOwner = !!formData?.ownerAuth?.isOwner;
             // 3) Payload
             const payload = {
                 title: formData.title,
@@ -169,6 +169,11 @@ export const createPropertyThunk = createAsyncThunk(
                 imageUrls,
                 amenityIds: formData.amenityIds || [],
                 constructionImages: formData.constructionImages || [], // CONSTRUCTION
+                isOwner,
+                contactName: !isOwner ? (formData.ownerAuth?.ownerName || formData.contact?.name || "").trim() : undefined,
+                contactPhone: !isOwner ? (formData.ownerAuth?.phoneNumber || formData.contact?.phone || "").trim() : undefined,
+                contactEmail: !isOwner ? (formData.ownerAuth?.ownerEmail || formData.contact?.email || "").trim() : undefined,
+                contactRelationship: !isOwner ? (formData.ownerAuth?.relationship || "").trim() : undefined,
             };
 
             const mode = submitMode?.toUpperCase() === "DRAFT" ? "DRAFT" : "PUBLISH";
@@ -246,6 +251,7 @@ export const updatePropertyThunk = createAsyncThunk(
             const uploaded = files.length ? await uploadMany(files, "properties") : [];
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
+            const isOwner = !!formData?.ownerAuth?.isOwner;
 
             // 2) Payload (same as create)
             const payload = {
@@ -281,7 +287,11 @@ export const updatePropertyThunk = createAsyncThunk(
                 imageUrls,
                 amenityIds: formData.amenityIds || [],
                 constructionImages: formData.constructionImages || [], // CONSTRUCTION
-
+                isOwner,
+                contactName: !isOwner ? (formData.ownerAuth?.ownerName || formData.contact?.name || "").trim() : undefined,
+                contactPhone: !isOwner ? (formData.ownerAuth?.phoneNumber || formData.contact?.phone || "").trim() : undefined,
+                contactEmail: !isOwner ? (formData.ownerAuth?.ownerEmail || formData.contact?.email || "").trim() : undefined,
+                contactRelationship: !isOwner ? (formData.ownerAuth?.relationship || "").trim() : undefined,
             };
 
             const mode = submitMode ? submitMode.toUpperCase() : undefined;

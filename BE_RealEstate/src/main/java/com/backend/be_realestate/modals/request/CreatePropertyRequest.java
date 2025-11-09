@@ -48,4 +48,9 @@ public class CreatePropertyRequest {
     private List<Long> amenityIds;
     private List<String> imageUrls;
     private List<String> constructionImages;
+    private Boolean isOwner;             // true: Chính chủ
+    private String contactName;
+    private String contactPhone;
+    private String contactEmail;
+    private String contactRelationship;
 }

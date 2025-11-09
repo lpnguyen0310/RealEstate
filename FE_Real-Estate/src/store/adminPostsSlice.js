@@ -7,6 +7,28 @@ import { normalizeStatuses, countByStatus } from "@/utils/validators";
 // Cho phép xác định có endpoint counts hay không
 const hasCountsApi = typeof adminPropertyApi?.counts === "function";
 
+/* ========= Chuẩn hoá contact từ nhiều cấu trúc khác nhau ========= */
+function normalizeContact(d = {}) {
+    const direct = {
+        name: d.contactName ?? d.ownerName ?? d.authorName ?? d.posterName ?? d.fullName ?? d.userFullName,
+        phone: d.contactPhone ?? d.ownerPhone ?? d.authorPhone ?? d.posterPhone ?? d.phone ?? d.phoneNumber,
+        email: d.contactEmail ?? d.ownerEmail ?? d.authorEmail ?? d.posterEmail ?? d.email,
+        relationship: d.contactRelationship ?? d.relationship ?? d.agentRelationship,
+        isOwner: typeof d.isOwner === "boolean" ? d.isOwner : undefined,
+    };
+    const u = d.user || d.owner || d.author || d.poster || {};
+    return {
+        name: direct.name ?? u.fullName ?? u.name ?? "-",
+        phone: direct.phone ?? u.phone ?? u.phoneNumber ?? "-",
+        email: direct.email ?? u.email ?? "-",
+        relationship: direct.relationship ?? "-",
+        isOwner:
+            typeof direct.isOwner === "boolean"
+                ? direct.isOwner
+                : (typeof u.isOwner === "boolean" ? u.isOwner : false),
+    };
+}
+
 const initialState = {
     // data
     posts: [],
@@ -17,6 +39,7 @@ const initialState = {
     // loading flags
     loadingList: false,
     loadingCounts: false,
+    loadingDetail: false,
     actioningId: null,
 
     // filters
@@ -55,14 +78,16 @@ export const fetchPostsThunk = createAsyncThunk(
                 sort: "postedAt,desc",
             });
 
-            // Chuẩn hóa như trong component
             const content = Array.isArray(res?.content) ? res.content : [];
-            // ... bên trong fetchPostsThunk, đoạn map normalizedRows:
+
             const normalizedRows = content.map((p) => {
                 const posted = p.postedAt ? dayjs(p.postedAt) : null;
                 const expires = p.expiresAt ? dayjs(p.expiresAt) : null;
                 const actualDurationDays =
                     p.actualDurationDays ?? (posted && expires ? expires.diff(posted, "day") : null);
+
+                // PREVIEW contact nếu API list có trả (không bắt buộc)
+                const contactPreview = normalizeContact(p);
 
                 return {
                     id: p.id,
@@ -85,9 +110,12 @@ export const fetchPostsThunk = createAsyncThunk(
 
                     author: { name: p.authorName, email: p.authorEmail },
                     images: p.imageUrls || [],
-
-                    // >>> THÊM 2 DÒNG NÀY <<<
-                    audit: Array.isArray(p.audit) ? p.audit : [],           // lấy lịch sử từ API
+                    contactName: p.contactName,
+                    contactPhone: p.contactPhone,
+                    contactEmail: p.contactEmail,
+                    contactRelationship: p.contactRelationship,
+                    isOwner: p.isOwner,
+                    audit: Array.isArray(p.audit) ? p.audit : [],
                     rejectReason:
                         p.rejectReason ??
                         p.rejectionReason ??
@@ -95,9 +123,11 @@ export const fetchPostsThunk = createAsyncThunk(
                         p.rejectNote ??
                         p.reason ??
                         null,
+
+                    // preview contact (không dùng cũng không sao)
+                    contactPreview,
                 };
             });
-
 
             const normalized = normalizeStatuses(normalizedRows);
 
@@ -115,7 +145,6 @@ export const fetchPostsThunk = createAsyncThunk(
 export const fetchCountsThunk = createAsyncThunk(
     "adminPosts/fetchCounts",
     async (_, { getState, rejectWithValue }) => {
-        // Chỉ gọi khi có API
         if (!hasCountsApi) return {};
         const s = getState().adminPosts;
         try {
@@ -123,11 +152,60 @@ export const fetchCountsThunk = createAsyncThunk(
                 q: s.q || undefined,
                 categoryId: s.category || undefined,
                 listingType: s.listingType || undefined,
-                // Không gửi status để counts là toàn tập theo filter
             });
             return res || {};
         } catch (e) {
             return rejectWithValue(e?.response?.data?.message || "Load counts thất bại");
+        }
+    }
+);
+
+/* ========== NEW: lấy FULL chi tiết theo id để mở Drawer ========== */
+export const fetchPostDetailThunk = createAsyncThunk(
+    "adminPosts/fetchDetail",
+    async (id, { rejectWithValue }) => {
+        try {
+            const full = await adminPropertyApi.getById(id);
+            // chuẩn hoá contact + một số field đồng nhất với list
+            const posted = full.postedAt ? dayjs(full.postedAt) : null;
+            const expires = full.expiresAt ? dayjs(full.expiresAt) : null;
+            const actualDurationDays =
+                full.actualDurationDays ?? (posted && expires ? expires.diff(posted, "day") : null);
+
+            const contact = normalizeContact(full);
+
+            return {
+                ...full,
+                id: full.id,
+                title: full.title,
+                listingType: full.listingType,
+                displayAddress: full.displayAddress,
+                description: full.description,
+                price: full.price,
+                status: full.status,
+                createdAt: full.postedAt,
+                expiresAt: full.expiresAt,
+                durationDays: actualDurationDays,
+                policyDurationDays: full.policyDurationDays ?? full.durationDays ?? null,
+                images: full.imageUrls || full.images || [],
+                audit: Array.isArray(full.audit) ? full.audit : [],
+                rejectReason:
+                    full.rejectReason ??
+                    full.rejectionReason ??
+                    full.reject_note ??
+                    full.rejectNote ??
+                    full.reason ??
+                    null,
+
+                // <- phần Drawer cần
+                contactName: contact.name,
+                contactPhone: contact.phone,
+                contactEmail: contact.email,
+                contactRelationship: contact.relationship,
+                isOwner: contact.isOwner,
+            };
+        } catch (e) {
+            return rejectWithValue(e?.response?.data?.message || "Load chi tiết thất bại");
         }
     }
 );
@@ -220,7 +298,7 @@ const adminPostsSlice = createSlice({
             s.page = 1;
         },
 
-        // drawer
+        // drawer (giữ để mở bằng row nếu muốn – nhưng khuyến nghị dùng fetchPostDetailThunk)
         openDetail: (s, a) => {
             const r = a.payload;
             const effectiveDuration = r.policyDurationDays ?? 30;
@@ -248,7 +326,6 @@ const adminPostsSlice = createSlice({
             s.pendingAction = null;
         },
 
-        // internal helper giống bumpCounts
         bumpCounts: (s, { payload }) => {
             const { from, to, removed = false } = payload || {};
             const next = { ...s.counts };
@@ -294,6 +371,28 @@ const adminPostsSlice = createSlice({
                 s.loadingCounts = false;
             });
 
+        /* ========== NEW: fetch detail by id ========== */
+        builder
+            .addCase(fetchPostDetailThunk.pending, (s) => {
+                s.loadingDetail = true;
+            })
+            .addCase(fetchPostDetailThunk.fulfilled, (s, { payload }) => {
+                s.loadingDetail = false;
+                // mở Drawer với detail đầy đủ (có contact/isOwner)
+                const effectiveDuration = payload.policyDurationDays ?? 30;
+                s.detail = { ...payload };
+                s.decision = {
+                    listingType: payload.listingType || "NORMAL",
+                    durationDays: effectiveDuration,
+                    note: "",
+                    reason: "",
+                };
+                s.open = true;
+            })
+            .addCase(fetchPostDetailThunk.rejected, (s) => {
+                s.loadingDetail = false;
+            });
+
         // approve
         builder
             .addCase(approvePostThunk.pending, (s, { meta }) => {
@@ -313,7 +412,6 @@ const adminPostsSlice = createSlice({
                         }
                         : x
                 );
-                // bump counts
                 const from = "PENDING_REVIEW";
                 s.counts = {
                     ...s.counts,
@@ -333,8 +431,6 @@ const adminPostsSlice = createSlice({
             .addCase(rejectPostThunk.fulfilled, (s, { payload }) => {
                 const { id } = payload;
                 s.actioningId = null;
-
-                // NEW: lấy lý do hiện tại trong state.decision
                 const reason = (s.decision?.reason ?? "").toString();
 
                 let from = null;
@@ -353,7 +449,6 @@ const adminPostsSlice = createSlice({
                     REJECTED: (s.counts.REJECTED || 0) + 1,
                 };
 
-                // NEW: nếu đang mở Drawer đúng tin này thì đồng bộ luôn detail
                 if (s.open && s.detail && s.detail.id === id) {
                     s.detail = { ...s.detail, status: "REJECTED", rejectReason: reason };
                 }
@@ -428,10 +523,8 @@ const adminPostsSlice = createSlice({
                         [from]: Math.max(0, (s.counts[from] || 0) - 1),
                     };
                 }
-                // totalItems giảm đi 1
                 s.totalItems = Math.max(0, s.totalItems - 1);
 
-                // Nếu đang xem chi tiết chính tin này thì đóng detail
                 if (s.open && s.detail && s.detail.id === id) {
                     s.open = false;
                     s.detail = null;

@@ -198,4 +198,18 @@ import java.util.List;
 
             @Column(name = "latest_warning_message", length = 1000)
             private String latestWarningMessage;
+
+            @Column(name = "is_owner", nullable = false)
+            private Boolean isOwner = Boolean.TRUE;
+
+            @Column(name = "contact_name", length = 255)
+            private String contactName;
+
+            @Column(name = "contact_phone", length = 50)
+            private String contactPhone;
+
+            @Column(name = "contact_email", length = 255)
+            private String contactEmail;
+            @Column(name = "contact_relationship", length = 255)
+            private String contactRelationship;
         }

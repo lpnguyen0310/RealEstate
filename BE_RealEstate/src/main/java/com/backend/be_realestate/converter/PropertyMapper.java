@@ -115,7 +115,8 @@ public class PropertyMapper {
         dto.setMap(mapDTO);
 
         dto.setMapMeta(buildMapMeta(entity));
-        dto.setAgent(buildAgentDetail(entity.getUser()));
+//        dto.setAgent(buildAgentDetail(entity.getUser()));
+        dto.setAgent(buildAgentDetail(entity)); // <-- đổi sang gọi bản mới
 
         return dto;
     }
@@ -193,18 +194,52 @@ public class PropertyMapper {
 
         );
     }
+    private String maskPhone(String phone) {
+        if (phone == null || phone.isBlank()) return "N/A";
+        if (phone.length() <= 4) return "****";
+        int keep = Math.min(3, phone.length() - 4);          // ví dụ giữ 3 số đầu
+        String head = phone.substring(0, keep);
+        return head + " " + "*".repeat(Math.max(0, phone.length() - keep));
+    }
 
-    private AgentDetailDTO buildAgentDetail(UserEntity user) {
+    private AgentDetailDTO buildAgentDetail(PropertyEntity p) {
+        UserEntity u = p.getUser();
+
         AgentDetailDTO agent = new AgentDetailDTO();
-        agent.setName(user.getFirstName() + " " + user.getLastName());
-        agent.setAvatar(user.getAvatar());
-        agent.setPhoneFull(user.getPhone());
-        agent.setPhoneMasked(user.getPhone() != null && user.getPhone().length() > 6 ? user.getPhone().substring(0, 7) + " ***" : "N/A");
-        // TODO: Cần query DB để lấy số tin đăng khác của user này
+        String name = (u != null)
+                ? ((u.getFirstName() + " " + u.getLastName()).trim())
+                : "Người đăng";
+        String avatar = (u != null) ? u.getAvatar() : null;
+        String phone  = (u != null) ? u.getPhone()  : null;
+        String email  = (u != null) ? u.getEmail()  : null;
+
+        agent.setName(name);
+        agent.setAvatar(avatar);
+        agent.setPhoneFull(phone);
+        agent.setPhoneMasked(maskPhone(phone));
+        agent.setEmail(email);
+
+        boolean isOwner = Boolean.TRUE.equals(p.getIsOwner());
+        agent.setIsOwner(isOwner);
+        agent.setTags(isOwner ? List.of("Chính chủ", "Đã xác thực")
+                : List.of("Không phải chính chủ"));
+
         agent.setOtherPostsText("Xem thêm 10 tin khác");
-        // TODO: Dữ liệu tag nên được lưu trong DB
-        agent.setTags(List.of("Chính chủ", "Đã xác thực"));
         return agent;
+    }
+
+    // Nếu nơi khác vẫn đang gọi bản cũ: giữ overload cũ và gọi qua bản mới
+    @Deprecated
+    private AgentDetailDTO buildAgentDetail(UserEntity user) {
+        PropertyEntity fake = new PropertyEntity();
+        fake.setUser(user);
+        fake.setIsOwner(Boolean.TRUE);
+        if (user != null) {
+            fake.setContactName((user.getFirstName() + " " + user.getLastName()).trim());
+            fake.setContactPhone(user.getPhone());
+            fake.setContactEmail(user.getEmail());
+        }
+        return buildAgentDetail(fake);
     }
 
     private String formatShortAddress(PropertyEntity entity) {

@@ -55,11 +55,24 @@ const Header = React.memo(function Header({ step, onClose, isEdit }) {
         </div>
     );
 });
-
+function toBool(v, def = false) {
+    if (v === true || v === false) return v;
+    if (v === 1 || v === "1" || v === "true") return true;
+    if (v === 0 || v === "0" || v === "false") return false;
+    return def;
+}
 /* =========== map detail -> formData =========== */
 function mapDetailToFormData(d) {
     if (!d) return null;
+
+    const isOwner = toBool(d.isOwner ?? d.is_owner, false);
+    // Fallback liên hệ: ưu tiên contact_*, nếu trống thì dùng author*/phoneNumber
+    const fbName = d.contactName || d.authorName || "";
+    const fbPhone = d.contactPhone || d.phoneNumber || "";
+    const fbEmail = d.contactEmail || d.authorEmail || "";
+
     return {
+        /* ===== Bài đăng cơ bản ===== */
         title: d.title ?? "",
         description: d.description ?? "",
         categoryId: d.categoryId ?? "",
@@ -67,14 +80,17 @@ function mapDetailToFormData(d) {
         priceType: d.priceType ?? "SELL_PRICE",
         price: d.price ?? "",
 
+        /* ===== Media ===== */
         images: Array.isArray(d.imageUrls) ? d.imageUrls : [],
         videoUrls: Array.isArray(d.videoUrls) ? d.videoUrls : ["", ""],
         amenityIds: Array.isArray(d.amenityIds) ? d.amenityIds : [],
 
+        /* ===== Địa giới ===== */
         provinceId: d.cityId ?? "",
         districtId: d.districtId ?? "",
         wardId: d.wardId ?? "",
 
+        /* ===== Địa chỉ hiển thị ===== */
         suggestedAddress: d.displayAddress || "",
         displayAddress: d.displayAddress || d.addressFull || "",
         streetName: d.addressStreet || "",
@@ -82,6 +98,7 @@ function mapDetailToFormData(d) {
         addressSuggestions: [],
         streetOptions: [],
 
+        /* ===== Thuộc tính BĐS ===== */
         position: d.position || "",
         direction: d.direction || "",
         landArea: d.landArea ?? "",
@@ -91,27 +108,39 @@ function mapDetailToFormData(d) {
         length: d.height ?? "",
         legalDocument: d.legalStatus || "",
 
-        contact: { name: "", phone: "", email: "", zalo: "" },
+        /* ===== Liên hệ cho UI ===== */
+        contact: {
+            name: fbName,
+            phone: fbPhone,
+            email: fbEmail,
+            zalo: d.zaloPhone || "",
+        },
 
+        /* ===== Gói tin ===== */
         listingType: d.listingType || null,
         listingTypePolicyId: d.listingTypePolicyId ?? null,
-        authorName: d.authorName || "",
-        authorEmail: d.authorEmail || "",
 
+        /* ===== Chủ sở hữu ===== */
         ownerAuth: {
-            isOwner: d.ownerAuth?.isOwner ?? true,
-            ownerName: d.ownerAuth?.ownerName ?? d.ownerName ?? "",
-            phoneNumber: d.ownerAuth?.phoneNumber ?? d.phoneNumber ?? "",       // thêm giữ SĐT
-            ownerEmail: d.ownerAuth?.ownerEmail ?? d.ownerEmail ?? "",         // thêm giữ Gmail
-            idNumber: d.ownerAuth?.idNumber ?? "",
-            issueDate: d.ownerAuth?.issueDate ? dayjs(d.ownerAuth.issueDate) : null,
-            issuePlace: d.ownerAuth?.issuePlace ?? "",
-            relationship: d.ownerAuth?.relationship ?? "",
-            agreed: d.ownerAuth?.agreed ?? false,
+            isOwner,
+            // Khi KHÔNG chính chủ, BE hiện đang lưu trong các cột contact_*
+            ownerName: d.contactName || d.ownerName || "",
+            phoneNumber: d.contactPhone || d.ownerPhone || "",
+            ownerEmail: d.contactEmail || d.ownerEmail || "",
+            idNumber: d.ownerAuth?.idNumber || d.owner_id_number || "",
+            issueDate: d.ownerAuth?.issueDate
+                ? dayjs(d.ownerAuth.issueDate)
+                : (d.owner_issue_date ? dayjs(d.owner_issue_date) : null),
+            issuePlace: d.ownerAuth?.issuePlace || d.owner_issue_place || "",
+            relationship: d.ownerAuth?.relationship || d.contactRelationship || d.relationship || "",
+            agreed: toBool(d.ownerAuth?.agreed ?? d.owner_agreed, false),
         },
+
+        /* ===== Ảnh xây dựng ===== */
         constructionImages: Array.isArray(d.constructionImages) ? d.constructionImages : [],
     };
 }
+
 
 function createInitialForm() {
     return {
@@ -245,10 +274,10 @@ export default function PostCreateDrawer({
         setFormData((prev) => {
             const dn = displayNameFromUser(user);
             const mergedContact = {
-                name: prev.contact?.name || mapped.contact?.name || currentProperty.authorName || dn || "",
-                email: prev.contact?.email || mapped.authorEmail || currentProperty.authorEmail || user?.email || "",
-                phone: prev.contact?.phone || currentProperty.phoneNumber || user?.phone || user?.phoneNumber || "",
-                zalo: prev.contact?.zalo || user?.zalo || user?.zaloPhone || user?.phone || user?.phoneNumber || "",
+                name: mapped.contact?.name ?? "",
+                email: mapped.contact?.email ?? "",
+                phone: mapped.contact?.phone ?? "",
+                zalo: mapped.contact?.zalo ?? "",
             };
 
             return {

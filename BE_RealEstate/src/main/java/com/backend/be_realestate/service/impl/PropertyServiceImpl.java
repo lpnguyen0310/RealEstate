@@ -375,12 +375,34 @@ public class PropertyServiceImpl implements IPropertyService {
                     : amenityRepository.findAllById(req.getAmenityIds());
             property.setAmenities(amenities);
         }
+        if (req.getIsOwner() != null) property.setIsOwner(req.getIsOwner());
 
+        if (Boolean.TRUE.equals(property.getIsOwner())) {
+            // Nếu chính chủ: auto-fill từ User nếu FE không gửi
+            var u = property.getUser();
+            if (req.getContactName() != null)  property.setContactName(req.getContactName());
+            else if (u != null)                property.setContactName((u.getFirstName() + " " + u.getLastName()).trim());
+
+            if (req.getContactEmail() != null) property.setContactEmail(req.getContactEmail());
+            else if (u != null)                property.setContactEmail(u.getEmail());
+
+            if (req.getContactPhone() != null) property.setContactPhone(req.getContactPhone());
+            else if (u != null)                property.setContactPhone(u.getPhone()); // tuỳ field của bạn
+        } else {
+            // Không chính chủ: lấy đúng theo req (không tự fill)
+            if (req.getContactName() != null)  property.setContactName(req.getContactName());
+            if (req.getContactEmail() != null) property.setContactEmail(req.getContactEmail());
+            if (req.getContactPhone() != null) property.setContactPhone(req.getContactPhone());
+            if (req.getContactRelationship() != null) property.setContactRelationship(req.getContactRelationship());
+
+        }
         // === Status khi tạo ===
         if (createMode) {
             SubmitMode effective = (mode == null) ? SubmitMode.PUBLISH : mode;
             property.setStatus(effective == SubmitMode.DRAFT ? PropertyStatus.DRAFT : PropertyStatus.PENDING_REVIEW);
         }
+
+
     }
 
     /* =====================    ====================================
