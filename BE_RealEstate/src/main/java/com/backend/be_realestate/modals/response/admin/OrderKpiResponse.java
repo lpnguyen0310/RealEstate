@@ -20,6 +20,8 @@ public class OrderKpiResponse {
         private long revenue;            // tổng doanh thu (VND) trong kỳ
         private double compareOrders;    // so với kỳ trước (tỷ lệ, vd 0.12 = +12%)
         private double compareRevenue;   // so với kỳ trước (tỷ lệ)
+        private long previousOrders;     // tổng số đơn KỲ TRƯỚC
+        private long previousRevenue;    // tổng doanh thu KỲ TRƯỚC
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder

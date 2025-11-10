@@ -62,7 +62,24 @@ function StatCard({
     lineColor = "#3b82f6",
     gradientFrom = "from-blue-50",
     gradientTo = "to-white",
+    prevValue,
+    valueFormatter = (v) => v,
 }) {
+    const tooltipTitle = useMemo(() => {
+        // Chỉ hiển thị tooltip nếu có giá trị kỳ trước, không đang tải và không lỗi
+        if (prevValue === null || prevValue === undefined || !hint || hint === "Đang tải…" || hint.startsWith("Lỗi:")) {
+            return null;
+        }
+
+        const currentValueFmt = value; // 'value' đã được format từ useMemo ở trên
+        const prevValueFmt = valueFormatter(prevValue); // Format giá trị kỳ trước
+
+        // Xử lý hint (ví dụ: "+10.5%... · 4 tin chờ duyệt" -> chỉ lấy "+10.5%...")
+        const pctHint = hint.split(" · ")[0];
+
+        // \n (xuống dòng) sẽ được render bởi tooltip native của trình duyệt
+        return `${title}: ${currentValueFmt}\nKỳ trước: ${prevValueFmt}\nThay đổi: ${pctHint}`;
+    }, [title, value, prevValue, valueFormatter, hint]);
     return (
         <div
             className={`relative p-6 rounded-2xl shadow-md border border-[#e5ebf5] flex flex-col justify-between
@@ -81,7 +98,10 @@ function StatCard({
                 </div>
 
                 {hint && (
-                    <p className={`text-xs flex items-center mt-2 font-medium ${trendColor}`}>
+                    <p
+                        className={`text-xs flex items-center mt-2 font-medium ${trendColor}`}
+                        title={tooltipTitle}
+                    >
                         {trend === "down" ? (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
@@ -189,6 +209,7 @@ export default function AdminDashboard() {
     const [newUsers, setNewUsers] = useState({
         total: 0,
         compareToPrev: 0,
+        previousTotal: 0, 
         series: [],
         loading: false,
         error: null,
@@ -204,6 +225,7 @@ export default function AdminDashboard() {
                 setNewUsers({
                     total: data?.summary?.total ?? 0,
                     compareToPrev: data?.summary?.compareToPrev ?? 0,
+                    previousTotal: data?.summary?.previousTotal ?? 0,
                     series: Array.isArray(data?.series) ? data.series : [],
                     loading: false,
                     error: null,
@@ -225,6 +247,7 @@ export default function AdminDashboard() {
     const newUsersCard = useMemo(() => {
         const total = newUsers.total ?? 0;
         const pct = Number(newUsers.compareToPrev ?? 0);
+        const prevTotal = newUsers.previousTotal ?? 0;
         const trend = pct < 0 ? "down" : "up";
         const pctText =
             pct === 0 && total === 0
@@ -238,6 +261,9 @@ export default function AdminDashboard() {
             hint,
             trend,
             spark: spark.length ? spark : [1, 2, 1, 3, 2, 4, 5],
+            prevValue: newUsers.loading ? null : prevTotal, // <-- TRUYỀN
+            valueFormatter: nfmt,
+            trendColor: trend === "down" ? "text-red-500" : "text-green-600",
         };
     }, [newUsers]);
 
@@ -247,6 +273,8 @@ export default function AdminDashboard() {
         revenue: 0,
         compareOrders: 0,
         compareRevenue: 0,
+        previousOrders: 0, // <-- THÊM
+        previousRevenue: 0, // <-- THÊM
         series: [],
         loading: false,
         error: null,
@@ -264,6 +292,8 @@ export default function AdminDashboard() {
                     revenue: data?.summary?.revenue ?? 0,
                     compareOrders: data?.summary?.compareOrders ?? 0,
                     compareRevenue: data?.summary?.compareRevenue ?? 0,
+                    previousOrders: data?.summary?.previousOrders ?? 0, // <-- THÊM
+                    previousRevenue: data?.summary?.previousRevenue ?? 0, // <-- THÊM
                     series: Array.isArray(data?.series) ? data.series : [],
                     loading: false,
                     error: null,
@@ -285,6 +315,7 @@ export default function AdminDashboard() {
     const ordersCard = useMemo(() => {
         const total = orderKpi.orders ?? 0;
         const pct = Number(orderKpi.compareOrders ?? 0);
+        const prevTotal = orderKpi.previousOrders ?? 0;
         const trend = pct < 0 ? "down" : "up";
         const pctText =
             pct === 0 && total === 0
@@ -299,12 +330,15 @@ export default function AdminDashboard() {
             trend,
             spark: spark.length ? spark : [2, 1, 3, 2, 4, 5, 3],
             trendColor: trend === "down" ? "text-red-500" : "text-green-600",
+            prevValue: orderKpi.loading ? null : prevTotal,
+            valueFormatter: nfmt,
         };
     }, [orderKpi]);
 
     const revenueCard = useMemo(() => {
         const totalVnd = orderKpi.revenue ?? 0;
         const pct = Number(orderKpi.compareRevenue ?? 0);
+        const prevTotal = orderKpi.previousRevenue ?? 0;
         const trend = pct < 0 ? "down" : "up";
         const pctText =
             pct === 0 && totalVnd === 0
@@ -318,6 +352,9 @@ export default function AdminDashboard() {
             hint,
             trend,
             spark: spark.length ? spark : [60, 63, 66, 70, 73, 75],
+            prevValue: orderKpi.loading ? null : prevTotal, // <-- TRUYỀN
+            valueFormatter: vnd, // <-- TRUYỀN
+            trendColor: trend === "down" ? "text-red-500" : "text-green-600",
         };
     }, [orderKpi]);
 
@@ -325,6 +362,7 @@ export default function AdminDashboard() {
     const [propKpi, setPropKpi] = useState({
         total: 0,
         compareToPrev: 0,
+        previousTotal: 0,
         pending: 0,
         series: [],
         loading: false,
@@ -341,6 +379,7 @@ export default function AdminDashboard() {
                 setPropKpi({
                     total: data?.summary?.total ?? 0,
                     compareToPrev: data?.summary?.compareToPrev ?? 0,
+                    previousTotal: data?.summary?.previousTotal ?? 0, // <-- THÊM
                     pending: data?.summary?.pending ?? 0,
                     series: Array.isArray(data?.series) ? data.series : [],
                     loading: false,
@@ -363,6 +402,7 @@ export default function AdminDashboard() {
     const newPostsCard = useMemo(() => {
         const total = propKpi.total ?? 0;
         const pct = Number(propKpi.compareToPrev ?? 0);
+        const prevTotal = propKpi.previousTotal ?? 0;
         const trend = pct < 0 ? "down" : "up";
         const pctText =
             pct === 0 && total === 0
@@ -384,6 +424,9 @@ export default function AdminDashboard() {
             trend,
             spark,
             lineColor: "#6366f1",
+            prevValue: propKpi.loading ? null : prevTotal, // <-- TRUYỀN
+            valueFormatter: nfmt,
+            trendColor: trend === "down" ? "text-red-500" : "text-green-600",
         };
     }, [propKpi]);
 

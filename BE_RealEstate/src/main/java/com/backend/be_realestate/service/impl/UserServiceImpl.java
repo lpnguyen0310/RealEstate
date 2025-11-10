@@ -160,6 +160,7 @@ public class UserServiceImpl implements UserService {
                 .summary(NewUsersKpiResponse.Summary.builder()
                         .total(totalCurrent)
                         .compareToPrev(compare)
+                        .previousTotal(totalPrev)
                         .build())
                 .series(series)
                 .range(NewUsersKpiResponse.RangeDto.builder()

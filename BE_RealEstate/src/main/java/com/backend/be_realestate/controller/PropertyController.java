@@ -172,6 +172,11 @@ public class PropertyController {
         return ResponseEntity.ok(users);
     }
 
+    @GetMapping("/banner-listings")
+    public ResponseEntity<List<PropertyCardDTO>> getBannerListings() {
+        List<PropertyCardDTO> dtos = propertyService.getBannerListings();
+        return ResponseEntity.ok(dtos);
+    }
 
     @GetMapping("/edit/{id}")
     public ResponseEntity<PropertyDTO> getDetailForEdit(

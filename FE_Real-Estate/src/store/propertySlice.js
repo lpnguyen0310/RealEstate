@@ -306,6 +306,25 @@ export const fetchMyPropertyCountsThunk = createAsyncThunk(
     }
 );
 
+export const fetchBannerListingsThunk = createAsyncThunk(
+  "property/fetchBannerListings",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/properties/banner-listings");
+      const data = res?.data?.data ?? res?.data ?? [];
+      if (Array.isArray(data)) {
+        // Tái sử dụng mapper có sẵn của bạn cho card public
+        return data.map(mapPublicPropertyToCard);
+      }
+      return [];
+    } catch (e) {
+      return rejectWithValue(
+        e?.response?.data?.message || "Không thể tải tin nổi bật"
+      );
+    }
+  }
+);
+
 /* ===================== DATE UTILS ===================== */
 
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -560,6 +579,10 @@ const initialState = {
     forYouLoading: false,
     forYouError: null,
     forYouSource: null, // 'personalized' | 'vip_premium' | 'popular' | null
+
+    bannerListings: [],
+    bannerListingsLoading: false,
+    bannerListingsError: null,
 
     // Dashboard list của tôi
     myList: [],
@@ -860,7 +883,19 @@ const propertySlice = createSlice({
             .addCase(updatePropertyThunk.rejected, (s, a) => {
                 s.creating = false;
                 s.createError = a.payload || "Cập nhật tin thất bại";
-            });
+            })
+            .addCase(fetchBannerListingsThunk.pending, (s) => {
+                s.bannerListingsLoading = true;
+                s.bannerListingsError = null;
+            })
+            .addCase(fetchBannerListingsThunk.fulfilled, (s, a) => {
+                s.bannerListingsLoading = false;
+                s.bannerListings = a.payload;
+            })
+            .addCase(fetchBannerListingsThunk.rejected, (s, a) => {
+                s.bannerListingsLoading = false;
+                s.bannerListingsError = a.payload;
+            });
     },
 });
 

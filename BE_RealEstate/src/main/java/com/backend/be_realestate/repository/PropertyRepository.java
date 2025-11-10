@@ -4,6 +4,7 @@ import com.backend.be_realestate.entity.CityEntity;
 import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.entity.UserInventoryEntity;
 import com.backend.be_realestate.enums.ActivityType;
+import com.backend.be_realestate.enums.ListingType;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import jakarta.persistence.LockModeType;
@@ -125,6 +126,16 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<PropertyEntity> findWithLockById(Long id);
+
+    @Query("SELECT p FROM PropertyEntity p " +
+            "WHERE p.status = :status " +
+            "AND (p.expiresAt IS NULL OR p.expiresAt > CURRENT_TIMESTAMP) " +
+            "AND p.images IS NOT EMPTY " +
+            "ORDER BY p.viewCount DESC, p.postedAt DESC")
+    List<PropertyEntity> findTopViewedForBanner(
+            @Param("status") PropertyStatus status,
+            Pageable pageable
+    );
 }
 
 

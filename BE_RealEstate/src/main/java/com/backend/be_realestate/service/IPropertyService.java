@@ -51,5 +51,5 @@ public interface IPropertyService {
     PageResponse<PendingPropertyDTO> findPending(String q, int page, int size);
 
     PropertyDTO getDetailForEdit(Long propertyId, Long requesterUserId);
-
+    List<PropertyCardDTO> getBannerListings();
 }

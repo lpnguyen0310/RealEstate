@@ -763,6 +763,7 @@ public class PropertyServiceImpl implements IPropertyService {
                         .total(totalCur)
                         .compareToPrev(pct)
                         .pending(pending)
+                        .previousTotal(totalPrev)
                         .build())
                 .series(series)
                 .range(PropertyKpiResponse.RangeDto.builder()
@@ -979,5 +980,21 @@ public class PropertyServiceImpl implements IPropertyService {
         LocalDateTime prevEnd = cur.start;
         LocalDateTime prevStart = prevEnd.minus(len);
         return new Range(prevStart, prevEnd);
+    }
+
+    public List<PropertyCardDTO> getBannerListings() {
+        // Lấy 10 tin
+        Pageable pageable = PageRequest.of(0, 5);
+
+        // ⭐️ GỌI HÀM MỚI (findTopViewedForBanner)
+        List<PropertyEntity> entities = propertyRepository.findTopViewedForBanner(
+                PropertyStatus.PUBLISHED,
+                pageable
+        );
+
+        // Phần còn lại giữ nguyên
+        return entities.stream()
+                .map(propertyMapper::toPropertyCardDTO) // Chuyển sang DTO
+                .toList();
     }
 }
