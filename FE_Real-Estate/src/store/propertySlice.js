@@ -458,6 +458,10 @@ function mapDtoToPostCard(p) {
         views: p?.viewCount ?? 0,
         favoriteCount: p?.favoriteCount ?? 0,
 
+        propertyType: p?.propertyType, // <--- CẦN CHO VIỆC PHÂN LOẠI
+        interactionCount: p?.interactionCount ?? 0, // <--- CẦN CHO THỐNG KÊ
+        potentialCustomerCount: p?.potentialCustomerCount ?? 0, // <--- CẦN CHO THỐNG KÊ
+
         listingType: p?.listingType, // NORMAL | VIP | PREMIUM
 
         postedAt: p?.postedAt ?? null,
@@ -902,6 +906,41 @@ export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
         auto: { total: autoTotal, premium, vip, normal },
     };
 });
+
+export const selectPostStatsByType = createSelector(
+    // Input: Lấy state myList (đã được map)
+    (state) => state.property.myList, 
+    
+    // Hàm tính toán
+    (myList) => {
+        const sellSummary = { views: 0, interactions: 0, potential: 0 };
+        const rentSummary = { views: 0, interactions: 0, potential: 0 };
+
+        // Duyệt qua danh sách tin của bạn
+        for (const post of myList) {
+            // Lấy các số liệu thống kê từ mỗi bài post
+            // (Đảm bảo 'mapDtoToPostCard' của bạn có các trường này)
+            const stats = {
+                views: post.views ?? 0,
+                interactions: post.interactionCount ?? 0,
+                potential: post.potentialCustomerCount ?? 0,
+            };
+
+            // Phân loại và cộng dồn
+            if (post.propertyType === 'sell') {
+                sellSummary.views += stats.views;
+                sellSummary.interactions += stats.interactions;
+                sellSummary.potential += stats.potential;
+            } else if (post.propertyType === 'rent') {
+                rentSummary.views += stats.views;
+                rentSummary.interactions += stats.interactions;
+                rentSummary.potential += stats.potential;
+            }
+        }
+
+        return { sellSummary, rentSummary };
+    }
+);
 
 /* ===================== EXPORTS ===================== */
 

@@ -1,6 +1,7 @@
 package com.backend.be_realestate.enums;
 
-public enum LeadType {
+public enum CustomerLeadType {
     VIEW_PHONE,      // Click "Hiện số"
-    CONTACT_FORM     // Gửi biểu mẫu liên hệ
+    CONTACT_FORM,
+    ZALO_CLICK
 }

@@ -63,4 +63,7 @@ public class PropertyDTO {
     private String rejectReason;          // lấy từ audit REJECTED gần nhất
     private int reportCount;
     private String LatestWarningMessage;
+
+    private Long interactionCount; // (Tổng: Lưu + Zalo + Share)
+    private Long potentialCustomerCount; // (Tổng: Xem SĐT + Form)
 }

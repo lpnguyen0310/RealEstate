@@ -1,8 +1,11 @@
 package com.backend.be_realestate.converter;
 
 import com.backend.be_realestate.entity.*;
+import com.backend.be_realestate.enums.ActivityType;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyAuditDTO;
+import com.backend.be_realestate.repository.PotentialCustomerRepository;
+import com.backend.be_realestate.repository.PropertyActivityLogRepository;
 import com.backend.be_realestate.repository.PropertyAuditRepository;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
@@ -18,10 +21,13 @@ public class PropertyConverter {
 
     private final ModelMapper modelMapper;
     private final PropertyAuditRepository auditRepo;
+    private final PropertyActivityLogRepository activityLogRepo;
+    private final PotentialCustomerRepository potentialCustomerRepo;
 
     /* ===================== SINGLE ===================== */
     public PropertyDTO toDto(PropertyEntity entity) {
         PropertyDTO dto = modelMapper.map(entity, PropertyDTO.class);
+        Long propertyId = entity.getId();
 
         // --- FK ids ---
         if (entity.getUser() != null)     dto.setUserId(entity.getUser().getUserId());
@@ -87,6 +93,16 @@ public class PropertyConverter {
                     .map(PropertyAuditEntity::getMessage)
                     .ifPresent(dto::setRejectReason);
         }
+
+        Long totalInteractions = activityLogRepo.countByPropertyIdAndActivityTypeIn(
+                propertyId,
+                List.of(ActivityType.SHARE, ActivityType.FAVORITE)
+        );
+        dto.setInteractionCount(totalInteractions);
+
+        // Tính Khách tiềm năng (Zalo + Phone + Form)
+        Long leadCount = potentialCustomerRepo.countByPropertyId(propertyId);
+        dto.setPotentialCustomerCount(leadCount);
 
         return dto;
     }

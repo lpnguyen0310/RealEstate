@@ -3,11 +3,15 @@ package com.backend.be_realestate.converter;
 import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.entity.PropertyImageEntity;
 import com.backend.be_realestate.entity.UserEntity;
+import com.backend.be_realestate.enums.ActivityType;
 import com.backend.be_realestate.modals.dto.AgentDTO;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
 import com.backend.be_realestate.modals.dto.detail.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.backend.be_realestate.repository.PotentialCustomerRepository;
+import com.backend.be_realestate.repository.PropertyActivityLogRepository;
+import com.fasterxml.jackson.databind.ObjectMapper; // Giữ lại import này, có thể bạn dùng ở chỗ khác
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
@@ -15,6 +19,7 @@ import java.text.NumberFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList; // Thêm import này
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -22,9 +27,13 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class PropertyMapper {
 
+    // Giữ lại ObjectMapper, có thể bạn cần dùng cho logic khác
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final PropertyActivityLogRepository activityLogRepo;
+    private final PotentialCustomerRepository potentialCustomerRepo;
 
     public PropertyCardDTO toPropertyCardDTO(PropertyEntity entity) {
         if (entity == null) {
@@ -43,7 +52,7 @@ public class PropertyMapper {
         dto.setBath(entity.getBathrooms() != null ? entity.getBathrooms() : 0);
         dto.setViewCount(entity.getViewCount() != null ? entity.getViewCount() : 0);
         dto.setStatus(entity.getStatus());
-        // === THAY ĐỔI 1: Thêm trường price đã được định dạng ===
+
         if (entity.getPrice() != null) {
             dto.setPrice(formatPrice(entity.getPrice().longValue()));
         }
@@ -76,7 +85,6 @@ public class PropertyMapper {
 
         // --- Ghép chuỗi địa chỉ ---
         dto.setAddressShort(formatShortAddress(entity));
-        // === THAY ĐỔI 2: Lấy địa chỉ đầy đủ trực tiếp từ display_address ===
         dto.setAddressFull(entity.getDisplayAddress());
 
         // --- Mapping thông tin liên quan ---
@@ -94,28 +102,48 @@ public class PropertyMapper {
     }
 
     // =================================================================================
-    // MAPPER CHO DETAIL VIEW (PHẦN BỔ SUNG MỚI)
+    // MAPPER CHO DETAIL VIEW (PHẦN ĐÃ SỬA)
     // =================================================================================
 
     public PropertyDetailDTO toPropertyDetailDTO(PropertyEntity entity) {
         if (entity == null) return null;
 
         PropertyDetailDTO dto = new PropertyDetailDTO();
+        Long propertyId = entity.getId();
 
         dto.setGallery(entity.getImages().stream()
                 .sorted(Comparator.comparing(PropertyImageEntity::getDisplayOrder))
                 .map(PropertyImageEntity::getImageUrl)
                 .collect(Collectors.toList()));
 
-        dto.setPostInfo(buildPostInfo(entity));
-        dto.setFeatures(buildFeatures(entity));
+        dto.setPostInfo(buildPostInfo(entity)); // Gọi hàm đã sửa
+        dto.setFeatures(buildFeatures(entity)); // Gọi hàm đã sửa
         dto.setViewCount(entity.getViewCount() == null ? 0 : entity.getViewCount());
 
+        // === FIX 1: THÊM LOGIC MAP DESCRIPTION ===
+        dto.setDescription(buildDescriptionFromString(entity.getDescription()));
+
         MapDTO mapDTO = new MapDTO();
+        // TODO: Thêm logic lấy Lat/Lng cho bản đồ
+        // mapDTO.setLat(entity.getLatitude());
+        // mapDTO.setLng(entity.getLongitude());
         dto.setMap(mapDTO);
 
         dto.setMapMeta(buildMapMeta(entity));
         dto.setAgent(buildAgentDetail(entity.getUser()));
+
+        // Logic tính toán (giữ nguyên)
+        Long favoriteCount = (entity.getFavoriteCount() != null) ? entity.getFavoriteCount() : 0L;
+        Long totalInteractions = activityLogRepo.countByPropertyIdAndActivityTypeIn(
+                propertyId,
+                List.of(ActivityType.SHARE, ActivityType.FAVORITE) // Đếm 2 sự kiện này
+        );
+        dto.setInteractionCount(totalInteractions);
+
+        // 2. Khách tiềm năng (Event) - Đếm TỔNG SỐ LẦN "View Phone", "Zalo" và "Form"
+        // Phép tính này vẫn đúng vì nó đếm tất cả trong bảng PotentialCustomer
+        Long leadCount = potentialCustomerRepo.countByPropertyId(propertyId);
+        dto.setPotentialCustomerCount(leadCount);
 
         return dto;
     }
@@ -134,17 +162,26 @@ public class PropertyMapper {
         return agentDto;
     }
 
+    // === FIX 2: SỬA LẠI buildPostInfo ===
     private PostInfoDTO buildPostInfo(PropertyEntity entity) {
         PostInfoDTO postInfo = new PostInfoDTO();
-        // TODO: Logic tạo breadcrumb động có thể phức tạp
         postInfo.setTitle(entity.getTitle());
-        // Lấy địa chỉ từ display_address cho cả DTO chi tiết
         postInfo.setAddress(entity.getDisplayAddress());
 
         StatsDTO stats = new StatsDTO();
         stats.setPriceText(formatPrice(entity.getPrice().longValue()));
-
         stats.setAreaText(entity.getArea() + " m²");
+
+        // Bổ sung các trường stats còn thiếu
+        double price = entity.getPrice();
+        float area = entity.getArea();
+        if (price > 0 && area > 0) {
+            stats.setPricePerM2(formatPricePerM2(price / area));
+        }
+
+        if (entity.getWidth() != null && entity.getWidth() > 0) {
+            stats.setFrontageText("Mặt tiền " + entity.getWidth() + " m");
+        }
 
         postInfo.setStats(stats);
 
@@ -157,30 +194,111 @@ public class PropertyMapper {
         return postInfo;
     }
 
-    private DescriptionDTO buildDescription(String descriptionJson) {
-        if (descriptionJson == null || descriptionJson.isEmpty()) {
-            return new DescriptionDTO();
+    // === FIX 3: XÓA buildDescription (cũ) VÀ THAY BẰNG buildDescriptionFromString ===
+    /**
+     * Hàm mới: Parse String từ DB sang DescriptionDTO
+     * Quy ước: Dòng đầu tiên là headline, các dòng sau là bullets
+     */
+    private DescriptionDTO buildDescriptionFromString(String dbDescription) {
+        DescriptionDTO descDto = new DescriptionDTO();
+
+        // Luôn khởi tạo mảng rỗng để FE không bị crash
+        descDto.setBullets(Collections.emptyList());
+        descDto.setNearby(Collections.emptyList());
+
+        if (dbDescription == null || dbDescription.trim().isEmpty()) {
+            descDto.setHeadline("Chưa có thông tin mô tả.");
+            // Bạn có thể set các trường khác là "" hoặc null tùy ý FE
+            descDto.setNearbyTitle("");
+            descDto.setPriceLine("");
+            descDto.setSuggest("");
+            return descDto;
         }
-        try {
-            return objectMapper.readValue(descriptionJson, DescriptionDTO.class);
-        } catch (Exception e) {
-            System.err.println("Lỗi parse JSON description: " + e.getMessage());
-            return new DescriptionDTO();
+
+        // Tách chuỗi bằng dấu xuống dòng (hỗ trợ cả Windows \r\n và Unix \n)
+        String[] lines = dbDescription.split("\\r?\\n");
+
+        if (lines.length > 0) {
+            // Dòng đầu tiên là headline
+            descDto.setHeadline(lines[0].trim());
         }
+
+        if (lines.length > 1) {
+            // Các dòng còn lại là bullets
+            List<String> bullets = new ArrayList<>();
+            for (int i = 1; i < lines.length; i++) {
+                String line = lines[i].trim();
+                if (!line.isEmpty()) { // Bỏ qua các dòng trống
+                    bullets.add(line);
+                }
+            }
+            descDto.setBullets(bullets);
+        }
+
+        // TODO: Thêm logic cho nearbyTitle, nearby, priceLine, suggest nếu cần
+        // Ví dụ:
+        // descDto.setNearbyTitle("Tiện ích lân cận:");
+        // descDto.setNearby(List.of("Gần chợ", "Gần trường học"));
+        // descDto.setPriceLine("Giá: " + formatPrice(entity.getPrice().longValue()));
+        // descDto.setSuggest("Liên hệ ngay để xem nhà!");
+
+        return descDto;
     }
 
+    // === FIX 4: SỬA LẠI buildFeatures ===
+    /**
+     * Sửa lại hàm buildFeatures để lấy nhiều trường hơn từ Entity
+     * và tự động ẩn các trường nếu không có dữ liệu.
+     */
     private FeaturesDTO buildFeatures(PropertyEntity entity) {
         FeaturesDTO features = new FeaturesDTO();
-        features.setLeft(List.of(
-                new FeatureItemDTO("Khoảng giá", formatPrice(entity.getPrice().longValue())),
-                new FeatureItemDTO("Diện tích", entity.getArea() + " m²"),
-                new FeatureItemDTO("Hướng nhà", entity.getDirection())
-        ));
-        features.setRight(List.of(
-                new FeatureItemDTO("Pháp lý", entity.getLegalStatus())
-        ));
+
+        // Dùng ArrayList để có thể thêm/bớt động
+        List<FeatureItemDTO> left = new ArrayList<>();
+        List<FeatureItemDTO> right = new ArrayList<>();
+
+        // === CỘT TRÁI ===
+        left.add(new FeatureItemDTO("Khoảng giá", formatPrice(entity.getPrice().longValue())));
+        left.add(new FeatureItemDTO("Diện tích", entity.getArea() + " m²"));
+
+        if (entity.getBedrooms() != null && entity.getBedrooms() > 0) {
+            left.add(new FeatureItemDTO("Phòng ngủ", entity.getBedrooms() + " phòng"));
+        }
+        if (entity.getLandArea() != null && entity.getLandArea() > 0) {
+            left.add(new FeatureItemDTO("Diện tích đất", entity.getLandArea() + " m²"));
+        }
+        if (entity.getWidth() != null && entity.getWidth() > 0 && entity.getHeight() != null && entity.getHeight() > 0) {
+            left.add(new FeatureItemDTO("Ngang x Dài", entity.getWidth() + "m x " + entity.getHeight() + "m"));
+        }
+
+        // === CỘT PHẢI ===
+        if (entity.getLegalStatus() != null && !entity.getLegalStatus().isEmpty()) {
+            right.add(new FeatureItemDTO("Pháp lý", entity.getLegalStatus()));
+        }
+
+        // Fix: Hiển thị "---" nếu Hướng nhà rỗng
+        if (entity.getDirection() != null && !entity.getDirection().isEmpty()) {
+            right.add(new FeatureItemDTO("Hướng nhà", entity.getDirection()));
+        } else {
+            right.add(new FeatureItemDTO("Hướng nhà", "---"));
+        }
+
+        if (entity.getBathrooms() != null && entity.getBathrooms() > 0) {
+            right.add(new FeatureItemDTO("Phòng tắm", entity.getBathrooms() + " phòng"));
+        }
+        if (entity.getFloors() != null && entity.getFloors() > 0) {
+            right.add(new FeatureItemDTO("Số tầng", entity.getFloors() + " tầng"));
+        }
+        if (entity.getPosition() != null && !entity.getPosition().isEmpty()) {
+            right.add(new FeatureItemDTO("Vị trí", entity.getPosition()));
+        }
+
+        features.setLeft(left);
+        features.setRight(right);
         return features;
     }
+
+    // === CÁC HÀM CÒN LẠI GIỮ NGUYÊN ===
 
     private List<MapMetaDTO> buildMapMeta(PropertyEntity entity) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -213,9 +331,6 @@ public class PropertyMapper {
         }
         return "N/A";
     }
-
-    // Phương thức này không còn được sử dụng cho addressFull trong PropertyCardDTO nữa
-    // private String formatFullAddress(PropertyEntity entity) { ... }
 
     private String formatPrice(long price) {
         if (price >= 1_000_000_000) {
