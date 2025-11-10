@@ -1,6 +1,6 @@
 // src/pages/Signup/RegisterModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Form, Input, Button, Divider, message } from "antd";
+import { Modal, Form, Input, Button, Divider, message, Grid } from "antd";
 import { AppleFilled, GoogleOutlined, ArrowLeftOutlined, CheckCircleTwoTone } from "@ant-design/icons";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -17,6 +17,8 @@ const RESEND_SECONDS = 60;
 export default function RegisterModal({ open, onClose, onSuccess, onBackToLogin }) {
     const dispatch = useDispatch();
     const { email: storeEmail, ticket } = useSelector((s) => s.register || {});
+    const screens = Grid.useBreakpoint();
+    const isMobile = !screens.md; // < md
 
     const [form] = Form.useForm();
     const [pwdForm] = Form.useForm();
@@ -107,7 +109,7 @@ export default function RegisterModal({ open, onClose, onSuccess, onBackToLogin 
             message.success("Xác minh OTP thành công.");
         } catch (err) {
             const msg = err?.message || "OTP không đúng hoặc đã hết hạn.";
-            setOtpError(msg); // hiển thị ngay dưới dãy OTP
+            setOtpError(msg);
             setOtp(Array(OTP_LEN).fill(""));
             inputsRef.current?.[0]?.focus();
         } finally {
@@ -222,7 +224,6 @@ export default function RegisterModal({ open, onClose, onSuccess, onBackToLogin 
                     size="large"
                     className="mt-6 !bg-[#d6402c] hover:!bg-[#c13628] h-[44px] px-6 font-semibold"
                     onClick={() => {
-                        // đóng modal & mở login nếu parent có xử lý
                         if (onBackToLogin) onBackToLogin();
                         else onClose?.();
                     }}
@@ -238,29 +239,46 @@ export default function RegisterModal({ open, onClose, onSuccess, onBackToLogin 
             open={open}
             onCancel={onClose}
             footer={null}
-            centered
-            width={800}
+            centered={!isMobile}
+            width={isMobile ? "100%" : 800}
             destroyOnClose
             maskClosable
-            bodyStyle={{ height: 700, padding: 0, overflow: "hidden" }}
+            style={{
+                top: isMobile ? 0 : undefined,
+                padding: 0,
+                maxWidth: isMobile ? "100vw" : undefined,
+            }}
+            bodyStyle={{
+                height: isMobile ? "100svh" : 700,
+                padding: 0,
+                overflow: "hidden",
+            }}
             modalRender={(node) => <div className="animate-fade-up">{node}</div>}
         >
-            <div className="flex flex-row h-full w-full">
-                {/* LEFT */}
-                <div className="w-[40%] h-full bg-[#ffe9e6] flex flex-col justify-center items-center rounded-l-[8px]">
-                    <img
-                        src="/assets/login-illustration.png"
-                        alt="illustration"
-                        className="max-w-[220px] object-contain"
-                        onError={(e) => (e.currentTarget.style.display = "none")}
-                    />
-                    <p className="mt-6 text-[#c23a2a] text-[16px] font-semibold text-center leading-snug">
-                        Tìm nhà đất<br />Batdongsan.com.vn dẫn lối
-                    </p>
-                </div>
+            <div className={`flex ${isMobile ? "flex-col h-full w-full" : "flex-row h-full w-full"}`}>
+                {/* LEFT — ẨN TRÊN MOBILE */}
+                {!isMobile && (
+                    <div className="w-[40%] h-full bg-[#ffe9e6] flex flex-col justify-center items-center rounded-l-[8px]">
+                        <img
+                            src="/assets/login-illustration.png"
+                            alt="illustration"
+                            className="max-w-[220px] object-contain"
+                            onError={(e) => (e.currentTarget.style.display = "none")}
+                        />
+                        <p className="mt-6 text-[#c23a2a] text-[16px] font-semibold text-center leading-snug">
+                            Tìm nhà đất<br />Batdongsan.com.vn dẫn lối
+                        </p>
+                    </div>
+                )}
 
                 {/* RIGHT */}
-                <div className="flex flex-col justify-center w-[60%] h-full px-8">
+                <div
+                    className={
+                        isMobile
+                            ? "flex-1 w-full h-full px-4 py-6 overflow-y-auto"
+                            : "flex flex-col justify-center w-[60%] h-full px-8"
+                    }
+                >
                     {step === "email" && (
                         <>
                             <h3 className="text-gray-900 font-semibold text-[14px]">Xin chào bạn</h3>
@@ -343,7 +361,7 @@ export default function RegisterModal({ open, onClose, onSuccess, onBackToLogin 
                                     className="!mb-0"
                                     label={null}
                                 >
-                                    <div className="mt-5 flex gap-2" onPaste={handlePaste}>
+                                    <div className="mt-5 flex gap-2 justify-between max-w-[360px]" onPaste={handlePaste}>
                                         {Array.from({ length: OTP_LEN }).map((_, i) => (
                                             <Input
                                                 key={i}

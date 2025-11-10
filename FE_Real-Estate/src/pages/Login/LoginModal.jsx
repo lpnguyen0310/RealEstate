@@ -1,27 +1,29 @@
 import { useEffect, useState } from "react";
-import { Modal, Form, message } from "antd";
+import { Modal, Form, message, Grid } from "antd";
 import { useDispatch } from "react-redux";
 import { loginThunk } from "@/store/authSlice";
-import { redirectAfterLogin } from "@/routes/helpers/redirectAfterLogin"; // file helper đã nói
+import { redirectAfterLogin } from "@/routes/helpers/redirectAfterLogin";
 import { useNavigate, useLocation } from "react-router-dom";
 
 import LoginForm from "@/components/auth/forms/LoginForm";
 import ForgotForm from "@/components/auth/forms/ForgotForm";
-import OtpZaloForm from "@/components/auth/forms/OtpZaloForm"; // dùng chung cho cả Zalo & email
+import OtpZaloForm from "@/components/auth/forms/OtpZaloForm";
 import ResetPasswordForm from "@/components/auth/forms/ResetPasswordForm";
 import LoggingInPanel from "@/components/auth/panels/LoggingInPanel";
 
 import useCountdown from "@/utils/useCountdown";
-import { isPhone, isEmail, maskPhone, maskEmail } from "@/utils/validators"; // nhớ export maskEmail
+import { isPhone, isEmail, maskPhone, maskEmail } from "@/utils/validators";
 
 export default function LoginModal({
   open,
   onClose,
   onRegisterClick,
   onSuccess,
-  onBeginLogging, // bật Skeleton ở Header
+  onBeginLogging,
 }) {
   const dispatch = useDispatch();
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
 
   const [form] = Form.useForm();
   const [forgotForm] = Form.useForm();
@@ -30,15 +32,13 @@ export default function LoginModal({
   const navigate = useNavigate();
   const location = useLocation();
 
-  // login | forgot | otp_zalo | reset | logging_in
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
   const [forceClosed, setForceClosed] = useState(false);
   const [loginRoles, setLoginRoles] = useState([]);
-
   const [sentTo, setSentTo] = useState("");
   const [maskInfo, setMaskInfo] = useState("");
-  const [channel, setChannel] = useState("zalo"); // 'zalo' | 'email'
+  const [channel, setChannel] = useState("zalo");
 
   const { value: resendIn, restart: restartCountdown } = useCountdown(60);
 
@@ -50,7 +50,6 @@ export default function LoginModal({
       setSentTo("");
       setMaskInfo("");
       setChannel("zalo");
-
       form.resetFields();
       forgotForm.resetFields();
       otpForm.resetFields();
@@ -58,12 +57,9 @@ export default function LoginModal({
     }
   }, [open]);
 
-  // ===== ĐĂNG NHẬP (Redux) =====
   const onFinishLogin = async (values) => {
     try {
       setLoading(true);
-
-      // ⬇️ SỬA: lấy ra roles từ loginThunk
       const { roles = [] } = await dispatch(
         loginThunk({
           username: values.username,
@@ -71,8 +67,8 @@ export default function LoginModal({
         })
       ).unwrap();
 
-      setLoginRoles(roles);               // ⬅️ LƯU roles để điều hướng sau khi xong panel
-      setMode("logging_in");              // ⬅️ như cũ
+      setLoginRoles(roles);
+      setMode("logging_in");
       onBeginLogging?.();
       message.success("Đăng nhập thành công!");
     } catch (errMsg) {
@@ -89,35 +85,28 @@ export default function LoginModal({
     }
   };
 
-  // ===== QUÊN MẬT KHẨU (email & phone đều đi OTP) =====
   const onFinishForgot = async ({ account }) => {
     try {
       setLoading(true);
       setSentTo(account);
 
       if (isPhone(account)) {
-        // Gửi OTP qua Zalo/SMS
-        // TODO: await api.sendOtpPhone(account)
         setChannel("zalo");
         setMaskInfo(maskPhone(account));
         setMode("otp_zalo");
         restartCountdown(60);
         otpForm.resetFields();
-        // giả lập
         await new Promise((r) => setTimeout(r, 500));
         message.success("Đã gửi OTP qua Zalo.");
         return;
       }
 
       if (isEmail(account)) {
-        // Gửi OTP qua email
-        // TODO: await api.sendOtpEmail(account)
         setChannel("email");
         setMaskInfo(maskEmail(account));
         setMode("otp_zalo");
         restartCountdown(60);
         otpForm.resetFields();
-        // giả lập
         await new Promise((r) => setTimeout(r, 500));
         message.success("Đã gửi OTP qua email.");
         return;
@@ -131,20 +120,13 @@ export default function LoginModal({
     }
   };
 
-  // ===== OTP (Zalo / Email) =====
   const resendOtp = async () => {
     try {
       setLoading(true);
-      // TODO:
-      // if (channel === 'zalo') await api.resendOtpPhone(sentTo)
-      // else await api.resendOtpEmail(sentTo)
-      await new Promise((r) => setTimeout(r, 500)); // giả lập
-
+      await new Promise((r) => setTimeout(r, 500));
       restartCountdown(60);
       message.success(
-        channel === "zalo"
-          ? "Đã gửi lại OTP qua Zalo."
-          : "Đã gửi lại OTP qua email."
+        channel === "zalo" ? "Đã gửi lại OTP qua Zalo." : "Đã gửi lại OTP qua email."
       );
     } catch {
       message.error("Không gửi lại được OTP.");
@@ -156,8 +138,7 @@ export default function LoginModal({
   const onVerifyOtp = async ({ otp }) => {
     try {
       setLoading(true);
-      // TODO: await api.verifyOtp({ account: sentTo, channel, otp })
-      await new Promise((r) => setTimeout(r, 600)); // giả lập
+      await new Promise((r) => setTimeout(r, 600));
       message.success("Xác thực OTP thành công.");
       setMode("reset");
     } catch {
@@ -167,12 +148,10 @@ export default function LoginModal({
     }
   };
 
-  // ===== ĐẶT LẠI MẬT KHẨU =====
   const onFinishReset = async ({ newPassword }) => {
     try {
       setLoading(true);
-      // TODO: await api.resetPassword({ account: sentTo, newPassword })
-      await new Promise((r) => setTimeout(r, 700)); // giả lập
+      await new Promise((r) => setTimeout(r, 700));
       message.success("Đổi mật khẩu thành công, vui lòng đăng nhập lại.");
       setMode("login");
       resetForm.resetFields();
@@ -184,15 +163,12 @@ export default function LoginModal({
     }
   };
 
-  // Panel “Đang đăng nhập” hoàn tất → ép đóng chắc chắn + báo ra ngoài
   const handleLoggingDone = () => {
-    // ⬇️ ĐIỀU HƯỚNG THEO ROLE Ở ĐÂY
     redirectAfterLogin({
-      roles: loginRoles,     // ["ADMIN","USER",...]
+      roles: loginRoles,
       navigate,
       location,
     });
-
     setForceClosed(true);
     onSuccess?.();
     onClose?.();
@@ -206,32 +182,52 @@ export default function LoginModal({
       open={shouldOpen}
       onCancel={isBlockingClose ? undefined : onClose}
       footer={null}
-      centered
-      width={800}
+      centered={!isMobile}
       destroyOnClose
       maskClosable={!isBlockingClose}
       closable={!isBlockingClose}
-      bodyStyle={{ height: 700, padding: 0, overflow: "hidden" }}
+      width={isMobile ? "100%" : 800}
+      style={{
+        top: isMobile ? 0 : undefined,
+        padding: 0,
+        maxWidth: isMobile ? "100vw" : undefined,
+      }}
+      bodyStyle={{
+        padding: 0,
+        overflow: "hidden",
+        height: isMobile ? "100svh" : 700,
+      }}
       modalRender={(node) => <div className="animate-fade-up">{node}</div>}
     >
-      <div className="flex flex-row h-full w-full">
-        {/* Bên trái */}
-        <div className="w-[40%] h-full bg-[#ffe9e6] flex flex-col justify-center items-center rounded-l-[8px]">
-          <img
-            src="/assets/login-illustration.png"
-            alt="illustration"
-            className="max-w-[220px] object-contain"
-            onError={(e) => (e.currentTarget.style.display = "none")}
-          />
-          <p className="mt-6 text-[#c23a2a] text-[16px] font-semibold text-center leading-snug">
-            Tìm nhà đất
-            <br />
-            Batdongsan.com.vn dẫn lối
-          </p>
-        </div>
+      <div
+        className={`flex ${isMobile ? "flex-col h-full w-full" : "flex-row h-full w-full"
+          }`}
+      >
+        {/* Bên trái: chỉ hiện desktop */}
+        {!isMobile && (
+          <div className="w-[40%] h-full bg-[#ffe9e6] flex flex-col justify-center items-center rounded-l-[8px]">
+            <img
+              src="/assets/login-illustration.png"
+              alt="illustration"
+              className="max-w-[220px] object-contain"
+              onError={(e) => (e.currentTarget.style.display = 'none')}
+            />
+            <p className="mt-6 text-[#c23a2a] text-[16px] font-semibold text-center leading-snug">
+              Tìm nhà đất
+              <br />
+              Batdongsan.com.vn dẫn lối
+            </p>
+          </div>
+        )}
 
         {/* Bên phải */}
-        <div className="flex flex-col justify-center w-[60%] h-full px-8">
+        <div
+          className={
+            isMobile
+              ? "flex-1 w-full h-full px-4 py-6 overflow-y-auto"
+              : "flex flex-col justify-center w-[60%] h-full px-8"
+          }
+        >
           {mode === "login" && (
             <LoginForm
               form={form}
@@ -261,7 +257,7 @@ export default function LoginModal({
               onBack={() => setMode("forgot")}
               onVerify={onVerifyOtp}
               loading={loading}
-              channel="email"
+              channel={channel}
             />
           )}
 
@@ -273,9 +269,7 @@ export default function LoginModal({
             />
           )}
 
-          {mode === "logging_in" && (
-            <LoggingInPanel onDone={handleLoggingDone} />
-          )}
+          {mode === "logging_in" && <LoggingInPanel onDone={handleLoggingDone} />}
         </div>
       </div>
     </Modal>
