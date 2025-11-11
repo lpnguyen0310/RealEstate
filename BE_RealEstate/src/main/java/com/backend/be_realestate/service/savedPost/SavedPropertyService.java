@@ -5,6 +5,7 @@ import com.backend.be_realestate.modals.dto.PropertyDTO;
 import java.util.List;
 
 public interface SavedPropertyService {
+
     boolean toggle(Long userId, Long propertyId);
 
     boolean isSaved(Long userId, Long propertyId);

@@ -176,7 +176,7 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             throw new IllegalStateException("Cannot unhide expired property");
         }
 
-        p.setStatus(PropertyStatus.ACTIVE);
+        p.setStatus(PropertyStatus.PUBLISHED);
         propertyRepository.save(p);
         saveAudit(p, adminId, "UNHIDDEN", "Unhidden by admin");
         return toShort(p);

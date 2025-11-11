@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import {
-    Drawer, Button, Switch, Tooltip, Tag, Spin, Modal, message, Grid
+    Drawer, Button, Switch, Tooltip, Tag, Spin, Modal, message, Grid, Upload, Space
 } from "antd";
 import {
     CloseOutlined, InfoCircleOutlined, CreditCardOutlined
@@ -30,6 +30,7 @@ import PostTypeSection from "./PostTypeDrawer";
 
 import { useVNLocations, useAddressSuggestions, useListingTypes } from "@/hooks";
 import dayjs from "dayjs";
+import * as XLSX from "xlsx";
 
 /* ================= Header ================= */
 const Header = React.memo(function Header({ step, onClose, isEdit }) {
@@ -55,12 +56,49 @@ const Header = React.memo(function Header({ step, onClose, isEdit }) {
         </div>
     );
 });
+
+/* ===== Excel helpers ===== */
+function ExcelImportBar({ onImport, onDownloadTemplate }) {
+    return (
+        <div className="mx-3 md:mx-4 my-3 p-3 border border-[#e3e9f5] bg-white rounded-xl flex items-center justify-between">
+            <div className="text-sm text-[#0f223a] font-medium">Nhập nhanh thông tin từ Excel</div>
+            <Space>
+                <Button onClick={onDownloadTemplate}>Tải mẫu Excel</Button>
+                <Upload
+                    accept=".xlsx,.xls"
+                    showUploadList={false}
+                    beforeUpload={(file) => { onImport(file); return false; }}
+                >
+                    <Button type="primary">Nhập từ Excel</Button>
+                </Upload>
+            </Space>
+        </div>
+    );
+}
+
 function toBool(v, def = false) {
     if (v === true || v === false) return v;
     if (v === 1 || v === "1" || v === "true") return true;
     if (v === 0 || v === "0" || v === "false") return false;
     return def;
 }
+
+const splitList = (v) =>
+    (typeof v === "string" ? v.split(",") : Array.isArray(v) ? v : [])
+        .map(s => String(s).trim())
+        .filter(Boolean);
+
+const parseNumber = (v) => {
+    if (v == null || v === "") return "";
+    const n = Number(String(v).replace(/[^\d.-]/g, ""));
+    return Number.isFinite(n) ? n : "";
+};
+
+const parseIntOr0 = (v) => {
+    const n = parseInt(String(v).trim(), 10);
+    return Number.isFinite(n) ? n : 0;
+};
+
 /* =========== map detail -> formData =========== */
 function mapDetailToFormData(d) {
     if (!d) return null;
@@ -102,6 +140,8 @@ function mapDetailToFormData(d) {
         position: d.position || "",
         direction: d.direction || "",
         landArea: d.landArea ?? "",
+        usableArea: d.usableArea ?? d.floorArea ?? "",           // NEW
+        floors: d.floors ?? d.numberOfFloors ?? 0,               // NEW
         bedrooms: d.bedrooms ?? 0,
         bathrooms: d.bathrooms ?? 0,
         width: d.width ?? "",
@@ -141,7 +181,6 @@ function mapDetailToFormData(d) {
     };
 }
 
-
 function createInitialForm() {
     return {
         title: "", description: "", categoryId: "",
@@ -151,6 +190,8 @@ function createInitialForm() {
         provinceId: "", districtId: "", wardId: "", suggestedAddress: "",
         addressSuggestions: [], streetName: "", streetOptions: [], houseNumber: "",
         displayAddress: "", position: "", landArea: "", legalDocument: "",
+        usableArea: "",                // NEW
+        floors: 0,                     // NEW
         bedrooms: 0, bathrooms: 0, width: "", length: "",
         direction: "",
         listingType: null,
@@ -169,6 +210,111 @@ function createInitialForm() {
         constructionImages: [],
     };
 }
+
+/* ===== Tìm theo tên/ID cho địa giới ===== */
+const findProvinceId = (provinces, nameOrId) => {
+    if (!nameOrId) return "";
+    const asNum = Number(nameOrId);
+    if (Number.isFinite(asNum)) {
+        const ok = provinces.find(p => String(p.id) === String(asNum));
+        if (ok) return ok.id;
+    }
+    const lower = String(nameOrId).toLowerCase();
+    const m = provinces.find(p => p.name?.toLowerCase() === lower);
+    return m?.id || "";
+};
+const findDistrictId = (districts, nameOrId) => {
+    if (!nameOrId) return "";
+    const asNum = Number(nameOrId);
+    if (Number.isFinite(asNum)) {
+        const ok = districts.find(p => String(p.id) === String(asNum));
+        if (ok) return ok.id;
+    }
+    const lower = String(nameOrId).toLowerCase();
+    const m = districts.find(p => p.name?.toLowerCase() === lower);
+    return m?.id || "";
+};
+const findWardId = (wards, nameOrId) => {
+    if (!nameOrId) return "";
+    const asNum = Number(nameOrId);
+    if (Number.isFinite(asNum)) {
+        const ok = wards.find(p => String(p.id) === String(asNum));
+        if (ok) return ok.id;
+    }
+    const lower = String(nameOrId).toLowerCase();
+    const m = wards.find(p => p.name?.toLowerCase() === lower);
+    return m?.id || "";
+};
+
+/* ===== Map 1 dòng Excel → formData (partial) ===== */
+const excelRowToForm = (row) => {
+    const images = splitList(row.ImageURLs);
+    const videos = splitList(row.VideoURLs);
+    const amenities = splitList(row.AmenityIds).map(x => Number(x)).filter(Number.isFinite);
+    const isOwner = toBool(row.IsOwner, true);
+
+    const issueDate =
+        row.OwnerIssueDate
+            ? dayjs(row.OwnerIssueDate, ["DD/MM/YYYY", "YYYY-MM-DD", "D/M/YYYY"], true)
+            : null;
+
+    return {
+        title: row.Title || "",
+        description: row.Description || "",
+        categoryId: row.CategoryId || "",
+        propertyType: (row.PropertyType || "sell").toLowerCase(),      // sell | rent
+        priceType: row.PriceType || "SELL_PRICE",
+        price: parseNumber(row.Price),
+
+        images,
+        videoUrls: videos.length ? videos : ["", ""],
+        amenityIds: amenities,
+
+        // Ưu tiên ID; fallback tên (để handler sau khớp)
+        provinceId: row.ProvinceId || row.Province || "",
+        districtId: row.DistrictId || row.District || "",
+        wardId: row.WardId || row.Ward || "",
+        suggestedAddress: row.SuggestedAddress || "",
+        displayAddress: row.DisplayAddress || row.SuggestedAddress || "",
+        streetName: row.StreetName || "",
+        houseNumber: row.HouseNumber || "",
+
+        position: row.Position || "",
+        direction: row.Direction || "",
+        landArea: parseNumber(row.LandArea),
+        usableArea: parseNumber(row.UsableArea),   // NEW
+        floors: parseIntOr0(row.Floors),           // NEW
+        bedrooms: parseIntOr0(row.Bedrooms),
+        bathrooms: parseIntOr0(row.Bathrooms),
+        width: parseNumber(row.Width),
+        length: parseNumber(row.Length),
+        legalDocument: row.LegalDocument || "",
+
+        contact: {
+            name: row.ContactName || "",
+            phone: row.ContactPhone || "",
+            email: row.ContactEmail || "",
+            zalo: row.Zalo || "",
+        },
+
+        listingType: row.ListingType || null,                 // NORMAL | VIP | PREMIUM
+        listingTypePolicyId: row.ListingTypePolicyId || null,
+
+        ownerAuth: {
+            isOwner,
+            ownerName: row.OwnerName || "",
+            phoneNumber: row.OwnerPhone || "",
+            ownerEmail: row.OwnerEmail || "",
+            idNumber: row.OwnerIdNumber || "",
+            issueDate: issueDate && issueDate.isValid() ? issueDate : null,
+            issuePlace: row.OwnerIssuePlace || "",
+            relationship: row.Relationship || "",
+            agreed: toBool(row.OwnerAgreed, false),
+        },
+
+        constructionImages: splitList(row.ConstructionImageURLs),
+    };
+};
 
 /* ================= MAIN: PostCreateDrawer ================= */
 export default function PostCreateDrawer({
@@ -272,7 +418,6 @@ export default function PostCreateDrawer({
         if (!mapped) return;
 
         setFormData((prev) => {
-            const dn = displayNameFromUser(user);
             const mergedContact = {
                 name: mapped.contact?.name ?? "",
                 email: mapped.contact?.email ?? "",
@@ -293,7 +438,7 @@ export default function PostCreateDrawer({
             await reloadAllByIds(mapped.provinceId, mapped.districtId);
             if (mapped.districtId) await loadWards(mapped.districtId);
         })();
-    }, [open, editingId, currentProperty, user, displayNameFromUser, reloadAllByIds, loadWards]);
+    }, [open, editingId, currentProperty, reloadAllByIds, loadWards]);
 
     /* ===== gói mặc định / map text -> id ===== */
     useEffect(() => {
@@ -354,6 +499,128 @@ export default function PostCreateDrawer({
             };
         });
     }, [open]);
+
+    /* ===== Excel: Import handler ===== */
+    const handleImportExcel = useCallback(async (file) => {
+        try {
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: "array" });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+            if (!rows.length) {
+                message.warning("File Excel rỗng.");
+                return;
+            }
+
+            const row = rows[0]; // nếu muốn nhiều dòng → lặp
+            const mapped = excelRowToForm(row);
+
+            // set các field đơn trước
+            setFormData((prev) => ({ ...prev, ...mapped }));
+
+            // map địa giới (ưu tiên ID; nếu là tên → khớp theo name)
+            let provinceId = mapped.provinceId;
+            let districtId = mapped.districtId;
+            let wardId = mapped.wardId;
+
+            if (provinceId && !Number.isFinite(Number(provinceId))) {
+                provinceId = findProvinceId(provinces, provinceId);
+            }
+            if (provinceId) {
+                await loadDistricts(provinceId);
+            }
+
+            if (districtId && !Number.isFinite(Number(districtId))) {
+                districtId = findDistrictId(districts, districtId);
+            }
+            if (districtId) {
+                await loadWards(districtId);
+            }
+
+            if (wardId && !Number.isFinite(Number(wardId))) {
+                wardId = findWardId(wards, wardId);
+            }
+
+            setFormData((prev) => ({
+                ...prev,
+                provinceId: provinceId || prev.provinceId,
+                districtId: districtId || prev.districtId,
+                wardId: wardId || prev.wardId,
+            }));
+
+            message.success("Đã nhập dữ liệu từ Excel!");
+        } catch (err) {
+            console.error(err);
+            message.error("Không đọc được file Excel. Vui lòng kiểm tra định dạng.");
+        }
+    }, [provinces, districts, wards, loadDistricts, loadWards]);
+
+    /* ===== Excel: Download template ===== */
+    const downloadExcelTemplate = useCallback(() => {
+        const header = [
+            "Title", "Description", "CategoryId", "PropertyType", "PriceType", "Price",
+            "ProvinceId", "DistrictId", "WardId", "StreetName", "HouseNumber",
+            "SuggestedAddress", "DisplayAddress",
+            "Position", "Direction", "LandArea", "UsableArea", "Floors", "Bedrooms", "Bathrooms", "Width", "Length", "LegalDocument",
+            "ContactName", "ContactPhone", "ContactEmail", "Zalo",
+            "IsOwner", "OwnerName", "OwnerPhone", "OwnerEmail",
+            "OwnerIdNumber", "OwnerIssueDate", "OwnerIssuePlace", "Relationship", "OwnerAgreed",
+            "ImageURLs", "VideoURLs", "AmenityIds", "ConstructionImageURLs",
+            "ListingType", "ListingTypePolicyId"
+        ];
+
+        const example = [{
+            Title: "Nhà phố 2 tầng trung tâm",
+            Description: "Nhà đẹp, sổ hồng riêng...",
+            CategoryId: 1,
+            PropertyType: "sell",
+            PriceType: "SELL_PRICE",
+            Price: 3500000000,
+            ProvinceId: 79,          // ví dụ (tuỳ dataset của bạn)
+            DistrictId: 760,
+            WardId: 26734,
+            StreetName: "Lê Lợi",
+            HouseNumber: "12",
+            SuggestedAddress: "12 Lê Lợi, Q1, TP.HCM",
+            DisplayAddress: "",
+            Position: "Mặt tiền",
+            Direction: "Đông Nam",
+            LandArea: 56,
+            UsableArea: 95,
+            Floors: 2,
+            Bedrooms: 3,
+            Bathrooms: 3,
+            Width: 4,
+            Length: 14,
+            LegalDocument: "Sổ hồng",
+            ContactName: "Nguyễn Văn A",
+            ContactPhone: "0909123456",
+            ContactEmail: "a@example.com",
+            Zalo: "0909123456",
+            IsOwner: true,
+            OwnerName: "Nguyễn Văn A",
+            OwnerPhone: "0909123456",
+            OwnerEmail: "a@example.com",
+            OwnerIdNumber: "0790xxxxxxx",
+            OwnerIssueDate: "15/10/2022",
+            OwnerIssuePlace: "CA TP.HCM",
+            Relationship: "",
+            OwnerAgreed: true,
+            ImageURLs: "https://.../img1.jpg, https://.../img2.jpg",
+            VideoURLs: "https://youtu.be/xxx",
+            AmenityIds: "1,2,5",
+            ConstructionImageURLs: "",
+            ListingType: "NORMAL",
+            ListingTypePolicyId: ""
+        }];
+
+        const ws = XLSX.utils.json_to_sheet(example, { header });
+        ws["!cols"] = header.map(() => ({ wch: 22 }));
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Template");
+        XLSX.writeFile(wb, "post_template_with_ids.xlsx");
+    }, []);
 
     /* ===== sang bước type ===== */
     const goToTypeStep = useCallback(() => {
@@ -551,6 +818,12 @@ export default function PostCreateDrawer({
                     {/* CONTENT */}
                     {step === "form" ? (
                         <div className="flex-1 min-h-0">
+                            {/* Thanh nhập Excel */}
+                            <ExcelImportBar
+                                onImport={handleImportExcel}
+                                onDownloadTemplate={downloadExcelTemplate}
+                            />
+
                             <div className="h-full overflow-y-auto px-3 md:px-4 py-4 space-y-4 pb-24">
                                 <TitlePostSection formData={formData} onChange={onFieldChange} errors={errors} />
                                 <TradeInfoSection formData={formData} onChange={onFieldChange} errors={errors} />

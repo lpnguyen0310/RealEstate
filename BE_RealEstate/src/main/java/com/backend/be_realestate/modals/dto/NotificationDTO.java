@@ -18,4 +18,6 @@ public class NotificationDTO {
     private boolean isRead;
     private Instant createdAt;
     private String type;
- }
+    private Long receiverId;
+
+}

@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+// src/components/dashboard/postmanagement/PostFilters.jsx
+import { useMemo, useRef, useState, useEffect } from "react";
 import dayjs from "dayjs";
 import {
     TextField,
@@ -13,9 +14,10 @@ import AddIcon from "@mui/icons-material/Add";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { DatePicker as AntDatePicker } from "antd";
 
-import { AREA_OPTIONS, PRICE_PRESETS } from "@/data/PostManagementData/FilterData";
+import { PRICE_PRESETS } from "@/data/PostManagementData/FilterData";
+import { locationApi } from "@/api/locationApi";
 
-/* ====== UI tokens ====== */
+/* ================= UI TOKENS ================= */
 const PILL_RADIUS = 50;
 
 const TF_PILL = {
@@ -63,23 +65,26 @@ const BTN_OUTLINED_SX = {
     "&:hover": { borderColor: "#1d4b8f", backgroundColor: "rgba(29,75,143,0.06)" },
 };
 
-/* ===== Helpers ===== */
+/* ================= HELPERS ================= */
 const fmtVN = (v) =>
     v >= 1_000_000_000
         ? `${(v / 1_000_000_000).toFixed(v % 1e9 ? 1 : 0)} tỷ`
         : `${Math.round(v / 1_000_000)} triệu`;
 
+/* ================= COMPONENT ================= */
 export default function PostFilters({ onSearch, onCreate }) {
     const isMobile = useMediaQuery("(max-width: 768px)");
 
     // ====== states ======
     const [keyword, setKeyword] = useState(""); // q
-    const [area, setArea] = useState("");
-    const [expireDate, setExpireDate] = useState(null); // dayjs | null
 
+    // ✅ City select
+    const [citySlug, setCitySlug] = useState("");
+    const [cities, setCities] = useState([]); // [{id, name}]
+
+    const [expireDate, setExpireDate] = useState(null); // dayjs|null
     const [areaMin, setAreaMin] = useState("");
     const [areaMax, setAreaMax] = useState("");
-
     const [priceMin, setPriceMin] = useState("");
     const [priceMax, setPriceMax] = useState("");
     const [priceLabel, setPriceLabel] = useState("Khoảng giá");
@@ -92,6 +97,23 @@ export default function PostFilters({ onSearch, onCreate }) {
 
     // mobile sheet
     const [sheetOpen, setSheetOpen] = useState(false);
+
+    // ====== load cities ======
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const data = await locationApi.getCities();
+                if (mounted) setCities(Array.isArray(data) ? data : []);
+            } catch (e) {
+                console.error("Load cities failed:", e);
+                if (mounted) setCities([]);
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const prettyPrice = useMemo(() => {
         if (priceLabel !== "Khoảng giá") return priceLabel;
@@ -108,7 +130,7 @@ export default function PostFilters({ onSearch, onCreate }) {
     const submit = () => {
         onSearch?.({
             q: keyword?.trim() || undefined,
-            area: area || undefined,
+            areaSlug: citySlug || undefined, // ✅ Gửi slug thay vì id
             areaMin: areaMin === "" ? undefined : Number(areaMin),
             areaMax: areaMax === "" ? undefined : Number(areaMax),
             priceMin: priceMin === "" ? undefined : Number(priceMin),
@@ -118,10 +140,10 @@ export default function PostFilters({ onSearch, onCreate }) {
         if (isMobile) setSheetOpen(false);
     };
 
+
     const reset = () => {
         setKeyword("");
-        setArea("");
-        setAreaMin("");
+        setCitySlug(""); setAreaMin("");
         setAreaMax("");
         setPriceMin("");
         setPriceMax("");
@@ -130,7 +152,7 @@ export default function PostFilters({ onSearch, onCreate }) {
         onSearch?.({});
     };
 
-    // ====== popover contents (desktop) ======
+    /* ===================== POPUP CONTENTS ===================== */
     const areaContent = (
         <div className="w-[280px] p-1">
             <div className="mb-2 text-sm text-gray-500">Diện tích (m²)</div>
@@ -154,23 +176,10 @@ export default function PostFilters({ onSearch, onCreate }) {
                 />
             </div>
             <div className="mt-3 flex justify-end gap-2">
-                <MUIButton
-                    size="small"
-                    variant="text"
-                    sx={{ textTransform: "none", minHeight: 32 }}
-                    onClick={() => {
-                        setAreaMin("");
-                        setAreaMax("");
-                    }}
-                >
+                <MUIButton size="small" variant="text" sx={{ textTransform: "none", minHeight: 32 }} onClick={() => { setAreaMin(""); setAreaMax(""); }}>
                     Xoá
                 </MUIButton>
-                <MUIButton
-                    size="small"
-                    variant="contained"
-                    sx={{ ...BTN_PRIMARY_SX, height: 32 }}
-                    onClick={() => setOpenArea(false)}
-                >
+                <MUIButton size="small" variant="contained" sx={{ ...BTN_PRIMARY_SX, height: 32 }} onClick={() => setOpenArea(false)}>
                     OK
                 </MUIButton>
             </div>
@@ -186,10 +195,7 @@ export default function PostFilters({ onSearch, onCreate }) {
                     type="number"
                     size="small"
                     value={priceMin}
-                    onChange={(e) => {
-                        setPriceMin(e.target.value);
-                        setPriceLabel("Khoảng giá");
-                    }}
+                    onChange={(e) => { setPriceMin(e.target.value); setPriceLabel("Khoảng giá"); }}
                     sx={{ width: "100%", "& .MuiInputBase-root": { height: 36, borderRadius: 10 } }}
                 />
                 <span className="text-gray-400">—</span>
@@ -198,26 +204,18 @@ export default function PostFilters({ onSearch, onCreate }) {
                     type="number"
                     size="small"
                     value={priceMax}
-                    onChange={(e) => {
-                        setPriceMax(e.target.value);
-                        setPriceLabel("Khoảng giá");
-                    }}
+                    onChange={(e) => { setPriceMax(e.target.value); setPriceLabel("Khoảng giá"); }}
                     sx={{ width: "100%", "& .MuiInputBase-root": { height: 36, borderRadius: 10 } }}
                 />
             </div>
 
-            {/* Presets */}
             <div className="mt-3 grid grid-cols-2 gap-2">
                 {PRICE_PRESETS.map((p) => (
                     <MUIButton
                         key={p.key}
                         variant="outlined"
                         sx={{ ...BTN_OUTLINED_SX, height: 36, borderRadius: 10 }}
-                        onClick={() => {
-                            setPriceMin(p.min ?? "");
-                            setPriceMax(p.max ?? "");
-                            setPriceLabel(p.label);
-                        }}
+                        onClick={() => { setPriceMin(p.min ?? ""); setPriceMax(p.max ?? ""); setPriceLabel(p.label); }}
                     >
                         {p.label}
                     </MUIButton>
@@ -229,20 +227,11 @@ export default function PostFilters({ onSearch, onCreate }) {
                     size="small"
                     variant="text"
                     sx={{ textTransform: "none", minHeight: 32 }}
-                    onClick={() => {
-                        setPriceMin("");
-                        setPriceMax("");
-                        setPriceLabel("Khoảng giá");
-                    }}
+                    onClick={() => { setPriceMin(""); setPriceMax(""); setPriceLabel("Khoảng giá"); }}
                 >
                     Xoá
                 </MUIButton>
-                <MUIButton
-                    size="small"
-                    variant="contained"
-                    sx={{ ...BTN_PRIMARY_SX, height: 32 }}
-                    onClick={() => setOpenPrice(false)}
-                >
+                <MUIButton size="small" variant="contained" sx={{ ...BTN_PRIMARY_SX, height: 32 }} onClick={() => setOpenPrice(false)}>
                     OK
                 </MUIButton>
             </div>
@@ -250,13 +239,11 @@ export default function PostFilters({ onSearch, onCreate }) {
     );
 
     /* ===================== RENDER ===================== */
-
-    // ------- MOBILE: chỉ Search + nút Bộ lọc -------
     if (isMobile) {
+        // ------- MOBILE -------
         return (
             <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4">
                 <div className="flex flex-col gap-3">
-                    {/* Search input */}
                     <TextField
                         label="Từ khóa"
                         variant="outlined"
@@ -264,12 +251,9 @@ export default function PostFilters({ onSearch, onCreate }) {
                         onChange={(e) => setKeyword(e.target.value)}
                         fullWidth
                         sx={TF_PILL}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") submit();
-                        }}
+                        onKeyDown={(e) => e.key === "Enter" && submit()}
                     />
 
-                    {/* Row: Bộ lọc + Tìm kiếm */}
                     <div className="flex items-center gap-2">
                         <MUIButton
                             variant="outlined"
@@ -290,35 +274,56 @@ export default function PostFilters({ onSearch, onCreate }) {
                     </div>
                 </div>
 
-                {/* Bottom Sheet: toàn bộ filter nâng cao */}
+                {/* Bottom Sheet */}
                 <Drawer
                     anchor="bottom"
                     open={sheetOpen}
                     onClose={() => setSheetOpen(false)}
-                    PaperProps={{
-                        sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, p: 2 },
-                    }}
+                    PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, p: 2 } }}
                 >
                     <div className="max-w-screen-md mx-auto w-full">
                         <div className="h-1.5 w-10 bg-gray-300 rounded-full mx-auto mb-3" />
 
-                        {/* Khu vực */}
+                        {/* ✅ City */}
                         <div className="mb-3">
                             <TextField
-                                label="Khu vực"
+                                label="Thành phố"
                                 variant="outlined"
                                 select
-                                value={area}
-                                onChange={(e) => setArea(e.target.value)}
+                                value={citySlug}
+                                onChange={(e) => setCitySlug(e.target.value)}
                                 fullWidth
                                 sx={TF_PILL}
+                                SelectProps={{
+                                    MenuProps: {
+                                        disablePortal: true, // 🧩 gắn menu ngay dưới input
+                                        PaperProps: {
+                                            style: {
+                                                maxHeight: 300,           // giới hạn chiều cao
+                                                marginTop: 4,             // khoảng cách nhỏ
+                                                borderRadius: 8,          // bo góc menu
+                                                boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                                            },
+                                        },
+                                        MenuListProps: {
+                                            sx: {
+                                                py: 0.5,
+                                                "& .MuiMenuItem-root": {
+                                                    fontSize: 14,
+                                                    py: 1,
+                                                },
+                                            },
+                                        },
+                                    },
+                                }}
                             >
-                                {AREA_OPTIONS.map((opt) => (
-                                    <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
+                                {cities.map((c) => (
+                                    <MenuItem key={c.id} value={c.slug}>
+                                        {c.name}
                                     </MenuItem>
                                 ))}
                             </TextField>
+
                         </div>
 
                         {/* Diện tích */}
@@ -354,10 +359,7 @@ export default function PostFilters({ onSearch, onCreate }) {
                                     type="number"
                                     size="small"
                                     value={priceMin}
-                                    onChange={(e) => {
-                                        setPriceMin(e.target.value);
-                                        setPriceLabel("Khoảng giá");
-                                    }}
+                                    onChange={(e) => { setPriceMin(e.target.value); setPriceLabel("Khoảng giá"); }}
                                     sx={{ width: "100%", "& .MuiInputBase-root": { height: 44, borderRadius: 14 } }}
                                 />
                                 <span className="text-gray-400">—</span>
@@ -366,26 +368,18 @@ export default function PostFilters({ onSearch, onCreate }) {
                                     type="number"
                                     size="small"
                                     value={priceMax}
-                                    onChange={(e) => {
-                                        setPriceMax(e.target.value);
-                                        setPriceLabel("Khoảng giá");
-                                    }}
+                                    onChange={(e) => { setPriceMax(e.target.value); setPriceLabel("Khoảng giá"); }}
                                     sx={{ width: "100%", "& .MuiInputBase-root": { height: 44, borderRadius: 14 } }}
                                 />
                             </div>
 
-                            {/* Presets */}
                             <div className="mt-3 grid grid-cols-2 gap-2">
                                 {PRICE_PRESETS.map((p) => (
                                     <MUIButton
                                         key={p.key}
                                         variant="outlined"
                                         sx={{ ...BTN_OUTLINED_SX, height: 40, borderRadius: 12 }}
-                                        onClick={() => {
-                                            setPriceMin(p.min ?? "");
-                                            setPriceMax(p.max ?? "");
-                                            setPriceLabel(p.label);
-                                        }}
+                                        onClick={() => { setPriceMin(p.min ?? ""); setPriceMax(p.max ?? ""); setPriceLabel(p.label); }}
                                     >
                                         {p.label}
                                     </MUIButton>
@@ -431,7 +425,7 @@ export default function PostFilters({ onSearch, onCreate }) {
         );
     }
 
-    // ------- DESKTOP: layout đầy đủ như cũ -------
+    // ------- DESKTOP -------
     return (
         <div className="bg-white border border-gray-100 rounded-[18px] shadow-[0_6px_24px_rgba(0,0,0,0.04)] p-4 md:p-5">
             <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap">
@@ -444,29 +438,27 @@ export default function PostFilters({ onSearch, onCreate }) {
                         onChange={(e) => setKeyword(e.target.value)}
                         fullWidth
                         sx={TF_PILL}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") submit();
-                        }}
+                        onKeyDown={(e) => e.key === "Enter" && submit()}
                     />
                 </div>
 
-                {/* Khu vực */}
+                {/* ✅ City Select */}
                 <div className="basis-[220px] xl:basis-[200px] grow">
                     <TextField
-                        label="Khu vực"
-                        variant="outlined"
+                        label="Thành phố"
                         select
-                        value={area}
-                        onChange={(e) => setArea(e.target.value)}
+                        value={citySlug}
+                        onChange={(e) => setCitySlug(e.target.value)}
                         fullWidth
                         sx={TF_PILL}
                     >
-                        {AREA_OPTIONS.map((opt) => (
-                            <MenuItem key={opt.value} value={opt.value}>
-                                {opt.label}
+                        {cities.map((c) => (
+                            <MenuItem key={c.id} value={c.slug}>
+                                {c.name}
                             </MenuItem>
                         ))}
                     </TextField>
+
                 </div>
 
                 {/* Diện tích (trigger) */}

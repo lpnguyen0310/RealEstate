@@ -1,5 +1,6 @@
 package com.backend.be_realestate.controller;
 
+import com.backend.be_realestate.enums.PropertyAction;
 import com.backend.be_realestate.enums.SubmitMode;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 
@@ -7,8 +8,10 @@ import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO;
 import com.backend.be_realestate.modals.dto.UserFavoriteDTO;
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
+import com.backend.be_realestate.modals.request.PropertyActionRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import com.backend.be_realestate.modals.response.PageResponse;
+import com.backend.be_realestate.modals.response.PropertyActionResponse;
 import com.backend.be_realestate.service.IPropertyService;
 import com.backend.be_realestate.service.IPropertyTrackingService;
 import com.backend.be_realestate.utils.SecurityUtils;
@@ -187,4 +190,29 @@ public class PropertyController {
         return ResponseEntity.ok(dto);
     }
 
+    @PostMapping("/{id}/actions")
+    public ResponseEntity<PropertyActionResponse> performAction(
+            @PathVariable("id") Long id,
+            @RequestBody PropertyActionRequest req,
+            Authentication authentication
+    ) {
+        Long userId = securityUtils.currentUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (req == null || req.getAction() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            var res = propertyService.performAction(userId, id, req.getAction(), req.getNote());
+            return ResponseEntity.ok(res);
+        } catch (IllegalStateException ise) {
+            // Trạng thái không hợp lệ → 409
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                    PropertyActionResponse.builder()
+                            .id(id)
+                            .newStatus(null)
+                            .message(ise.getMessage())
+                            .build()
+            );
+        }
+    }
 }

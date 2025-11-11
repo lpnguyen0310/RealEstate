@@ -1,5 +1,6 @@
 package com.backend.be_realestate.service;
 
+import com.backend.be_realestate.enums.PropertyAction;
 import com.backend.be_realestate.enums.SubmitMode;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
@@ -9,6 +10,7 @@ import com.backend.be_realestate.modals.dto.propertydashboard.PendingPropertyDTO
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import com.backend.be_realestate.modals.response.PageResponse;
+import com.backend.be_realestate.modals.response.PropertyActionResponse;
 import com.backend.be_realestate.modals.response.admin.PropertyKpiResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,5 +53,6 @@ public interface IPropertyService {
     PageResponse<PendingPropertyDTO> findPending(String q, int page, int size);
 
     PropertyDTO getDetailForEdit(Long propertyId, Long requesterUserId);
+    PropertyActionResponse performAction(Long userId, Long propertyId, PropertyAction action, String note);
 
 }

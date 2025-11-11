@@ -1,21 +1,90 @@
+// src/components/ws/WebSocketListener.jsx
 import { useEffect, useRef } from "react";
 import { Client } from "@stomp/stompjs";
-import { getAccessToken } from "@/utils/auth";
 import { useDispatch, useSelector } from "react-redux";
+import { getAccessToken } from "@/utils/auth";
 import { notificationApi } from "@/services/notificationApi";
 import { supportSliceActions } from "@/store/supportSlice";
 
+/* ===========================
+   Helpers
+=========================== */
+function safeJson(str) {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+}
+
+/** Xin quyền notification 1 lần/khi cần */
+function ensureNotificationPermission() {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    Notification.requestPermission().then((perm) => {
+      console.log("[Notify] Permission:", perm);
+    });
+  }
+}
+
+/** Hiển thị thông báo trình duyệt (đã chắc chắn đúng người nhận) */
+function showBrowserNotification(payload) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (window.Notification.permission !== "granted") return;
+
+  const title = payload?.title || "Thông báo mới";
+  const body = payload?.message || payload?.body || "Bạn có thông báo mới.";
+  const link = payload?.link || payload?.url || "/dashboard/notifications";
+  const icon = `${window.location.origin}/bell.png`;
+
+  try {
+    console.log("[Notify] showBrowserNotification CALLED with:", payload);
+    window.__ALLOW_NOTIFICATION__ = true;             // ✅ bật cờ
+    const n = new window.Notification(title, { body, icon });
+    window.__ALLOW_NOTIFICATION__ = false;            // ✅ tắt cờ
+    n.onclick = () => {
+      window.focus();
+      window.location.href = link;
+    };
+  } catch (e) {
+    window.__ALLOW_NOTIFICATION__ = false;
+    console.error("[Notify] ❌ Không tạo được Notification:", e);
+  }
+}
+
+/** Lấy receiverId từ payload với nhiều khả năng đặt tên khác nhau */
+function extractReceiverId(payload) {
+  if (!payload) return null;
+  return (
+    payload.receiverId ??
+    payload.targetUserId ??
+    payload.recipientId ??
+    payload.userId ??
+    payload?.receiver?.id ??
+    payload?.targetUser?.id ??
+    payload?.recipient?.id ??
+    null
+  );
+}
+
 export default function WebSocketListener() {
-  const clientRef = useRef(null);        // giữ instance client
-  const convoSubRef = useRef(null);      // sub riêng của hội thoại đang mở
-  const activeIdRef = useRef(null);      // phản ánh activeConversationId hiện tại cho mọi callback
+  const clientRef = useRef(null);   // giữ instance STOMP client
+  const convoSubRef = useRef(null); // sub của hội thoại đang mở
+  const activeIdRef = useRef(null); // cache id hội thoại đang mở cho callback
 
-  const token = getAccessToken();
   const dispatch = useDispatch();
+  const token = getAccessToken();
 
-  const activeConversationId = useSelector((s) => s.support.activeConversationId);
+  // id user đang đăng nhập (dùng để so khớp receiver)
+  const currentUserId = useSelector((s) => s.auth?.user?.id);
+  const activeConversationId = useSelector(
+    (s) => s.support.activeConversationId
+  );
+
+  // đồng bộ activeConversationId tới ref để callback có giá trị mới
   useEffect(() => {
-    activeIdRef.current = activeConversationId != null ? String(activeConversationId) : null;
+    activeIdRef.current =
+      activeConversationId != null ? String(activeConversationId) : null;
   }, [activeConversationId]);
 
   const WS_URL =
@@ -23,7 +92,12 @@ export default function WebSocketListener() {
     location.host +
     "/ws";
 
-  // ===== Khởi tạo WebSocket (1 lần duy nhất) =====
+  /* ========== 0) Xin quyền notification ngay khi mount (nếu cần) ========== */
+  useEffect(() => {
+    ensureNotificationPermission();
+  }, []);
+
+  /* ========== 1) Khởi tạo WebSocket một lần ========== */
   useEffect(() => {
     if (!token || clientRef.current) return;
 
@@ -39,47 +113,54 @@ export default function WebSocketListener() {
     client.onConnect = () => {
       console.log("[WS] ✅ Connected");
 
-      /* ===== Notifications ===== */
+      /* ===== Notifications (queue riêng theo user) ===== */
       client.subscribe("/user/queue/notifications", (m) => {
-        console.log("[WS] 🔔 Notification:", m.body);
-        dispatch(
-          notificationApi.util.invalidateTags(["UnreadCount", "Notifications"])
-        );
+        const notif = safeJson(m.body) || { message: m.body };
+        dispatch(notificationApi.util.invalidateTags(["UnreadCount", "Notifications"]));
+
+        const receiverId = extractReceiverId(notif);
+        const uid = currentUserId;
+        const canShow = receiverId != null && uid != null && String(receiverId) === String(uid);
+
+        console.log("[Notify] decision => receiverId:", receiverId, " currentUserId:", uid, " canShow:", canShow);
+        if (!canShow) return;
+
+        // (tuỳ chọn) nếu tab đang visible thì bỏ qua
+        // if (document.visibilityState === "visible") return;
+
+        showBrowserNotification(notif);
       });
+
 
       /* ===== Support Chat: broadcast toàn hệ thống =====
          Tránh đẩy trùng cho hội thoại đang mở (đã có sub riêng) */
       client.subscribe("/topic/support", (m) => {
         const evt = safeJson(m.body);
-        console.log("[WS] 💬 support.topic:", evt);
         if (!evt) return;
 
-        // cố gắng rút conversationId từ nhiều cấu trúc payload
-       const cidFromEvt =
-         evt?.conversationId ??
-         evt?.conversation?.id ??
-        evt?.data?.conversationId ??
-         evt?.data?.conversation?.id ??
-       evt?.message?.conversationId ??
-         evt?.data?.message?.conversationId ??
-         null;
+        const cidFromEvt =
+          evt?.conversationId ??
+          evt?.conversation?.id ??
+          evt?.data?.conversationId ??
+          evt?.data?.conversation?.id ??
+          evt?.message?.conversationId ??
+          evt?.data?.message?.conversationId ??
+          null;
 
-        // Nếu đúng hội thoại đang mở → bỏ qua ở kênh broadcast
         if (
           activeIdRef.current &&
           cidFromEvt != null &&
           String(cidFromEvt) === String(activeIdRef.current)
         ) {
-          return;
+          return; // đã sub kênh riêng, bỏ qua broadcast
         }
 
         dispatch(supportSliceActions.handleTopicEvent(evt));
       });
 
-      /* ===== Support Chat: queue riêng cho admin/agent ===== */
+      /* ===== Support Chat: queue riêng (agent/admin) ===== */
       client.subscribe("/user/queue/support", (m) => {
         const evt = safeJson(m.body);
-        console.log("[WS] 📩 support.queue:", evt);
         if (!evt) return;
         dispatch(supportSliceActions.handleQueueEvent(evt));
       });
@@ -89,7 +170,8 @@ export default function WebSocketListener() {
       console.error("[WS] ❌ STOMP error:", f.headers?.message, f.body);
     client.onWebSocketClose = (e) =>
       console.warn("[WS] ⚠️ Closed:", e?.code, e?.reason);
-    client.onWebSocketError = (e) => console.error("[WS] 💥 Error:", e);
+    client.onWebSocketError = (e) =>
+      console.error("[WS] 💥 Error:", e);
 
     client.activate();
     clientRef.current = client;
@@ -101,14 +183,12 @@ export default function WebSocketListener() {
         clientRef.current = null;
       }
     };
-  }, [token, WS_URL, dispatch]);
+  }, [token, WS_URL, dispatch, currentUserId]);
 
-  // ===== Theo dõi hội thoại đang mở và sub topic riêng =====
   useEffect(() => {
     const client = clientRef.current;
     if (!client || !client.connected) return;
 
-    // hủy sub cũ (nếu có)
     try {
       convoSubRef.current?.unsubscribe();
     } catch { }
@@ -116,14 +196,13 @@ export default function WebSocketListener() {
 
     if (!activeConversationId) return;
 
-    // sub vào topic của CV đang mở
+    // sub topic riêng của hội thoại đang mở
     convoSubRef.current = client.subscribe(
       `/topic/support.conversation.${activeConversationId}`,
       (m) => {
         const evt = safeJson(m.body);
-        console.log("[WS] 🗨 conversation:", evt);
         if (!evt) return;
-        // ✅ forward cả reaction.updated (và những event khác nếu sau này cần)
+
         const t = evt.type;
         if (
           t === "message.created" ||
@@ -145,13 +224,4 @@ export default function WebSocketListener() {
   }, [activeConversationId, dispatch]);
 
   return null;
-}
-
-/* ===== Helper ===== */
-function safeJson(str) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return null;
-  }
 }

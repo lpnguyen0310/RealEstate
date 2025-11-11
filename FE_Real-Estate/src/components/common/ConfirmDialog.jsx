@@ -30,8 +30,15 @@ export default function ConfirmDialog({
                     {cancelText}
                 </Button>
                 <Button
-                    onClick={onConfirm}
-                    disabled={loading || confirmDisabled} // <<< NEW
+                    onClick={() => {
+                        if (!loading && !confirmDisabled && typeof onConfirm === "function") {
+                            console.log("[ConfirmDialog] Gọi onConfirm()");
+                            onConfirm();
+                        } else {
+                            console.warn("[ConfirmDialog] Không có onConfirm hoặc đang disable");
+                        }
+                    }}
+                    disabled={loading || confirmDisabled}
                     variant="contained"
                 >
                     {loading ? "Đang xử lý..." : confirmText}

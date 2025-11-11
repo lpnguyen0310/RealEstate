@@ -20,6 +20,7 @@ export default function PostStatusTabs({
             { key: "expiringSoon", label: "Sắp hết hạn", badgeBg: "#fed7aa" },
             { key: "hidden", label: "Đã Ẩn", badgeBg: "#e5e7eb" },
             { key: "warned", label: "Bị Cảnh Cáo", badgeBg: "#fef08a" },
+            { key: "archived", label: "Thành Công", badgeBg: "#e2e8f0" },
         ],
         []
     );

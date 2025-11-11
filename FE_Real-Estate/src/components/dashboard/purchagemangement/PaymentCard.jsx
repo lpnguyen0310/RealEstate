@@ -34,6 +34,8 @@ const extractTypeAndQty = (c) => {
     const name = child.name || typeLabel(typeCode);
     return { typeCode, label: name, baseQty };
 };
+
+// Tóm tắt combo theo loại tin, có nhân số lượng (multiplier = số lượng combo người dùng chọn)
 const comboSummary = (items = [], multiplier = 1) => {
     if (!Array.isArray(items) || items.length === 0) return "";
     const m = Number(multiplier) || 1;
@@ -48,31 +50,24 @@ const comboSummary = (items = [], multiplier = 1) => {
         .sort(([a], [b]) => (order[a] ?? 9) - (order[b] ?? 9))
         .map(([type, total]) => `${total} tin ${typeLabel(type).replace(/^Tin\s+/i, "")}`)
         .join(", ");
-
-// summary an toàn: chạy với Mô hình 2
-const comboSummary = (items = []) => {
-    if (!Array.isArray(items) || items.length === 0) return "";
-    
-    // Logic mới: Đếm số lượng của từng 'code' (VIP_1, PRM_1...)
-    const counts = {};
-    items.forEach(it => {
-        // it.childPackage = { id: 20, code: "VIP_1", name: "Tin VIP", listingType: "VIP" }
-        const child = it?.childPackage; 
-        if (child && it.quantity > 0) {
-            // Ưu tiên Tên ("Tin VIP")
-            const label = child.name || typeLabel(child.listingType) || child.code; 
-            counts[label] = (counts[label] || 0) + it.quantity;
-        }
-    });
-
-    // Chuyển { "Tin VIP": 5, "Tin Premium": 3 } thành "5 tin vip, 3 tin premium"
-    return Object.entries(counts)
-        .map(([label, qty]) => `${qty} ${label.toLowerCase()}`)
-        .join(", ");
 };
+
 const Chevron = ({ open }) => (
-    <svg width="18" height="18" viewBox="0 0 24 24" className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden>
-        <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        aria-hidden
+    >
+        <path
+            d="M6 9l6 6 6-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
     </svg>
 );
 
@@ -114,7 +109,9 @@ export default function PaymentCard({
             {/* selected lines */}
             <div className="space-y-3">
                 {!hasItems ? (
-                    <div className="text-center text-[13px] sm:text-[14px] text-[#7A8AA1]">Bạn chưa chọn gói tin nào.</div>
+                    <div className="text-center text-[13px] sm:text-[14px] text-[#7A8AA1]">
+                        Bạn chưa chọn gói tin nào.
+                    </div>
                 ) : (
                     allItems
                         .filter((it) => (qty[it?.id] || 0) > 0)
@@ -161,7 +158,9 @@ export default function PaymentCard({
                                     </div>
 
                                     {isCombo && !open && (
-                                        <div className="pl-8 mt-0.5 text-[12px] text-[#7A8AA1]">{comboSummary(comboItems, q)}</div>
+                                        <div className="pl-8 mt-0.5 text-[12px] text-[#7A8AA1]">
+                                            {comboSummary(comboItems, q)}
+                                        </div>
                                     )}
 
                                     {isCombo && open && (
@@ -171,7 +170,8 @@ export default function PaymentCard({
                                                     <span
                                                         key={typeCode}
                                                         className={
-                                                            "px-3 py-[3px] rounded-full text-[12px] font-semibold " + chipClassByCode(typeCode)
+                                                            "px-3 py-[3px] rounded-full text-[12px] font-semibold " +
+                                                            chipClassByCode(typeCode)
                                                         }
                                                     >
                                                         {typeLabel(typeCode)} × {totalQty}
@@ -192,12 +192,16 @@ export default function PaymentCard({
             {/* total */}
             <div className="flex items-center justify-between py-4">
                 <span className="text-[18px] sm:text-[22px] font-semibold text-[#1a3b7c]">Tổng tiền</span>
-                <span className="text-[18px] sm:text-[22px] font-semibold text-[#1a3b7c]">{fmt(total)}</span>
+                <span className="text-[18px] sm:text-[22px] font-semibold text-[#1a3b7c]">
+                    {fmt(total)}
+                </span>
             </div>
 
             {/* need to pay */}
             <div className="flex items-center justify-between py-3 border-t border-dashed border-[#D7DFEC]">
-                <span className="text-[14px] sm:text-[15px] font-semibold text-[#2B3A55]">Số tiền cần thanh toán</span>
+                <span className="text-[14px] sm:text-[15px] font-semibold text-[#2B3A55]">
+                    Số tiền cần thanh toán
+                </span>
                 <span className="text-[#e32222] font-semibold">{fmt(total)} VNĐ</span>
             </div>
 
@@ -212,7 +216,10 @@ export default function PaymentCard({
                     <span className="font-medium text-blue-600">{fmt(bonusBalance)}</span>
                 </div>
                 {total > 0 && (
-                    <div className={`flex justify-between font-semibold ${canPayWithBalance ? "text-green-700" : "text-red-600"}`}>
+                    <div
+                        className={`flex justify-between font-semibold ${canPayWithBalance ? "text-green-700" : "text-red-600"
+                            }`}
+                    >
                         <span>Tổng số dư:</span>
                         <span>{fmt(totalBalance)}</span>
                     </div>
@@ -235,12 +242,20 @@ export default function PaymentCard({
 
             {/* payment methods */}
             <div className="border-t border-dashed border-gray-200 my-4 pt-4">
-                <h4 className="font-medium text-[#1a3b7c] mb-3 text-sm sm:text-base">Chọn phương thức thanh toán:</h4>
-                <Radio.Group onChange={(e) => setPaymentMethod?.(e.target.value)} value={paymentMethod} className="w-full">
+                <h4 className="font-medium text-[#1a3b7c] mb-3 text-sm sm:text-base">
+                    Chọn phương thức thanh toán:
+                </h4>
+                <Radio.Group
+                    onChange={(e) => setPaymentMethod?.(e.target.value)}
+                    value={paymentMethod}
+                    className="w-full"
+                >
                     <Space direction="vertical" className="w-full">
                         <Radio value="balance" disabled={!canPayWithBalance}>
                             Thanh toán bằng số dư
-                            {!canPayWithBalance && total > 0 && <span className="text-xs text-red-500 ml-2">(Không đủ)</span>}
+                            {!canPayWithBalance && total > 0 && (
+                                <span className="text-xs text-red-500 ml-2">(Không đủ)</span>
+                            )}
                         </Radio>
                         <Radio value="online">Thanh toán trực tuyến (Thẻ quốc tế)</Radio>
                     </Space>
@@ -253,7 +268,9 @@ export default function PaymentCard({
                     <div className="relative w-11 h-[26px] rounded-full bg-[#E6ECF7] select-none">
                         <span className="absolute top-[3px] left-[3px] h-[20px] w-[20px] rounded-full bg-white shadow" />
                     </div>
-                    <span className="text-[14px] sm:text-[15px] text-[#637089]">Xuất hoá đơn cho giao dịch</span>
+                    <span className="text-[14px] sm:text-[15px] text-[#637089]">
+                        Xuất hoá đơn cho giao dịch
+                    </span>
                 </div>
             </div>
 
@@ -277,7 +294,11 @@ export default function PaymentCard({
                 className={`mt-3 sm:mt-4 w-full h-[46px] sm:h-[48px] rounded-xl text-white font-semibold transition-colors duration-200 ${total <= 0 || disabled ? "bg-[#93a3bd] cursor-not-allowed" : "bg-[#0f2f63] hover:bg-[#0c2550]"
                     }`}
             >
-                {disabled ? "Đang xử lý..." : paymentMethod === "balance" ? "Xác nhận trừ số dư" : "Tiếp tục Thanh toán"}
+                {disabled
+                    ? "Đang xử lý..."
+                    : paymentMethod === "balance"
+                        ? "Xác nhận trừ số dư"
+                        : "Tiếp tục Thanh toán"}
             </button>
         </div>
     );

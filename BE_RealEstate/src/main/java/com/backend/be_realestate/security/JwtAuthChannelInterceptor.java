@@ -1,6 +1,5 @@
 package com.backend.be_realestate.security;
 
-import com.backend.be_realestate.security.JwtService;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,10 +10,8 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -23,61 +20,57 @@ import org.springframework.util.StringUtils;
 @Slf4j
 public class JwtAuthChannelInterceptor implements ChannelInterceptor {
 
-    private final JwtService jwtService;
+    private final JwtService jwtService;               // Service của bạn
     private final UserDetailsService userDetailsService;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
-        StompHeaderAccessor accessor =
-                MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        StompHeaderAccessor acc = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (acc == null) return message;
 
-        // Chỉ kiểm tra khi client gửi frame CONNECT
-        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-            log.info("[Interceptor] Processing CONNECT command...");
+        StompCommand cmd = acc.getCommand();
 
-            String authHeader = accessor.getFirstNativeHeader("Authorization");
-            String jwt = null;
+        // A) BẮT BUỘC XÁC THỰC ở CONNECT
+        if (StompCommand.CONNECT.equals(cmd)) {
+            String authHeader = acc.getFirstNativeHeader("Authorization");
+            String jwt = (authHeader != null && authHeader.startsWith("Bearer "))
+                    ? authHeader.substring(7) : null;
 
-            if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
-                jwt = authHeader.substring(7);
-            }
-
-            // ⭐️ SỬA ĐỔI 1: Nếu không có token, log warning nhưng VẪN CHO PHÉP kết nối
-            if (jwt == null) {
-                log.warn("WebSocket CONNECT: Thiếu JWT Token (Authorization header). Cho phép kết nối không xác thực.");
-                return message; // <-- Vẫn cho phép kết nối
+            if (!StringUtils.hasText(jwt)) {
+                log.warn("[WS] CONNECT bị từ chối: thiếu JWT");
+                return null; // block
             }
 
             try {
-                // ⭐️ SỬA ĐỔI 2: Nếu là refresh token, log warning nhưng VẪN CHO PHÉP
                 if (jwtService.isRefresh(jwt)) {
-                    log.warn("WebSocket CONNECT: Không chấp nhận Refresh Token. Cho phép kết nối không xác thực.");
-                    return message; // <-- Vẫn cho phép kết nối
+                    log.warn("[WS] CONNECT bị từ chối: sử dụng refresh token");
+                    return null; // block
                 }
 
-                String subject = jwtService.getSubject(jwt); // subject là email/phone
+                String subject = jwtService.getSubject(jwt); // email/phone (tuỳ hệ thống)
+                UserDetails ud = userDetailsService.loadUserByUsername(subject);
 
-                if (subject != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UserDetails userDetails = this.userDetailsService.loadUserByUsername(subject);
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(ud, null, ud.getAuthorities());
 
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-
-                    // Quan trọng: Đặt Principal (user) vào session WebSocket
-                    accessor.setUser(authToken);
-                    log.info("WebSocket CONNECT: Đã xác thực user: {}", subject);
-                }
-            } catch (JwtException | UsernameNotFoundException e) {
-                // ⭐️ SỬA ĐỔI 3: Nếu có lỗi, log warning nhưng VẪN CHO PHÉP kết nối
-                log.error("WebSocket Authentication Error: {}. Cho phép kết nối không xác thực.", e.getMessage());
-                return message; // <-- Vẫn cho phép kết nối
+                // principalName = ud.getUsername()
+                acc.setUser(auth);
+                log.info("[WS] CONNECT OK, principalName={}", auth.getName());
+            } catch (RuntimeException e) {
+                log.warn("[WS] CONNECT từ chối: {}", e.getMessage());
+                return null; // block
             }
         }
 
-        // Chỉ trả về message nếu mọi thứ OK
+        // B) CẤM SUBSCRIBE/SEND tới /user/** khi không có principal
+        if (StompCommand.SUBSCRIBE.equals(cmd) || StompCommand.SEND.equals(cmd)) {
+            String dest = acc.getDestination();
+            if (dest != null && dest.startsWith("/user/") && acc.getUser() == null) {
+                log.warn("[WS] Block {} to {}: missing principal", cmd, dest);
+                return null;
+            }
+        }
+
         return message;
     }
 }

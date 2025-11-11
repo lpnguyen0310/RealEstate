@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Tag, Tooltip, Dropdown, Modal, Button, Space } from "antd"; // thêm Dropdown, Modal
+import { Tag, Tooltip, Dropdown, Button, Space } from "antd";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination as SwiperPagination } from "swiper/modules";
 import "swiper/css";
@@ -12,7 +12,9 @@ import "viewerjs/dist/viewer.min.css";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchPropertyFavoritesThunk, clearFavorites } from "@/store/propertySlice";
 import FavoriteUsersModal from "./FavoriteUsersModal";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 
+/* ---------- helpers ---------- */
 const Box = ({ children, className = "" }) => (
   <div className={"bg-white/90 rounded-xl border border-[#e9eef7] shadow-[0_6px_18px_rgba(13,47,97,0.06)] p-4 " + className}>
     {children}
@@ -28,17 +30,21 @@ const STATUS_STYLE = {
   expiringSoon: { label: "Sắp Hết Hạn", cls: "bg-orange-50 border-orange-200 text-[#9a3412]" },
   rejected: { label: "Bị Từ Chối", cls: "bg-red-50    border-red-200    text-[#b42318]" },
   warned: { label: "Cần Chỉnh Sửa", cls: "bg-yellow-100 border-yellow-300 text-yellow-700" },
+  archived: { label: "Thành Công", cls: "bg-emerald-50 border-emerald-200 text-[#046c4e]" }
 };
 const getStatusStyle = (key) => STATUS_STYLE[key] ?? STATUS_STYLE.draft;
 
+/* ---------- component ---------- */
 export default function PostCard({
   post,
   onOpenDetail = () => { },
   onConfirmSuccess = (id) => console.log("confirm success:", id),
   onHidePost = (id) => console.log("hide post:", id),
+  onUnhidePost = (id) => console.log("unhide post:", id), // 🆕
   onViewWarning = () => { },
   isHighlighted = false,
 }) {
+  /* ====== images + viewer ====== */
   const images = useMemo(() => {
     const arr = (post?.images && post.images.length ? post.images : post?.imageUrls) || [];
     return arr.length ? arr : ["https://picsum.photos/1200/800"];
@@ -74,11 +80,12 @@ export default function PostCard({
     viewerRef.current.view(idx);
   };
 
+  /* ====== favorites modal ====== */
   const dispatch = useDispatch();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const favoriteUsers = useSelector((s) => s.property.currentFavoriteUsers);
-const isLoadingFavorites = useSelector((s) => s.property.loadingFavorites);
-const errorFavorites = useSelector((s) => s.property.errorFavorites);
+  const isLoadingFavorites = useSelector((s) => s.property.loadingFavorites);
+  const errorFavorites = useSelector((s) => s.property.errorFavorites);
 
   const handleShowFavorites = (e) => {
     e.stopPropagation();
@@ -99,61 +106,114 @@ const errorFavorites = useSelector((s) => s.property.errorFavorites);
 
   const stop = (e) => e.stopPropagation();
 
-  // ====== MENU 3 CHẤM ======
-  const confirmAction = (title, onOk) => {
-    Modal.confirm({
-      title,
-      centered: true,
-      okText: "Xác nhận",
-      cancelText: "Hủy",
-      onOk,
-    });
-  };
-
+  /* ====== menu 3 chấm (động theo trạng thái) ====== */
+  const isHidden = (post?.statusKey || "").toLowerCase() === "hidden";
   const menuItems = [
-    {
-      key: "confirm",
-      label: "Xác nhận giao dịch thành công",
-      onClick: ({ domEvent }) => {
-        domEvent.stopPropagation();
-        confirmAction("Xác nhận giao dịch đã hoàn tất?", () => onConfirmSuccess(post.id));
-      },
-    },
+    { key: "confirm", label: "Xác nhận giao dịch thành công" },
     { type: "divider" },
-    {
-      key: "hide",
-      danger: true,
-      label: "Ẩn tin",
-      onClick: ({ domEvent }) => {
-        domEvent.stopPropagation();
-        confirmAction("Ẩn tin này khỏi danh sách hiển thị?", () => onHidePost(post.id));
-      },
-    },
+    isHidden
+      ? { key: "unhide", label: "Hiện lại tin" }
+      : { key: "hide", danger: true, label: "Ẩn tin" },
   ];
 
+  /* ====== ConfirmDialog state ====== */
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [confirmDisabled, setConfirmDisabled] = useState(false);
+  const [confirmMeta, setConfirmMeta] = useState({
+    type: "",
+    title: "",
+    content: "",
+    onConfirm: null,
+  });
+
+  const openConfirm = (meta) => {
+    setConfirmMeta(meta);
+    setConfirmOpen(true);
+  };
+  const closeConfirm = () => {
+    if (confirmLoading) return;
+    setConfirmOpen(false);
+    setConfirmDisabled(false);
+    setConfirmLoading(false);
+    setConfirmMeta({ type: "", title: "", content: "", onConfirm: null });
+  };
+
+  const onMenuClick = ({ key, domEvent }) => {
+    domEvent?.stopPropagation?.();
+
+    if (key === "confirm") {
+      openConfirm({
+        type: "confirm",
+        title: "Xác nhận giao dịch đã hoàn tất?",
+        content: `Bạn sắp xác nhận tin #${post.id} đã giao dịch thành công.`,
+        onConfirm: async () => {
+          try {
+            setConfirmLoading(true);
+            setConfirmDisabled(true);
+            await Promise.resolve(onConfirmSuccess(post.id));
+            closeConfirm();
+          } catch (e) {
+            setConfirmLoading(false);
+            setConfirmDisabled(false);
+          }
+        },
+      });
+    } else if (key === "hide") {
+      openConfirm({
+        type: "hide",
+        title: "Ẩn tin này khỏi danh sách hiển thị?",
+        content: `Tin #${post.id} sẽ bị ẩn khỏi danh sách hiển thị công khai.`,
+        onConfirm: async () => {
+          try {
+            setConfirmLoading(true);
+            setConfirmDisabled(true);
+            await Promise.resolve(onHidePost(post.id));
+            closeConfirm();
+          } catch (e) {
+            setConfirmLoading(false);
+            setConfirmDisabled(false);
+          }
+        },
+      });
+    } else if (key === "unhide") {
+      openConfirm({
+        type: "unhide",
+        title: "Hiện lại tin này?",
+        content: `Tin #${post.id} sẽ được hiển thị công khai trở lại.`,
+        onConfirm: async () => {
+          try {
+            setConfirmLoading(true);
+            setConfirmDisabled(true);
+            await Promise.resolve(onUnhidePost(post.id));
+            closeConfirm();
+          } catch (e) {
+            setConfirmLoading(false);
+            setConfirmDisabled(false);
+          }
+        },
+      });
+    }
+  };
+
+  /* ====== highlight scroll ====== */
   const cardRef = useRef(null);
+  useEffect(() => {
+    if (isHighlighted && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isHighlighted, post?.id]);
 
-// 💡 [THÊM MỚI] Thêm useEffect để scroll khi được highlight
-useEffect(() => {
-// Chỉ chạy khi isHighlighted là true VÀ ref đã được gắn
-if (isHighlighted && cardRef.current) {
-console.log(`✅ PostCard [${post.id}]: Đang scroll tới...`);
-cardRef.current.scrollIntoView({
-behavior: "smooth",
-block: "center",
-});
-}
-}, [isHighlighted, post.id]); // Phụ thuộc vào isHighlighted
-
+  /* ====== render ====== */
   return (
     <>
       <div
         ref={cardRef}
-        id={`post-item-${post.id}`} 
+        id={`post-item-${post.id}`}
         className={`
-            relative rounded-2xl bg-[#f2f6fd] p-3 border border-[#e6eefb] 
-            shadow-[0_14px_36px_rgba(13,47,97,0.08)] cursor-pointer
-            ${isHighlighted ? 'post-highlight-animation' : ''}
+          relative rounded-2xl bg-[#f2f6fd] p-3 border border-[#e6eefb] 
+          shadow-[0_14px_36px_rgba(13,47,97,0.08)] cursor-pointer
+          ${isHighlighted ? "post-highlight-animation" : ""}
         `}
         onClick={handleCardClick}
         role="button"
@@ -161,9 +221,9 @@ block: "center",
         onKeyDown={(e) => (e.key === "Enter" ? handleCardClick() : null)}
         aria-label={`Mở chỉnh sửa tin #${post?.id ?? ""}`}
       >
-        {/* Nút menu ba chấm góc phải */}
+        {/* Nút menu ba chấm */}
         <Dropdown
-          menu={{ items: menuItems }}
+          menu={{ items: menuItems, onClick: onMenuClick }}
           placement="bottomRight"
           trigger={["click"]}
         >
@@ -172,7 +232,6 @@ block: "center",
             aria-label="Mở menu hành động"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* icon ba chấm */}
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
               <circle cx="5" cy="12" r="2"></circle>
               <circle cx="12" cy="12" r="2"></circle>
@@ -182,7 +241,7 @@ block: "center",
         </Dropdown>
 
         <div className="grid grid-cols-12 gap-3 items-stretch">
-          {/* LEFT: images (không mở Drawer) */}
+          {/* LEFT: images */}
           <div className="col-span-12 md:col-span-4" onClick={stop} onKeyDown={stop} role="presentation">
             <div className="rounded-2xl overflow-hidden relative h-full">
               <Swiper modules={[Navigation, SwiperPagination]} navigation pagination={{ clickable: true }} className="!rounded-2xl h-full">
@@ -191,7 +250,7 @@ block: "center",
                     <img
                       src={src}
                       alt={`Property image ${i + 1}`}
-                      className="h-[240px] w-full object-cover cursor-zoom-in"
+                      className="h[240px] md:h-[240px] w-full object-cover cursor-zoom-in"
                       onClick={() => openViewerAt(i)}
                       onError={(e) => {
                         e.currentTarget.onerror = null;
@@ -236,11 +295,10 @@ block: "center",
                 <div className="flex items-center gap-2"><span aria-hidden="true">🗂️</span><span>Tình trạng tin đăng</span></div>
                 {(() => {
                   const stKey = post?.statusKey || "draft";
-                  const isWarned = stKey === 'warned';
+                  const isWarned = stKey === "warned";
                   const { label, cls } = getStatusStyle(stKey);
 
                   if (isWarned) {
-                    // NẾU BỊ CẢNH CÁO: Render Tag + Nút "Xem lý do"
                     return (
                       <div className="text-right">
                         <Space size="small" wrap align="center" className="justify-end">
@@ -252,9 +310,8 @@ block: "center",
                             size="small"
                             style={{ padding: 0 }}
                             onClick={(e) => {
-                              e.stopPropagation(); // RẤT QUAN TRỌNG: Ngăn card bị click
-                              // 'latestWarningMessage' là message từ API
-                              onViewWarning(post.latestWarningMessage); 
+                              e.stopPropagation();
+                              onViewWarning(post.latestWarningMessage);
                             }}
                           >
                             Xem lý do
@@ -264,7 +321,6 @@ block: "center",
                     );
                   }
 
-                  // NẾU BÌNH THƯỜNG: Render như cũ
                   return (
                     <div className="text-right">
                       <span className={"inline-flex items-center justify-center px-3 py-1 rounded-xl border text-sm font-medium " + cls}>
@@ -339,12 +395,32 @@ block: "center",
         </div>
       </div>
 
+      {/* Modal danh sách người yêu thích */}
       <FavoriteUsersModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         users={favoriteUsers}
         isLoading={isLoadingFavorites}
         error={errorFavorites}
+      />
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        title={confirmMeta.title}
+        content={confirmMeta.content}
+        confirmText={
+          confirmMeta.type === "hide"
+            ? "Ẩn tin"
+            : confirmMeta.type === "unhide"
+              ? "Hiện lại"
+              : "Xác nhận"
+        }
+        cancelText="Hủy"
+        loading={confirmLoading}
+        confirmDisabled={confirmDisabled}
+        onClose={closeConfirm}
+        onConfirm={confirmMeta.onConfirm}
       />
     </>
   );

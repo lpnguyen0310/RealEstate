@@ -14,6 +14,7 @@ public class NotificationConverter {
 
         return NotificationDTO.builder()
                 .id(entity.getId())
+                .receiverId(entity.getUser() != null ? entity.getUser().getUserId() : null)
                 .type(entity.getType().name())
                 .message(entity.getMessage())
                 .link(entity.getLink())

@@ -23,54 +23,49 @@ public class PropertySpecification {
         return (root, query, cb) -> {
             if (keyword == null || keyword.isBlank()) return cb.conjunction();
 
-            // tokenize
+            // --- normalize + tokenize ---
             String kwRaw = keyword.trim().toLowerCase();
             String[] raw = kwRaw.split("\\s+");
             List<String> tokens = new ArrayList<>();
             for (String t : raw) if (t.length() >= 2) tokens.add(t);
             if (tokens.isEmpty()) return cb.conjunction();
 
-            // fields
+            // --- fields: title + displayAddress ---
             Expression<String> titleExpr = cb.lower(cb.coalesce(root.get("title"), ""));
-            Expression<String> descExpr  = cb.lower(cb.coalesce(root.get("description"), ""));
-            Expression<String> addrExpr  = cb.lower(cb.coalesce(root.get("displayAddress"), "")); // ƯU TIÊN
+            Expression<String> addrExpr  = cb.lower(cb.coalesce(root.get("displayAddress"), ""));
 
-            // exact phrase
+            // --- exact phrase ---
             String phraseLike   = "%" + escapeLike(kwRaw) + "%";
             String phrasePrefix = escapeLike(kwRaw) + "%";
             Predicate phrase = cb.or(
                     cb.like(addrExpr,  phraseLike, '\\'),
-                    cb.like(titleExpr, phraseLike, '\\'),
-                    cb.like(descExpr,  phraseLike, '\\')
+                    cb.like(titleExpr, phraseLike, '\\')
             );
 
-            // per-token
+            // --- per-token ---
             List<Predicate> perToken = new ArrayList<>();
             for (String t : tokens) {
                 String like = "%" + escapeLike(t) + "%";
                 perToken.add(cb.or(
                         cb.like(addrExpr,  like, '\\'),
-                        cb.like(titleExpr, like, '\\'),
-                        cb.like(descExpr,  like, '\\')
+                        cb.like(titleExpr, like, '\\')
                 ));
             }
             Predicate tokenGroup = matchAll
-                    ? cb.and(perToken.toArray(new Predicate[0]))  // TẤT CẢ token
-                    : cb.or(perToken.toArray(new Predicate[0]));   // CHỈ CẦN 1 token
+                    ? cb.and(perToken.toArray(new Predicate[0]))
+                    : cb.or(perToken.toArray(new Predicate[0]));
 
-            // final: phrase OR tokenGroup
             Predicate finalPred = cb.or(phrase, tokenGroup);
 
-            // ORDER BY relevance (chỉ khi select entity)
+            // --- relevance ordering ---
             if (PropertyEntity.class.equals(query.getResultType())) {
                 Expression<Long> sAddrStarts  = cb.<Long>selectCase().when(cb.like(addrExpr,  phrasePrefix, '\\'), 8L).otherwise(0L);
                 Expression<Long> sTitleStarts = cb.<Long>selectCase().when(cb.like(titleExpr, phrasePrefix, '\\'), 5L).otherwise(0L);
                 Expression<Long> sAddr        = cb.<Long>selectCase().when(cb.like(addrExpr,  phraseLike,   '\\'), 4L).otherwise(0L);
                 Expression<Long> sTitle       = cb.<Long>selectCase().when(cb.like(titleExpr, phraseLike,   '\\'), 2L).otherwise(0L);
-                Expression<Long> sDesc        = cb.<Long>selectCase().when(cb.like(descExpr,  phraseLike,   '\\'), 1L).otherwise(0L);
-                Expression<Long> score = cb.sum(cb.sum(cb.sum(sAddrStarts, sTitleStarts), cb.sum(sAddr, sTitle)), sDesc);
+                Expression<Long> score = cb.sum(cb.sum(cb.sum(sAddrStarts, sTitleStarts), cb.sum(sAddr, sTitle)), cb.literal(0L));
 
-                query.orderBy(cb.desc(score), cb.desc(root.get("postedAt"))); // đổi field ngày đúng với schema
+                query.orderBy(cb.desc(score), cb.desc(root.get("postedAt")));
             }
             return finalPred;
         };

@@ -22,18 +22,24 @@ public class LocationServiceImpl implements ILocationService {
     @Override
     public List<OptionDTO> getCities() {
         return cityRepo.findAll(Sort.by("name"))
-                .stream().map(c -> new OptionDTO(c.getId(), c.getName())).toList();
+                .stream()
+                .map(c -> new OptionDTO(c.getId(), c.getName(), c.getSlug()))
+                .toList();
     }
 
     @Override
     public List<OptionDTO> getDistricts(Long cityId) {
         return districtRepo.findByCity_IdOrderByNameAsc(cityId)
-                .stream().map(d -> new OptionDTO(d.getId(), d.getName())).toList();
+                .stream()
+                .map(d -> new OptionDTO(d.getId(), d.getName(), d.getSlug()))
+                .toList();
     }
 
     @Override
     public List<OptionDTO> getWards(Long districtId) {
         return wardRepo.findByDistrict_IdOrderByNameAsc(districtId)
-                .stream().map(w -> new OptionDTO(w.getId(), w.getName())).toList();
+                .stream()
+                .map(w -> new OptionDTO(w.getId(), w.getName(), w.getSlug()))
+                .toList();
     }
 }

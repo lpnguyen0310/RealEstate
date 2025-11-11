@@ -1,12 +1,12 @@
 // src/pages/dashboard/posts/PostManagerPage.jsx
-import { Button } from "antd";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { Button, message } from "antd";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination as SwiperPagination, Autoplay } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/pagination";
-import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 
 import {
@@ -16,6 +16,7 @@ import {
     setSize,
     setPendingAction,
     clearPendingAction,
+    performPropertyActionThunk,
 } from "@/store/propertySlice";
 
 import {
@@ -48,7 +49,7 @@ const parseFiltersFromSearch = (sp) => {
     const obj = Object.fromEntries(sp.entries());
     return cleanObj({
         q: obj.q,
-        area: obj.area,
+        areaSlug: obj.areaSlug,
         areaMin: parseNumber(obj.areaMin),
         areaMax: parseNumber(obj.areaMax),
         priceMin: parseNumber(obj.priceMin),
@@ -69,29 +70,20 @@ const buildSearchParams = ({ status, page, size, filters }) => {
 /* ------------------------------------------- */
 
 export default function PostManagerPage() {
-    const navigate = useNavigate();
     const dispatch = useDispatch();
     const { user } = useOutletContext() || {};
     const [searchParams, setSearchParams] = useSearchParams();
     const [warningModal, setWarningModal] = useState({ open: false, message: "" });
     const [highlightedId, setHighlightedId] = useState(null);
 
-    const {
-        list,
-        page,
-        size,
-        totalElements,
-        counts,
-        pendingAction,
-        rawLoading,
-    } = useSelector((s) => ({
+    const { list, page, size, totalElements, counts, pendingAction, rawLoading } = useSelector((s) => ({
         list: s.property.myList,
         page: s.property.myPage,
         size: s.property.mySize,
         totalElements: s.property.myTotalElements,
         counts: s.property.counts,
-        pendingAction: s.property.pendingAction, 
-        rawLoading: s.property.loading,        
+        pendingAction: s.property.pendingAction,
+        rawLoading: s.property.loading,
     }));
 
     const [status, setStatus] = useState(searchParams.get("tab") || "active");
@@ -105,7 +97,26 @@ export default function PostManagerPage() {
     const handleCloseWarning = useCallback(() => {
         setWarningModal({ open: false, message: "" });
     }, []);
+    const handleAction = async (id, action) => {
+        console.log("[handleAction] ->", id, action);
 
+        try {
+            // gọi BE
+            await dispatch(performPropertyActionThunk({ id, action })).unwrap();
+            console.log("[handleAction] OK <-", res);
+
+            // báo thành công
+            if (action === "MARK_SOLD") message.success("Đã xác nhận giao dịch thành công");
+            else if (action === "HIDE") message.success("Đã ẩn tin");
+            else message.success("Thao tác thành công");
+
+            // refetch counts + danh sách hiện tại
+            dispatch(fetchMyPropertyCountsThunk());
+            dispatch(fetchMyPropertiesThunk({ page, size, status, ...filters }));
+        } catch (e) {
+            console.error("[handleAction] ERR <-", e);
+        }
+    };
     /* ========== URL -> STATE ========== */
     useEffect(() => {
         const qp = Object.fromEntries(searchParams.entries());
@@ -130,7 +141,7 @@ export default function PostManagerPage() {
 
         if (urlPage - 1 !== page) dispatch(setPage(Math.max(0, urlPage - 1)));
         if (urlSize !== size && urlSize != null) dispatch(setSize(urlSize));
-    }, [searchParams, dispatch]);
+    }, [searchParams, dispatch]); // intentionally not depending on page/size to avoid loops
 
     /* ========== xử lý hành động chờ (highlight / mở modal) ========== */
     useEffect(() => {
@@ -166,14 +177,17 @@ export default function PostManagerPage() {
     useEffect(() => {
         dispatch(fetchMyPropertiesThunk({ page, size, status, ...filters }));
     }, [dispatch, page, size, status, filters]);
+
     useEffect(() => {
         dispatch(fetchMyPropertyCountsThunk());
     }, [dispatch]);
 
+    // Skeleton delay (debounce loading)
     const [delayedLoading, setDelayedLoading] = useState(false);
     useEffect(() => {
-        if (rawLoading) setDelayedLoading(true);
-        else {
+        if (rawLoading) {
+            setDelayedLoading(true);
+        } else {
             const t = setTimeout(() => setDelayedLoading(false), 1200);
             return () => clearTimeout(t);
         }
@@ -189,16 +203,6 @@ export default function PostManagerPage() {
         setSearchParams(params, { replace: false });
     };
 
-    const [delayedLoading, setDelayedLoading] = useState(false);
-    useEffect(() => {
-        if (rawLoading) {
-            setDelayedLoading(true);
-        } else {
-            const t = setTimeout(() => setDelayedLoading(false), 1200);
-            return () => clearTimeout(t);
-        }
-    }, [rawLoading]);
-
     // 🆕 mở Drawer chi tiết từ card
     const handleOpenDetail = (id) => {
         if (!id) return;
@@ -211,12 +215,11 @@ export default function PostManagerPage() {
     };
     const handleEndHighlight = useCallback(() => setHighlightedId(null), []);
 
-    // —— Swiper autoplay pause + bảo đảm update khi đổi kích thước
+    // —— Swiper autoplay pause + update khi đổi visibility
     const swiperAutoplayRef = useRef(null);
     useEffect(() => {
         const onVis = () => {
-            const inst =
-                swiperAutoplayRef.current?.$el?.[0]?.swiper || swiperAutoplayRef.current;
+            const inst = swiperAutoplayRef.current?.$el?.[0]?.swiper || swiperAutoplayRef.current;
             if (!inst) return;
             if (document.hidden) inst.stop();
             else {
@@ -271,7 +274,6 @@ export default function PostManagerPage() {
                             slidesPerView={1}
                             observer
                             observeParents
-                            resizeObserver
                             onBeforeInit={(s) => {
                                 s.params.observer = true;
                                 s.params.observeParents = true;
@@ -294,7 +296,7 @@ export default function PostManagerPage() {
                 </div>
             </div>
 
-            {/* Filters + Tabs + List: giữ cấu trúc grid như OrderManagement */}
+            {/* Filters + Tabs + List */}
             <div className="grid grid-cols-1 gap-3 sm:gap-4">
                 {/* Filters Bar */}
                 <div className="min-w-0">
@@ -351,6 +353,9 @@ export default function PostManagerPage() {
                         onHighlightEnd={handleEndHighlight}
                         onViewWarningClick={handleOpenWarning}
                         highlightedId={highlightedId}
+                        onConfirmSuccess={(id) => handleAction(id, "MARK_SOLD")}
+                        onHidePost={(id) => handleAction(id, "HIDE")}
+                        onUnhidePost={(id) => handleAction(id, "UNHIDE")}
                     />
                 </div>
             </div>

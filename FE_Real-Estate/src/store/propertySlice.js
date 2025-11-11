@@ -2,6 +2,7 @@
 import { createSlice, createAsyncThunk, createSelector } from "@reduxjs/toolkit";
 import api from "@/api/axios";
 import { uploadMany } from "@/api/cloudinary";
+import { performPropertyAction } from "@/api/property";
 
 /* ===================== THUNKS ===================== */
 
@@ -196,37 +197,31 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
             const {
                 page = 0,
                 size = 10,
-                status,
                 sort = "postedAt,desc",
-                q,
-                code,
-                area,
-                areaMin,
-                areaMax,
-                priceMin,
-                priceMax,
-                autoPosting,
-                expireDate,
+                status,
+                ...restFilters // ← các filter khác như q, code, areaSlug, areaMin...
             } = params;
+
+            // Lọc bỏ undefined/null/"" để URL gọn gàng
+            const filters = Object.fromEntries(
+                Object.entries(restFilters).filter(
+                    ([, v]) => v !== undefined && v !== null && v !== ""
+                )
+            );
 
             const query = {
                 page,
                 size,
                 sort,
                 ...(status ? { status } : {}),
-                ...(q ? { q } : {}),
-                ...(code ? { code } : {}),
-                ...(area ? { area } : {}),
-                ...(areaMin != null ? { areaMin } : {}),
-                ...(areaMax != null ? { areaMax } : {}),
-                ...(priceMin != null ? { priceMin } : {}),
-                ...(priceMax != null ? { priceMax } : {}),
-                ...(autoPosting ? { autoPosting } : {}),
-                ...(expireDate ? { expireDate } : {}),
+                ...filters,
             };
 
+            // (tuỳ thích) log nhanh để kiểm chứng trên DevTools
+            // console.log("GET /properties/me", query);
+
             const res = await api.get("/properties/me", { params: query });
-            return res.data; // PageResponse
+            return res.data;
         } catch (err) {
             return thunkApi.rejectWithValue(
                 err?.response?.data?.message || err.message
@@ -234,6 +229,7 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
         }
     }
 );
+
 
 // Cập nhật tin đăng
 export const updatePropertyThunk = createAsyncThunk(
@@ -318,7 +314,22 @@ export const fetchMyPropertyCountsThunk = createAsyncThunk(
         }
     }
 );
-
+// Thực hiện hành động trên tin đăng (HIDE, UNHIDE, MARK_SOLD, UNMARK_SOLD)
+export const performPropertyActionThunk = createAsyncThunk(
+    "property/performAction",
+    async ({ id, action, note }, { rejectWithValue }) => {
+        try {
+            console.log("[performPropertyActionThunk] ->", { id, action, note });
+            const res = await performPropertyAction(id, action, note);
+            console.log("[performPropertyActionThunk] OK <-", res);
+            return res;
+        } catch (e) {
+            console.error("[performPropertyActionThunk] ERR <-", e?.response || e);
+            const msg = e?.response?.data?.message || "Thao tác thất bại";
+            return rejectWithValue(msg);
+        }
+    }
+);
 /* ===================== DATE UTILS ===================== */
 
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -410,7 +421,7 @@ function statusEnumToKey(status) {
         case "EXPIRINGSOON":
             return "expiringSoon";
         case "ARCHIVED":
-            return "hidden";
+            return "archived";
         case "WARNED":
             return "warned";
         default:
@@ -597,6 +608,7 @@ const initialState = {
         hidden: 0,
         expired: 0,
         expiringSoon: 0,
+        archived: 0,
     },
     loadingCounts: false,
 
@@ -873,6 +885,43 @@ const propertySlice = createSlice({
             .addCase(updatePropertyThunk.rejected, (s, a) => {
                 s.creating = false;
                 s.createError = a.payload || "Cập nhật tin thất bại";
+            })
+            .addCase(performPropertyActionThunk.pending, (s, a) => {
+                // có thể set cờ nếu cần, hoặc để trống
+            })
+            .addCase(performPropertyActionThunk.fulfilled, (s, a) => {
+                const { id, newStatus } = a.payload || {};
+                if (!id || !newStatus) return;
+                const nextKey = statusEnumToKey(newStatus);
+                // Cập nhật item trong myList (dashboard)
+                const idx = s.myList.findIndex((x) => String(x.id) === String(id));
+                if (idx >= 0) {
+                    const prevKey = s.myList[idx].statusKey || null;
+                    s.myList[idx].statusTag = toStatusTag(newStatus);
+                    s.myList[idx].statusKey = nextKey;
+                    if (prevKey && prevKey !== nextKey) {
+                        if (s.counts[prevKey] != null) {
+                            s.counts[prevKey] = Math.max(0, (s.counts[prevKey] || 0) - 1);
+                        }
+                        if (s.counts[nextKey] != null) {
+                            s.counts[nextKey] = (s.counts[nextKey] || 0) + 1;
+                        }
+                    }
+                }
+
+                // Nếu bạn cũng muốn cập nhật list public (tuỳ use case)
+                const pIdx = s.list.findIndex((x) => String(x.id) === String(id));
+                if (pIdx >= 0) {
+                    s.list[pIdx].statusTag = toStatusTag(newStatus);
+                    s.list[pIdx].statusKey = statusEnumToKey(newStatus);
+                    s.list[pIdx].statusKey = nextKey;
+                }
+
+                // Có thể trigger refetch counts ngoài component, hoặc ở đây dispatch tiếp thunk counts
+                // (nếu muốn tự động) — chỉ gợi ý: dùng middleware hoặc dispatch ở component.
+            })
+            .addCase(performPropertyActionThunk.rejected, (s, a) => {
+                // giữ nguyên state, error nếu muốn
             });
     },
 });
@@ -922,8 +971,8 @@ export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
 
 export const selectPostStatsByType = createSelector(
     // Input: Lấy state myList (đã được map)
-    (state) => state.property.myList, 
-    
+    (state) => state.property.myList,
+
     // Hàm tính toán
     (myList) => {
         const sellSummary = { views: 0, interactions: 0, potential: 0 };

@@ -145,13 +145,13 @@ export const fetchPostsThunk = createAsyncThunk(
 export const fetchCountsThunk = createAsyncThunk(
     "adminPosts/fetchCounts",
     async (_, { getState, rejectWithValue }) => {
-        if (!hasCountsApi) return {};
+        if (!hasCountsApi) return null;
         // const s = getState().adminPosts; // <-- KHÔNG LẤY STATE NỮA
 
         try {
             // Gọi API mà KHÔNG có bất kỳ tham số filter nào
-            const res = await adminPropertyApi.counts({}); 
-            return res || {};
+            const res = await adminPropertyApi.counts({});
+            return res ?? null;
         } catch (e) {
             return rejectWithValue(e?.response?.data?.message || "Load counts thất bại");
         }
@@ -361,7 +361,7 @@ const adminPostsSlice = createSlice({
             })
             .addCase(fetchCountsThunk.fulfilled, (s, { payload }) => {
                 s.loadingCounts = false;
-                if (payload && typeof payload === "object") {
+                if (payload && typeof payload === "object" && Object.keys(payload).length > 0) {
                     s.counts = payload;
                 }
             })

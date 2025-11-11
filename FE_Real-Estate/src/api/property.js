@@ -10,11 +10,15 @@ export async function createProperty(payload) {
     return data;
 }
 
-
 export async function getRecommendations({ userId, limit = 8 }) {
     // BE: GET /api/properties/recommendations?userId=&limit=
     const { data } = await api.get("/properties/recommendations", {
         params: { userId, limit },
     });
     return data; // List<PropertyCardDTO>
+}
+
+export async function performPropertyAction(id, action, note) {
+    const { data } = await api.post(`/properties/${id}/actions`, { action, note });
+    return data; // PropertyActionResponse
 }

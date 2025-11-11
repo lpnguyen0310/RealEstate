@@ -32,5 +32,10 @@ public enum NotificationType {
     SUPPORT_CONVERSATION_CREATED,
     SUPPORT_ASSIGNMENT,
     SUPPORT_MESSAGE_RECEIVED,
-    SUPPORT_CONVERSATION_RESOLVED
+    SUPPORT_CONVERSATION_RESOLVED,
+
+    LISTING_HIDDEN,          // User ẩn tin
+    LISTING_UNHIDDEN,        // User bỏ ẩn tin
+    LISTING_MARKED_SOLD,     // User đánh dấu đã bán
+    LISTING_UNMARKED_SOLD,   // User gỡ trạng thái đã bán
 }

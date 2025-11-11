@@ -1,7 +1,14 @@
 // src/components/admidashboard/dashboard/NotificationsCard.jsx
 import React, { useMemo } from "react";
-import { Link } from "react-router-dom";
-import { useGetNotificationsQuery } from "@/services/notificationApi";
+import { Link, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+
+// dùng đúng đường dẫn service bạn đã gửi
+import {
+    useGetNotificationsQuery,
+    useMarkAsReadMutation,
+    notificationApi,
+} from "@/services/notificationApi";
 
 /* ---------- Skeleton ---------- */
 const SkeletonItem = () => (
@@ -48,6 +55,7 @@ function mapApiTypeToIconType(apiType) {
         case "LISTING_APPROVED":
         case "LISTING_REJECTED":
         case "COMMENT_RECEIVED":
+        case "LISTING_FAVORITED":
         default:
             return "comment";
     }
@@ -84,37 +92,41 @@ const IconBubble = ({ variant = "default" }) => {
     }
 };
 
+const Dot = () => <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />;
+
+const NewPing = () => (
+    <span className="absolute -left-1 top-2.5">
+        <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-30" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
+        </span>
+    </span>
+);
+
 export default function NotificationsCard() {
     const { data: apiData, isLoading, isError } = useGetNotificationsQuery();
+    const [markAsRead] = useMarkAsReadMutation();
+    const navigate = useNavigate();
+    const dispatch = useDispatch();
 
-    // Chuẩn hóa dữ liệu
+    // Chuẩn hóa dữ liệu, ưu tiên field `type` (bạn BE đang trả), fallback `notificationType`
     const items = useMemo(() => {
         const arr = Array.isArray(apiData) ? apiData : [];
-        // Xác định thông báo mới nhất theo createdAt
-        const latestTs = Math.max(
-            0,
-            ...arr.map((x) => (x?.createdAt ? new Date(x.createdAt).getTime() : 0)),
-        );
-        const latestId = arr.find((x) => new Date(x?.createdAt || 0).getTime() === latestTs)?.id;
-
-        return arr.map((apiItem) => ({
-            id: apiItem.id,
-            type: mapApiTypeToIconType(apiItem.notificationType),
-            text: apiItem.message,
-            time: formatRelativeTime(apiItem.createdAt),
-            link: apiItem.link,
-            // hỗ trợ cả read/isRead từ BE (nếu có), mặc định là false (chưa đọc)
-            read: Boolean(apiItem.read ?? apiItem.isRead ?? false),
-            createdAt: apiItem.createdAt,
-            isLatest: apiItem.id === latestId, // đánh dấu "mới nhận"
+        return arr.map((n) => ({
+            id: n.id,
+            type: mapApiTypeToIconType(n.type || n.notificationType),
+            text: n.message,
+            time: formatRelativeTime(n.createdAt),
+            link: n.link,
+            read: Boolean(n.read ?? n.isRead ?? false),
+            createdAt: n.createdAt,
         }));
     }, [apiData]);
 
     const displayItems = items.slice(0, 4);
 
     const liClass = (it) => {
-        // Nổi bật nhất cho "mới nhận"
-        if (it.isLatest) {
+        if (!it.read) {
             return [
                 "relative",
                 "flex items-start gap-3 py-3 px-2 -mx-2 rounded-xl transition-colors",
@@ -123,36 +135,44 @@ export default function NotificationsCard() {
                 "before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-blue-400/70",
             ].join(" ");
         }
-        // Chưa đọc (không phải mới nhất): nhấn nhẹ
-        if (!it.read) {
-            return [
-                "relative",
-                "flex items-start gap-3 py-3 px-2 -mx-2 rounded-xl transition-colors",
-                "hover:bg-gray-50/70",
-                "bg-gray-50",
-            ].join(" ");
-        }
-        // Đã đọc: mặc định
         return "flex items-start gap-3 py-3 px-2 -mx-2 rounded-xl hover:bg-gray-50/70 transition-colors";
     };
 
-    const Dot = ({ strong = false }) => (
-        <span
-            className={[
-                "inline-block w-2 h-2 rounded-full",
-                strong ? "bg-blue-500" : "bg-blue-400",
-            ].join(" ")}
-        />
-    );
+    // Optimistic update vào cache getNotifications
+    const markReadInCache = (id) => {
+        try {
+            dispatch(
+                notificationApi.util.updateQueryData("getNotifications", undefined, (draft) => {
+                    const idx = Array.isArray(draft) ? draft.findIndex((x) => x?.id === id) : -1;
+                    if (idx > -1) draft[idx].read = true;
+                })
+            );
+        } catch { }
+    };
 
-    const NewPing = () => (
-        <span className="absolute -left-1 top-2.5">
-            <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-30" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
-            </span>
-        </span>
-    );
+    const handleItemClick = async (e, item) => {
+        const to = item.link || "#";
+
+        // Nếu đã đọc rồi thì điều hướng luôn
+        if (item.read) return;
+
+        // Chặn điều hướng tức thì để set read trước
+        e.preventDefault();
+
+        // 1) Optimistic update để UI đổi ngay
+        markReadInCache(item.id);
+
+        // 2) Gọi BE persist (đúng endpoint bạn đã khai báo: POST /notifications/mark-read/{id})
+        try {
+            await markAsRead(item.id).unwrap();
+            // invalidatesTags đã setup → cache sẽ refetch/refresh UnreadCount & Notifications
+        } catch {
+            // giữ nguyên optimistic cho UX mượt; lần refetch tiếp sẽ sync lại với BE
+        } finally {
+            // 3) Điều hướng
+            navigate(to);
+        }
+    };
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
@@ -198,9 +218,13 @@ export default function NotificationsCard() {
                     !isError &&
                     displayItems.map((item) => (
                         <li key={item.id} className="relative">
-                            <Link to={item.link || "#"} className={liClass(item)}>
-                                {/* Ping “mới nhận” */}
-                                {item.isLatest && <NewPing />}
+                            <Link
+                                to={item.link || "#"}
+                                className={liClass(item)}
+                                onClick={(e) => handleItemClick(e, item)}
+                            >
+                                {/* Ping cho “chưa đọc” */}
+                                {!item.read && <NewPing />}
 
                                 {/* Icon */}
                                 <IconBubble variant={item.type} />
@@ -208,25 +232,19 @@ export default function NotificationsCard() {
                                 {/* Nội dung */}
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-start gap-2">
-                                        {/* Nhãn “Mới” cho item mới nhất */}
-                                        {item.isLatest && (
+                                        {!item.read && (
                                             <span className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 ring-1 ring-blue-200">
                                                 Mới
                                             </span>
                                         )}
-
                                         <p
-                                            className={[
-                                                "font-medium text-sm leading-snug",
-                                                item.isLatest ? "text-gray-900" : "text-gray-900",
-                                            ].join(" ")}
+                                            className="font-medium text-sm leading-snug text-gray-900"
                                             dangerouslySetInnerHTML={{ __html: item.text }}
                                         />
                                     </div>
 
                                     <div className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
-                                        {/* Dot xanh cho “chưa đọc” (không phải mới nhất) */}
-                                        {!item.isLatest && !item.read && <Dot />}
+                                        {!item.read && <Dot />}
                                         <span>{item.time}</span>
                                     </div>
                                 </div>

@@ -10,4 +10,5 @@ import lombok.Setter;
 public class OptionDTO {
     private Long id;
     private String name;
+    private String slug;
 }

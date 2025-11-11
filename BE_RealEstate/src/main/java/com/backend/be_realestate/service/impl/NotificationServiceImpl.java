@@ -1,12 +1,12 @@
-package com.backend.be_realestate.service.impl; // Giả sử bạn có package impl
+package com.backend.be_realestate.service.impl;
 
 import com.backend.be_realestate.converter.NotificationConverter;
 import com.backend.be_realestate.entity.NotificationEntity;
 import com.backend.be_realestate.entity.UserEntity;
 import com.backend.be_realestate.enums.NotificationType;
 import com.backend.be_realestate.modals.dto.NotificationDTO;
-import com.backend.be_realestate.repository.NotificationRepository; // Import repository
-import com.backend.be_realestate.service.NotificationService; // Import interface
+import com.backend.be_realestate.repository.NotificationRepository;
+import com.backend.be_realestate.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -23,55 +23,46 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
-
-    private final NotificationConverter notificationConverter; // ⭐️ INJECT CONVERTER
+    private final NotificationConverter notificationConverter;
 
     @Override
     public void createNotification(UserEntity user, NotificationType type, String message, String link) {
-        NotificationEntity notification = new NotificationEntity();
-        notification.setUser(user);
-        notification.setType(type);
-        notification.setMessage(message);
-        notification.setLink(link);
-        notification.setRead(false);
-        // Giả sử @PrePersist tự động thêm createdAt
+        // 1) Lưu DB
+        NotificationEntity entity = new NotificationEntity();
+        entity.setUser(user);
+        entity.setType(type);
+        entity.setMessage(message);
+        entity.setLink(link);
+        entity.setRead(false);
+        NotificationEntity saved = notificationRepository.save(entity);
 
-        NotificationEntity savedNotification = notificationRepository.save(notification);
+        // 2) Xác định principalName (phải KHỚP với Username ở CONNECT)
+        String principalKey =
+                user.getEmail() != null ? user.getEmail()
+                        : user.getPhone() != null ? user.getPhone()
+                        : String.valueOf(user.getUserId()); // fallback
 
-        // ⭐️ SỬA ĐỔI QUAN TRỌNG: Chuyển đổi sang DTO trước khi gửi
+        if (principalKey == null) {
+            log.error("[Notify] Không thể gửi WS: user {} thiếu email/phone", user.getUserId());
+            return;
+        }
+
+        // 3) Đổi sang DTO (có receiverId) và gửi đúng channel user
         try {
-            String destinationUser = user.getEmail();
-            if (destinationUser == null) {
-                // Nếu user đăng nhập bằng SĐT, dùng SĐT làm destination
-                destinationUser = user.getPhone();
-            }
-
-            if (destinationUser == null) {
-                log.error("Không thể gửi WS notification: User {} không có email hoặc SĐT.", user.getUserId());
-                return;
-            }
-
-            // 1. Chuyển đổi Entity sang DTO
-            NotificationDTO dto = notificationConverter.toDTO(savedNotification);
-
-            String channel = "/queue/notifications";
-
-            // 2. Gửi DTO (đã an toàn) thay vì Entity
+            NotificationDTO dto = notificationConverter.toDTO(saved);
             messagingTemplate.convertAndSendToUser(
-                    destinationUser,
-                    channel,
-                    dto // ⭐️ GỬI DTO
+                    principalKey,
+                    "/queue/notifications",
+                    dto
             );
-            log.info("Đã gửi thông báo WebSocket tới user: {}", destinationUser);
-
+            log.info("[Notify] WS -> userKey={} dtoId={}", principalKey, dto.getId());
         } catch (Exception e) {
-            log.error("Lỗi khi gửi thông báo WebSocket cho user {}: {}", user.getUserId(), e.getMessage(), e);
+            log.error("[Notify] Lỗi gửi WS (userId={}): {}", user.getUserId(), e.getMessage(), e);
         }
     }
 
-
     @Override
-    @Transactional(readOnly = true) // Tối ưu cho các tác vụ chỉ đọc
+    @Transactional(readOnly = true)
     public List<NotificationEntity> getNotificationsForUser(UserEntity user) {
         return notificationRepository.findByUserOrderByCreatedAtDesc(user);
     }
@@ -84,15 +75,11 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public boolean markAsRead(Long notificationId, UserEntity user) {
-        // Tìm thông báo
-        NotificationEntity notification = notificationRepository.findById(notificationId)
-                .orElse(null);
-
-        // Kiểm tra bảo mật: thông báo phải tồn tại VÀ thuộc về đúng người dùng
-        if (notification != null && notification.getUser().getUserId().equals(user.getUserId())) {
-            if (!notification.isRead()) { // Chỉ update nếu nó chưa được đọc
-                notification.setRead(true);
-                notificationRepository.save(notification);
+        NotificationEntity n = notificationRepository.findById(notificationId).orElse(null);
+        if (n != null && n.getUser().getUserId().equals(user.getUserId())) {
+            if (!n.isRead()) {
+                n.setRead(true);
+                notificationRepository.save(n);
             }
             return true;
         }
@@ -101,14 +88,9 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public void markAllAsRead(UserEntity user) {
-        List<NotificationEntity> unreadNotifications = notificationRepository.findByUserAndIsReadFalse(user);
-
-        if (unreadNotifications.isEmpty()) {
-            return; // Không cần làm gì
-        }
-
-        unreadNotifications.forEach(notification -> notification.setRead(true));
-
-        notificationRepository.saveAll(unreadNotifications);
+        List<NotificationEntity> list = notificationRepository.findByUserAndIsReadFalse(user);
+        if (list.isEmpty()) return;
+        list.forEach(n -> n.setRead(true));
+        notificationRepository.saveAll(list);
     }
 }

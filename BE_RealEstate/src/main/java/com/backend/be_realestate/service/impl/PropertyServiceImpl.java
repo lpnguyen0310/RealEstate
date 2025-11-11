@@ -16,6 +16,7 @@ import com.backend.be_realestate.modals.dto.propertydashboard.PendingPropertyDTO
 import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import com.backend.be_realestate.modals.response.PageResponse;
+import com.backend.be_realestate.modals.response.PropertyActionResponse;
 import com.backend.be_realestate.modals.response.admin.PropertyKpiResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
@@ -485,6 +486,30 @@ public class PropertyServiceImpl implements IPropertyService {
                 });
             }
 
+            String areaSlug = trim(filters.get("areaSlug")); // Tên param mới
+
+            if (areaSlug != null) {
+                final String slugToMatch = areaSlug.toLowerCase();
+
+                spec = spec.and((root, qy, cb2) -> {
+                    Join<PropertyEntity, DistrictEntity> dist = safeLeftJoin(root, "district");
+                    Join<PropertyEntity, CityEntity> city = safeLeftJoin(root, "city");
+
+                    List<Predicate> ors = new ArrayList<>();
+
+                    // So sánh chính xác với City Slug
+                    if (city != null) {
+                        ors.add(cb2.equal(cb2.lower(city.get("slug")), slugToMatch));
+                    }
+                    // So sánh chính xác với District Slug
+                    if (dist != null) {
+                        ors.add(cb2.equal(cb2.lower(dist.get("slug")), slugToMatch));
+                    }
+
+                    return ors.isEmpty() ? cb2.conjunction() : cb2.or(ors.toArray(new Predicate[0]));
+                });
+            }
+
             // diện tích: area (float)
             Integer areaMin = parseInt(filters.get("areaMin")).orElse(null);
             Integer areaMax = parseInt(filters.get("areaMax")).orElse(null);
@@ -510,9 +535,6 @@ public class PropertyServiceImpl implements IPropertyService {
         return propertyRepository.findAll(spec, pageable).map(propertyConverter::toDto);
     }
 
-    /* =========================================================
-     * COUNTS (TABS)
-     * ========================================================= */
     @Override
     public Map<String, Long> getPropertyCountsByStatus(Long userId) {
         Map<String, Long> counts = new HashMap<>();
@@ -841,6 +863,106 @@ public class PropertyServiceImpl implements IPropertyService {
         return propertyConverter.toDto(property);
     }
 
+    @Override
+    @Transactional
+    public PropertyActionResponse performAction(Long userId, Long propertyId, PropertyAction action, String note) {
+        // 1) Tải tin + kiểm tra quyền sở hữu
+        var property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new IllegalArgumentException("Property not found: " + propertyId));
+
+        if (property.getUser() == null || !Objects.equals(property.getUser().getUserId(), userId)) {
+            throw new AccessDeniedException("Bạn không có quyền thao tác tin này");
+        }
+
+        final PropertyStatus current = property.getStatus();
+        final PropertyStatus target;
+
+        // 2) Xác thực & chuyển trạng thái
+        switch (action) {
+            case HIDE -> {
+                if (!(current == PropertyStatus.PUBLISHED || current == PropertyStatus.EXPIRINGSOON)) {
+                    throw new IllegalStateException("Không thể ẨN tin từ trạng thái: " + current);
+                }
+                target = PropertyStatus.HIDDEN;
+            }
+            case UNHIDE -> {
+                if (current != PropertyStatus.HIDDEN) {
+                    throw new IllegalStateException("Chỉ có thể BỎ ẨN tin đang ở trạng thái HIDDEN");
+                }
+                // Có thể khôi phục về trạng thái trước khi ẩn nếu bạn lưu previousStatus; hiện khôi phục về PUBLISHED cho đơn giản
+                target = PropertyStatus.PUBLISHED;
+            }
+            case MARK_SOLD -> {
+                if (!(current == PropertyStatus.PUBLISHED || current == PropertyStatus.EXPIRINGSOON || current == PropertyStatus.HIDDEN)) {
+                    throw new IllegalStateException("Không thể đánh dấu ĐÃ BÁN từ trạng thái: " + current);
+                }
+                target = PropertyStatus.ARCHIVED; // dùng ARCHIVED làm 'đã bán/đóng tin'
+                // TODO (tuỳ chọn): property.setSoldAt(Instant.now()); property.setSoldNote(note);
+            }
+            case UNMARK_SOLD -> {
+                if (current != PropertyStatus.ARCHIVED) {
+                    throw new IllegalStateException("Chỉ có thể GỠ ĐÃ BÁN khi tin đang ARCHIVED");
+                }
+                target = PropertyStatus.PUBLISHED;
+            }
+            default -> throw new IllegalArgumentException("Unsupported action: " + action);
+        }
+
+        property.setStatus(target);
+        propertyRepository.save(property);
+
+        // 3) Gửi notification cho chủ tin
+        try {
+            String title = (property.getTitle() != null) ? property.getTitle() : ("Tin #" + property.getId());
+            String link = "/dashboard/posts";
+            String msg;
+            NotificationType nType;
+
+            switch (action) {
+                case HIDE -> {
+                    msg = String.format("Bạn đã ẩn tin '%s'.", title);
+                    nType = NotificationType.LISTING_HIDDEN;        // nếu chưa thêm, tạm dùng INFO
+                }
+                case UNHIDE -> {
+                    msg = String.format("Bạn đã bỏ ẩn tin '%s'.", title);
+                    nType = NotificationType.LISTING_UNHIDDEN;      // nếu chưa thêm, tạm dùng INFO
+                }
+                case MARK_SOLD -> {
+                    msg = String.format("Bạn đã đánh dấu '%s' đã giao dịch thành công.", title);
+                    nType = NotificationType.LISTING_MARKED_SOLD;   // nếu chưa thêm, tạm dùng INFO
+                }
+                case UNMARK_SOLD -> {
+                    msg = String.format("Bạn đã gỡ trạng thái đã bán của '%s'.", title);
+                    nType = NotificationType.LISTING_UNMARKED_SOLD; // nếu chưa thêm, tạm dùng INFO
+                }
+                default -> {
+                    msg = "Cập nhật trạng thái tin của bạn.";
+                    nType = NotificationType.SYSTEM_ANNOUNCEMENT;
+                }
+            }
+
+            notificationService.createNotification(property.getUser(), nType, msg, link);
+        } catch (Exception e) {
+            log.warn("Notify user after action failed: {}", e.getMessage());
+        }
+
+        // 4) Đẩy WS để FE refresh list/KPI
+        try {
+            messagingTemplate.convertAndSend("/topic/admin/properties", "user_update_action");
+        } catch (Exception e) {
+            log.error("WS push error: {}", e.getMessage());
+        }
+
+        log.info("PropertyAction userId={} propertyId={} action={} {}->{}",
+                userId, propertyId, action, current, target);
+
+        return PropertyActionResponse.builder()
+                .id(property.getId())
+                .newStatus(target)
+                .message("OK")
+                .build();
+    }
+
     /* =========================================================
      * PRIVATE HELPERS
      * ========================================================= */
@@ -908,8 +1030,8 @@ public class PropertyServiceImpl implements IPropertyService {
             case DRAFT:
             case ACTIVE:         return "draft";
             case REJECTED:       return "rejected";
-            case HIDDEN:
-            case ARCHIVED:       return "hidden";
+            case HIDDEN:         return "hidden";
+            case ARCHIVED:       return "archived";
             case EXPIRED:        return "expired";
             case EXPIRINGSOON:   return "expiringSoon";
             case WARNED:         return "warned";
@@ -940,11 +1062,8 @@ public class PropertyServiceImpl implements IPropertyService {
                         cb.equal(r.get("status"), PropertyStatus.DRAFT),
                         cb.equal(r.get("status"), PropertyStatus.ACTIVE)
                 );
-            case "hidden":
-                return (r, q, cb) -> cb.or(
-                        cb.equal(r.get("status"), PropertyStatus.HIDDEN),
-                        cb.equal(r.get("status"), PropertyStatus.ARCHIVED)
-                );
+            case "hidden":   return (r, q, cb) -> cb.equal(r.get("status"), PropertyStatus.HIDDEN);
+            case "archived": return (r, q, cb) -> cb.equal(r.get("status"), PropertyStatus.ARCHIVED);
             case "warned":
                 return (r, q, cb) -> cb.equal(r.get("status"), PropertyStatus.WARNED);
             default: {

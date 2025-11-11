@@ -32,6 +32,9 @@ export default function PostList({
     onItemClick = () => { },
     onViewWarningClick = () => { },
     highlightedId = null,
+    onConfirmSuccess = () => { },
+    onHidePost = () => { },
+    onUnhidePost = () => { },
 }) {
     const showEmpty = !loading && items.length === 0;
     const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -50,6 +53,9 @@ export default function PostList({
                             onOpenDetail={onItemClick}
                             onViewWarning={onViewWarningClick}
                             isHighlighted={p.id === highlightedId}
+                            onConfirmSuccess={onConfirmSuccess}
+                            onHidePost={() => onHidePost?.(p.id)}
+                            onUnhidePost={() => onUnhidePost?.(p.id)}
                         />
                     ))}
 
