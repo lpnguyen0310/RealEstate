@@ -20,6 +20,7 @@ import {
   selectPostsReport,
   selectPostStatsByType,
 } from "@/store/propertySlice";
+import { fetchMyProfile } from "@/store/profileSlice";
 
 // Favorites (đọc trực tiếp từ favoriteSlice)
 import {
@@ -30,7 +31,8 @@ import {
 export default function DashboardOverview() {
   const nav = useNavigate();
   const dispatch = useDispatch();
-  const { user: reduxUser } = useOutletContext();
+  // const { user: reduxUser } = useOutletContext();
+  const { data: profile, status: profileStatus } = useSelector((state) => state.profile);
 
   const [isLeadModalVisible, setIsLeadModalVisible] = useState(false);
   const [leadTypeToShow, setLeadTypeToShow] = useState("sell"); 
@@ -40,24 +42,44 @@ export default function DashboardOverview() {
     dispatch(fetchMyPropertiesThunk({ page: 0, size: 20, sort: "postedAt,desc" }));
   }, [dispatch]);
 
+  useEffect(() => {
+    // Chỉ gọi API nếu state đang là 'idle' (chưa gọi)
+    if (profileStatus === 'idle') {
+      dispatch(fetchMyProfile());
+    }
+  }, [dispatch, profileStatus]);
+
   // User info
   const user = useMemo(() => {
-    if (!reduxUser) {
-      return { name: "Người dùng", email: "", phone: "", avatarUrl: "", balance: 0 };
-    }
-    const name =
-      reduxUser.fullName ||
-      `${reduxUser.firstName ?? ""} ${reduxUser.lastName ?? ""}`.trim() ||
-      reduxUser.email ||
-      "Người dùng";
-    return {
-      name,
-      email: reduxUser.email || "",
-      phone: reduxUser.phone || reduxUser.phoneNumber || "",
-      avatarUrl: reduxUser.avatarUrl || "",
-      balance: reduxUser.balance ?? 0,
-    };
-  }, [reduxUser]);
+    if (!profile) {
+      // Hiển thị trạng thái loading hoặc mặc định
+      const isLoading = profileStatus === 'loading' || profileStatus === 'idle';
+      return { 
+        name: isLoading ? "Đang tải..." : "Người dùng", 
+        email: "", 
+        phone: "", 
+        avatarUrl: "", 
+        balance: 0 
+      };
+    }
+
+    // Lấy dữ liệu từ `profile` (từ API response của bạn)
+    const name =
+      profile.fullName ||
+      `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim() ||
+      profile.email ||
+      "Người dùng";
+    
+    return {
+      name,
+      email: profile.email || "",
+      phone: profile.phone || profile.phoneNumber || "",
+      // Dùng đúng tên trường 'avatar' từ API
+      avatarUrl: profile.avatar || "", 
+      // DÙNG ĐÚNG TÊN TRƯỜNG 'mainBalance' TỪ API
+      balance: profile.mainBalance ?? 0, 
+    };
+  }, [profile, profileStatus]);
 
   // Favorites (REAL DATA từ Redux)
   const favList = useSelector(selectFavList); // [{id,title,thumb,href,priceDisplay,displayAddress,...}]

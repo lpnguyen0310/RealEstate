@@ -2,10 +2,12 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserInventory } from "@/store/inventorySlice";
+import { useNavigate } from "react-router-dom";
 
 export default function UserHeader({ user }) {
   const dispatch = useDispatch();
   const { items: inventory, loading } = useSelector((state) => state.inventory);
+  const navigate = useNavigate();
 
   useEffect(() => {
     dispatch(fetchUserInventory());
@@ -67,6 +69,7 @@ export default function UserHeader({ user }) {
 
             <button
               className="h-8 sm:h-9 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-[#5db9f0] to-[#b36ad6] text-white text-[12px] sm:text-[13px] font-medium shadow-sm hover:opacity-90 active:translate-y-[1px] transition"
+              onClick={() => navigate("/dashboard/account?action=topup")}
             >
               Nạp tiền
             </button>

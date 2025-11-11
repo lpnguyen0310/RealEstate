@@ -1,6 +1,6 @@
 // src/pages/AccountManagement.jsx
 import React, { useMemo, useState, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { Tabs, Space, Typography, Button, Spin, message } from "antd";
 import { SaveOutlined, ArrowLeftOutlined, CreditCardOutlined } from "@ant-design/icons";
 
@@ -33,6 +33,8 @@ export default function AccountManagement() {
     const { data: profileData, status, error } = useSelector((s) => s.profile);
     const isLoading = status === "loading";
 
+    const [searchParams, setSearchParams] = useSearchParams();
+
     // Snackbar
     const [alert, setAlert] = useState({ open: false, message: "", severity: "success" });
     const handleCloseAlert = (_, reason) => {
@@ -52,6 +54,17 @@ export default function AccountManagement() {
 
     const [activeTab, setActiveTab] = useState("edit");
     const [panel, setPanel] = useState({ view: "manage", data: null });
+
+    useEffect(() => {
+        const action = searchParams.get("action");
+        if (action === "topup") {
+        setPanel({ view: "topup", data: null }); // Chuyển sang view nạp tiền
+
+        // Xóa param khỏi URL để tránh bị "kẹt" khi F5 hoặc điều hướng
+        searchParams.delete("action");
+        setSearchParams(searchParams, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
 
     const summary = useMemo(() => {
         const u = profileData;

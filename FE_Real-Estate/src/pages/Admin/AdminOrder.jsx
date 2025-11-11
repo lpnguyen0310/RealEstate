@@ -16,7 +16,7 @@ export default function AdminOrder() {
         rows, 
         total, loading, 
         selectedIds, 
-        filters: { q, status, method, sort },
+        filters: { q, status, method, sort, range },
         pagination: { page, pageSize },
         stats 
     } = useSelector(state => state.adminOrder); 
@@ -46,7 +46,7 @@ export default function AdminOrder() {
         return () => {
             clearTimeout(timer);
         };
-    }, [q, status, method, sort, page, pageSize, fetchData]); 
+    }, [q, status, method, sort, page, pageSize, range, fetchData]); 
 
     // a. Thay đổi Filter và Search
     const handleSetFilter = (newFilters) => {
@@ -129,6 +129,21 @@ export default function AdminOrder() {
 
     return (
         <Box sx={{ display: "grid", gap: 1}}>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6 px-1">
+                <select
+                    value={range || 'today'} // (Giữ nguyên hoặc thêm '|| today' cho an toàn)
+                    onChange={(e) => dispatch(setFilter({ range: e.target.value }))} // <-- SỬA DÒNG NÀY
+                    className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ring-inset transition"
+                >
+                    <option value="today">Hôm nay</option>
+                    <option value="last_7d">7 ngày qua</option>
+                    <option value="last_30d">30 ngày qua</option>
+                    <option value="this_month">Tháng này</option>
+                </select>
+            </div>
+
             {/* KPIs */}
             <StatCards stats={stats} />
 

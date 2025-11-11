@@ -8,11 +8,13 @@ import com.backend.be_realestate.enums.ListingType;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import jakarta.persistence.LockModeType;
+import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -136,6 +138,11 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
             @Param("status") PropertyStatus status,
             Pageable pageable
     );
+    @Modifying
+    @Transactional
+    @Query("UPDATE PropertyEntity p SET p.status = 'EXPIRED' " +
+            "WHERE p.status = 'PUBLISHED' AND p.expiresAt < :now")
+    int updateStatusForExpiredPosts(@Param("now") Timestamp now);
 }
 
 

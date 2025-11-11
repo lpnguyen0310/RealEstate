@@ -37,6 +37,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -458,6 +459,30 @@ public class PropertyServiceImpl implements IPropertyService {
                     List<Predicate> ors = new ArrayList<>();
                     if (dist != null) ors.add(cb2.like(cb2.lower(dist.get("name")), like));
                     if (city != null) ors.add(cb2.like(cb2.lower(city.get("name")), like));
+                    return ors.isEmpty() ? cb2.conjunction() : cb2.or(ors.toArray(new Predicate[0]));
+                });
+            }
+
+            String areaSlug = trim(filters.get("areaSlug")); // Tên param mới
+
+            if (areaSlug != null) {
+                final String slugToMatch = areaSlug.toLowerCase();
+
+                spec = spec.and((root, qy, cb2) -> {
+                    Join<PropertyEntity, DistrictEntity> dist = safeLeftJoin(root, "district");
+                    Join<PropertyEntity, CityEntity> city = safeLeftJoin(root, "city");
+
+                    List<Predicate> ors = new ArrayList<>();
+
+                    // So sánh chính xác với City Slug
+                    if (city != null) {
+                        ors.add(cb2.equal(cb2.lower(city.get("slug")), slugToMatch));
+                    }
+                    // So sánh chính xác với District Slug
+                    if (dist != null) {
+                        ors.add(cb2.equal(cb2.lower(dist.get("slug")), slugToMatch));
+                    }
+
                     return ors.isEmpty() ? cb2.conjunction() : cb2.or(ors.toArray(new Predicate[0]));
                 });
             }
@@ -996,5 +1021,23 @@ public class PropertyServiceImpl implements IPropertyService {
         return entities.stream()
                 .map(propertyMapper::toPropertyCardDTO) // Chuyển sang DTO
                 .toList();
+    }
+
+    @Scheduled(cron = "0 0 * * * ?") // Chạy vào đầu mỗi giờ (0 phút 0 giây)
+    @Transactional
+    public void handleExpiredListings() {
+        log.info("[ScheduledJob] Running job: Checking for expired listings...");
+
+        // Lấy thời gian hiện tại
+        Timestamp now = Timestamp.from(Instant.now());
+
+        // Gọi hàm repository bạn vừa tạo ở Bước 1
+        int count = propertyRepository.updateStatusForExpiredPosts(now);
+
+        if (count > 0) {
+            log.info("[ScheduledJob] Updated {} listings from PUBLISHED to EXPIRED.", count);
+        } else {
+            log.info("[ScheduledJob] No expired listings found to update.");
+        }
     }
 }
