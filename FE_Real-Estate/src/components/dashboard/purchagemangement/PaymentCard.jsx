@@ -48,6 +48,27 @@ const comboSummary = (items = [], multiplier = 1) => {
         .sort(([a], [b]) => (order[a] ?? 9) - (order[b] ?? 9))
         .map(([type, total]) => `${total} tin ${typeLabel(type).replace(/^Tin\s+/i, "")}`)
         .join(", ");
+
+// summary an toàn: chạy với Mô hình 2
+const comboSummary = (items = []) => {
+    if (!Array.isArray(items) || items.length === 0) return "";
+    
+    // Logic mới: Đếm số lượng của từng 'code' (VIP_1, PRM_1...)
+    const counts = {};
+    items.forEach(it => {
+        // it.childPackage = { id: 20, code: "VIP_1", name: "Tin VIP", listingType: "VIP" }
+        const child = it?.childPackage; 
+        if (child && it.quantity > 0) {
+            // Ưu tiên Tên ("Tin VIP")
+            const label = child.name || typeLabel(child.listingType) || child.code; 
+            counts[label] = (counts[label] || 0) + it.quantity;
+        }
+    });
+
+    // Chuyển { "Tin VIP": 5, "Tin Premium": 3 } thành "5 tin vip, 3 tin premium"
+    return Object.entries(counts)
+        .map(([label, qty]) => `${qty} ${label.toLowerCase()}`)
+        .join(", ");
 };
 const Chevron = ({ open }) => (
     <svg width="18" height="18" viewBox="0 0 24 24" className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden>

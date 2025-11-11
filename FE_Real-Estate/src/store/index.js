@@ -17,6 +17,7 @@ import { notificationApi } from "@/services/notificationApi";
 import {reportApi} from "@/services/reportApiSlice";
 import { listenerMiddleware } from "./listenerMiddleware";
 import { adminListingPackageApiSlice } from "@/services/adminListingPackageApiSlice";
+import { trackingApi } from "@/services/trackingApi";
 
 export const store = configureStore({
   reducer: {
@@ -38,6 +39,7 @@ export const store = configureStore({
     [notificationApi.reducerPath]: notificationApi.reducer,
     [reportApi.reducerPath]: reportApi.reducer,
     [adminListingPackageApiSlice.reducerPath]: adminListingPackageApiSlice.reducer,
+    [trackingApi.reducerPath]: trackingApi.reducer,
   },
 
   middleware: (getDefaultMiddleware) =>
@@ -45,5 +47,6 @@ export const store = configureStore({
       .concat(notificationApi.middleware)
       .concat(reportApi.middleware)
       .concat(adminListingPackageApiSlice.middleware)
+      .concat(trackingApi.middleware)
       .prepend(listenerMiddleware.middleware),
 });

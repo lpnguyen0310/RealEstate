@@ -146,13 +146,11 @@ export const fetchCountsThunk = createAsyncThunk(
     "adminPosts/fetchCounts",
     async (_, { getState, rejectWithValue }) => {
         if (!hasCountsApi) return {};
-        const s = getState().adminPosts;
+        // const s = getState().adminPosts; // <-- KHÔNG LẤY STATE NỮA
+
         try {
-            const res = await adminPropertyApi.counts({
-                q: s.q || undefined,
-                categoryId: s.category || undefined,
-                listingType: s.listingType || undefined,
-            });
+            // Gọi API mà KHÔNG có bất kỳ tham số filter nào
+            const res = await adminPropertyApi.counts({}); 
             return res || {};
         } catch (e) {
             return rejectWithValue(e?.response?.data?.message || "Load counts thất bại");

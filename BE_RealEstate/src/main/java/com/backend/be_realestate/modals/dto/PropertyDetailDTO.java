@@ -16,6 +16,8 @@ public class PropertyDetailDTO {
     private List<MapMetaDTO> mapMeta;
     private AgentDetailDTO agent;
     private Long viewCount;
+    private Long interactionCount; // (Tổng: Lưu + Zalo + Share)
+    private Long potentialCustomerCount; // (Tổng: Xem SĐT + Form)
 }
 
 

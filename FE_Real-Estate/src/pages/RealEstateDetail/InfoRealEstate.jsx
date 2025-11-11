@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { Button, Tag, message } from "antd";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -10,6 +10,22 @@ import "swiper/css/free-mode";
 import "swiper/css/thumbs";
 import Viewer from "viewerjs";
 import "viewerjs/dist/viewer.min.css";
+import {
+  useTrackZaloClickMutation,
+  useTrackShareClickMutation,
+  useTrackViewPhoneMutation,
+} from "@/services/trackingApi";
+
+import { useDispatch, useSelector } from "react-redux";
+import { 
+    fetchPropertyByIdThunk, 
+    clearCurrentProperty // Dùng để dọn dẹp state khi component unmount
+} from "@/store/propertySlice";
+import { 
+    toggleFavorite,       
+    makeSelectIsSaved 
+} from "@/store/favoriteSlice";
+
 
 import CommentsSection from "@/components/detailPost/CommentsSection";
 import ReportModal from "@/components/detailPost/modals/ReportModal";
@@ -24,7 +40,7 @@ import {
     DEFAULT_AGENT,
 } from "@/data/properties";
 
-import axios from "axios";
+import api from "@/api/axios";
 
 import SimilarNews from "../../components/cards/SimilarNews";
 
@@ -84,16 +100,29 @@ export default function InfoRealEstate() {
     // KHAI BÁO TẤT CẢ HOOKS Ở ĐẦU COMPONENT
     // ==========================================================
     const { id } = useParams();
+    const dispatch = useDispatch(); // <-- THÊM MỚI
+    // 1. Chuyển ID (string) từ URL thành số
+    const numericId = useMemo(() => Number(id), [id]);
 
-    // State cho dữ liệu
-    const [property, setProperty] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    // 2. Tạo selector được memoized (tránh re-render không cần thiết)
+    const selectIsSaved = useMemo(() => makeSelectIsSaved(numericId), [numericId]);
+    
+    // 3. Lấy state 'liked' từ Redux store
+    const liked = useSelector(selectIsSaved);
 
+    // Lấy state từ Redux thay vì useState
+    const { property, loading, error } = useSelector((state) => ({
+        property: state.property.currentProperty,
+        loading: state.property.loadingDetail,
+        error: state.property.errorDetail,
+    }));
+
+    const [trackZaloClick] = useTrackZaloClickMutation();
+    const [trackShareClick] = useTrackShareClickMutation();
+    const [trackViewPhone] = useTrackViewPhoneMutation();
     // State cho UI
     const [activeIndex, setActiveIndex] = useState(0);
     const [thumbsSwiper, setThumbsSwiper] = useState(null);
-    const [liked, setLiked] = useState(false);
     const [showPhone, setShowPhone] = useState(false);
     const [isReportModalVisible, setIsReportModalVisible] = useState(false);
 
@@ -103,6 +132,7 @@ export default function InfoRealEstate() {
     const prevRef = useRef(null);
     const nextRef = useRef(null);
     const mainSwiperRef = useRef(null);
+    const phoneTrackedRef = useRef(false);
 
     // ==========================================================
     // TẤT CẢ USEEFFECT NẰM TIẾP THEO
@@ -164,6 +194,18 @@ export default function InfoRealEstate() {
 
         fetchPropertyDetail();
     }, [id]);
+        if (id) {
+            dispatch(fetchPropertyByIdThunk(id));
+        }
+
+        // Cleanup: Rất quan trọng
+        // Khi component bị hủy (ví dụ: chuyển trang),
+        // nó sẽ xóa data của tin đăng cũ khỏi store.
+        // Tránh bị "nháy" dữ liệu cũ khi xem tin mới.
+        return () => {
+            dispatch(clearCurrentProperty());
+        };
+    }, [id, dispatch]);
 
 
     useEffect(() => {
@@ -224,7 +266,24 @@ export default function InfoRealEstate() {
 
     const openViewerAt = (i) => viewerRef.current?.view(i ?? activeIndex);
 
+    const handleShowPhone = () => {
+        setShowPhone(true); 
+
+        // THÊM LOG NÀY ĐỂ DEBUG
+        console.log("Đã click Hiện số. ID:", id); 
+
+        if (!phoneTrackedRef.current && id) {
+            console.log("ĐANG GỌI API TRACKING..."); // <-- THÊM LOG NÀY
+            trackViewPhone(id);
+            phoneTrackedRef.current = true;
+        } else {
+            // THÊM LOG NÀY
+            console.log("Bỏ qua gọi API (Đã gọi rồi hoặc không có ID)");
+        }
+    };
+
     const onShare = async () => {
+        trackShareClick(id);
         const url = window.location.href;
         try {
             if (navigator.share) await navigator.share({ title: document.title || "BĐS", url });
@@ -238,9 +297,49 @@ export default function InfoRealEstate() {
     };
 
     const onLike = () => {
-        setLiked((v) => !v);
-        message.success(!liked ? "Đã thêm vào yêu thích" : "Đã bỏ khỏi yêu thích");
-    };
+        // Guard: Không cho nhấn "Thích" nếu chưa có dữ liệu
+        if (!id || !property) return;
+
+        // 1. Map dữ liệu từ 'property' (Detail DTO) sang
+        //    payload (Card DTO) mà 'favoriteSlice' cần
+        //    để thêm vào danh sách ngay lập tức.
+        
+        // Helper để tìm giá trị trong 'features'
+        const getFeature = (key) => property.features?.left?.find(f => f.label === key)?.value || 
+                                   property.features?.right?.find(f => f.label === key)?.value;
+        
+        // Helper parse số từ string (ví dụ: "100.0 m²" -> 100.0)
+        const parseNum = (str) => parseFloat(String(str).replace(/[^0-9.-]+/g, ""));
+
+        const favoritePayload = {
+            id: numericId,
+            title: property.postInfo?.title,
+            imageUrls: property.gallery,
+            thumb: property.gallery?.[0],
+            image: property.gallery?.[0],
+            priceDisplay: property.postInfo?.stats?.priceText,
+            displayAddress: property.postInfo?.address,
+            pricePerM2: property.postInfo?.stats?.pricePerM2,
+            area: parseNum(property.postInfo?.stats?.areaText),
+            bed: parseNum(getFeature("Phòng ngủ")),
+            bath: parseNum(getFeature("Phòng tắm")),
+            photos: property.gallery?.length || 0,
+            // listingType: ... (Thêm nếu bạn có)
+        };
+
+        // 2. Dispatch thunk
+        dispatch(toggleFavorite({ 
+            id: numericId, 
+            payload: favoritePayload 
+        }));
+
+        // 3. Hiển thị thông báo (không cần gọi setLiked)
+        if (liked) {
+            message.info("Đã bỏ khỏi yêu thích");
+        } else {
+            message.success("Đã thêm vào yêu thích");
+        }
+    };
 
     return (
         <div className="min-h-screen w-full bg-white">
@@ -367,7 +466,13 @@ export default function InfoRealEstate() {
                                 </div>
 
                                 <div className="mt-4 grid gap-2">
-                                    <Button type="default" icon={<ChatIcon />} size="large" className="w-full">
+                                    <Button 
+                                        type="default" 
+                                        icon={<ChatIcon />} 
+                                        size="large" 
+                                        className="w-full"
+                                        onClick={() => trackZaloClick(id)} // <-- THÊM DÒNG NÀY
+                                    >
                                         Chat qua Zalo
                                     </Button>
                                     <Button
@@ -375,7 +480,7 @@ export default function InfoRealEstate() {
                                         icon={<PhoneIcon />}
                                         size="large"
                                         className="w-full"
-                                        onClick={() => setShowPhone((s) => !s)}
+                                        onClick={handleShowPhone}
                                     >
                                         {showPhone ? agent.phoneFull : `${agent.phoneMasked} · Hiện số`}
                                     </Button>
@@ -426,15 +531,33 @@ export default function InfoRealEstate() {
 
                     {/* Hàng action nhỏ (share / save / report) */}
                     <div className="mt-3 flex items-center gap-3 text-gray-500">
-                        <button className="hover:text-gray-700 inline-flex items-center gap-1">
+                        <button className="hover:text-gray-700 inline-flex items-center gap-1" onClick={onShare}>
                             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M18 16a3 3 0 00-2.24 1.02L8.91 13.7a3.06 3.06 0 000-3.4l6.85-3.33A3 3 0 1015 5a3 3 0 00.09.72L8.24 9.05a3 3 0 100 5.9l6.85 3.33A3 3 0 1018 16z" /></svg>
                             Chia sẻ
                         </button>
-                        <button className="hover:text-gray-700 inline-flex items-center gap-1">
-                            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <button
+                            // THAY ĐỔI 1: Thêm class động để đổi màu chữ khi "liked"
+                            className={[
+                                "inline-flex items-center gap-1",
+                                liked
+                                    ? "text-blue-600 font-semibold hover:text-blue-700" // Màu khi đã thích
+                                    : "text-gray-500 hover:text-gray-700"           // Màu mặc định
+                            ].join(" ")}
+                            onClick={onLike}
+                        >
+                            {/* THAY ĐỔI 2: Thêm "fill" động cho SVG */}
+                            <svg 
+                                viewBox="0 0 24 24" 
+                                className="w-5 h-5" 
+                                fill={liked ? "currentColor" : "none"} // <== SỬA Ở ĐÂY
+                                stroke="currentColor" 
+                                strokeWidth="1.8"
+                            >
                                 <path d="M12.1 21.35l-1.1-1.02C5.14 14.88 2 12.05 2 8.5 2 6 4 4 6.5 4c1.54 0 3.04.74 3.96 1.9A5.28 5.28 0 0114.5 4C17 4 19 6 19 8.5c0 3.55-3.14 6.38-8.9 11.83l-1.1 1.02z" />
                             </svg>
-                            Lưu tin
+                            
+                            {/* THAY ĐỔI 3: Thêm "text" động */}
+                            {liked ? "Đã lưu" : "Lưu tin"} 
                         </button>
                         <button
                             className="hover:text-gray-700 inline-flex items-center gap-1"
@@ -483,34 +606,35 @@ export default function InfoRealEstate() {
                     <div className="mt-6">
                         <h2 className="text-lg font-semibold text-gray-900">Thông tin mô tả</h2>
                         <div className="mt-3 space-y-3 text-gray-800 leading-relaxed">
-                            <p className="uppercase font-medium">{description.headline}</p>
+                            <p className="uppercase font-medium">{description?.headline}</p>
 
                             <ul className="list-disc pl-5 space-y-1">
-                                {description.bullets.map((b) => (
+                                {description?.bullets.map((b) => (
                                     <li key={b}>{b}</li>
                                 ))}
                             </ul>
 
                             <div className="space-y-1">
-                                <div className="font-semibold text-gray-900">{description.nearbyTitle}</div>
-                                {description.nearby.map((n) => (
+                                <div className="font-semibold text-gray-900">{description?.nearbyTitle}</div>
+                                {description?.nearby.map((n) => (
                                     <p key={n}>{n}</p>
                                 ))}
                             </div>
 
                             <div className="space-y-2">
-                                <p><b>{description.priceLine}</b></p>
-                                <p>{description.suggest}</p>
+                                <p><b>{description?.priceLine}</b></p>
+                                <p>{description?.suggest}</p>
                                 <div className="flex items-center gap-2">
                                     <span className="text-gray-600">Lh.</span>
                                     <span className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-700 text-sm">
                                         {agent.phoneMasked}
                                     </span>
                                     <button
-                                        onClick={() => window.alert(`Hiện số: ${agent.phoneFull}`)}
+                                        onClick={handleShowPhone} // <-- SỬA DÒNG NÀY
                                         className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
                                     >
-                                        Hiện số
+                                        {/* Cập nhật cả text để đồng bộ */}
+                                        {showPhone ? agent.phoneFull : "Hiện số"} 
                                     </button>
                                 </div>
                             </div>

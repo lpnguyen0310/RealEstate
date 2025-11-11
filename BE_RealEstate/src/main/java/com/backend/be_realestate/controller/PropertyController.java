@@ -10,9 +10,12 @@ import com.backend.be_realestate.modals.request.CreatePropertyRequest;
 import com.backend.be_realestate.modals.response.CreatePropertyResponse;
 import com.backend.be_realestate.modals.response.PageResponse;
 import com.backend.be_realestate.service.IPropertyService;
+import com.backend.be_realestate.service.IPropertyTrackingService;
 import com.backend.be_realestate.utils.SecurityUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -31,10 +34,12 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/properties")
 @RequiredArgsConstructor
+@Slf4j
 public class PropertyController {
 
     private final IPropertyService propertyService;
     private final SecurityUtils securityUtils;
+    private final IPropertyTrackingService trackingService;
 
     @GetMapping
     public ResponseEntity<Page<PropertyCardDTO>> searchProperties(
@@ -54,11 +59,31 @@ public class PropertyController {
     public ResponseEntity<PropertyDetailDTO> getPropertyById(
             Authentication auth,
             @PathVariable Long id,
-            @RequestParam(name = "preview", defaultValue = "false") boolean preview
+            @RequestParam(name = "preview", defaultValue = "false") boolean preview,
+            HttpServletRequest request
     ) {
         Long userId = securityUtils.currentUserId(auth); // null nếu chưa đăng nhập
+        if (!preview) { // Chỉ log view khi không phải là chế độ xem trước
+            try {
+                String ipAddress = getClientIp(request); // Lấy IP
+                String userAgent = request.getHeader("User-Agent");
+                trackingService.logView(id, userId, ipAddress, userAgent);
+            } catch (Exception e) {
+                // Quan trọng: Không để lỗi tracking làm hỏng API chính
+                log.error("Failed to log view for property {}: {}", id, e.getMessage());
+            }
+        }
         PropertyDetailDTO dto = propertyService.getPropertyDetailById(id, userId, preview);
         return ResponseEntity.ok(dto);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String remoteAddr = request.getHeader("X-FORWARDED-FOR");
+        if (remoteAddr == null || remoteAddr.isEmpty()) {
+            remoteAddr = request.getRemoteAddr();
+        }
+        // Lấy IP đầu tiên nếu có nhiều IP (X-FORWARDED-FOR)
+        return remoteAddr.split(",")[0].trim();
     }
 
     @GetMapping("/me")

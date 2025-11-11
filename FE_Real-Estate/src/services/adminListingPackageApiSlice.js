@@ -18,6 +18,7 @@ const fromBackendListingType = (pkg) => ({
   maxDays: pkg.durationDays,
   highlightFactor: pkg.boostFactor,
   isActive: pkg.isActive,
+  listingType: pkg.listingType,
   createdAt: pkg.createdAt,
 });
 

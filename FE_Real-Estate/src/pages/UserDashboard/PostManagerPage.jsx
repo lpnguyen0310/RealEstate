@@ -90,8 +90,8 @@ export default function PostManagerPage() {
         size: s.property.mySize,
         totalElements: s.property.myTotalElements,
         counts: s.property.counts,
-        pendingAction: s.property.pendingAction,
-        rawLoading: s.property.loading,
+        pendingAction: s.property.pendingAction, 
+        rawLoading: s.property.loading,        
     }));
 
     const [status, setStatus] = useState(searchParams.get("tab") || "active");
@@ -189,6 +189,17 @@ export default function PostManagerPage() {
         setSearchParams(params, { replace: false });
     };
 
+    const [delayedLoading, setDelayedLoading] = useState(false);
+    useEffect(() => {
+        if (rawLoading) {
+            setDelayedLoading(true);
+        } else {
+            const t = setTimeout(() => setDelayedLoading(false), 1200);
+            return () => clearTimeout(t);
+        }
+    }, [rawLoading]);
+
+    // 🆕 mở Drawer chi tiết từ card
     const handleOpenDetail = (id) => {
         if (!id) return;
         setEditingId(id);

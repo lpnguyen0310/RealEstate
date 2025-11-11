@@ -1,5 +1,5 @@
 // src/pages/UserDashboard/DashboardOverview.jsx
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -13,9 +13,12 @@ import {
   PostTypeSummary,
 } from "../../components/dashboard/dashboardoverview";
 
+import LeadDetailModal from "@/components/dashboard/dashboardoverview/LeadDetailModal";
+
 import {
   fetchMyPropertiesThunk,
   selectPostsReport,
+  selectPostStatsByType,
 } from "@/store/propertySlice";
 
 // Favorites (đọc trực tiếp từ favoriteSlice)
@@ -28,6 +31,9 @@ export default function DashboardOverview() {
   const nav = useNavigate();
   const dispatch = useDispatch();
   const { user: reduxUser } = useOutletContext();
+
+  const [isLeadModalVisible, setIsLeadModalVisible] = useState(false);
+  const [leadTypeToShow, setLeadTypeToShow] = useState("sell"); 
 
   // Load "tin của tôi" cho dashboard
   useEffect(() => {
@@ -88,8 +94,9 @@ export default function DashboardOverview() {
   const report = useSelector(selectPostsReport);
 
   // Other blocks tạm
-  const sellSummary = { views: 0, interactions: 0, potential: 0 };
-  const rentSummary = { views: 0, interactions: 0, potential: 0 };
+  // const sellSummary = { views: 0, interactions: 0, potential: 0 };
+  // const rentSummary = { views: 0, interactions: 0, potential: 0 };
+  const { sellSummary, rentSummary } = useSelector(selectPostStatsByType);
 
   const notifications = [
     {
@@ -98,6 +105,11 @@ export default function DashboardOverview() {
       text: "Bạn đã cập nhật tất cả thông tin của ngày hôm nay 👏",
     },
   ];
+
+  const handleLeadsClick = (type) => {
+    setLeadTypeToShow(type);
+    setIsLeadModalVisible(true);
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -140,7 +152,7 @@ export default function DashboardOverview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
         <div className="lg:col-span-5">
-          <PostTypeSummary sell={sellSummary} rent={rentSummary} />
+          <PostTypeSummary sell={sellSummary} rent={rentSummary} onLeadsClick={handleLeadsClick}/>
         </div>
         <div className="lg:col-span-7">
           <PostsChartCard defaultMode="day" />
@@ -151,6 +163,11 @@ export default function DashboardOverview() {
         <h1 className="text-2xl font-semibold mb-2 sm:mb-3">Tổng quan</h1>
         <p className="text-sm sm:text-base">Xin chào! Đây là bảng điều khiển của bạn.</p>
       </div>
+      <LeadDetailModal
+        visible={isLeadModalVisible}
+        leadType={leadTypeToShow}
+        onClose={() => setIsLeadModalVisible(false)}
+      />
     </div>
   );
 }

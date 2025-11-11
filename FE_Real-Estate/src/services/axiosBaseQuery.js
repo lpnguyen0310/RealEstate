@@ -2,6 +2,7 @@
 export const axiosBaseQuery =
   ({ axiosInstance }) =>
   async ({ url, method, data, params, headers }) => {
+    console.log(">>> axiosBaseQuery ĐANG CHẠY VỚI:", { url, method });
     try {
       const result = await axiosInstance({
         url: url, // URL đã được axiosInstance cấu hình (baseURL)

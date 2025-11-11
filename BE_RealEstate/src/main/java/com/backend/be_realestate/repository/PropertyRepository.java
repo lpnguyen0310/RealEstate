@@ -3,6 +3,7 @@ package com.backend.be_realestate.repository;
 import com.backend.be_realestate.entity.CityEntity;
 import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.entity.UserInventoryEntity;
+import com.backend.be_realestate.enums.ActivityType;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import jakarta.persistence.LockModeType;
@@ -12,6 +13,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -83,6 +85,9 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
         WHERE (:pendingStatus IS NULL OR p.status = :pendingStatus)
         """, nativeQuery = true)
     long countPending(@Param("pendingStatus") String pendingStatus);
+
+    @Query("SELECT p.viewCount FROM PropertyEntity p WHERE p.id = :id")
+    Optional<Long> findViewCountById(@Param("id") Long id);
 
 
     interface PendingPropertyRow {

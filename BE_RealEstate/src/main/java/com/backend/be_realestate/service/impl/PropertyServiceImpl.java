@@ -20,6 +20,7 @@ import com.backend.be_realestate.modals.response.admin.PropertyKpiResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.repository.specification.PropertySpecification;
 import com.backend.be_realestate.service.IPropertyService;
+import com.backend.be_realestate.service.IPropertyTrackingService;
 import com.backend.be_realestate.utils.RecommendationSpec;
 import io.micrometer.common.lang.Nullable;
 import jakarta.persistence.EntityNotFoundException;
@@ -27,6 +28,7 @@ import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
@@ -72,6 +74,8 @@ public class PropertyServiceImpl implements IPropertyService {
 
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String TZ_OFFSET = "+07:00";
+    private final IPropertyTrackingService trackingService;
+    private final HttpServletRequest request;
 
     /* =========================================================
      * PUBLIC LIST / SEARCH (HOME)
@@ -135,14 +139,23 @@ public class PropertyServiceImpl implements IPropertyService {
         PropertyEntity entity = propertyRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
 
-        if (!preview) {
-            Long authorId = (entity.getUser() != null) ? entity.getUser().getUserId() : null;
-            if (currentUserId == null || !Objects.equals(currentUserId, authorId)) {
-                propertyRepository.bumpView(id);
-                entity.setViewCount((entity.getViewCount() == null ? 0 : entity.getViewCount()) + 1);
-            }
-        }
+//        if (!preview) {
+//            Long authorId = (entity.getUser() != null) ? entity.getUser().getUserId() : null;
+//            if (currentUserId == null || !Objects.equals(currentUserId, authorId)) {
+//                propertyRepository.bumpView(id);
+//                entity.setViewCount((entity.getViewCount() == null ? 0 : entity.getViewCount()) + 1);
+//            }
+//        }
         return propertyMapper.toPropertyDetailDTO(entity);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String remoteAddr = request.getHeader("X-FORWARDED-FOR");
+        if (remoteAddr == null || remoteAddr.isEmpty()) {
+            remoteAddr = request.getRemoteAddr();
+        }
+        // Lấy IP đầu tiên nếu có nhiều IP (X-FORWARDED-FOR)
+        return remoteAddr.split(",")[0].trim();
     }
 
     @Override

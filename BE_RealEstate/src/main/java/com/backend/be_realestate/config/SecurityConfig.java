@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/orders/**").permitAll()
                         .requestMatchers("/api/support/**").permitAll()
                         .requestMatchers("/api/locations/**").permitAll()
+                        .requestMatchers("/api/tracking/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // bật oauth2 login
