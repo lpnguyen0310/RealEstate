@@ -3,6 +3,8 @@ package com.backend.be_realestate.utils;
 import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.enums.PropertyType;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.Collection;
@@ -11,7 +13,6 @@ import java.util.List;
 public final class RecommendationSpec {
     private RecommendationSpec() {}
 
-    /* ===== GIỮ NGUYÊN ===== */
     public static Specification<PropertyEntity> statusPublished() {
         return (root, cq, cb) -> cb.equal(root.get("status"), PropertyStatus.PUBLISHED);
     }
@@ -52,7 +53,7 @@ public final class RecommendationSpec {
         return (root, cq, cb) -> cb.not(root.get("id").in(ids));
     }
 
-    /* ===== TUỲ CHỌN: biên trên EXCLUSIVE (< to) ===== */
+    // --- Exclusive (optional) ---
     public static Specification<PropertyEntity> priceBetweenExclusive(Double from, Double to) {
         if (from == null && to == null) return null;
         return (root, cq, cb) -> {
@@ -85,24 +86,35 @@ public final class RecommendationSpec {
         };
     }
 
-    /* ===== MỚI: OR-SAFE (chỉ cần 1 trong 2 đúng) ===== */
     public static Specification<PropertyEntity> orSafe(Specification<PropertyEntity> a,
                                                        Specification<PropertyEntity> b) {
         if (a == null) return b;
         if (b == null) return a;
-        return (root, cq, cb) -> cb.or(
-                a.toPredicate(root, cq, cb),
-                b.toPredicate(root, cq, cb)
-        );
+        return (root, cq, cb) -> cb.or(a.toPredicate(root, cq, cb), b.toPredicate(root, cq, cb));
     }
 
+    /** Dùng LEFT JOIN để không vô tình “inner join” loại bản ghi */
     public static Specification<PropertyEntity> inCityIds(Collection<Long> cityIds) {
         if (cityIds == null || cityIds.isEmpty()) return null;
-        return (root, cq, cb) -> root.get("city").get("id").in(cityIds);
+        return (root, cq, cb) -> {
+            Join<Object, Object> city = root.join("city", JoinType.LEFT);
+            return city.get("id").in(cityIds);
+        };
     }
 
     public static Specification<PropertyEntity> cityIdEquals(Long cityId) {
         if (cityId == null) return null;
-        return (root, cq, cb) -> cb.equal(root.get("city").get("id"), cityId);
+        return (root, cq, cb) -> {
+            Join<Object, Object> city = root.join("city", JoinType.LEFT);
+            return cb.equal(city.get("id"), cityId);
+        };
+    }
+
+    // (Tuỳ chọn) helper AND-safe
+    public static Specification<PropertyEntity> andSafe(Specification<PropertyEntity> a,
+                                                        Specification<PropertyEntity> b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return a.and(b);
     }
 }

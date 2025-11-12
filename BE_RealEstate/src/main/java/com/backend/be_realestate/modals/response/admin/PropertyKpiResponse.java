@@ -19,6 +19,7 @@ public class PropertyKpiResponse {
         private long total;           // tổng tin đăng trong kỳ (theo status lọc)
         private double compareToPrev; // tỷ lệ so kỳ trước (vd 0.153 = +15.3%)
         private long pending;         // số tin đang chờ duyệt (tuỳ status pending)
+        private long previousTotal;
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder

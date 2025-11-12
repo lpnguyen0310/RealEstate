@@ -164,9 +164,9 @@ export default function PostDetailDrawer({
                                 variant="outlined"
                                 size="small"
                                 startIcon={<OpenInNewIcon />}
-                                onClick={() => window.open(`/posts/${d.id}`, "_blank")}
+                                onClick={() => window.open(`/real-estate/${d.id}`, "_blank")}
                             >
-                                Mở trên FE
+                                Mở trên trình duyệt
                             </Button>
                         )}
                     </Stack>

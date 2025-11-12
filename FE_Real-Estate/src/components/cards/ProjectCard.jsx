@@ -2,7 +2,7 @@
 export default function ProjectCard({ project }) {
   return (
     <a
-      href={`/du-an/${project.id}`}
+      href={`/real-estate/${project.id}`}
       className="block group rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition"
     >
       {/* Chọn chiều cao cố định theo breakpoint để không bị “lùn” */}

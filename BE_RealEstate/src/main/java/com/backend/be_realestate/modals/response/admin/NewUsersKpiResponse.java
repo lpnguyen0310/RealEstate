@@ -18,6 +18,7 @@ public class NewUsersKpiResponse {
     public static class Summary {
         private long total;
         private double compareToPrev; // 0.153 = +15.3%
+        private long previousTotal;
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder

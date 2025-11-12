@@ -1,3 +1,4 @@
+// src/components/dashboard/postmanagement/PostCard.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Tag, Tooltip, Dropdown, Button, Space } from "antd";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -30,7 +31,7 @@ const STATUS_STYLE = {
   expiringSoon: { label: "Sắp Hết Hạn", cls: "bg-orange-50 border-orange-200 text-[#9a3412]" },
   rejected: { label: "Bị Từ Chối", cls: "bg-red-50    border-red-200    text-[#b42318]" },
   warned: { label: "Cần Chỉnh Sửa", cls: "bg-yellow-100 border-yellow-300 text-yellow-700" },
-  archived: { label: "Thành Công", cls: "bg-emerald-50 border-emerald-200 text-[#046c4e]" }
+  archived: { label: "Thành Công", cls: "bg-emerald-50 border-emerald-200 text-[#046c4e]" },
 };
 const getStatusStyle = (key) => STATUS_STYLE[key] ?? STATUS_STYLE.draft;
 
@@ -40,7 +41,8 @@ export default function PostCard({
   onOpenDetail = () => { },
   onConfirmSuccess = (id) => console.log("confirm success:", id),
   onHidePost = (id) => console.log("hide post:", id),
-  onUnhidePost = (id) => console.log("unhide post:", id), // 🆕
+  onUnhidePost = (id) => console.log("unhide post:", id),
+  onUnmarkSold = (id) => console.log("unmark sold:", id), // 🆕 Đăng lại
   onViewWarning = () => { },
   isHighlighted = false,
 }) {
@@ -107,14 +109,23 @@ export default function PostCard({
   const stop = (e) => e.stopPropagation();
 
   /* ====== menu 3 chấm (động theo trạng thái) ====== */
-  const isHidden = (post?.statusKey || "").toLowerCase() === "hidden";
-  const menuItems = [
-    { key: "confirm", label: "Xác nhận giao dịch thành công" },
-    { type: "divider" },
-    isHidden
-      ? { key: "unhide", label: "Hiện lại tin" }
-      : { key: "hide", danger: true, label: "Ẩn tin" },
-  ];
+  const stKey = (post?.statusKey || "").toLowerCase();
+  const isHidden = stKey === "hidden";
+  const isArchived = stKey === "archived";
+
+  const menuItems = isArchived
+    ? [
+      { key: "repost", label: "Đăng lại" },                 // thay cho confirm
+      { type: "divider" },
+      { key: "hide", danger: true, label: "Ẩn tin" },       // vẫn cho phép ẩn
+    ]
+    : [
+      { key: "confirm", label: "Xác nhận giao dịch thành công" },
+      { type: "divider" },
+      isHidden
+        ? { key: "unhide", label: "Hiện lại tin" }
+        : { key: "hide", danger: true, label: "Ẩn tin" },
+    ];
 
   /* ====== ConfirmDialog state ====== */
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -141,6 +152,26 @@ export default function PostCard({
 
   const onMenuClick = ({ key, domEvent }) => {
     domEvent?.stopPropagation?.();
+
+    if (key === "repost") {
+      openConfirm({
+        type: "repost",
+        title: "Đăng lại tin đã giao dịch?",
+        content: `Tin #${post.id} sẽ được chuyển về trạng thái hiển thị công khai.`,
+        onConfirm: async () => {
+          try {
+            setConfirmLoading(true);
+            setConfirmDisabled(true);
+            await Promise.resolve(onUnmarkSold(post.id)); // gọi UNMARK_SOLD
+            closeConfirm();
+          } catch (e) {
+            setConfirmLoading(false);
+            setConfirmDisabled(false);
+          }
+        },
+      });
+      return;
+    }
 
     if (key === "confirm") {
       openConfirm({
@@ -294,9 +325,9 @@ export default function PostCard({
               <div className="grid grid-cols-2 gap-y-3 text-[#506285]">
                 <div className="flex items-center gap-2"><span aria-hidden="true">🗂️</span><span>Tình trạng tin đăng</span></div>
                 {(() => {
-                  const stKey = post?.statusKey || "draft";
-                  const isWarned = stKey === "warned";
-                  const { label, cls } = getStatusStyle(stKey);
+                  const stKeyLocal = post?.statusKey || "draft";
+                  const isWarned = stKeyLocal === "warned";
+                  const { label, cls } = getStatusStyle(stKeyLocal);
 
                   if (isWarned) {
                     return (
@@ -414,7 +445,9 @@ export default function PostCard({
             ? "Ẩn tin"
             : confirmMeta.type === "unhide"
               ? "Hiện lại"
-              : "Xác nhận"
+              : confirmMeta.type === "repost"
+                ? "Đăng lại"
+                : "Xác nhận"
         }
         cancelText="Hủy"
         loading={confirmLoading}

@@ -1,5 +1,5 @@
 // src/components/menu/NotificationBell.jsx
-import React, { useState, useMemo, useRef } from "react"; // 1. Import thêm useRef
+import React, { useState, useMemo, useRef, useEffect } from "react"; // 1. Import thêm useRef
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { Badge, Dropdown, List, Spin, Typography, Tabs, Avatar } from "antd";
@@ -80,12 +80,20 @@ export default function NotificationBell() {
     pollingInterval: 300000,
   });
 
-  const { data: items = [], isLoading } = useGetNotificationsQuery(undefined, {
-    skip: !isAuthenticated || !isOpen,
-  });
+  const { data: items = [], isLoading, refetch } = useGetNotificationsQuery(undefined, {
+skip: !isAuthenticated || !isOpen,
+  });
 
   const [markAllAsRead] = useMarkAllAsReadMutation();
   const [markAsRead] = useMarkAsReadMutation();
+
+  useEffect(() => {
+// Khi dropdown được mở (isOpen = true)
+// và component đã render lại, hãy gọi refetch.
+if (isOpen) {
+  refetch();
+}
+  }, [isOpen, refetch]);
 
   // --- Memo ---
   const filteredItems = useMemo(() => {
@@ -116,7 +124,7 @@ export default function NotificationBell() {
   };
 
   const handleItemClick = (notification) => {
-    if (!notification.isRead) {
+    if (!notification.read) {
       markAsRead(notification.id);
     }
     
@@ -164,32 +172,50 @@ export default function NotificationBell() {
           renderItem={(item) => (
             <List.Item
               onClick={() => handleItemClick(item)}
-              className="py-3 cursor-pointer hover:bg-gray-50"
+              className={`
+                  py-3 cursor-pointer transition-colors duration-150
+                  ${!item.read ? "bg-blue-50 hover:bg-blue-100" : "hover:bg-gray-50"}
+              `}
               // Sửa lại padding bằng style
               style={{ paddingLeft: 24, paddingRight: 24 }} 
-              extra={!item.isRead && <Badge status="processing" />}
+              // extra={!item.read && <Badge status="processing" />}
             >
               <List.Item.Meta
                 avatar={
-                  <Avatar
-                    icon={getIconForType(item.type)}
-                    className="bg-gray-100"
-                  />
+                    <Avatar
+                        icon={getIconForType(item.type)}
+                        // Phân biệt nền avatar
+                        className={!item.read ? "bg-white" : "bg-gray-100"} 
+                    />
                 }
                 title={
-<Text 
-                    strong={!item.isRead} 
-                    className="!mb-0 whitespace-pre-line" // <<< THÊM CLASS NÀY
-                  >
-{item.message}
-</Text>
-}
-                description={
-                  <Text type="secondary" className="text-xs">
-                    <TimeAgo date={item.createdAt} />
-                  </Text>
+                    <Text
+                        // Bỏ 'strong', dùng class của Tailwind
+                        className={`
+                            !mb-0 whitespace-pre-line
+                            ${!item.read ? "font-semibold text-gray-900" : "font-normal text-gray-500"}
+                        `} // <-- THAY ĐỔI Ở ĐÂY
+                    >
+                        {item.message}
+                        {/* Thêm chấm xanh vào đây cho đẹp hơn */}
+                        {!item.read && (
+                            <span 
+                                className="inline-block w-2 h-2 bg-blue-500 rounded-full ml-2" 
+                                title="Chưa đọc"
+                            />
+                        )}
+                    </Text>
                 }
-              />
+                description={
+                    <Text 
+                        type="secondary" 
+                        // Phân biệt màu của thời gian
+                        className={`text-xs ${!item.read ? "!text-blue-600" : ""}`} // <-- THAY ĐỔI Ở ĐÂY
+                    >
+                        <TimeAgo date={item.createdAt} />
+                    </Text>
+                }
+            />
             </List.Item>
           )}
         />

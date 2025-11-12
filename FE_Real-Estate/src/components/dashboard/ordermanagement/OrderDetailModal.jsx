@@ -26,13 +26,7 @@ const formatCurrency = (amount) => {
 
 
 export default function OrderDetailModal({ open, onClose, order }) {
-  // ✨ 2. XÓA BỎ STATE VÀ useEffect ĐỂ GỌI API
-  // const [transactions, setTransactions] = useState([]);
-  // const [isLoadingTx, setIsLoadingTx] = useState(false);
-  // const [errorTx, setErrorTx] = useState(null);
-  // useEffect(...);
 
-  // ✨ 3. LẤY DANH SÁCH TẤT CẢ ĐƠN HÀNG TỪ REDUX
   const { myOrders } = useSelector((state) => state.orders);
 
   if (!order) return null;

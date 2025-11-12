@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
-import { Carousel } from "antd";
+import { Carousel, Spin, Alert } from "antd";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+
+import { fetchBannerListingsThunk } from "@/store/propertySlice"; // (Kiểm tra lại đường dẫn)
+import { EnvironmentOutlined, DollarCircleOutlined } from "@ant-design/icons";
 
 import FeatureTools from "../../components/button/FeatureTools";
 import FeaturedList from "../../components/cards/FeaturedList";
@@ -18,10 +22,81 @@ import bannerContact from "../../assets/home-section8-image-bg.png";
 import MetroModal from "../../components/search/MetroModal";
 import SearchCard from "../../components/search/SearchCard";
 
+const formatPrice = (price) => {
+  if (!price) return "Thỏa thuận";
+  if (price >= 1_000_000_000) {
+    return `${(price / 1_000_000_000).toFixed(1)} tỷ`;
+  }
+  if (price >= 1_000_000) {
+    return `${(price / 1_000_000).toFixed(0)} triệu`;
+  }
+  return new Intl.NumberFormat("vi-VN").format(price) + " đ";
+};
+
+function BannerSlide({ property }) {
+  const navigate = useNavigate();
+  if (!property) return null;
+
+  // Mapper 'mapPublicPropertyToCard' của bạn dùng 'image' (ảnh bìa)
+  const imageUrl =
+    property.image ||
+    "https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1600&auto=format&fit=crop";
+
+  return (
+    <div
+      className="w-full h-[220px] sm:h-[260px] lg:h-[300px] relative cursor-pointer group"
+      // Sửa lại đường dẫn chi tiết cho đúng (ví dụ)
+      onClick={() => navigate(`/real-estate/${property.id}`)}
+    >
+      {/* Ảnh nền */}
+      <img
+        className="w-full h-full object-cover"
+        src={imageUrl}
+        alt={property.title}
+      />
+      {/* Lớp phủ mờ + transition */}
+      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-all duration-300" />
+
+      {/* Nội dung text */}
+      <div className="absolute bottom-0 left-0 px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6 text-white w-full">
+        <h3 className="font-semibold text-lg leading-tight group-hover:underline truncate">
+          {property.title}
+        </h3>
+        <div className="flex items-center gap-4 mt-2 text-sm flex-nowrap">
+          <span className="flex items-center gap-1 flex-shrink-0">
+            <DollarCircleOutlined />
+            {property.price}
+          </span>
+          <span className="flex items-center gap-1 opacity-80 truncate min-w-0">
+            <EnvironmentOutlined />
+            {property.addressMain || "Đang cập nhật"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
     const [showMetro, setShowMetro] = useState(false);
     const [mapKey, setMapKey] = useState(0);
     const navigate = useNavigate();
+
+    const dispatch = useDispatch();
+    const {
+        bannerListings,
+        isLoading,
+        error,
+    } = useSelector((state) => ({
+        bannerListings: state.property.bannerListings,
+        isLoading: state.property.bannerListingsLoading,
+        error: state.property.bannerListingsError,
+    }));
+
+    // ⭐️ GỌI THUNK KHI COMPONENT MOUNT
+    useEffect(() => {
+        dispatch(fetchBannerListingsThunk());
+    }, [dispatch]);
 
     useEffect(() => {
         const handleOpen = () => setShowMetro(true);
@@ -68,17 +143,45 @@ export default function Home() {
                         </div>
                         <div className="w-full">
                             <div className="bg-white/5 rounded-2xl overflow-hidden shadow-xl">
-                                <Carousel autoplay dots className="h-[220px] sm:h-[260px] lg:h-[300px]">
-                                    {[1, 2, 3].map((i) => (
-                                        <div key={i} className="h-full">
-                                            <img
-                                                className="w-full h-full object-cover"
-                                                src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1600&auto=format&fit=crop"
-                                                alt={`banner-${i}`}
-                                            />
-                                        </div>
+                
+                                {/* ⭐️ SỬA LẠI LOGIC RENDER CAROUSEL */}
+                                {isLoading && (
+                                <div className="h-[220px] sm:h-[260px] lg:h-[300px] flex items-center justify-center">
+                                    <Spin />
+                                </div>
+                                )}
+                                {error && (
+                                <div className="h-[220px] sm:h-[260px] lg:h-[300px] flex items-center justify-center p-4">
+                                    <Alert message={error} type="error" />
+                                </div>
+                                )}
+
+                                {/* Khi load xong và có data */}
+                                {!isLoading && !error && bannerListings.length > 0 && (
+                                <Carousel
+                                    autoplay
+                                    dots
+                                    className="h-[220px] sm:h-[260px] lg:h-[300px]"
+                                >
+                                    {bannerListings.map((property) => (
+                                    <div key={property.id} className="h-full">
+                                        {/* Dùng component slide mới */}
+                                        <BannerSlide property={property} />
+                                    </div>
                                     ))}
                                 </Carousel>
+                                )}
+
+                                {/* Khi không load, không lỗi, nhưng không có tin nào (dùng ảnh default) */}
+                                {!isLoading && !error && bannerListings.length === 0 && (
+                                <div className="h-[220px] sm:h-[260px] lg:h-[300px]">
+                                    <img
+                                    className="w-full h-full object-cover"
+                                    src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1600&auto=format&fit=crop"
+                                    alt="banner-default"
+                                    />
+                                </div>
+                                )}
                             </div>
                         </div>
                     </div>

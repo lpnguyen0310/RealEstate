@@ -9,27 +9,27 @@ export const trackingApi = createApi({
   tagTypes: ['Leads'], // Giữ nguyên
   
   endpoints: (builder) => ({
-    trackZaloClick: builder.mutation({
+trackZaloClick: builder.mutation({
         // ... (code giữ nguyên)
         query: (propertyId) => ({
-        url: `/tracking/interaction/${propertyId}?type=ZALO_CLICK`,
-        method: "POST",
-      }),
-    }),
-    trackShareClick: builder.mutation({
+url: `/tracking/interaction/${propertyId}?type=ZALO_CLICK`,
+method: "POST",
+  }),
+}),
+trackShareClick: builder.mutation({
         // ... (code giữ nguyên)
         query: (propertyId) => ({
-        url: `/tracking/interaction/${propertyId}?type=SHARE`,
-        method: "POST",
-      }),
-    }),
-    trackViewPhone: builder.mutation({
+url: `/tracking/interaction/${propertyId}?type=SHARE`,
+method: "POST",
+  }),
+}),
+trackViewPhone: builder.mutation({
         // ... (code giữ nguyên)
         query: (propertyId) => ({
-        url: `/tracking/lead/view-phone/${propertyId}`,
-        method: "POST",
-      }),
-    }),
+url: `/tracking/lead/view-phone/${propertyId}`,
+method: "POST",
+  }),
+}),
 
     getMyLeads: builder.query({
       query: ({ type, page = 0, size = 10 }) => ({

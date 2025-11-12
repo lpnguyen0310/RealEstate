@@ -35,6 +35,7 @@ export default function PostList({
     onConfirmSuccess = () => { },
     onHidePost = () => { },
     onUnhidePost = () => { },
+    onUnmarkSold = () => { },
 }) {
     const showEmpty = !loading && items.length === 0;
     const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -56,6 +57,7 @@ export default function PostList({
                             onConfirmSuccess={onConfirmSuccess}
                             onHidePost={() => onHidePost?.(p.id)}
                             onUnhidePost={() => onUnhidePost?.(p.id)}
+                            onUnmarkSold={() => onUnmarkSold?.(p.id)}
                         />
                     ))}
 

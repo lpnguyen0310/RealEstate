@@ -356,6 +356,7 @@ export default function PostManagerPage() {
                         onConfirmSuccess={(id) => handleAction(id, "MARK_SOLD")}
                         onHidePost={(id) => handleAction(id, "HIDE")}
                         onUnhidePost={(id) => handleAction(id, "UNHIDE")}
+                        onUnmarkSold={(id) => handleAction(id, "UNMARK_SOLD")}
                     />
                 </div>
             </div>

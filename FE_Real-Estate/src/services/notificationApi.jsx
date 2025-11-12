@@ -47,7 +47,10 @@ export const notificationApi = createApi({
         url: '', // Sẽ gọi GET /api/notifications
         method: 'GET',
       }),
-      providesTags: ['Notifications'], // Đánh dấu: "Data này tên là Notifications"
+      providesTags: (result = []) => [
+...result.map(({ id }) => ({ type: 'Notifications', id })),
+{ type: 'Notifications', id: 'LIST' },
+  ],
     }),
 
     // 2. Query: Lấy số lượng chưa đọc
@@ -67,7 +70,10 @@ export const notificationApi = createApi({
       }),
       // ⭐️ Tự động refresh:
       // "Khi chạy xong, làm mới (refresh) data của 2 tag này"
-      invalidatesTags: ['Notifications', 'UnreadCount'],
+      invalidatesTags: (result, error, id) => [
+{ type: 'Notifications', id },
+'UnreadCount',
+  ],
     }),
 
     // 4. Mutation: Đánh dấu tất cả đã đọc
@@ -78,7 +84,10 @@ export const notificationApi = createApi({
       }),
       // ⭐️ Tự động refresh:
       // "Khi chạy xong, làm mới (refresh) data của 2 tag này"
-      invalidatesTags: ['Notifications', 'UnreadCount'],
+      invalidatesTags: [
+{ type: 'Notifications', id: 'LIST' },
+'UnreadCount',
+  ],
     }),
   }),
 });

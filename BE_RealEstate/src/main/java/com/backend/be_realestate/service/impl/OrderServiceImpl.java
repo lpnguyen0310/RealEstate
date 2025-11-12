@@ -337,6 +337,8 @@ public class OrderServiceImpl implements OrderService {
                         .revenue(curRevenue)
                         .compareOrders(cmpOrders)
                         .compareRevenue(cmpRevenue)
+                        .previousOrders(prevOrders)
+                        .previousRevenue(prevRevenue)
                         .build())
                 .series(series)
                 .range(OrderKpiResponse.RangeDto.builder()

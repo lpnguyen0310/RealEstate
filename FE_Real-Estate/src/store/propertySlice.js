@@ -314,6 +314,26 @@ export const fetchMyPropertyCountsThunk = createAsyncThunk(
         }
     }
 );
+
+export const fetchBannerListingsThunk = createAsyncThunk(
+    "property/fetchBannerListings",
+    async (_, { rejectWithValue }) => {
+        try {
+            const res = await api.get("/properties/banner-listings");
+            const data = res?.data?.data ?? res?.data ?? [];
+            if (Array.isArray(data)) {
+                // Tái sử dụng mapper có sẵn của bạn cho card public
+                return data.map(mapPublicPropertyToCard);
+            }
+            return [];
+        } catch (e) {
+            return rejectWithValue(
+                e?.response?.data?.message || "Không thể tải tin nổi bật"
+            );
+        }
+    }
+);
+
 // Thực hiện hành động trên tin đăng (HIDE, UNHIDE, MARK_SOLD, UNMARK_SOLD)
 export const performPropertyActionThunk = createAsyncThunk(
     "property/performAction",
@@ -585,6 +605,10 @@ const initialState = {
     forYouError: null,
     forYouSource: null, // 'personalized' | 'vip_premium' | 'popular' | null
 
+    bannerListings: [],
+    bannerListingsLoading: false,
+    bannerListingsError: null,
+
     // Dashboard list của tôi
     myList: [],
     myPage: 0,
@@ -724,9 +748,7 @@ const propertySlice = createSlice({
             })
             .addCase(fetchMyPropertiesThunk.fulfilled, (s, a) => {
                 const d = a.payload || {};
-                s.myList = Array.isArray(d.content)
-                    ? d.content.map(mapDtoToPostCard)
-                    : [];
+                s.myList = Array.isArray(d.content) ? d.content.map(mapDtoToPostCard) : [];
                 s.myPage = d.page ?? d.number ?? 0;
                 s.mySize = d.size ?? s.mySize;
                 s.myTotalElements = d.totalElements ?? 0;
@@ -755,19 +777,13 @@ const propertySlice = createSlice({
                 const arr = pageData.content || [];
                 let mapped = Array.isArray(arr) ? arr.map(mapPublicPropertyToCard) : [];
 
-                // ForYou fallback → lọc NORMAL
-                if (
-                    (a.meta?.arg?.type === "forYou" || pageData._forYou) &&
-                    pageData._source === "vip_premium"
-                ) {
+                if ((a.meta?.arg?.type === "forYou" || pageData._forYou) &&
+                    pageData._source === "vip_premium") {
                     mapped = mapped.filter((x) =>
-                        ["PREMIUM", "VIP"].includes(
-                            String(x?.listingType || "").toUpperCase()
-                        )
+                        ["PREMIUM", "VIP"].includes(String(x?.listingType || "").toUpperCase())
                     );
                 }
 
-                // Ưu tiên PREMIUM/VIP
                 const sortOrder = { PREMIUM: 1, VIP: 2, NORMAL: 3 };
                 const sorted = mapped.sort((A, B) => {
                     const aT = (A.listingType || "").toUpperCase();
@@ -775,7 +791,6 @@ const propertySlice = createSlice({
                     return (sortOrder[aT] || 99) - (sortOrder[bT] || 99);
                 });
 
-                // Nhánh For You
                 if (a.meta?.arg?.type === "forYou" || pageData._forYou) {
                     s.forYouList = sorted;
                     s.forYouLoading = false;
@@ -783,12 +798,10 @@ const propertySlice = createSlice({
                     return;
                 }
 
-                // Nhánh public theo slot
                 const { slot } = a.meta?.arg || {};
                 const k = slotKey(slot);
 
                 if (k.list === "list") {
-                    // slot mặc định cho trang search: gán cả phân trang
                     s.list = sorted;
                     s.page = pageData.number ?? 0;
                     s.size = pageData.size ?? 20;
@@ -797,7 +810,6 @@ const propertySlice = createSlice({
                     s[k.loading] = false;
                     s[k.error] = null;
                 } else {
-                    // các slot khác (homeFeatured/similarNews): chỉ set list
                     s[k.list] = sorted;
                     s[k.loading] = false;
                     s[k.error] = null;
@@ -886,14 +898,30 @@ const propertySlice = createSlice({
                 s.creating = false;
                 s.createError = a.payload || "Cập nhật tin thất bại";
             })
-            .addCase(performPropertyActionThunk.pending, (s, a) => {
-                // có thể set cờ nếu cần, hoặc để trống
+
+            // ===== BANNER LISTINGS =====
+            .addCase(fetchBannerListingsThunk.pending, (s) => {
+                s.bannerListingsLoading = true;
+                s.bannerListingsError = null;
+            })
+            .addCase(fetchBannerListingsThunk.fulfilled, (s, a) => {
+                s.bannerListingsLoading = false;
+                s.bannerListings = a.payload;
+            })
+            .addCase(fetchBannerListingsThunk.rejected, (s, a) => {
+                s.bannerListingsLoading = false;
+                s.bannerListingsError = a.payload;
+            })
+
+            // ===== PERFORM ACTION (HIDE/UNHIDE/SOLD/UNSOLD) =====
+            .addCase(performPropertyActionThunk.pending, (s) => {
+                // optional: set cờ pending
             })
             .addCase(performPropertyActionThunk.fulfilled, (s, a) => {
                 const { id, newStatus } = a.payload || {};
                 if (!id || !newStatus) return;
                 const nextKey = statusEnumToKey(newStatus);
-                // Cập nhật item trong myList (dashboard)
+
                 const idx = s.myList.findIndex((x) => String(x.id) === String(id));
                 if (idx >= 0) {
                     const prevKey = s.myList[idx].statusKey || null;
@@ -909,21 +937,17 @@ const propertySlice = createSlice({
                     }
                 }
 
-                // Nếu bạn cũng muốn cập nhật list public (tuỳ use case)
                 const pIdx = s.list.findIndex((x) => String(x.id) === String(id));
                 if (pIdx >= 0) {
                     s.list[pIdx].statusTag = toStatusTag(newStatus);
-                    s.list[pIdx].statusKey = statusEnumToKey(newStatus);
                     s.list[pIdx].statusKey = nextKey;
                 }
-
-                // Có thể trigger refetch counts ngoài component, hoặc ở đây dispatch tiếp thunk counts
-                // (nếu muốn tự động) — chỉ gợi ý: dùng middleware hoặc dispatch ở component.
             })
-            .addCase(performPropertyActionThunk.rejected, (s, a) => {
-                // giữ nguyên state, error nếu muốn
+            .addCase(performPropertyActionThunk.rejected, (s) => {
+                // optional: giữ nguyên
             });
     },
+
 });
 
 /* ===================== SELECTORS ===================== */
