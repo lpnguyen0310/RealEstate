@@ -110,11 +110,31 @@ public final class RecommendationSpec {
         };
     }
 
-    // (Tuỳ chọn) helper AND-safe
+    // ===== Helpers AND-safe =====
+
+    /** AND an toàn cho 2 spec (giữ lại để tương thích cũ) */
     public static Specification<PropertyEntity> andSafe(Specification<PropertyEntity> a,
                                                         Specification<PropertyEntity> b) {
         if (a == null) return b;
         if (b == null) return a;
         return a.and(b);
+    }
+
+    /** AND an toàn cho nhiều spec cùng lúc (varargs) */
+    @SafeVarargs
+    public static Specification<PropertyEntity> andSafe(Specification<PropertyEntity>... specs) {
+        Specification<PropertyEntity> acc = null;
+        if (specs == null) return null;
+        for (Specification<PropertyEntity> s : specs) {
+            if (s == null) continue;
+            acc = (acc == null) ? s : acc.and(s);
+        }
+        return acc;
+    }
+
+    /** AND thêm điều kiện nếu condition != null */
+    public static Specification<PropertyEntity> andIf(Specification<PropertyEntity> base,
+                                                      Specification<PropertyEntity> condition) {
+        return andSafe(base, condition);
     }
 }

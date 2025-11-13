@@ -23,15 +23,26 @@ public class LocationServiceImpl implements ILocationService {
     public List<OptionDTO> getCities() {
         return cityRepo.findAll(Sort.by("name"))
                 .stream()
-                .map(c -> new OptionDTO(c.getId(), c.getName(), c.getSlug()))
+                .map(c -> new OptionDTO(
+                        c.getId(),
+                        c.getName(),
+                        c.getSlug(),
+                        c.getLat(),
+                        c.getLng()
+                ))
                 .toList();
     }
-
     @Override
     public List<OptionDTO> getDistricts(Long cityId) {
         return districtRepo.findByCity_IdOrderByNameAsc(cityId)
                 .stream()
-                .map(d -> new OptionDTO(d.getId(), d.getName(), d.getSlug()))
+                .map(d -> new OptionDTO(
+                        d.getId(),
+                        d.getName(),
+                        d.getSlug(),
+                        d.getLat(),
+                        d.getLng()
+                ))
                 .toList();
     }
 
@@ -39,7 +50,13 @@ public class LocationServiceImpl implements ILocationService {
     public List<OptionDTO> getWards(Long districtId) {
         return wardRepo.findByDistrict_IdOrderByNameAsc(districtId)
                 .stream()
-                .map(w -> new OptionDTO(w.getId(), w.getName(), w.getSlug()))
+                .map(w -> new OptionDTO(
+                        w.getId(),
+                        w.getName(),
+                        w.getSlug(),
+                        w.getLat(),
+                        w.getLng()
+                ))
                 .toList();
     }
 }

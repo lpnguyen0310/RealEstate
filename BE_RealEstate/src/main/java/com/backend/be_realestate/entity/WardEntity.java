@@ -24,6 +24,11 @@ public class WardEntity {
     @Column(name= "slug")
     private String slug;
 
+    @Column(name = "lat")
+    private Double lat;
+
+    @Column(name = "lng")
+    private Double lng;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "district_id", nullable = false)
     private DistrictEntity district;

@@ -2,6 +2,7 @@ package com.backend.be_realestate.service;
 
 import com.backend.be_realestate.enums.PropertyAction;
 import com.backend.be_realestate.enums.SubmitMode;
+import com.backend.be_realestate.modals.RecoResult;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.dto.PropertyDetailDTO; // Import DTO chi tiết
@@ -47,8 +48,12 @@ public interface IPropertyService {
 
     List<UserFavoriteDTO> getUsersWhoFavorited(Long propertyId, Long currentUserId);
 
-    List<PropertyCardDTO> getRecommendations(Long userId, int limit);
-
+    List<PropertyCardDTO> getRecommendations(Long userId, int limit, Long cityId);
+    RecoResult getRecommendations(
+            Long userId, int limit, Long anchorCityId, List<Long> nearCityIds,
+            Double minPriceIn, Double maxPriceIn,
+            Float  minAreaIn,  Float  maxAreaIn
+    );
     PropertyKpiResponse propertiesKpi(String range, String status, String pendingStatus);
     PageResponse<PendingPropertyDTO> findPending(String q, int page, int size);
 

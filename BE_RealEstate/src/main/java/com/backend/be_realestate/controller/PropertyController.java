@@ -2,6 +2,7 @@ package com.backend.be_realestate.controller;
 
 import com.backend.be_realestate.enums.PropertyAction;
 import com.backend.be_realestate.enums.SubmitMode;
+import com.backend.be_realestate.modals.RecoResult;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 
 import com.backend.be_realestate.modals.dto.PropertyDTO;
@@ -33,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/properties")
@@ -157,11 +159,32 @@ public class PropertyController {
 
 
     @GetMapping("/recommendations")
-    public ResponseEntity<List<PropertyCardDTO>> recommendations(
+    public ResponseEntity<?> recommendations(
             @RequestParam Long userId,
-            @RequestParam(defaultValue = "8") int limit
+            @RequestParam(defaultValue = "8") int limit,
+            @RequestParam(name = "cityId", required = false) Long anchorCityId,
+            @RequestParam(name = "nearCityIds", required = false) List<Long> nearCityIds,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) Float minArea,
+            @RequestParam(required = false) Float maxArea
     ) {
-        return ResponseEntity.ok(propertyService.getRecommendations(userId, limit));
+        // (Optional) làm sạch nearCityIds trùng lặp/chứa anchor:
+        if (nearCityIds != null) {
+            nearCityIds = nearCityIds.stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .filter(id -> !Objects.equals(id, anchorCityId))
+                    .toList();
+        }
+
+        RecoResult result = propertyService.getRecommendations(
+                userId, limit, anchorCityId, nearCityIds, minPrice, maxPrice, minArea, maxArea
+        );
+
+        return ResponseEntity.ok()
+                .header("x-reco-source", result.getSource() == null ? "" : result.getSource())
+                .body(result);
     }
     @GetMapping("/{id}/favorites")
     public ResponseEntity<List<UserFavoriteDTO>> getPropertyFavorites( // Sửa ResponseEntity<?>
