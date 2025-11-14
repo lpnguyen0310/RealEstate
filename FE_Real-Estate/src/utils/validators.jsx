@@ -132,6 +132,7 @@ export const countByStatus = (list = []) => {
     EXPIRED: 0,
     EXPIRING_SOON: 0,
     HIDDEN: 0,
+    ARCHIVED: 0,
   };
 
   list.forEach((p) => {

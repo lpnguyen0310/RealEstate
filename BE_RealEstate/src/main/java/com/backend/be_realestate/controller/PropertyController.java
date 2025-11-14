@@ -186,6 +186,7 @@ public class PropertyController {
                 .header("x-reco-source", result.getSource() == null ? "" : result.getSource())
                 .body(result);
     }
+
     @GetMapping("/{id}/favorites")
     public ResponseEntity<List<UserFavoriteDTO>> getPropertyFavorites( // Sửa ResponseEntity<?>
                                                                        @PathVariable Long id,

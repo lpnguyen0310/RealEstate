@@ -149,7 +149,6 @@ export const fetchCountsThunk = createAsyncThunk(
         // const s = getState().adminPosts; // <-- KHÔNG LẤY STATE NỮA
 
         try {
-            // Gọi API mà KHÔNG có bất kỳ tham số filter nào
             const res = await adminPropertyApi.counts({});
             return res ?? null;
         } catch (e) {

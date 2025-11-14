@@ -50,7 +50,7 @@ export const notificationApi = createApi({
       providesTags: (result = []) => [
 ...result.map(({ id }) => ({ type: 'Notifications', id })),
 { type: 'Notifications', id: 'LIST' },
-  ],
+],
     }),
 
     // 2. Query: Lấy số lượng chưa đọc
@@ -73,7 +73,7 @@ export const notificationApi = createApi({
       invalidatesTags: (result, error, id) => [
 { type: 'Notifications', id },
 'UnreadCount',
-  ],
+],
     }),
 
     // 4. Mutation: Đánh dấu tất cả đã đọc
@@ -87,7 +87,7 @@ export const notificationApi = createApi({
       invalidatesTags: [
 { type: 'Notifications', id: 'LIST' },
 'UnreadCount',
-  ],
+],
     }),
   }),
 });

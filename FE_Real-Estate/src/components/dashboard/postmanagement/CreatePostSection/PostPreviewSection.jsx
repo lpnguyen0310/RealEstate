@@ -10,7 +10,6 @@ import {
 import ImagePickerModal from "../ModalImage/ImagePickerModal";
 import { formatVND, priceText, makeUrl } from "@/utils/validators";
 
-
 const Ribbon = ({ text }) => (
     <div className="absolute left-2 top-2 z-10">
         <div className="px-2 py-1 rounded-md bg-[#ffb020] text-white text-[12px] font-semibold shadow">
@@ -22,8 +21,8 @@ const Ribbon = ({ text }) => (
 export default function PostPreviewSection({
     data,
     postType = "free",
-    editable = true,            // NEW: bật click-để-sửa
-    onImagesChange,             // NEW: (nextArr) => void
+    editable = true,
+    onImagesChange,
 }) {
     const {
         title,
@@ -36,24 +35,38 @@ export default function PostPreviewSection({
         position,
         bedrooms,
         bathrooms,
+        constructionImages = [], // ⭐ thêm để preview ảnh xây dựng
     } = data || {};
 
-    // objectURL cho File/Blob
+    // objectURL cho File/Blob trong mảng images chính
     const [blobUrls, setBlobUrls] = useState([]);
     useEffect(() => {
         const urls = [];
         images.forEach((it) => {
-            if (it instanceof File || it instanceof Blob) urls.push(URL.createObjectURL(it));
+            if (it instanceof File || it instanceof Blob) {
+                urls.push(URL.createObjectURL(it));
+            }
         });
         setBlobUrls(urls);
         return () => urls.forEach((u) => URL.revokeObjectURL(u));
     }, [images]);
 
+    // gộp ảnh chính + ảnh xây dựng để HIỂN THỊ
     const imgUrls = useMemo(() => {
-        const mapped = images.map(makeUrl);
+        // 1) ảnh chính (images)
+        const mappedMain = images.map(makeUrl);
         let bi = 0;
-        return mapped.map((u) => (u || blobUrls[bi++] || "")).filter(Boolean);
-    }, [images, blobUrls]);
+        const mainUrls = mappedMain
+            .map((u) => u || blobUrls[bi++] || "")
+            .filter(Boolean);
+
+        // 2) ảnh xây dựng (constructionImages) – thường là string URL
+        const consUrls = (constructionImages || [])
+            .map(makeUrl)
+            .filter(Boolean);
+
+        return [...mainUrls, ...consUrls];
+    }, [images, constructionImages, blobUrls]);
 
     const addrMain = displayAddress || suggestedAddress || "—";
 
@@ -64,7 +77,10 @@ export default function PostPreviewSection({
         return `(~${formatVND(Math.round(p / a))}/m²)`;
     }, [price, landArea]);
 
-    const ribbonText = postType === "premium" ? "Premium" : postType === "vip" ? "Vip" : null;
+    const ribbonText =
+        postType === "premium" ? "Premium" :
+            postType === "vip" ? "Vip" :
+                null;
 
     // ===== EDIT: open picker & move image to slot =====
     const [pickerOpen, setPickerOpen] = useState(false);
@@ -78,9 +94,18 @@ export default function PostPreviewSection({
 
     const moveImageToSlot = (pickedIndex) => {
         if (pickedIndex == null || !onImagesChange) return;
+
+        // Chỉ thao tác trên mảng images chính
         const next = images.slice();
-        const [picked] = next.splice(pickedIndex, 1); // lấy ra
-        next.splice(slotIndex, 0, picked);            // chèn vào vị trí slot
+        if (pickedIndex >= next.length) {
+            // Phòng hờ, thực tế sẽ không xảy ra
+            setPickerOpen(false);
+            return;
+        }
+
+        const [picked] = next.splice(pickedIndex, 1);
+        // Nếu slotIndex > length thì splice sẽ đẩy xuống cuối
+        next.splice(slotIndex, 0, picked);
         setPickerOpen(false);
         onImagesChange(next);
     };
@@ -92,23 +117,27 @@ export default function PostPreviewSection({
         onImagesChange(next);
     };
 
-    // ===== block ảnh =====
-    const Clickable = ({ idx, children }) => (
-        <button
-            type="button"
-            onClick={() => openPickerAt(idx)}
-            className={editable ? "relative group w-full" : "relative w-full"}
-            style={{ cursor: editable ? "pointer" : "default" }}
-        >
-            {children}
-            {editable && (
-                <div
-                    className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition
-                     bg-black/0 group-hover:bg-black/10"
-                />
-            )}
-        </button>
-    );
+    // Chỉ cho phép hover/click reorder trên ảnh thuộc images (index < images.length)
+    const Clickable = ({ idx, children }) => {
+        const canEdit = editable && idx < images.length;
+
+        return (
+            <button
+                type="button"
+                onClick={() => { if (canEdit) openPickerAt(idx); }}
+                className={canEdit ? "relative group w-full" : "relative w-full"}
+                style={{ cursor: canEdit ? "pointer" : "default" }}
+            >
+                {children}
+                {canEdit && (
+                    <div
+                        className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition
+                         bg-black/0 group-hover:bg-black/10"
+                    />
+                )}
+            </button>
+        );
+    };
 
     const BaseImageBlock = ({ ribbon, showThumbs }) => (
         <div>
@@ -130,7 +159,11 @@ export default function PostPreviewSection({
                         imgUrls[i] ? (
                             <Clickable key={i} idx={i}>
                                 <div className="rounded-lg overflow-hidden border border-[#e8eefc] bg-[#f5f7ff]">
-                                    <img src={imgUrls[i]} alt={`thumb-${i}`} className="w-full h-[70px] object-cover" />
+                                    <img
+                                        src={imgUrls[i]}
+                                        alt={`thumb-${i}`}
+                                        className="w-full h-[70px] object-cover"
+                                    />
                                 </div>
                             </Clickable>
                         ) : (
@@ -165,7 +198,12 @@ export default function PostPreviewSection({
                                 {i === 0 && ribbonText && <Ribbon text={ribbonText} />}
                                 {u ? (
                                     <Clickable idx={idx}>
-                                        <img src={u} alt={`p-${i}`} className="w-full" style={{ height: h, objectFit: "cover" }} />
+                                        <img
+                                            src={u}
+                                            alt={`p-${i}`}
+                                            className="w-full"
+                                            style={{ height: h, objectFit: "cover" }}
+                                        />
                                     </Clickable>
                                 ) : (
                                     <button
@@ -185,14 +223,19 @@ export default function PostPreviewSection({
     };
 
     const ImageBlock =
-        postType === "premium" ? PremiumImages : postType === "vip" ? VipImages : FreeImage;
+        postType === "premium" ? PremiumImages :
+            postType === "vip" ? VipImages :
+                FreeImage;
 
     return (
         <div className="space-y-3">
             <div className="text-[20px] font-semibold text-[#0f223a]">Xem trước tin đăng</div>
             <div className="h-[2px] w-full bg-[#0f223a]/80 mb-2" />
 
-            <Card bodyStyle={{ padding: 14 }} className="rounded-2xl border border-[#e3e9f5] bg-white shadow-sm">
+            <Card
+                bodyStyle={{ padding: 14 }}
+                className="rounded-2xl border border-[#e3e9f5] bg-white shadow-sm"
+            >
                 {postType === "premium" ? (
                     <div className="space-y-4">
                         <ImageBlock />
@@ -239,7 +282,7 @@ export default function PostPreviewSection({
                 <a href="#" className="text-[#1d74ff] underline">Chính sách</a> của nền tảng.
             </div>
 
-            {/* Modal chọn ảnh - NEW */}
+            {/* Modal chọn ảnh */}
             <ImagePickerModal
                 open={pickerOpen}
                 images={images}
@@ -270,7 +313,9 @@ function TitleAndContent({
 
             <div className="mt-1 text-[28px] font-bold text-[#1d74ff]">
                 {priceText(price)}{" "}
-                <span className="text-[12px] font-medium text-[#6b7a99] align-middle">{pricePerM2}</span>
+                <span className="text-[12px] font-medium text-[#6b7a99] align-middle">
+                    {pricePerM2}
+                </span>
             </div>
 
             <div className="mt-1 flex items-start gap-2 text-[14px] text-[#4b5d7d]">

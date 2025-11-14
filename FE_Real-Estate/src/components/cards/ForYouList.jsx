@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import { Button, Modal, Slider, message, Select, Spin, Grid, Alert } from "antd";
+import { Button, Modal, Slider, message, Select, Spin, Grid } from "antd";
 import { DownOutlined, UpOutlined, AimOutlined } from "@ant-design/icons";
 import PropertyCard from "./PropertyCard";
 import PropertyCardSkeleton from "./skeletion/PropertyCardSkeleton";
@@ -29,13 +29,21 @@ export default function ForYouList() {
   const [provinces, setProvinces] = useState([]);
   const [loadingProv, setLoadingProv] = useState(false);
 
-  // ⛳️ NEW: chọn nhiều thành phố
-  const [selectedCityIds, setSelectedCityIds] = useState([]);     // [id, id, ...]
+  // chọn nhiều thành phố
+  const [selectedCityIds, setSelectedCityIds] = useState([]); // [id, id, ...]
   const [selectedCityLabels, setSelectedCityLabels] = useState([]); // ["Hà Nội", "Đà Nẵng", ...]
 
-  // NEW: state cho khoảng giá & diện tích
+  // khoảng giá & diện tích
   const [priceRange, setPriceRange] = useState([1_000_000_000, 5_000_000_000]); // VND
   const [areaRange, setAreaRange] = useState([30, 120]); // m²
+
+  // modal thông báo khi fallback nearby
+  const [showNearbyModal, setShowNearbyModal] = useState(false);
+
+  // modal thông báo khi không có kết quả ngay cả sau khi fallback
+  const [showEmptyModal, setShowEmptyModal] = useState(false);
+  // cờ đánh dấu: user đã bấm "Xem gợi ý" ít nhất 1 lần (không tính auto-load)
+  const [hasSearched, setHasSearched] = useState(false);
 
   const screens = Grid.useBreakpoint();
   const modalWidth = 640;
@@ -43,6 +51,8 @@ export default function ForYouList() {
   useEffect(() => {
     setFetchedForUserId(null);
     setExpanded(false);
+    setHasSearched(false);
+    setShowEmptyModal(false);
   }, [userId]);
 
   // load session (để nhớ lựa chọn trước đó)
@@ -84,6 +94,20 @@ export default function ForYouList() {
   const effectiveList = forYouList || [];
   const effectiveHasData = Array.isArray(effectiveList) && effectiveList.length > 0;
 
+  // 🆕 Lấy danh sách tên khu vực từ kết quả nearby
+  const suggestedCityNames = useMemo(() => {
+    if (forYouSource !== "nearby" || !effectiveHasData) return [];
+    const names = effectiveList
+      .map((it) => {
+        // đổi lại field cho đúng với DTO của bạn
+        return it.cityName || it.city?.name || it.city || null;
+      })
+      .filter(Boolean);
+
+    // unique + giới hạn khoảng 5–6 tên cho gọn
+    return Array.from(new Set(names)).slice(0, 6);
+  }, [forYouSource, effectiveHasData, effectiveList]);
+
   const showSkeleton =
     forYouLocalLoading ||
     (forYouLoading && fetchedForUserId === userId) ||
@@ -93,6 +117,13 @@ export default function ForYouList() {
     () => (expanded ? effectiveList : effectiveList.slice(0, 8)),
     [expanded, effectiveList]
   );
+
+  // Khi BE trả source = nearby => mở modal thông báo
+  useEffect(() => {
+    if (forYouSource === "nearby" && effectiveHasData) {
+      setShowNearbyModal(true);
+    }
+  }, [forYouSource, effectiveHasData]);
 
   // Lần đầu: gọi personalized mặc định (chưa chọn city/price/area)
   useEffect(() => {
@@ -149,6 +180,8 @@ export default function ForYouList() {
 
     setShowModal(false);
     setForYouLocalLoading(true);
+    setHasSearched(true); // ✅ đánh dấu đã tìm theo sở thích
+    setShowEmptyModal(false); // reset mỗi lần tìm mới
     const start = performance.now();
 
     // anchor = thành phố đầu tiên; near = phần còn lại
@@ -198,6 +231,15 @@ export default function ForYouList() {
     }
   };
 
+  // ✅ Nếu đã tìm (hasSearched) + không loading + không có dữ liệu (kể cả sau fallback) → hiện modal "Rất tiếc..."
+  useEffect(() => {
+    if (!hasSearched) return;
+    if (forYouLoading || forYouLocalLoading) return;
+    if (!effectiveHasData) {
+      setShowEmptyModal(true);
+    }
+  }, [hasSearched, forYouLoading, forYouLocalLoading, effectiveHasData]);
+
   if (!userId) {
     return (
       <section className="mt-10 text-center text-gray-600">
@@ -220,16 +262,75 @@ export default function ForYouList() {
         )}
       </div>
 
-      {/* Nếu BE báo nguồn nearby */}
-      {forYouSource === "nearby" && (
-        <Alert
-          type="info"
-          showIcon
-          message="Không tìm được tin đúng khu vực; hiển thị các gợi ý từ khu vực lân cận."
-          className="mb-4"
-          style={{ borderRadius: 12 }}
-        />
-      )}
+      {/* Modal thông báo khi BE fallback sang khu vực lân cận */}
+      <Modal
+        open={showNearbyModal}
+        onCancel={() => setShowNearbyModal(false)}
+        centered
+        width={520}
+        footer={[
+          <Button
+            key="ok"
+            type="primary"
+            onClick={() => setShowNearbyModal(false)}
+            style={{ background: "#1f5fbf", borderRadius: 8, fontWeight: 600 }}
+          >
+            Tôi hiểu
+          </Button>,
+        ]}
+        title={
+          <div className="text-[17px] font-semibold text-[#1b2a57]">
+            Không tìm thấy tin đúng khu vực bạn chọn
+          </div>
+        }
+      >
+        <p className="text-[14px] text-gray-600 leading-relaxed mb-2">
+          Chúng tôi không tìm thấy bất động sản phù hợp với{" "}
+          <b>khu vực bạn đã chọn</b>. Để tránh để trống kết quả, hệ thống đang
+          đề xuất thêm các tin từ <b>khu vực lân cận</b>.
+        </p>
+
+        {suggestedCityNames.length > 0 && (
+          <p className="text-[13px] text-gray-600 leading-relaxed">
+            Hiện tại, các gợi ý đang đến từ:{" "}
+            <b>{suggestedCityNames.join(", ")}</b>.
+          </p>
+        )}
+      </Modal>
+
+      {/* 🆕 Modal khi không có kết quả ngay cả sau fallback */}
+      <Modal
+        open={showEmptyModal}
+        onCancel={() => setShowEmptyModal(false)}
+        centered
+        width={520}
+        footer={[
+          <Button key="ok" type="primary" onClick={() => setShowEmptyModal(false)}
+            style={{ background: "#1f5fbf", borderRadius: 8, fontWeight: 600 }}
+          >
+            Tôi hiểu
+          </Button>,
+        ]}
+        title={
+          <div className="text-[17px] font-semibold text-[#1b2a57]">
+            Rất tiếc, hiện tại chưa có bài đăng phù hợp
+          </div>
+        }
+      >
+        <p className="text-[14px] text-gray-600 leading-relaxed mb-2">
+          Rất tiếc, hiện tại chúng tôi chưa tìm thấy bất động sản nào phù hợp
+          với <b>tiêu chí bạn đã chọn</b>, kể cả khi đã thử mở rộng sang{" "}
+          <b>khu vực lân cận</b>.
+        </p>
+        <p className="text-[13px] text-gray-600 leading-relaxed">
+          Bạn có thể:
+        </p>
+        <ul className="list-disc list-inside text-[13px] text-gray-600 mt-1 space-y-1">
+          <li>Thử nới rộng khoảng giá hoặc diện tích.</li>
+          <li>Chọn thêm hoặc đổi sang khu vực khác.</li>
+          <li>Quay lại sau, vì mỗi ngày sẽ có thêm những bài đăng mới.</li>
+        </ul>
+      </Modal>
 
       {/* Intro block */}
       {!effectiveHasData && !forYouLoading && !forYouLocalLoading && (
@@ -249,7 +350,7 @@ export default function ForYouList() {
         </div>
       )}
 
-      {/* ===== MODAL ===== */}
+      {/* ===== MODAL CHỌN SỞ THÍCH ===== */}
       <Modal
         title={
           <div className="flex items-center gap-3">
@@ -311,7 +412,7 @@ export default function ForYouList() {
               value={selectedCityIds}
               onChange={(values, opts) => {
                 setSelectedCityIds(values);
-                const labels = Array.isArray(opts) ? opts.map(o => o?.label ?? "") : [];
+                const labels = Array.isArray(opts) ? opts.map((o) => o?.label ?? "") : [];
                 setSelectedCityLabels(labels);
               }}
               size="large"
