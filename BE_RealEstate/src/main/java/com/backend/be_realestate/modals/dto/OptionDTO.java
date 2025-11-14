@@ -11,4 +11,6 @@ public class OptionDTO {
     private Long id;
     private String name;
     private String slug;
+    private Double lat;
+    private Double lng;
 }

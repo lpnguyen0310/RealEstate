@@ -28,6 +28,11 @@ public class DistrictEntity {
     @JoinColumn(name = "city_id", nullable = false)
     private CityEntity city;
 
+    @Column(name = "lat")
+    private Double lat;
+
+    @Column(name = "lng")
+    private Double lng;
     @OneToMany(mappedBy = "district", fetch = FetchType.LAZY)
     @JsonIgnore
     private List<WardEntity> wards;

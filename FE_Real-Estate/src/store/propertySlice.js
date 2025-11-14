@@ -12,52 +12,59 @@ export const fetchPropertiesThunk = createAsyncThunk(
     async (params = {}, thunkApi) => {
         const { rejectWithValue, getState } = thunkApi;
         try {
-            // === Route: For You (recommendations) ===
             if (params?.type === "forYou") {
                 const state = getState();
                 const userId =
                     state?.auth?.user?.id ||
                     state?.auth?.user?.userId ||
                     params?.userId;
+
                 const limit = params?.limit ?? params?.size ?? 8;
 
-                // Chưa đăng nhập → không fallback (giữ behavior cũ)
+                // Lấy cityId & range từ params (nếu có)
+                const cityId =
+                    params?.cityId || state?.location?.selectedProvinceId || undefined;
+                const minPrice = params?.minPrice;
+                const maxPrice = params?.maxPrice;
+                const minArea = params?.minArea;
+                const maxArea = params?.maxArea;
+
+                // Cho phép FE truyền nearCityIds (khi bấm "Tìm tiếp lân cận")
+                const nearCityIds = params?.nearCityIds;
+
                 if (!userId)
                     return { content: [], _source: "popular", _forYou: true };
 
-                // 1) Personalized
-                const recoRes = await api.get("/properties/recommendations", {
-                    params: { userId, limit },
-                });
-                const recoArr = recoRes?.data?.data ?? recoRes?.data ?? [];
-                const recoSource =
-                    recoRes?.headers?.["x-reco-source"] || "personalized";
-
-                if (Array.isArray(recoArr) && recoArr.length > 0) {
-                    return {
-                        content: recoArr,
-                        _source: recoSource,
-                        _forYou: true,
-                    };
+                // ✅ Gộp params gọn gàng; BE xử lý personalized + nearby fallback + range
+                const query = { userId, limit };
+                if (cityId != null) query.cityId = cityId;
+                if (minPrice != null) query.minPrice = minPrice;
+                if (maxPrice != null) query.maxPrice = maxPrice;
+                if (minArea != null) query.minArea = minArea;
+                if (maxArea != null) query.maxArea = maxArea;
+                if (Array.isArray(nearCityIds) && nearCityIds.length > 0) {
+                    // axios mặc định serialize array dưới dạng nearCityIds[]=x
+                    // BE có thể đọc List<Long> nearCityIds
+                    query.nearCityIds = nearCityIds;
                 }
 
-                // 2) Fallback: lấy PREMIUM & VIP (PUBLISHED)
-                const fallbackParams = {
-                    page: 0,
-                    size: params?.limit ?? 24,
-                    status: "PUBLISHED",
-                    ensurePublished: true,
-                    // Nếu BE nhận mảng, đổi sang: listingType: ["PREMIUM","VIP"]
-                    listingType: "PREMIUM,VIP",
-                    sort: "postedAt,DESC",
-                };
-                const fbRes = await api.get("/properties", { params: fallbackParams });
-                const fb = fbRes?.data?.data ?? fbRes?.data;
-                const fbContent = fb?.content ?? (Array.isArray(fb) ? fb : []);
+                const recoRes = await api.get("/properties/recommendations", { params: query });
+
+                // Back-compat: BE cũ trả List; BE mới trả object {items, source, nearCityIds, anchorCityId}
+                const body = recoRes?.data;
+                const isArray = Array.isArray(body) || Array.isArray(body?.data);
+                const content = isArray ? (body?.data ?? body ?? []) : (body?.items ?? []);
+                const sourceFromHeader = recoRes?.headers?.["x-reco-source"];
+                const sourceFromBody = isArray ? undefined : body?.source;
+                const recoSource = sourceFromBody || sourceFromHeader || "personalized";
+                const nearIdsMeta = isArray ? [] : (body?.nearCityIds ?? []);
+                const anchorCityIdMeta = isArray ? undefined : (body?.anchorCityId ?? null);
 
                 return {
-                    content: Array.isArray(fbContent) ? fbContent : [],
-                    _source: "vip_premium",
+                    content,
+                    _source: recoSource,
+                    _nearCityIds: nearIdsMeta,
+                    _anchorCityId: anchorCityIdMeta,
                     _forYou: true,
                 };
             }
@@ -136,6 +143,7 @@ export const createPropertyThunk = createAsyncThunk(
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
             const isOwner = !!formData?.ownerAuth?.isOwner;
+
             // 3) Payload
             const payload = {
                 title: formData.title,
@@ -199,10 +207,9 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
                 size = 10,
                 sort = "postedAt,desc",
                 status,
-                ...restFilters // ← các filter khác như q, code, areaSlug, areaMin...
+                ...restFilters
             } = params;
 
-            // Lọc bỏ undefined/null/"" để URL gọn gàng
             const filters = Object.fromEntries(
                 Object.entries(restFilters).filter(
                     ([, v]) => v !== undefined && v !== null && v !== ""
@@ -217,9 +224,6 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
                 ...filters,
             };
 
-            // (tuỳ thích) log nhanh để kiểm chứng trên DevTools
-            // console.log("GET /properties/me", query);
-
             const res = await api.get("/properties/me", { params: query });
             return res.data;
         } catch (err) {
@@ -229,7 +233,6 @@ export const fetchMyPropertiesThunk = createAsyncThunk(
         }
     }
 );
-
 
 // Cập nhật tin đăng
 export const updatePropertyThunk = createAsyncThunk(
@@ -350,6 +353,7 @@ export const performPropertyActionThunk = createAsyncThunk(
         }
     }
 );
+
 /* ===================== DATE UTILS ===================== */
 
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -502,9 +506,9 @@ function mapDtoToPostCard(p) {
         views: p?.viewCount ?? 0,
         favoriteCount: p?.favoriteCount ?? 0,
 
-        propertyType: p?.propertyType, // <--- CẦN CHO VIỆC PHÂN LOẠI
-        interactionCount: p?.interactionCount ?? 0, // <--- CẦN CHO THỐNG KÊ
-        potentialCustomerCount: p?.potentialCustomerCount ?? 0, // <--- CẦN CHO THỐNG KÊ
+        propertyType: p?.propertyType,
+        interactionCount: p?.interactionCount ?? 0,
+        potentialCustomerCount: p?.potentialCustomerCount ?? 0,
 
         listingType: p?.listingType, // NORMAL | VIP | PREMIUM
 
@@ -546,8 +550,8 @@ function mapPublicPropertyToCard(p) {
         agent: p.agent,
         type: p.type,
         category: p.category,
-
-        // BE /recommendations có thể trả listingType (camelCase)
+        cityId: p.cityId ?? p.city_id ?? p.city?.id,
+        cityName: p.cityName ?? p.city_name ?? p.city?.name,
         listingType: p.listing_type || p.listingType,
     };
 }
@@ -572,7 +576,7 @@ const slotKey = (slot = "list") =>
         error: "similarNewsError",
     },
 
-    // Slot logic cho For You (để đồng nhất cách bật/tắt cờ)
+    // Slot logic cho For You
     forYou: {
         list: "forYouList",
         loading: "forYouLoading",
@@ -603,7 +607,9 @@ const initialState = {
     forYouList: [],
     forYouLoading: false,
     forYouError: null,
-    forYouSource: null, // 'personalized' | 'vip_premium' | 'popular' | null
+    forYouSource: null, // 'personalized' | 'nearby' | 'popular' | 'empty' | null
+    forYouNearCityIds: [],       // ⭐️ NEW
+    forYouAnchorCity: null,      // ⭐️ NEW
 
     bannerListings: [],
     bannerListingsLoading: false,
@@ -687,6 +693,8 @@ const propertySlice = createSlice({
             state.forYouLoading = false;
             state.forYouError = null;
             state.forYouSource = null;
+            state.forYouNearCityIds = [];
+            state.forYouAnchorCity = null;
 
             // Clear my list
             state.myList = [];
@@ -709,6 +717,8 @@ const propertySlice = createSlice({
             state.forYouLoading = false;
             state.forYouError = null;
             state.forYouSource = null;
+            state.forYouNearCityIds = [];
+            state.forYouAnchorCity = null;
         },
         clearHomeSlots(state) {
             state.homeFeaturedList = [];
@@ -777,13 +787,7 @@ const propertySlice = createSlice({
                 const arr = pageData.content || [];
                 let mapped = Array.isArray(arr) ? arr.map(mapPublicPropertyToCard) : [];
 
-                if ((a.meta?.arg?.type === "forYou" || pageData._forYou) &&
-                    pageData._source === "vip_premium") {
-                    mapped = mapped.filter((x) =>
-                        ["PREMIUM", "VIP"].includes(String(x?.listingType || "").toUpperCase())
-                    );
-                }
-
+                // Ưu tiên PREMIUM > VIP > NORMAL
                 const sortOrder = { PREMIUM: 1, VIP: 2, NORMAL: 3 };
                 const sorted = mapped.sort((A, B) => {
                     const aT = (A.listingType || "").toUpperCase();
@@ -794,7 +798,9 @@ const propertySlice = createSlice({
                 if (a.meta?.arg?.type === "forYou" || pageData._forYou) {
                     s.forYouList = sorted;
                     s.forYouLoading = false;
-                    if (pageData._source) s.forYouSource = pageData._source;
+                    if (pageData._source) s.forYouSource = pageData._source; // 'personalized' | 'nearby' | 'empty' | ...
+                    s.forYouNearCityIds = Array.isArray(pageData._nearCityIds) ? pageData._nearCityIds : [];
+                    s.forYouAnchorCity = pageData._anchorCityId ?? null;
                     return;
                 }
 
@@ -947,7 +953,6 @@ const propertySlice = createSlice({
                 // optional: giữ nguyên
             });
     },
-
 });
 
 /* ===================== SELECTORS ===================== */
@@ -994,25 +999,18 @@ export const selectPostsReport = createSelector(selectMyPosts, (posts) => {
 });
 
 export const selectPostStatsByType = createSelector(
-    // Input: Lấy state myList (đã được map)
     (state) => state.property.myList,
-
-    // Hàm tính toán
     (myList) => {
         const sellSummary = { views: 0, interactions: 0, potential: 0 };
         const rentSummary = { views: 0, interactions: 0, potential: 0 };
 
-        // Duyệt qua danh sách tin của bạn
         for (const post of myList) {
-            // Lấy các số liệu thống kê từ mỗi bài post
-            // (Đảm bảo 'mapDtoToPostCard' của bạn có các trường này)
             const stats = {
                 views: post.views ?? 0,
                 interactions: post.interactionCount ?? 0,
                 potential: post.potentialCustomerCount ?? 0,
             };
 
-            // Phân loại và cộng dồn
             if (post.propertyType === 'sell') {
                 sellSummary.views += stats.views;
                 sellSummary.interactions += stats.interactions;

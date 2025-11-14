@@ -1,8 +1,7 @@
-// src/components/ForYouList.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import { Button, Modal, Slider, message, Select, Spin, Grid } from "antd";
+import { Button, Modal, Slider, message, Select, Spin, Grid, Alert } from "antd";
 import { DownOutlined, UpOutlined, AimOutlined } from "@ant-design/icons";
 import PropertyCard from "./PropertyCard";
 import PropertyCardSkeleton from "./skeletion/PropertyCardSkeleton";
@@ -11,54 +10,11 @@ import { locationApi } from "@/api/locationApi";
 
 const MIN_SKELETON_MS = 2000;
 const SS_NS = "fy_interest_state";
-
-function normalizePublicItem(p = {}) {
-  const imgs = Array.isArray(p.images)
-    ? p.images
-    : Array.isArray(p.imageUrls)
-      ? p.imageUrls
-      : [];
-
-  const pricePerM2 =
-    p.pricePerM2 != null
-      ? p.pricePerM2
-      : p.price != null && p.area > 0
-        ? p.price / p.area
-        : null;
-
-  const listingTypeRaw = p.listing_type ?? p.listingType ?? p.listingtype;
-  const listingType =
-    typeof listingTypeRaw === "string" ? listingTypeRaw.toUpperCase() : listingTypeRaw;
-
-  return {
-    id: p.id,
-    images: imgs,
-    image: p.image,
-    title: p.title,
-    description: p.description,
-    price: p.price,
-    pricePerM2,
-    postedAt: p.postedAt,
-    photos: p.photos,
-    addressMain:
-      p.addressMain || p.addressFull || p.addressShort || p.displayAddress || p.address || "",
-    addressShort: p.addressShort || "",
-    addressFull: p.addressFull || "",
-    area: p.area,
-    bed: p.bed ?? p.bedrooms,
-    bath: p.bath ?? p.bathrooms,
-    agent: p.agent,
-    type: p.type,
-    category: p.category,
-    listingType,
-  };
-}
+const RECO_TAKE = 24;
 
 export default function ForYouList() {
   const dispatch = useDispatch();
-  const { forYouList, forYouError, forYouSource, forYouLoading } = useSelector(
-    (s) => s.property
-  );
+  const { forYouList, forYouSource, forYouLoading } = useSelector((s) => s.property);
   const authUser = useSelector((s) => s.auth.user);
   const userId = authUser?.id || authUser?.userId || null;
 
@@ -72,50 +28,51 @@ export default function ForYouList() {
 
   const [provinces, setProvinces] = useState([]);
   const [loadingProv, setLoadingProv] = useState(false);
-  const [provinceId, setProvinceId] = useState(undefined);
-  const [provinceName, setProvinceName] = useState("");
-  const [priceRange, setPriceRange] = useState([1_000_000_000, 5_000_000_000]);
-  const [areaRange, setAreaRange] = useState([30, 120]);
-  const [interestResults, setInterestResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [searchRequested, setSearchRequested] = useState(false);
+
+  // ⛳️ NEW: chọn nhiều thành phố
+  const [selectedCityIds, setSelectedCityIds] = useState([]);     // [id, id, ...]
+  const [selectedCityLabels, setSelectedCityLabels] = useState([]); // ["Hà Nội", "Đà Nẵng", ...]
+
+  // NEW: state cho khoảng giá & diện tích
+  const [priceRange, setPriceRange] = useState([1_000_000_000, 5_000_000_000]); // VND
+  const [areaRange, setAreaRange] = useState([30, 120]); // m²
 
   const screens = Grid.useBreakpoint();
-  const modalWidth = 640; // cố định 640px
+  const modalWidth = 640;
 
   useEffect(() => {
     setFetchedForUserId(null);
     setExpanded(false);
   }, [userId]);
 
+  // load session (để nhớ lựa chọn trước đó)
   useEffect(() => {
     if (!userKey) return;
     try {
       const raw = sessionStorage.getItem(userKey);
       if (raw) {
         const saved = JSON.parse(raw);
-        if (Array.isArray(saved?.priceRange)) setPriceRange(saved.priceRange);
-        if (Array.isArray(saved?.areaRange)) setAreaRange(saved.areaRange);
-        if (Array.isArray(saved?.items)) setInterestResults(saved.items);
-        if (saved?.provinceId) {
-          setProvinceId(saved.provinceId);
-          setProvinceName(saved.provinceName || "");
+
+        // Back-compat: nếu trước đây chỉ lưu 1 provinceId thì map sang mảng
+        if (Array.isArray(saved?.selected?.cityIds)) {
+          setSelectedCityIds(saved.selected.cityIds);
+          setSelectedCityLabels(saved.selected.cityLabels || []);
+        } else if (saved?.selected?.provinceId) {
+          setSelectedCityIds([saved.selected.provinceId]);
+          setSelectedCityLabels([saved.selected.provinceName || ""]);
         }
-        setSearchRequested(Boolean(saved?.keyword));
-      } else setInterestResults([]);
+
+        if (Array.isArray(saved?.selected?.priceRange)) {
+          setPriceRange(saved.selected.priceRange);
+        }
+        if (Array.isArray(saved?.selected?.areaRange)) {
+          setAreaRange(saved.selected.areaRange);
+        }
+      }
     } catch { }
   }, [userKey]);
 
-  useEffect(() => {
-    if (userId) return;
-    try {
-      Object.keys(sessionStorage)
-        .filter((k) => k.startsWith(`${SS_NS}:`))
-        .forEach((k) => sessionStorage.removeItem(k));
-    } catch { }
-    setInterestResults([]);
-  }, [userId]);
-
+  // skeleton delay
   useEffect(() => {
     const t = setTimeout(() => setMinDelayDone(true), MIN_SKELETON_MS);
     return () => clearTimeout(t);
@@ -123,10 +80,11 @@ export default function ForYouList() {
 
   const hasPersonalized =
     forYouSource === "personalized" && Array.isArray(forYouList) && forYouList.length > 0;
-  const effectiveList = hasPersonalized ? forYouList : interestResults;
+
+  const effectiveList = forYouList || [];
   const effectiveHasData = Array.isArray(effectiveList) && effectiveList.length > 0;
+
   const showSkeleton =
-    searching ||
     forYouLocalLoading ||
     (forYouLoading && fetchedForUserId === userId) ||
     (!effectiveHasData && !minDelayDone);
@@ -136,6 +94,7 @@ export default function ForYouList() {
     [expanded, effectiveList]
   );
 
+  // Lần đầu: gọi personalized mặc định (chưa chọn city/price/area)
   useEffect(() => {
     if (!userId) return;
     if (fetchedForUserId === userId) return;
@@ -147,9 +106,7 @@ export default function ForYouList() {
       fetchPropertiesThunk({
         type: "forYou",
         userId,
-        limit: 24,
-        enforcePersonalized: true,
-        fallback: false,
+        limit: RECO_TAKE,
         slot: "forYou",
       })
     ).finally(() => {
@@ -160,75 +117,84 @@ export default function ForYouList() {
     });
   }, [dispatch, userId, fetchedForUserId]);
 
+  // lazy load provinces khi mở modal
   useEffect(() => {
     if (!showModal) return;
-    let abort = new AbortController();
-    if (provinces.length === 0) {
-      setLoadingProv(true);
-      locationApi
-        .getCities()
-        .then((list) => setProvinces(list))
-        .catch(() => { })
-        .finally(() => setLoadingProv(false));
-    }
-    return () => abort.abort();
+    if (provinces.length > 0) return;
+    setLoadingProv(true);
+    locationApi
+      .getCities()
+      .then((list) => setProvinces(list || []))
+      .catch(() => { })
+      .finally(() => setLoadingProv(false));
   }, [showModal, provinces.length]);
 
+  // Bấm "Xem gợi ý" → gọi /recommendations kèm nhiều city
   const handleSearch = async () => {
-    if (!provinceName) {
-      message.warning("Vui lòng chọn Tỉnh/Thành phố.");
+    if (!selectedCityIds.length) {
+      message.warning("Vui lòng chọn ít nhất 1 khu vực (Tỉnh/Thành phố).");
+      return;
+    }
+    // Ép min/max hợp lệ nhẹ
+    const [minP, maxP] = priceRange;
+    const [minA, maxA] = areaRange;
+    if (minP >= maxP) {
+      message.warning("Khoảng giá chưa hợp lệ.");
+      return;
+    }
+    if (minA >= maxA) {
+      message.warning("Khoảng diện tích chưa hợp lệ.");
       return;
     }
 
-    const keyword = provinceName;
-    setSearchRequested(true);
-    setSearching(true);
     setShowModal(false);
-
+    setForYouLocalLoading(true);
     const start = performance.now();
 
+    // anchor = thành phố đầu tiên; near = phần còn lại
+    const anchorCityId = selectedCityIds[0];
+    const nearRest = selectedCityIds.slice(1);
+
     try {
-      const payload = await dispatch(
+      await dispatch(
         fetchPropertiesThunk({
-          page: 0,
-          size: 24,
-          sort: "postedAt,desc",
-          keyword,
-          priceFrom: priceRange[0],
-          priceTo: priceRange[1],
-          areaFrom: areaRange[0],
-          areaTo: areaRange[1],
-          cityId: provinceId,
+          type: "forYou",
+          userId,
+          limit: RECO_TAKE,
+          cityId: anchorCityId,
+          // Gửi thêm các thành phố còn lại qua nearCityIds (BE đã hỗ trợ danh sách)
+          nearCityIds: nearRest,
+          minPrice: minP,
+          maxPrice: maxP,
+          minArea: minA,
+          maxArea: maxA,
+          slot: "forYou",
         })
-      ).unwrap();
+      );
 
-      const items =
-        payload?.content ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
-      const mapped = (items || []).map(normalizePublicItem);
-
+      // Lưu để lần sau mở modal có sẵn
       if (userKey) {
         sessionStorage.setItem(
           userKey,
           JSON.stringify({
-            keyword,
-            priceRange,
-            areaRange,
-            items: mapped,
+            selected: {
+              cityIds: selectedCityIds,
+              cityLabels: selectedCityLabels,
+              // để back-compat, vẫn lưu thêm cặp đầu
+              provinceId: anchorCityId,
+              provinceName: selectedCityLabels[0] || "",
+              priceRange,
+              areaRange,
+            },
             ts: Date.now(),
-            provinceId,
-            provinceName,
           })
         );
       }
-
-      setInterestResults(mapped);
       setExpanded(false);
-    } catch {
-      message.error("Không thể tải dữ liệu theo lựa chọn của bạn.");
     } finally {
       const elapsed = performance.now() - start;
       const remain = Math.max(0, MIN_SKELETON_MS - elapsed);
-      setTimeout(() => setSearching(false), remain);
+      setTimeout(() => setForYouLocalLoading(false), remain);
     }
   };
 
@@ -254,11 +220,23 @@ export default function ForYouList() {
         )}
       </div>
 
-      {!hasPersonalized && interestResults.length === 0 && !searching && !searchRequested && (
+      {/* Nếu BE báo nguồn nearby */}
+      {forYouSource === "nearby" && (
+        <Alert
+          type="info"
+          showIcon
+          message="Không tìm được tin đúng khu vực; hiển thị các gợi ý từ khu vực lân cận."
+          className="mb-4"
+          style={{ borderRadius: 12 }}
+        />
+      )}
+
+      {/* Intro block */}
+      {!effectiveHasData && !forYouLoading && !forYouLocalLoading && (
         <div className="text-center py-14 bg-[#f8fafc] rounded-2xl shadow-inner">
           <h3 className="text-xl font-semibold text-[#1b2a57] mb-2">Chào mừng bạn!</h3>
           <p className="text-gray-600 mb-6">
-            Hãy chọn thành phố, khoảng giá và diện tích để xem các tin phù hợp.
+            Chọn khu vực, khoảng giá và diện tích để nhận gợi ý.
           </p>
           <Button
             type="primary"
@@ -283,7 +261,7 @@ export default function ForYouList() {
                 Cá nhân hóa gợi ý bất động sản
               </div>
               <div className="text-[12px] text-gray-500 -mt-0.5">
-                Chọn khu vực, khoảng giá và diện tích để nhận gợi ý phù hợp
+                Chọn khu vực, khoảng giá và diện tích.
               </div>
             </div>
           </div>
@@ -312,7 +290,7 @@ export default function ForYouList() {
           <Button
             key="submit"
             type="primary"
-            loading={searching}
+            loading={forYouLocalLoading}
             onClick={handleSearch}
             style={{ background: "#1f5fbf", borderRadius: 8, fontWeight: 600 }}
           >
@@ -321,18 +299,20 @@ export default function ForYouList() {
         ]}
       >
         <div className="space-y-7">
+          {/* === CITY (multi) === */}
           <div>
             <label className="block text-sm font-medium text-[#1b2a57] mb-1.5">
-              Tỉnh / Thành phố
+              Bạn muốn mình gợi ý bất động sản ở <b>khu vực nào</b>?
             </label>
             <Select
-              showSearch
+              mode="multiple"
               allowClear
-              placeholder="Chọn Tỉnh/Thành phố"
-              value={provinceId}
-              onChange={(val, option) => {
-                setProvinceId(val);
-                setProvinceName(option?.label ?? "");
+              placeholder="Chọn Tỉnh/Thành phố (có thể chọn nhiều)"
+              value={selectedCityIds}
+              onChange={(values, opts) => {
+                setSelectedCityIds(values);
+                const labels = Array.isArray(opts) ? opts.map(o => o?.label ?? "") : [];
+                setSelectedCityLabels(labels);
               }}
               size="large"
               style={{ width: "100%" }}
@@ -342,10 +322,19 @@ export default function ForYouList() {
                 (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
               notFoundContent={loadingProv ? <Spin size="small" /> : null}
+              maxTagCount="responsive"
             />
+            {selectedCityLabels?.length > 0 && (
+              <div className="mt-2 text-xs text-gray-600">
+                Ưu tiên: <b>{selectedCityLabels[0]}</b>
+                {selectedCityLabels.length > 1 && (
+                  <>; kèm theo: {selectedCityLabels.slice(1).join(", ")}</>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* === GIÁ === */}
+          {/* === PRICE === */}
           <div className="p-5 rounded-xl border border-[#dde4ef] bg-[#f3f6fb]">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-[#1b2a57]">Khoảng giá (VND)</label>
@@ -353,7 +342,7 @@ export default function ForYouList() {
                 {(priceRange[0] / 1e9).toFixed(1)} tỷ – {(priceRange[1] / 1e9).toFixed(1)} tỷ
               </span>
             </div>
-            <div className="mx-auto w-[100%]">
+            <div className="mx-auto w-full">
               <Slider
                 range
                 min={500_000_000}
@@ -372,7 +361,7 @@ export default function ForYouList() {
             </div>
           </div>
 
-          {/* === DIỆN TÍCH === */}
+          {/* === AREA === */}
           <div className="p-5 rounded-xl border border-[#dde4ef] bg-[#f3f6fb]">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-[#1b2a57]">Diện tích (m²)</label>
@@ -380,7 +369,7 @@ export default function ForYouList() {
                 {areaRange[0]} m² – {areaRange[1]} m²
               </span>
             </div>
-            <div className="mx-auto w-[100%]">
+            <div className="mx-auto w-full">
               <Slider
                 range
                 min={10}

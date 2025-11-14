@@ -24,6 +24,12 @@ public class CityEntity {
     @Column(name= "slug")
     private String slug;
 
+    @Column(name = "lat")
+    private Double lat;
+
+    @Column(name = "lng")
+    private Double lng;
+
     @OneToMany(mappedBy = "city", fetch = FetchType.LAZY)
     @JsonIgnore
     private List<DistrictEntity> districts;
