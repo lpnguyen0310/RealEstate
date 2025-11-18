@@ -48,17 +48,22 @@ export const fetchPropertiesThunk = createAsyncThunk(
                     query.nearCityIds = nearCityIds;
                 }
 
-                const recoRes = await api.get("/properties/recommendations", { params: query });
+                const recoRes = await api.get("/properties/recommendations", {
+                    params: query,
+                });
 
                 // Back-compat: BE cũ trả List; BE mới trả object {items, source, nearCityIds, anchorCityId}
                 const body = recoRes?.data;
                 const isArray = Array.isArray(body) || Array.isArray(body?.data);
-                const content = isArray ? (body?.data ?? body ?? []) : (body?.items ?? []);
+                const content = isArray
+                    ? body?.data ?? body ?? []
+                    : body?.items ?? [];
                 const sourceFromHeader = recoRes?.headers?.["x-reco-source"];
                 const sourceFromBody = isArray ? undefined : body?.source;
-                const recoSource = sourceFromBody || sourceFromHeader || "personalized";
-                const nearIdsMeta = isArray ? [] : (body?.nearCityIds ?? []);
-                const anchorCityIdMeta = isArray ? undefined : (body?.anchorCityId ?? null);
+                const recoSource =
+                    sourceFromBody || sourceFromHeader || "personalized";
+                const nearIdsMeta = isArray ? [] : body?.nearCityIds ?? [];
+                const anchorCityIdMeta = isArray ? undefined : body?.anchorCityId ?? null;
 
                 return {
                     content,
@@ -131,15 +136,24 @@ export const createPropertyThunk = createAsyncThunk(
     /**
      * @param {{ formData: any, listingTypePolicyId: number|null, submitMode?: "publish"|"draft" }} arg
      */
-    async ({ formData, listingTypePolicyId, submitMode = "publish" }, { rejectWithValue }) => {
+    async (
+        { formData, listingTypePolicyId, submitMode = "publish" },
+        { rejectWithValue }
+    ) => {
         try {
             // 1) Ảnh: tách file & URL
             const imgs = formData.images || [];
-            const files = imgs.filter((x) => x instanceof File || x instanceof Blob);
-            const existedUrls = imgs.filter((x) => typeof x === "string" && x.startsWith("http"));
+            const files = imgs.filter(
+                (x) => x instanceof File || x instanceof Blob
+            );
+            const existedUrls = imgs.filter(
+                (x) => typeof x === "string" && x.startsWith("http")
+            );
 
             // 2) Upload Cloudinary
-            const uploaded = files.length ? await uploadMany(files, "properties") : [];
+            const uploaded = files.length
+                ? await uploadMany(files, "properties")
+                : [];
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
             const isOwner = !!formData?.ownerAuth?.isOwner;
@@ -179,13 +193,34 @@ export const createPropertyThunk = createAsyncThunk(
                 amenityIds: formData.amenityIds || [],
                 constructionImages: formData.constructionImages || [], // CONSTRUCTION
                 isOwner,
-                contactName: !isOwner ? (formData.ownerAuth?.ownerName || formData.contact?.name || "").trim() : undefined,
-                contactPhone: !isOwner ? (formData.ownerAuth?.phoneNumber || formData.contact?.phone || "").trim() : undefined,
-                contactEmail: !isOwner ? (formData.ownerAuth?.ownerEmail || formData.contact?.email || "").trim() : undefined,
-                contactRelationship: !isOwner ? (formData.ownerAuth?.relationship || "").trim() : undefined,
+                contactName: !isOwner
+                    ? (
+                        formData.ownerAuth?.ownerName ||
+                        formData.contact?.name ||
+                        ""
+                    ).trim()
+                    : undefined,
+                contactPhone: !isOwner
+                    ? (
+                        formData.ownerAuth?.phoneNumber ||
+                        formData.contact?.phone ||
+                        ""
+                    ).trim()
+                    : undefined,
+                contactEmail: !isOwner
+                    ? (
+                        formData.ownerAuth?.ownerEmail ||
+                        formData.contact?.email ||
+                        ""
+                    ).trim()
+                    : undefined,
+                contactRelationship: !isOwner
+                    ? (formData.ownerAuth?.relationship || "").trim()
+                    : undefined,
             };
 
-            const mode = submitMode?.toUpperCase() === "DRAFT" ? "DRAFT" : "PUBLISH";
+            const mode =
+                submitMode?.toUpperCase() === "DRAFT" ? "DRAFT" : "PUBLISH";
             const res = await api.post("/properties/create", payload, {
                 params: { mode },
             });
@@ -240,14 +275,23 @@ export const updatePropertyThunk = createAsyncThunk(
     /**
      * @param {{ id: number|string, formData: any, listingTypePolicyId?: number|null, submitMode?: "publish"|"draft"|undefined }} arg
      */
-    async ({ id, formData, listingTypePolicyId, submitMode }, { rejectWithValue }) => {
+    async (
+        { id, formData, listingTypePolicyId, submitMode },
+        { rejectWithValue }
+    ) => {
         try {
             // 1) Ảnh
             const imgs = formData.images || [];
-            const files = imgs.filter((x) => x instanceof File || x instanceof Blob);
-            const existedUrls = imgs.filter((x) => typeof x === "string" && x.startsWith("http"));
+            const files = imgs.filter(
+                (x) => x instanceof File || x instanceof Blob
+            );
+            const existedUrls = imgs.filter(
+                (x) => typeof x === "string" && x.startsWith("http")
+            );
 
-            const uploaded = files.length ? await uploadMany(files, "properties") : [];
+            const uploaded = files.length
+                ? await uploadMany(files, "properties")
+                : [];
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
             const isOwner = !!formData?.ownerAuth?.isOwner;
@@ -287,10 +331,30 @@ export const updatePropertyThunk = createAsyncThunk(
                 amenityIds: formData.amenityIds || [],
                 constructionImages: formData.constructionImages || [], // CONSTRUCTION
                 isOwner,
-                contactName: !isOwner ? (formData.ownerAuth?.ownerName || formData.contact?.name || "").trim() : undefined,
-                contactPhone: !isOwner ? (formData.ownerAuth?.phoneNumber || formData.contact?.phone || "").trim() : undefined,
-                contactEmail: !isOwner ? (formData.ownerAuth?.ownerEmail || formData.contact?.email || "").trim() : undefined,
-                contactRelationship: !isOwner ? (formData.ownerAuth?.relationship || "").trim() : undefined,
+                contactName: !isOwner
+                    ? (
+                        formData.ownerAuth?.ownerName ||
+                        formData.contact?.name ||
+                        ""
+                    ).trim()
+                    : undefined,
+                contactPhone: !isOwner
+                    ? (
+                        formData.ownerAuth?.phoneNumber ||
+                        formData.contact?.phone ||
+                        ""
+                    ).trim()
+                    : undefined,
+                contactEmail: !isOwner
+                    ? (
+                        formData.ownerAuth?.ownerEmail ||
+                        formData.contact?.email ||
+                        ""
+                    ).trim()
+                    : undefined,
+                contactRelationship: !isOwner
+                    ? (formData.ownerAuth?.relationship || "").trim()
+                    : undefined,
             };
 
             const mode = submitMode ? submitMode.toUpperCase() : undefined;
@@ -369,8 +433,15 @@ function parseToDate(x) {
             return Number.isNaN(t) ? null : new Date(t);
         }
         if (typeof x === "object" && "year" in x && "month" in x && "day" in x) {
-            const { year, month, day, hour = 0, minute = 0, second = 0, nano = 0 } =
-                x;
+            const {
+                year,
+                month,
+                day,
+                hour = 0,
+                minute = 0,
+                second = 0,
+                nano = 0,
+            } = x;
             return new Date(
                 year,
                 month - 1,
@@ -604,12 +675,14 @@ const initialState = {
     similarNewsError: null,
 
     // For You (recommend)
-    forYouList: [],
+    forYouList: [], // ⭐ list đã merge (filters + history)
+    forYouFromFilters: [], // ⭐ list theo "Xem gợi ý"
+    forYouFromHistory: [], // ⭐ list theo lịch sử / saved
     forYouLoading: false,
     forYouError: null,
     forYouSource: null, // 'personalized' | 'nearby' | 'popular' | 'empty' | null
-    forYouNearCityIds: [],       // ⭐️ NEW
-    forYouAnchorCity: null,      // ⭐️ NEW
+    forYouNearCityIds: [], // ⭐ NEW
+    forYouAnchorCity: null, // ⭐ NEW
 
     bannerListings: [],
     bannerListingsLoading: false,
@@ -690,6 +763,8 @@ const propertySlice = createSlice({
 
             // Clear For You
             state.forYouList = [];
+            state.forYouFromFilters = [];
+            state.forYouFromHistory = [];
             state.forYouLoading = false;
             state.forYouError = null;
             state.forYouSource = null;
@@ -714,6 +789,8 @@ const propertySlice = createSlice({
         },
         clearForYou(state) {
             state.forYouList = [];
+            state.forYouFromFilters = [];
+            state.forYouFromHistory = [];
             state.forYouLoading = false;
             state.forYouError = null;
             state.forYouSource = null;
@@ -758,7 +835,9 @@ const propertySlice = createSlice({
             })
             .addCase(fetchMyPropertiesThunk.fulfilled, (s, a) => {
                 const d = a.payload || {};
-                s.myList = Array.isArray(d.content) ? d.content.map(mapDtoToPostCard) : [];
+                s.myList = Array.isArray(d.content)
+                    ? d.content.map(mapDtoToPostCard)
+                    : [];
                 s.myPage = d.page ?? d.number ?? 0;
                 s.mySize = d.size ?? s.mySize;
                 s.myTotalElements = d.totalElements ?? 0;
@@ -785,7 +864,9 @@ const propertySlice = createSlice({
             .addCase(fetchPropertiesThunk.fulfilled, (s, a) => {
                 const pageData = a.payload || {};
                 const arr = pageData.content || [];
-                let mapped = Array.isArray(arr) ? arr.map(mapPublicPropertyToCard) : [];
+                let mapped = Array.isArray(arr)
+                    ? arr.map(mapPublicPropertyToCard)
+                    : [];
 
                 // Ưu tiên PREMIUM > VIP > NORMAL
                 const sortOrder = { PREMIUM: 1, VIP: 2, NORMAL: 3 };
@@ -795,16 +876,49 @@ const propertySlice = createSlice({
                     return (sortOrder[aT] || 99) - (sortOrder[bT] || 99);
                 });
 
-                if (a.meta?.arg?.type === "forYou" || pageData._forYou) {
-                    s.forYouList = sorted;
-                    s.forYouLoading = false;
-                    if (pageData._source) s.forYouSource = pageData._source; // 'personalized' | 'nearby' | 'empty' | ...
-                    s.forYouNearCityIds = Array.isArray(pageData._nearCityIds) ? pageData._nearCityIds : [];
+                const { type, slot, mode } = a.meta?.arg || {};
+
+                // ===== FOR YOU logic (merge 2 nguồn) =====
+                if (type === "forYou" || pageData._forYou) {
+                    const m = mode || "filter"; // default: filter
+
+                    if (m === "history") {
+                        s.forYouFromHistory = sorted;
+                    } else {
+                        s.forYouFromFilters = sorted;
+                    }
+
+                    if (pageData._source) {
+                        s.forYouSource = pageData._source;
+                    }
+                    s.forYouNearCityIds = Array.isArray(pageData._nearCityIds)
+                        ? pageData._nearCityIds
+                        : [];
                     s.forYouAnchorCity = pageData._anchorCityId ?? null;
+
+                    // merge: ưu tiên list theo tiêu chí (filters) trước, rồi đến history
+                    const merged = [];
+                    const seen = new Set();
+                    const pushArr = (arr2) => {
+                        for (const it of arr2 || []) {
+                            if (!it || it.id == null) continue;
+                            const key = String(it.id);
+                            if (seen.has(key)) continue;
+                            seen.add(key);
+                            merged.push(it);
+                        }
+                    };
+
+                    pushArr(s.forYouFromFilters);
+                    pushArr(s.forYouFromHistory);
+
+                    s.forYouList = merged;
+                    s.forYouLoading = false;
+                    s.forYouError = null;
                     return;
                 }
 
-                const { slot } = a.meta?.arg || {};
+                // ===== LIST PUBLIC + HOME SLOTS =====
                 const k = slotKey(slot);
 
                 if (k.list === "list") {
@@ -928,14 +1042,19 @@ const propertySlice = createSlice({
                 if (!id || !newStatus) return;
                 const nextKey = statusEnumToKey(newStatus);
 
-                const idx = s.myList.findIndex((x) => String(x.id) === String(id));
+                const idx = s.myList.findIndex(
+                    (x) => String(x.id) === String(id)
+                );
                 if (idx >= 0) {
                     const prevKey = s.myList[idx].statusKey || null;
                     s.myList[idx].statusTag = toStatusTag(newStatus);
                     s.myList[idx].statusKey = nextKey;
                     if (prevKey && prevKey !== nextKey) {
                         if (s.counts[prevKey] != null) {
-                            s.counts[prevKey] = Math.max(0, (s.counts[prevKey] || 0) - 1);
+                            s.counts[prevKey] = Math.max(
+                                0,
+                                (s.counts[prevKey] || 0) - 1
+                            );
                         }
                         if (s.counts[nextKey] != null) {
                             s.counts[nextKey] = (s.counts[nextKey] || 0) + 1;
@@ -943,7 +1062,9 @@ const propertySlice = createSlice({
                     }
                 }
 
-                const pIdx = s.list.findIndex((x) => String(x.id) === String(id));
+                const pIdx = s.list.findIndex(
+                    (x) => String(x.id) === String(id)
+                );
                 if (pIdx >= 0) {
                     s.list[pIdx].statusTag = toStatusTag(newStatus);
                     s.list[pIdx].statusKey = nextKey;
@@ -1011,11 +1132,11 @@ export const selectPostStatsByType = createSelector(
                 potential: post.potentialCustomerCount ?? 0,
             };
 
-            if (post.propertyType === 'sell') {
+            if (post.propertyType === "sell") {
                 sellSummary.views += stats.views;
                 sellSummary.interactions += stats.interactions;
                 sellSummary.potential += stats.potential;
-            } else if (post.propertyType === 'rent') {
+            } else if (post.propertyType === "rent") {
                 rentSummary.views += stats.views;
                 rentSummary.interactions += stats.interactions;
                 rentSummary.potential += stats.potential;
@@ -1035,7 +1156,9 @@ export const {
     clearProperties,
     clearCurrentProperty,
     clearFavorites,
-    clearForYou, setPendingAction, clearPendingAction,
+    clearForYou,
+    setPendingAction,
+    clearPendingAction,
     clearHomeSlots,
 } = propertySlice.actions;
 

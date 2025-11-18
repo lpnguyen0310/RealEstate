@@ -14,10 +14,23 @@ import java.util.List;
 @AllArgsConstructor
 public class UserPreference {
     private Long userId;
+
+    // LIKE CŨ
     private List<Long> favCityIds;
     private List<PropertyType> favTypes;
-    private Double maxPrice;
-    private Float maxArea;
+    private Double maxPrice;   // => sẽ đổi thành priceMax
+    private Double maxArea;    // => sẽ đổi thành areaMax
     private List<Long> savedIds;
     private List<String> keywords;
+
+    private Long anchorCityId;       // city FE đang chọn chính
+    private List<Long> nearCityIds;  // city lân cận FE gửi lên
+    private List<Long> preferredCityIds; // anchor + near + favCityIds
+
+    private Double priceMin;
+    private Double priceMax;
+    private Float  areaMin;
+    private Float  areaMax;
+
+    private Integer limit; // optional: số lượng muốn lấy tối đa
 }

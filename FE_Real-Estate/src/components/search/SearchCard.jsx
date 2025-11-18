@@ -133,8 +133,8 @@ export default function SearchCard() {
           <div className="px-6 pt-5">
             <div className="inline-flex bg-[#eef3fb] rounded-full p-1">
               {/* ✅ ĐẶT type="button" để không submit form */}
-              <button type="button" onClick={() => setMode("buy")} className={`px-6 py-2 rounded-full font-semibold transition ${mode === "buy" ? "bg-[#17306b] text-white shadow" : "text-[#17306b]"}`}>Mua</button>
-              <button type="button" onClick={() => setMode("rent")} className={`px-6 py-2 rounded-full font-semibold transition ${mode === "rent" ? "bg-[#17306b] text-white shadow" : "text-[#17306b]"}`}>Thuê</button>
+              <button type="button" onClick={() => setMode("buy")} className={`px-6 py-2 rounded-full font-semibold transition ${mode === "buy" ? "bg-[#17306b] !text-white shadow" : "text-[#17306b]"}`}>Mua</button>
+              <button type="button" onClick={() => setMode("rent")} className={`px-6 py-2 rounded-full font-semibold transition ${mode === "rent" ? "bg-[#17306b] !text-white shadow" : "text-[#17306b]"}`}>Thuê</button>
             </div>
           </div>
 

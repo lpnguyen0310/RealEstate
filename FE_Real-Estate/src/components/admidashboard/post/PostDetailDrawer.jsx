@@ -1,9 +1,23 @@
-// src/components/.../PostDetailDrawer.jsx
+// src/components/.../PostDetailDrawer.jsx 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
-    Drawer, Box, Stack, Avatar, Typography, Divider, Chip, Button,
-    Card, CardContent, Grid, TextField, Tooltip, Alert, AlertTitle,
-    IconButton, useMediaQuery
+    Drawer,
+    Box,
+    Stack,
+    Avatar,
+    Typography,
+    Divider,
+    Chip,
+    Button,
+    Card,
+    CardContent,
+    Grid,
+    TextField,
+    Tooltip,
+    Alert,
+    AlertTitle,
+    IconButton,
+    useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -73,6 +87,10 @@ export default function PostDetailDrawer({
     const isApprovable = isPending;
     const isRejectable = isPending;
 
+    // chỉ cho mở trên trình duyệt nếu bài đang public
+    const canOpenPublic =
+        hasDetail && ["PUBLISHED", "EXPIRING_SOON", "EXPIRED"].includes(d.status);
+
     const resubmitInfo = useMemo(() => {
         if (!hasDetail || !isPending) return { isResubmit: false, fromStatus: null };
         const lastBadAction = (d.audit || []).find((a) => (a.type || "").toUpperCase() !== "APPROVED");
@@ -84,8 +102,10 @@ export default function PostDetailDrawer({
     }, [hasDetail, isPending, d.audit]);
 
     const listingChipColor =
-        d.listingType === "VIP" ? "secondary"
-            : d.listingType === "PREMIUM" ? "warning"
+        d.listingType === "VIP"
+            ? "secondary"
+            : d.listingType === "PREMIUM"
+                ? "warning"
                 : "info";
 
     useEffect(() => {
@@ -97,15 +117,18 @@ export default function PostDetailDrawer({
     const [rejectConfirm, setRejectConfirm] = useState({ open: false, loading: false });
     const openRejectConfirm = useCallback(() => setRejectConfirm({ open: true, loading: false }), []);
     const closeRejectConfirm = useCallback(() => setRejectConfirm({ open: false, loading: false }), []);
-    const doReject = useCallback(async () => {
-        try {
-            setRejectConfirm((s) => ({ ...s, loading: true }));
-            if (hasDetail) await onReject(d.id);
-            onClose();
-        } finally {
-            closeRejectConfirm();
-        }
-    }, [hasDetail, d.id, onReject, onClose, closeRejectConfirm]);
+    const doReject = useCallback(
+        async () => {
+            try {
+                setRejectConfirm((s) => ({ ...s, loading: true }));
+                if (hasDetail) await onReject(d.id);
+                onClose();
+            } finally {
+                closeRejectConfirm();
+            }
+        },
+        [hasDetail, d.id, onReject, onClose, closeRejectConfirm]
+    );
 
     const rejectReasonValue = ((hasDetail && d.rejectReason) ?? decision.reason ?? "").toString();
 
@@ -118,15 +141,31 @@ export default function PostDetailDrawer({
                 sx: {
                     width: drawerWidth,
                     ...(isXs
-                        ? { height: "100vh", borderRadius: 0, mt: 0, mb: 0, mr: 0, boxShadow: "none" }
-                        : { borderRadius: 3, mt: 3, mb: 3, mr: 3, boxShadow: "0 12px 36px rgba(0,0,0,0.14)", maxHeight: "calc(100vh - 48px)" }),
+                        ? {
+                            height: "100vh",
+                            borderRadius: 0,
+                            mt: 0,
+                            mb: 0,
+                            mr: 0,
+                            boxShadow: "none",
+                        }
+                        : {
+                            borderRadius: 3,
+                            mt: 3,
+                            mb: 3,
+                            mr: 3,
+                            boxShadow: "0 12px 36px rgba(0,0,0,0.14)",
+                            maxHeight: "calc(100vh - 48px)",
+                        }),
                     overflow: "hidden",
                     display: "flex",
                     bgcolor: "#fff",
                 },
             }}
             ModalProps={{
-                BackdropProps: { sx: { backgroundColor: "rgba(15,23,42,0.35)", backdropFilter: "blur(3px)" } },
+                BackdropProps: {
+                    sx: { backgroundColor: "rgba(15,23,42,0.35)", backdropFilter: "blur(3px)" },
+                },
             }}
         >
             <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -152,14 +191,27 @@ export default function PostDetailDrawer({
                             <ArticleOutlinedIcon />
                         </Avatar>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography fontWeight={700} noWrap title={d.title} sx={{ fontSize: { xs: 15, sm: 16 } }}>
+                            <Typography
+                                fontWeight={700}
+                                noWrap
+                                title={d.title}
+                                sx={{ fontSize: { xs: 15, sm: 16 } }}
+                            >
                                 {d.title || "—"}
                             </Typography>
                             <Typography fontSize={12} color="#7a8aa1">
-                                {hasDetail ? <>#{d.id} • {STATUS_LABEL[d.status]}</> : "Đang tải…"}
+                                {hasDetail ? (
+                                    <>
+                                        #{d.id} • {STATUS_LABEL[d.status]}
+                                    </>
+                                ) : (
+                                    "Đang tải…"
+                                )}
                             </Typography>
                         </Box>
-                        {!isXs && hasDetail && (
+
+                        {/* chỉ hiện nút khi bài đang public */}
+                        {!isXs && hasDetail && canOpenPublic && (
                             <Button
                                 variant="outlined"
                                 size="small"
@@ -188,10 +240,21 @@ export default function PostDetailDrawer({
                     ) : (
                         <>
                             {resubmitInfo.isResubmit && (
-                                <Alert severity="info" icon={<InfoOutlinedIcon />} sx={{ mb: 2, borderRadius: 2 }}>
-                                    <AlertTitle sx={{ fontWeight: 600 }}>Tin đăng được gửi duyệt lại</AlertTitle>
+                                <Alert
+                                    severity="info"
+                                    icon={<InfoOutlinedIcon />}
+                                    sx={{ mb: 2, borderRadius: 2 }}
+                                >
+                                    <AlertTitle sx={{ fontWeight: 600 }}>
+                                        Tin đăng được gửi duyệt lại
+                                    </AlertTitle>
                                     Tin này đã được người dùng cập nhật lại sau khi bị
-                                    <b>{resubmitInfo.fromStatus === "WARNED" ? " Cảnh báo" : " Từ chối"}</b>.
+                                    <b>
+                                        {resubmitInfo.fromStatus === "WARNED"
+                                            ? " Cảnh báo"
+                                            : " Từ chối"}
+                                    </b>
+                                    .
                                 </Alert>
                             )}
 
@@ -225,7 +288,13 @@ export default function PostDetailDrawer({
                                         <Grid item xs={12} sm={6}>
                                             <Row
                                                 label="Trạng thái"
-                                                value={<Chip label={STATUS_LABEL[d.status]} color={STATUS_CHIP_COLOR[d.status]} size="small" />}
+                                                value={
+                                                    <Chip
+                                                        label={STATUS_LABEL[d.status]}
+                                                        color={STATUS_CHIP_COLOR[d.status]}
+                                                        size="small"
+                                                    />
+                                                }
                                             />
                                         </Grid>
                                         <Grid item xs={12}>
@@ -238,7 +307,7 @@ export default function PostDetailDrawer({
                                 </CardContent>
                             </Card>
 
-                            {/* === THÔNG TIN NGƯỜI ĐĂNG / CHÍNH CHỦ === */}
+                            {/* Thông tin người đăng / chính chủ */}
                             <Card sx={{ borderRadius: 2, mt: 2 }}>
                                 <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                                     <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>
@@ -273,7 +342,10 @@ export default function PostDetailDrawer({
 
                                         {!d.isOwner && (
                                             <Grid item xs={12} sm={6}>
-                                                <Row label="Quan hệ với chủ nhà" value={d.contactRelationship || "-"} />
+                                                <Row
+                                                    label="Quan hệ với chủ nhà"
+                                                    value={d.contactRelationship || "-"}
+                                                />
                                             </Grid>
                                         )}
                                     </Grid>
@@ -314,7 +386,11 @@ export default function PostDetailDrawer({
 
                                     <Grid item xs={12}>
                                         <TextField
-                                            label={isRejected ? "Lý do từ chối" : "Lý do từ chối (nhập khi bấm Từ chối)"}
+                                            label={
+                                                isRejected
+                                                    ? "Lý do từ chối"
+                                                    : "Lý do từ chối (nhập khi bấm Từ chối)"
+                                            }
                                             value={rejectReasonValue}
                                             onChange={(e) => setDecision({ reason: e.target.value })}
                                             multiline
