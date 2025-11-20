@@ -878,14 +878,15 @@ const propertySlice = createSlice({
 
                 const { type, slot, mode } = a.meta?.arg || {};
 
-                // ===== FOR YOU logic (merge 2 nguồn) =====
+                // ===== FOR YOU logic (history đè filter) =====
                 if (type === "forYou" || pageData._forYou) {
                     const m = mode || "filter"; // default: filter
 
+                    // A = list đã filter, B = history
                     if (m === "history") {
-                        s.forYouFromHistory = sorted;
+                        s.forYouFromHistory = sorted;    // List B
                     } else {
-                        s.forYouFromFilters = sorted;
+                        s.forYouFromFilters = sorted;    // List A
                     }
 
                     if (pageData._source) {
@@ -896,27 +897,20 @@ const propertySlice = createSlice({
                         : [];
                     s.forYouAnchorCity = pageData._anchorCityId ?? null;
 
-                    // merge: ưu tiên list theo tiêu chí (filters) trước, rồi đến history
-                    const merged = [];
-                    const seen = new Set();
-                    const pushArr = (arr2) => {
-                        for (const it of arr2 || []) {
-                            if (!it || it.id == null) continue;
-                            const key = String(it.id);
-                            if (seen.has(key)) continue;
-                            seen.add(key);
-                            merged.push(it);
-                        }
-                    };
+                    // 🎯 Ưu tiên:
+                    // - Nếu đã có history (forYouFromHistory) => dùng history
+                    // - Nếu chưa có history thì fallback sang list đã filter
+                    if (Array.isArray(s.forYouFromHistory) && s.forYouFromHistory.length > 0) {
+                        s.forYouList = s.forYouFromHistory;
+                    } else {
+                        s.forYouList = s.forYouFromFilters || [];
+                    }
 
-                    pushArr(s.forYouFromFilters);
-                    pushArr(s.forYouFromHistory);
-
-                    s.forYouList = merged;
                     s.forYouLoading = false;
                     s.forYouError = null;
                     return;
                 }
+
 
                 // ===== LIST PUBLIC + HOME SLOTS =====
                 const k = slotKey(slot);

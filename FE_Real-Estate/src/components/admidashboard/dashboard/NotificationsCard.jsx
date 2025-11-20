@@ -1,14 +1,15 @@
 // src/components/admidashboard/dashboard/NotificationsCard.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 
-// dùng đúng đường dẫn service bạn đã gửi
 import {
     useGetNotificationsQuery,
     useMarkAsReadMutation,
     notificationApi,
 } from "@/services/notificationApi";
+
+import AllNotificationsModal from "./AllNotificationsModal";
 
 /* ---------- Skeleton ---------- */
 const SkeletonItem = () => (
@@ -43,49 +44,104 @@ function formatRelativeTime(isoDate) {
     }
 }
 
-/* ---------- Map BE type -> FE type ---------- */
+/* ---------- Map BE type -> FE icon variant ---------- */
 function mapApiTypeToIconType(apiType) {
     const type = (apiType || "").toUpperCase();
     switch (type) {
         case "NEW_LISTING_PENDING":
+        case "LISTING_PENDING_USER":
+        case "POST_WARNING":
         case "REPORT_RECEIVED":
             return "report";
+
         case "NEW_USER_REGISTERED":
             return "new_user";
+
+        case "ORDER_PENDING":
+        case "PACKAGE_PURCHASED":
+        case "NEW_ORDER_PAID":
+            return "finance";
+
         case "LISTING_APPROVED":
         case "LISTING_REJECTED":
-        case "COMMENT_RECEIVED":
-        case "LISTING_FAVORITED":
+            return "comment";
+
+        case "CATALOG_UPDATED":
         default:
             return "comment";
     }
 }
 
-/* ---------- Icons ---------- */
+/* ---------- Icons cho card nhỏ ---------- */
 const IconBubble = ({ variant = "default" }) => {
     switch (variant) {
         case "report":
             return (
                 <div className="relative shrink-0 w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center ring-1 ring-red-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
                     </svg>
                 </div>
             );
         case "new_user":
             return (
                 <div className="relative shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center ring-1 ring-blue-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                    >
                         <path d="M18 21a8 8 0 0 0-16 0" />
                         <circle cx="10" cy="8" r="4" />
+                    </svg>
+                </div>
+            );
+        case "finance":
+            return (
+                <div className="relative shrink-0 w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center ring-1 ring-emerald-200">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                    >
+                        <path d="M12 8c-1.657 0-3 .843-3 1.882C9 11.157 10.343 12 12 12s3 .843 3 1.882C15 15.157 13.657 16 12 16s-3-.843-3-1.882M12 6v2m0 8v2" />
+                        <circle cx="12" cy="12" r="9" />
                     </svg>
                 </div>
             );
         default:
             return (
                 <div className="relative shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center ring-1 ring-gray-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                        />
                     </svg>
                 </div>
             );
@@ -108,20 +164,32 @@ export default function NotificationsCard() {
     const [markAsRead] = useMarkAsReadMutation();
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const [showAllModal, setShowAllModal] = useState(false);
 
-    // Chuẩn hóa dữ liệu, ưu tiên field `type` (bạn BE đang trả), fallback `notificationType`
+    // Chuẩn hóa dữ liệu, sort mới -> cũ
     const items = useMemo(() => {
         const arr = Array.isArray(apiData) ? apiData : [];
-        return arr.map((n) => ({
-            id: n.id,
-            type: mapApiTypeToIconType(n.type || n.notificationType),
-            text: n.message,
-            time: formatRelativeTime(n.createdAt),
-            link: n.link,
-            read: Boolean(n.read ?? n.isRead ?? false),
-            createdAt: n.createdAt,
-        }));
+        return arr
+            .map((n) => {
+                const rawType = (n.type || n.notificationType || "").toUpperCase();
+                return {
+                    id: n.id,
+                    rawType, // dùng cho filter tabs trong modal
+                    type: mapApiTypeToIconType(rawType),
+                    text: n.message,
+                    time: formatRelativeTime(n.createdAt),
+                    link: n.link,
+                    read: Boolean(n.read ?? n.isRead ?? false),
+                    createdAt: n.createdAt,
+                };
+            })
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }, [apiData]);
+
+    const unreadCount = useMemo(
+        () => items.filter((it) => !it.read).length,
+        [items]
+    );
 
     const displayItems = items.slice(0, 4);
 
@@ -142,32 +210,37 @@ export default function NotificationsCard() {
     const markReadInCache = (id) => {
         try {
             dispatch(
-                notificationApi.util.updateQueryData("getNotifications", undefined, (draft) => {
-                    const idx = Array.isArray(draft) ? draft.findIndex((x) => x?.id === id) : -1;
-                    if (idx > -1) draft[idx].read = true;
-                })
+                notificationApi.util.updateQueryData(
+                    "getNotifications",
+                    undefined,
+                    (draft) => {
+                        const idx = Array.isArray(draft)
+                            ? draft.findIndex((x) => x?.id === id)
+                            : -1;
+                        if (idx > -1) draft[idx].read = true;
+                    }
+                )
             );
-        } catch { }
+        } catch {
+            // ignore
+        }
     };
 
     const handleItemClick = async (e, item) => {
         const to = item.link || "#";
 
-        // Nếu đã đọc rồi thì điều hướng luôn
-        if (item.read) return;
+        if (item.read) return; // đã đọc thì để Link tự navigate
 
-        // Chặn điều hướng tức thì để set read trước
         e.preventDefault();
 
-        // 1) Optimistic update để UI đổi ngay
+        // 1) Optimistic update
         markReadInCache(item.id);
 
-        // 2) Gọi BE persist (đúng endpoint bạn đã khai báo: POST /notifications/mark-read/{id})
+        // 2) Gọi BE persist
         try {
             await markAsRead(item.id).unwrap();
-            // invalidatesTags đã setup → cache sẽ refetch/refresh UnreadCount & Notifications
         } catch {
-            // giữ nguyên optimistic cho UX mượt; lần refetch tiếp sẽ sync lại với BE
+            // refetch sau sẽ sync nếu lệch
         } finally {
             // 3) Điều hướng
             navigate(to);
@@ -175,94 +248,131 @@ export default function NotificationsCard() {
     };
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Thông báo mới</h3>
-                <button
-                    className="text-sm px-3 h-8 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
-                    type="button"
-                >
-                    Xem tất cả
-                </button>
+        <>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-gray-800">
+                            Thông báo mới
+                        </h3>
+                        {unreadCount > 0 && (
+                            <span
+                                className="
+                                    inline-flex items-center justify-center
+                                    min-w-[1.75rem] h-6 px-2
+                                    rounded-full text-xs font-semibold
+                                    bg-blue-100 text-blue-700 ring-1 ring-blue-200
+                                "
+                                title={`${unreadCount} thông báo chưa đọc`}
+                            >
+                                {unreadCount}
+                            </span>
+                        )}
+                    </div>
+
+                    <button
+                        className="text-sm px-3 h-8 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
+                        type="button"
+                        onClick={() => setShowAllModal(true)}
+                    >
+                        {unreadCount > 0
+                            ? `Xem tất cả (${unreadCount})`
+                            : "Xem tất cả"}
+                    </button>
+                </div>
+
+                {/* List nhỏ (4 item mới nhất) */}
+                <ul className="divide-y divide-gray-100">
+                    {/* Loading */}
+                    {isLoading && (
+                        <>
+                            <SkeletonItem />
+                            <SkeletonItem />
+                            <SkeletonItem />
+                            <SkeletonItem />
+                        </>
+                    )}
+
+                    {/* Error */}
+                    {isError && (
+                        <li className="py-6 text-center text-sm text-red-500">
+                            Đã xảy ra lỗi khi tải thông báo.
+                        </li>
+                    )}
+
+                    {/* Empty */}
+                    {!isLoading &&
+                        !isError &&
+                        displayItems.length === 0 && (
+                            <li className="py-6 text-center text-sm text-gray-500">
+                                Chưa có thông báo mới
+                            </li>
+                        )}
+
+                    {/* Data */}
+                    {!isLoading &&
+                        !isError &&
+                        displayItems.map((item) => (
+                            <li key={item.id} className="relative">
+                                <Link
+                                    to={item.link || "#"}
+                                    className={liClass(item)}
+                                    onClick={(e) => handleItemClick(e, item)}
+                                >
+                                    {!item.read && <NewPing />}
+
+                                    <IconBubble variant={item.type} />
+
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-start gap-2">
+                                            {!item.read && (
+                                                <span className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 ring-1 ring-blue-200">
+                                                    Mới
+                                                </span>
+                                            )}
+                                            <p
+                                                className="font-medium text-sm leading-snug text-gray-900"
+                                                dangerouslySetInnerHTML={{
+                                                    __html: item.text,
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
+                                            {!item.read && <Dot />}
+                                            <span>{item.time}</span>
+                                        </div>
+                                    </div>
+
+                                    <svg
+                                        className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition ml-2 mt-1 shrink-0"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path
+                                            d="M9 18l6-6-6-6"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                    </svg>
+                                </Link>
+                            </li>
+                        ))}
+                </ul>
             </div>
 
-            {/* List */}
-            <ul className="divide-y divide-gray-100">
-                {/* Loading */}
-                {isLoading && (
-                    <>
-                        <SkeletonItem />
-                        <SkeletonItem />
-                        <SkeletonItem />
-                        <SkeletonItem />
-                    </>
-                )}
-
-                {/* Error */}
-                {isError && (
-                    <li className="py-6 text-center text-sm text-red-500">
-                        Đã xảy ra lỗi khi tải thông báo.
-                    </li>
-                )}
-
-                {/* Empty */}
-                {!isLoading && !isError && displayItems.length === 0 && (
-                    <li className="py-6 text-center text-sm text-gray-500">
-                        Chưa có thông báo mới
-                    </li>
-                )}
-
-                {/* Data */}
-                {!isLoading &&
-                    !isError &&
-                    displayItems.map((item) => (
-                        <li key={item.id} className="relative">
-                            <Link
-                                to={item.link || "#"}
-                                className={liClass(item)}
-                                onClick={(e) => handleItemClick(e, item)}
-                            >
-                                {/* Ping cho “chưa đọc” */}
-                                {!item.read && <NewPing />}
-
-                                {/* Icon */}
-                                <IconBubble variant={item.type} />
-
-                                {/* Nội dung */}
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-start gap-2">
-                                        {!item.read && (
-                                            <span className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 ring-1 ring-blue-200">
-                                                Mới
-                                            </span>
-                                        )}
-                                        <p
-                                            className="font-medium text-sm leading-snug text-gray-900"
-                                            dangerouslySetInnerHTML={{ __html: item.text }}
-                                        />
-                                    </div>
-
-                                    <div className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
-                                        {!item.read && <Dot />}
-                                        <span>{item.time}</span>
-                                    </div>
-                                </div>
-
-                                {/* Chevron */}
-                                <svg
-                                    className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition ml-2 mt-1 shrink-0"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                >
-                                    <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            </Link>
-                        </li>
-                    ))}
-            </ul>
-        </div>
+            {/* Modal xem tất cả + tabs phân loại */}
+            <AllNotificationsModal
+                open={showAllModal}
+                onClose={() => setShowAllModal(false)}
+                items={items}
+                isLoading={isLoading}
+                isError={isError}
+                onItemClick={handleItemClick}
+            />
+        </>
     );
 }

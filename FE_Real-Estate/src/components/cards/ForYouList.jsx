@@ -14,11 +14,9 @@ const RECO_TAKE = 24;
 
 export default function ForYouList() {
   const dispatch = useDispatch();
-  const {
-    forYouList,
-    forYouSource,
-    forYouLoading,
-  } = useSelector((s) => s.property);
+  const { forYouList, forYouSource, forYouLoading } = useSelector(
+    (s) => s.property
+  );
 
   const authUser = useSelector((s) => s.auth.user);
   const userId = authUser?.id || authUser?.userId || null;
@@ -55,6 +53,9 @@ export default function ForYouList() {
   // cờ: đã load xong sessionStorage (để tránh race)
   const [sessionLoaded, setSessionLoaded] = useState(false);
 
+  // cờ: đã hiện modal nearby cho lần search hiện tại chưa
+  const [hasSeenNearbyModal, setHasSeenNearbyModal] = useState(false);
+
   const screens = Grid.useBreakpoint();
   const modalWidth = 640;
 
@@ -64,9 +65,10 @@ export default function ForYouList() {
     setExpanded(false);
     setHasSearched(false);
     setShowEmptyModal(false);
+    setHasSeenNearbyModal(false);
   }, [userId]);
 
-  // ===== Load session (nhớ lựa chọn + hasSearched) =====
+  // ===== Load session (nhớ lựa chọn + hasSearched + hasSeenNearbyModal) =====
   useEffect(() => {
     if (!userKey) {
       setSessionLoaded(true);
@@ -94,6 +96,9 @@ export default function ForYouList() {
 
         if (saved?.meta?.hasSearched) {
           setHasSearched(true);
+        }
+        if (saved?.meta?.hasSeenNearbyModal) {
+          setHasSeenNearbyModal(true);
         }
       }
     } catch {
@@ -137,12 +142,42 @@ export default function ForYouList() {
     [expanded, effectiveList]
   );
 
-  // Khi BE trả source = nearby => mở modal thông báo
+  // Khi BE trả source = nearby => mở modal thông báo (chỉ 1 lần / search)
   useEffect(() => {
+    if (!hasSearched) return; // chỉ hiển thị khi đã thực sự bấm "Xem gợi ý"
+    if (hasSeenNearbyModal) return;
+
     if (forYouSource === "nearby" && effectiveHasData) {
       setShowNearbyModal(true);
+      setHasSeenNearbyModal(true);
+
+      if (userKey) {
+        try {
+          const raw = sessionStorage.getItem(userKey);
+          const saved = raw ? JSON.parse(raw) : {};
+          sessionStorage.setItem(
+            userKey,
+            JSON.stringify({
+              ...saved,
+              meta: {
+                ...(saved.meta || {}),
+                hasSearched: true,
+                hasSeenNearbyModal: true,
+              },
+            })
+          );
+        } catch {
+          // ignore
+        }
+      }
     }
-  }, [forYouSource, effectiveHasData]);
+  }, [
+    forYouSource,
+    effectiveHasData,
+    hasSearched,
+    hasSeenNearbyModal,
+    userKey,
+  ]);
 
   // ===== Lần đầu load: ưu tiên dùng tiêu chí đã lưu (nếu có) =====
   useEffect(() => {
@@ -216,7 +251,7 @@ export default function ForYouList() {
     locationApi
       .getCities()
       .then((list) => setProvinces(list || []))
-      .catch(() => { })
+      .catch(() => {})
       .finally(() => setLoadingProv(false));
   }, [showModal, provinces.length]);
 
@@ -240,6 +275,7 @@ export default function ForYouList() {
     setShowModal(false);
     setForYouLocalLoading(true);
     setHasSearched(true);
+    setHasSeenNearbyModal(false); // 🔹 reset cho lần search mới
     setShowEmptyModal(false);
     const start = performance.now();
 
@@ -277,6 +313,7 @@ export default function ForYouList() {
             },
             meta: {
               hasSearched: true,
+              hasSeenNearbyModal: false, // sẽ set true khi thực sự fallback nearby
             },
             ts: Date.now(),
           })
@@ -451,7 +488,7 @@ export default function ForYouList() {
         style={{
           borderRadius: 18,
           overflow: "hidden",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.15)",
         }}
         footer={[
           <Button key="cancel" onClick={() => setShowModal(false)}>

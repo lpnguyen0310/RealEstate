@@ -180,11 +180,6 @@ balance: profile.mainBalance ?? 0,
           <PostsChartCard defaultMode="day" />
         </div>
       </div>
-
-      <div>
-        <h1 className="text-2xl font-semibold mb-2 sm:mb-3">Tổng quan</h1>
-        <p className="text-sm sm:text-base">Xin chào! Đây là bảng điều khiển của bạn.</p>
-      </div>
       <LeadDetailModal
         visible={isLeadModalVisible}
         leadType={leadTypeToShow}

@@ -2,7 +2,8 @@ import api from "@/api/axios";
 
 /* ===== ENV & CONST ===== */
 export const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_KEY;
-export const MODEL = import.meta.env.VITE_OPENROUTER_MODEL || "openai/gpt-3.5-turbo";
+export const MODEL =
+    import.meta.env.VITE_OPENROUTER_MODEL || "openai/gpt-3.5-turbo";
 
 /* ===== tiny utils ===== */
 export const uid = () => Math.random().toString(36).slice(2);
@@ -32,7 +33,10 @@ export async function callAI(historyMsgs) {
     };
     const cleaned = (historyMsgs || [])
         .filter((m) => typeof m?.content === "string" && m.content.trim())
-        .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.content }));
+        .map((m) => ({
+            role: m.role === "user" ? "user" : "assistant",
+            content: m.content,
+        }));
 
     try {
         const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -43,9 +47,14 @@ export async function callAI(historyMsgs) {
                 "HTTP-Referer": window.location.origin,
                 "X-Title": "RealEstateX",
             },
-            body: JSON.stringify({ model: MODEL, messages: [sys, ...cleaned], temperature: 0.6 }),
+            body: JSON.stringify({
+                model: MODEL,
+                messages: [sys, ...cleaned],
+                temperature: 0.6,
+            }),
         });
-        if (!res.ok) return `⚠️ OpenRouter ${res.status}: ${(await res.text()).slice(0, 160)}`;
+        if (!res.ok)
+            return `⚠️ OpenRouter ${res.status}: ${(await res.text()).slice(0, 160)}`;
         const data = await res.json();
         return data?.choices?.[0]?.message?.content?.trim() || "(empty)";
     } catch {
@@ -59,7 +68,8 @@ export function parseMoneyVN(s) {
     const x = s.toString().trim().toLowerCase().replace(/\./g, "").replace(/,/g, "");
     if (x.endsWith("k")) return Number(x.slice(0, -1)) * 1_000;
     if (/(ng|nghìn|nghin)$/.test(x)) return Number(x.replace(/[^\d]/g, "")) * 1_000;
-    if (x.endsWith("m") || x.endsWith("tr")) return Number(x.replace(/[^\d]/g, "")) * 1_000_000;
+    if (x.endsWith("m") || x.endsWith("tr"))
+        return Number(x.replace(/[^\d]/g, "")) * 1_000_000;
     if (/(ty|tỷ|tỷ)$/.test(x)) return Number(x.replace(/[^\d]/g, "")) * 1_000_000_000;
     const n = Number(x.replace(/[^\d]/g, ""));
     return Number.isFinite(n) ? n : null;
@@ -67,46 +77,130 @@ export function parseMoneyVN(s) {
 
 export function parseArea(s) {
     if (!s) return null;
-    const n = Number(String(s).toLowerCase().replace(/m2|m²/g, "").replace(/[^\d.]/g, ""));
+    const n = Number(
+        String(s).toLowerCase().replace(/m2|m²/g, "").replace(/[^\d.]/g, "")
+    );
     return Number.isFinite(n) ? n : null;
 }
 
 export function parseSearchDSL(text) {
     const m = text.trim().match(/^\/search\s+(.+)$/i);
     if (!m) return null;
-    const tokens = m[1].split(/\s+/).map(t => t.trim()).filter(Boolean);
+
+    const tokens = m[1]
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+
     const params = {};
+
     for (const t of tokens) {
         const rel = t.match(/^([^=<>:]+)\s*(<=|>=|=|:)\s*(.+)$/);
         if (!rel) continue;
-        const key = rel[1].toLowerCase(), op = rel[2], val = rel[3];
+
+        const rawKey = rel[1].trim();
+        const key = rawKey.toLowerCase();
+        const op = rel[2];
+        const val = rel[3].trim();
+
+        // ---- TYPE ----
         if (key === "type") {
+            // "rent" => rent, còn lại mặc định sell
             params.type = val.toLowerCase().includes("rent") ? "rent" : "sell";
-        } else if (key === "category") {
+            continue;
+        }
+
+        // ---- CATEGORY ----
+        if (key === "category") {
             params.category = val;
-        } else if (key === "keyword" || key === "q") {
+            continue;
+        }
+
+        // ---- KEYWORD ----
+        if (key === "keyword" || key === "q") {
             params.keyword = val;
-        } else if (key === "area") {
-            params.keyword = (params.keyword ? params.keyword + " " : "") + val;
-        } else if (key === "price") {
+            continue;
+        }
+
+        // ---- PRICE (VND) ----
+        if (key === "price") {
             const v = parseMoneyVN(val);
             if (v != null) {
                 if (op === "<=") params.priceTo = v;
                 else if (op === ">=") params.priceFrom = v;
-                else params.priceFrom = params.priceTo = v;
+                else {
+                    params.priceFrom = v;
+                    params.priceTo = v;
+                }
             }
-        } else if (key === "beds" || key === "bedrooms") {
-            const n = Number(val.replace(/[^\d]/g, ""));
-            if (Number.isFinite(n)) params.keyword = (params.keyword ? params.keyword + " " : "") + `${n} phòng ngủ`;
-        } else if (key === "areasize" || key === "size" || key === "area") {
+            continue;
+        }
+
+        // ---- AREA (m²) ----
+        if (key === "areasize" || key === "size" || key === "area") {
             const a = parseArea(val);
             if (a != null) {
                 if (op === "<=") params.areaTo = a;
                 else if (op === ">=") params.areaFrom = a;
-                else params.areaFrom = params.areaTo = a;
+                else {
+                    params.areaFrom = a;
+                    params.areaTo = a;
+                }
             }
+            continue;
+        }
+
+        // ---- BEDROOMS ----
+        if (key === "beds" || key === "bedrooms") {
+            const n = Number(val.replace(/[^\d]/g, ""));
+            if (!Number.isFinite(n)) continue;
+
+            if (op === "<=") {
+                params.bedroomsTo = n;
+            } else if (op === ">=") {
+                params.bedroomsFrom = n; // ≥ 2
+            } else {
+                params.bedroomsFrom = n;
+                params.bedroomsTo = n;
+            }
+            continue;
+        }
+
+        // ---- BATHROOMS ----
+        if (key === "baths" || key === "bathrooms") {
+            const n = Number(val.replace(/[^\d]/g, ""));
+            if (!Number.isFinite(n)) continue;
+
+            if (op === "<=") {
+                params.bathroomsTo = n;
+            } else if (op === ">=") {
+                params.bathroomsFrom = n;
+            } else {
+                params.bathroomsFrom = n;
+                params.bathroomsTo = n;
+            }
+            continue;
+        }
+
+        // ---- AMENITIES (optional, dạng id) ----
+        if (key === "amenities" || key === "amenity") {
+            // ví dụ: amenities:1,5,7
+            const ids = val
+                .split(/[;,]+/)
+                .map((x) => x.trim())
+                .map((x) => Number(x.replace(/[^\d]/g, "")))
+                .filter((x) => Number.isFinite(x));
+
+            if (ids.length) {
+                // BE đọc query param "amenities" dạng "1,5,7"
+                params.amenities = ids.join(",");
+                // nếu BE đọc "amenityIds" dạng List<Long> thì đổi:
+                // params.amenityIds = ids;
+            }
+            continue;
         }
     }
+
     return params;
 }
 
@@ -156,36 +250,65 @@ export async function searchPropertiesAPI(params) {
 export function buildSearchSummary({ total, page, pages, shownCount }) {
     const pn = (n) => new Intl.NumberFormat("vi-VN").format(n);
     const pageText = pages > 1 ? ` (trang ${page + 1}/${pages})` : "";
-    if (!total) return "Chưa thấy tin nào khớp tiêu chí 😥. Bạn thử:\n• Đổi từ khóa\n• Nới khoảng giá/diện tích\n• Chọn lại loại tin";
-    if (total === 1) return "Mình tìm được 1 tin đúng yêu cầu, bạn xem ngay bên dưới nhé.";
+    if (!total)
+        return (
+            "Chưa thấy tin nào khớp tiêu chí 😥. Bạn thử:\n" +
+            "• Đổi từ khóa\n" +
+            "• Nới khoảng giá/diện tích\n" +
+            "• Chọn lại loại tin"
+        );
+    if (total === 1)
+        return "Mình tìm được 1 tin đúng yêu cầu, bạn xem ngay bên dưới nhé.";
     const head = `Mình tìm được ${pn(total)} tin phù hợp${pageText}.`;
-    const tail = shownCount && shownCount < total ? ` Mình hiển thị ${shownCount} tin đầu tiên trước, cần mình tải thêm không?` : "";
+    const tail =
+        shownCount && shownCount < total
+            ? ` Mình hiển thị ${shownCount} tin đầu tiên trước, cần mình tải thêm không?`
+            : "";
     return head + tail;
 }
 
-/* ===== NL → /search ===== */
+/* ===== NL → /search (DSL text) ===== */
 export function tryAutoConvertToSearch(nlText) {
     if (!nlText) return null;
     const text = nlText.trim();
     const verbRe = /^(tìm|cho tôi xem|hiển thị|tôi muốn xem|liệt kê)\b/i;
     if (!verbRe.test(text)) return null;
 
-    let body = text.replace(verbRe, "")
-        .replace(/\b(các|những|bất động sản|tin|nhà|căn hộ|chung cư|bài đăng)\b/gi, "")
+    let body = text
+        .replace(verbRe, "")
+        .replace(
+            /\b(các|những|bất động sản|tin|nhà|căn hộ|chung cư|bài đăng)\b/gi,
+            ""
+        )
         .trim();
 
     let type = "";
     if (/\bthuê\b/i.test(body)) type = "type=rent";
-    if (/\b(mua|bán)\b/i.test(body)) type = "type=buy";
+    if (/\b(mua|bán)\b/i.test(body)) type = "type=sell";
 
-    const priceRe = /(dưới|<=|<|trên|>=|>|từ|khoảng)\s*(\d+[.,]?\d*)\s*(tỷ|ty|triệu|tr|nghìn|nghin|k)?/i;
+    const priceRe =
+        /(dưới|<=|<|trên|>=|>|từ|khoảng)\s*(\d+[.,]?\d*)\s*(tỷ|ty|triệu|tr|nghìn|nghin|k)?/i;
     let priceClause = "";
     const pm = body.match(priceRe);
     if (pm) {
-        const dir = pm[1].toLowerCase(), val = pm[2], unit = pm[3] || "";
+        const dir = pm[1].toLowerCase(),
+            val = pm[2],
+            unit = pm[3] || "";
         let sign = "=";
-        if (dir.includes("dưới") || dir === "<=" || dir === "<" || dir.includes("khoảng")) sign = "<=";
-        if (dir.includes("trên") || dir === ">=" || dir === ">" || dir.includes("từ")) sign = sign === "<=" ? "<=" : ">=";
+        if (
+            dir.includes("dưới") ||
+            dir === "<=" ||
+            dir === "<" ||
+            dir.includes("khoảng")
+        )
+            sign = "<=";
+        if (
+            dir.includes("trên") ||
+            dir === ">=" ||
+            dir === ">" ||
+            dir.includes("từ")
+        )
+            sign = sign === "<=" ? "<=" : ">=";
         priceClause = ` price${sign}${val}${unit}`;
         body = body.replace(priceRe, "").trim();
     }
@@ -194,7 +317,11 @@ export function tryAutoConvertToSearch(nlText) {
     const locRe = /(ở|tại)\s+(.+)$/i;
     const lm = body.match(locRe);
     if (lm?.[2]) keyword = lm[2].trim();
-    else keyword = body.replace(/\b(ở|tại|quận|huyện|thành phố|tp\.?)\b/gi, "").replace(/\s+/g, " ").trim();
+    else
+        keyword = body
+            .replace(/\b(ở|tại|quận|huyện|thành phố|tp\.?)\b/gi, "")
+            .replace(/\s+/g, " ")
+            .trim();
 
     if (keyword) keyword = keyword.replace(/[,.;\-–—]+$/, "").trim();
 
@@ -204,4 +331,89 @@ export function tryAutoConvertToSearch(nlText) {
     if (priceClause) parts.push(priceClause.trim());
     const generated = parts.join(" ");
     return generated.length > "/search".length ? generated : null;
+}
+
+/* ===== NL → params trực tiếp (không cần /search) ===== */
+export function tryNLToSearchParams(nlText) {
+    if (!nlText) return null;
+    const original = nlText.trim();
+    if (!original) return null;
+
+    const text = original.toLowerCase();
+
+    // Phải có ý định tìm BĐS => tránh hiểu nhầm câu chat thường
+    const intentRe =
+        /(tìm|mua|thuê|cần|kiếm)\b.*(nhà|căn hộ|chung cư|phòng|đất|bất động sản|bđs)|\b(nhà|căn hộ|chung cư|phòng|đất|bất động sản|bđs)\b.*(tìm|mua|thuê)/;
+    if (!intentRe.test(text)) return null;
+
+    const params = {};
+
+    // Mục đích: mua / thuê
+    if (text.includes("thuê")) params.type = "rent";
+    else if (text.includes("mua") || text.includes("bán")) params.type = "sell";
+
+    // GIÁ: "dưới 7 tỷ", "trên 3 tỷ", "từ 2 tỷ", "khoảng 5 tỷ" ...
+    const priceRe =
+        /(dưới|<=|<|trên|>=|>|từ|khoảng)\s*([\d.,]+)\s*(tỷ|ty|triệu|tr|nghìn|nghin|k)?/i;
+    const pm = original.match(priceRe); // dùng original để giữ đơn vị
+    if (pm) {
+        const dir = pm[1].toLowerCase();
+        const num = pm[2];
+        const unit = pm[3] || "";
+        const val = parseMoneyVN(num + unit);
+        if (val != null) {
+            if (
+                dir.includes("dưới") ||
+                dir === "<=" ||
+                dir === "<" ||
+                dir.includes("khoảng")
+            ) {
+                params.priceTo = val;
+            } else if (
+                dir.includes("trên") ||
+                dir === ">=" ||
+                dir === ">" ||
+                dir.includes("từ")
+            ) {
+                params.priceFrom = val;
+            }
+        }
+    }
+
+    // DIỆN TÍCH: "trên 60m2", "khoảng 70 m²" -> đơn giản: areaFrom
+    const areaRe = /(\d+)\s*(m2|m²|m vuông|m\s*vuong)/i;
+    const am = original.match(areaRe);
+    if (am) {
+        const a = parseArea(am[0]);
+        if (a != null) {
+            params.areaFrom = a;
+        }
+    }
+
+    // PHÒNG NGỦ: "2pn", "2 phòng ngủ"
+    const bedRe = /(\d+)\s*(pn|phòng ngủ|phong ngu)/i;
+    const bm = original.match(bedRe);
+    if (bm) {
+        const n = Number(bm[1].replace(/[^\d]/g, ""));
+        if (Number.isFinite(n)) params.bedroomsFrom = n;
+    }
+
+    // PHÒNG TẮM: "2wc", "2 toilet"
+    const bathRe = /(\d+)\s*(wc|toilet|phòng tắm|phong tam)/i;
+    const wm = original.match(bathRe);
+    if (wm) {
+        const n = Number(wm[1].replace(/[^\d]/g, ""));
+        if (Number.isFinite(n)) params.bathroomsFrom = n;
+    }
+
+    // KHU VỰC: phần sau "ở"/"tại" -> cho vào keyword, BE map city bằng keyword
+    const locRe = /(ở|tại)\s+([^.,;]+)$/i;
+    const lm = original.match(locRe);
+    if (lm?.[2]) {
+        const kw = lm[2].trim();
+        if (kw) params.keyword = kw;
+    }
+
+    // Nếu không parse được gì thì trả null để fallback sang chat AI
+    return Object.keys(params).length ? params : null;
 }

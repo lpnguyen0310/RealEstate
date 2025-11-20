@@ -106,26 +106,47 @@ public class PropertyServiceImpl implements IPropertyService {
         Float areaTo        = params.get("areaTo")    != null ? Float.parseFloat(params.get("areaTo"))      : null;
         Long cityId         = params.get("cityId")    != null ? Long.parseLong(params.get("cityId"))        : null;
 
+        // 🔹 MỚI: phòng ngủ, phòng tắm, pháp lý, tiện ích
+        Integer bedroomsFrom  = params.get("bedroomsFrom")  != null ? Integer.parseInt(params.get("bedroomsFrom"))  : null;
+        Integer bathroomsFrom = params.get("bathroomsFrom") != null ? Integer.parseInt(params.get("bathroomsFrom")) : null;
+        String legalType      = params.get("legalType"); // "Sổ hồng" / "Sổ đỏ" ...
+
+        List<Long> amenityIds = null;
+        String amenitiesRaw = params.get("amenities"); // VD: "1,3,5"
+        if (amenitiesRaw != null && !amenitiesRaw.isBlank()) {
+            amenityIds = Arrays.stream(amenitiesRaw.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .toList();
+        }
+
         boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
 
-
         Specification<PropertyEntity> spec = Specification
-                .where(PropertySpecification.isPublished());
+                .where(PropertySpecification.isPublished())
+                .and(PropertySpecification.notExpired()); // optional: lọc tin hết hạn
+
         if (cityId != null) {
             spec = spec.and(PropertySpecification.hasCity(cityId));
         } else {
             spec = spec.and(PropertySpecification.hasKeyword(keyword, matchAll));
         }
+
         spec = spec
                 .and(PropertySpecification.hasPropertyType(propertyType))
                 .and(PropertySpecification.hasCategorySlug(categorySlug))
                 .and(PropertySpecification.priceBetween(priceFrom, priceTo))
-                .and(PropertySpecification.areaBetween(areaFrom, areaTo));
+                .and(PropertySpecification.areaBetween(areaFrom, areaTo))
+                // 🔹 các điều kiện mới
+                .and(PropertySpecification.hasMinBedrooms(bedroomsFrom))
+                .and(PropertySpecification.hasMinBathrooms(bathroomsFrom))
+                .and(PropertySpecification.hasLegalStatus(legalType))
+                .and(PropertySpecification.hasAnyAmenities(amenityIds));
 
         Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
         return resultPage.map(propertyMapper::toPropertyCardDTO);
     }
-
 
 
     private Pageable createPageableFromParams(Map<String, String> params) {
@@ -642,17 +663,36 @@ public class PropertyServiceImpl implements IPropertyService {
             log.info("[Reco][Behavior] FE range empty -> lookup priceAreaMinMax rows.size={}",
                     rows == null ? 0 : rows.size());
 
+//            if (rows != null && !rows.isEmpty()) {
+//                Object[] r = rows.get(0);
+//                if (r != null && r.length == 4) {
+//                    minPrice = toD(r[0]);
+//                    maxPrice = toD(r[1]);
+//                    Double minAreaD = toD(r[2]);
+//                    Double maxAreaD = toD(r[3]);
+//                    minArea = minAreaD == null ? null : minAreaD.floatValue();
+//                    maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
+//                }
+//            }
             if (rows != null && !rows.isEmpty()) {
                 Object[] r = rows.get(0);
                 if (r != null && r.length == 4) {
-                    minPrice = toD(r[0]);
-                    maxPrice = toD(r[1]);
-                    Double minAreaD = toD(r[2]);
-                    Double maxAreaD = toD(r[3]);
-                    minArea = minAreaD == null ? null : minAreaD.floatValue();
-                    maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
+                    Double maxPriceD = toD(r[1]);   // max price từ history
+                    Double maxAreaD  = toD(r[3]);   // max area từ history
+                    if (maxPriceD != null && maxPriceD > 0) {
+                        minPrice = 0d;
+                        maxPrice = maxPriceD;
+                    }
+
+                    if (maxAreaD != null && maxAreaD > 0) {
+                        minArea = 0f;
+                        maxArea = maxAreaD.floatValue();
+                    }
                 }
             }
+            log.info("[Reco][Behavior] range from history (0→max) -> price[{},{}], area[{},{}]",
+                    minPrice, maxPrice, minArea, maxArea);
+
             log.info("[Reco][Behavior] range from history -> price[{},{}], area[{},{}]",
                     minPrice, maxPrice, minArea, maxArea);
         } else {
