@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Box, TextField, Stack, Typography, debounce } from "@mui/material"; // <<< UPDATED
+import { Box, TextField, Stack, Typography, debounce, MenuItem } from "@mui/material"; // <<< UPDATED
 import { fmtDate, money } from "@/utils/validators";
 import {
     KpiGrid,
@@ -30,6 +30,11 @@ import {
     hardDeletePostThunk,
     setPendingAction,
     clearPendingAction,
+    bulkApproveThunk, 
+    bulkRejectThunk, 
+    setAllSelected,
+    toggleSelected,
+    clearSelection,
 } from "@/store/adminPostsSlice";
 
 import { Client } from "@stomp/stompjs";
@@ -55,6 +60,7 @@ export default function AdminPostsMUI() {
         loadingList,
         loadingCounts,
         actioningId,
+        selectedIds,
         q,
         category,
         listingType,
@@ -225,7 +231,12 @@ export default function AdminPostsMUI() {
 
     /* =============== NEW: Reject Reason Dialog state =============== */
     const [rejectDlg, setRejectDlg] = useState({ open: false, id: null, reason: "" });
-
+    const [bulkRejectDlg, setBulkRejectDlg] = useState({ open: false, reason: "" });
+    const [bulkApproveDlg, setBulkApproveDlg] = useState({
+        open: false,
+        listingType: decision.listingType,
+        durationDays: decision.durationDays,
+    });
 
 
 
@@ -477,6 +488,79 @@ export default function AdminPostsMUI() {
         };
     }, [counts]);
 
+    // 2. Tạo các hàm xử lý
+    const handleSelectAll = useCallback((event) => {
+        if (event.target.checked) {
+            // Lọc ra các ID có thể xử lý (ví dụ: chỉ PENDING_REVIEW)
+            // Nếu không lọc, dùng posts.map((n) => n.id)
+            const selectables = posts
+                .filter(p => p.status === 'PENDING_REVIEW') 
+                .map((n) => n.id);
+            dispatch(setAllSelected(selectables)); // <-- Gọi Redux Action
+        } else {
+            dispatch(clearSelection()); // <-- Gọi Redux Action
+        }
+    }, [dispatch, posts]);
+
+    const handleSelectOne = useCallback((id) => {
+        dispatch(toggleSelected(id)); // <-- Gọi Redux Action
+    }, [dispatch]);
+
+    const openBulkApprove = useCallback(() => {
+        if (selectedIds.length === 0) return;
+        setBulkApproveDlg({
+            open: true,
+            // Dùng giá trị mặc định từ Redux decision hoặc hardcode
+            listingType: decision.listingType, 
+            durationDays: decision.durationDays,
+        });
+    }, [selectedIds.length, decision.listingType, decision.durationDays]);
+
+    const confirmBulkApprove = useCallback(async () => {
+        if (selectedIds.length === 0) return;
+
+        // Chỉ truyền IDs và một ghi chú (nếu cần), BỎ QUA listingType và durationDays.
+        // Backend sẽ sử dụng gói tin đã được định nghĩa trong PropertyEntity.
+        await dispatch(bulkApproveThunk({
+            ids: selectedIds,
+            // BỎ QUA listingType và durationDays để Backend tự xử lý theo gói gốc
+            note: `Bulk approved by Admin (Retaining original listing type).`, 
+        }));
+
+        // Sau khi action thành công
+        await dispatch(fetchCountsThunk());
+        await dispatch(fetchPostsThunk());
+        
+        // Đóng dialog
+        setBulkApproveDlg(s => ({...s, open: false}));
+
+    }, [dispatch, selectedIds]);
+
+
+    const openBulkReject = useCallback(() => {
+        if (selectedIds.length === 0) return;
+        // Mở dialog nhập lý do cho hành động từ chối hàng loạt
+        setBulkRejectDlg({ open: true, reason: "" });
+    }, [selectedIds.length]);
+
+    const confirmBulkReject = useCallback(async () => {
+        const reason = (bulkRejectDlg.reason || "").trim();
+        if (selectedIds.length === 0 || reason.length < 5) return;
+
+        // Gửi thunk với data cần thiết
+        await dispatch(bulkRejectThunk({
+            ids: selectedIds,
+            reason: reason,
+        }));
+
+        // Sau khi action thành công
+        await dispatch(fetchCountsThunk());
+        await dispatch(fetchPostsThunk());
+
+        setBulkRejectDlg(s => ({...s, open: false}));
+
+    }, [dispatch, selectedIds, bulkRejectDlg]);
+
     return (
         <Box
             sx={{
@@ -549,6 +633,11 @@ export default function AdminPostsMUI() {
                     money={money}
                     fmtDate={fmtDate}
                     setDecision={(payload) => dispatch(setDecision(payload))}
+                    selectedIds={selectedIds}
+                    onSelectAll={handleSelectAll}
+                    onSelectOne={handleSelectOne}
+                    onBulkApprove={openBulkApprove}
+                    onBulkReject={openBulkReject}
                 />
 
                 <PostDetailDrawer
@@ -647,6 +736,56 @@ export default function AdminPostsMUI() {
                     </Stack>
                 }
             />
+            <ConfirmDialog
+                open={bulkRejectDlg.open}
+                title={`Từ chối ${selectedIds.length} bài đăng`}
+                confirmText={`Từ chối ${selectedIds.length} tin`}
+                onClose={() => setBulkRejectDlg(s => ({...s, open: false}))}
+                onConfirm={confirmBulkReject}
+                confirmDisabled={!bulkRejectDlg.reason.trim() || bulkRejectDlg.reason.trim().length < 5}
+                content={
+                    <Stack spacing={1}>
+                        <Typography sx={{ color: "#475569" }}>
+                            Vui lòng nhập <b>lý do từ chối chung</b> cho <b>{selectedIds.length}</b> tin đã chọn.
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#64748b" }}>
+                            Tối thiểu 5 ký tự.
+                        </Typography>
+                        <TextField
+                            autoFocus
+                            multiline
+                            minRows={3}
+                            maxRows={6}
+                            placeholder="Nhập lý do chung..."
+                            value={bulkRejectDlg.reason}
+                            onChange={(e) => setBulkRejectDlg((s) => ({ ...s, reason: e.target.value }))}
+                            inputProps={{ maxLength: 500 }}
+                            helperText={bulkRejectDlg.reason.trim().length < 5 ? "Vui lòng nhập tối thiểu 5 ký tự" : " "}
+                        />
+                    </Stack>
+                }
+            />
+            
+            {/* === NEW: Dialog Duyệt Hàng Loạt (Bulk Approve) === */}
+            <ConfirmDialog
+                open={bulkApproveDlg.open}
+                title={`Duyệt ${selectedIds.length} bài đăng`}
+                confirmText={`DUYỆT ${selectedIds.length} TIN`}
+                onClose={() => setBulkApproveDlg(s => ({...s, open: false}))}
+                onConfirm={confirmBulkApprove}
+                // Không cần check durationDays nữa
+                confirmDisabled={selectedIds.length === 0} 
+                content={
+                    <Stack spacing={1}>
+                        <Typography>
+                            Bạn đang chuẩn bị duyệt **{selectedIds.length}** tin đã chọn.
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0f6b4e' }}>
+                            Hệ thống sẽ áp dụng gói tin và thời hạn **đã được người dùng chọn ban đầu** cho từng bài viết.
+                        </Typography>
+                    </Stack>
+                }
+            />
             <ReportDetailsModal
                 open={reportsModal.open}
                 loading={isLoadingReports || isDeletingReports || isSendingWarning}
@@ -657,7 +796,7 @@ export default function AdminPostsMUI() {
                 onDeleteReports={handleDeleteReports}
                 onSendWarning={handleSendWarning}
             />
-            {/* === (Hết bước 5) === */}
+            
         </Box>
     );
 }

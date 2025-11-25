@@ -6,6 +6,7 @@ import com.backend.be_realestate.modals.dto.order.AdminOrderListDTO;
 import com.backend.be_realestate.modals.dto.order.OrderDTO;
 import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
+import com.backend.be_realestate.modals.request.AdminPropertyBulkReq;
 import com.backend.be_realestate.modals.request.order.AdminOrderBulkReq;
 import com.backend.be_realestate.modals.response.AdminUserResponse;
 import com.backend.be_realestate.modals.response.ApiResponse;
@@ -22,10 +23,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @AllArgsConstructor
@@ -212,6 +216,41 @@ public class AdminController {
 
         // SỬA: Dùng success(null)
         return ApiResponse.success(null);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/properties/bulk-approve")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<List<PropertyShortResponse>> bulkApprove(
+            @RequestBody AdminPropertyBulkReq req,
+            Authentication auth
+    ) {
+        Long adminId = securityUtils.currentUserId(auth);
+        List<PropertyShortResponse> results = adminPropertyService.bulkApprove(req, adminId);
+
+        // Trả về danh sách các tin đã được duyệt thành công
+        return ApiResponse.success(results);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/properties/bulk-reject")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<List<PropertyShortResponse>> bulkReject(
+            @RequestBody AdminPropertyBulkReq req,
+            Authentication auth
+    ) {
+        // Validation cơ bản (chi tiết hơn nên để ở service)
+        if (req.getReason() == null || req.getReason().isBlank()) {
+            // Thay vì throw IllegalArgumentException, bạn có thể trả về lỗi qua ApiResponse
+            // Tuy nhiên, nếu throw exception, Spring sẽ tự động bắt và trả về 400 Bad Request.
+            throw new IllegalArgumentException("Reason is required for bulk rejection.");
+        }
+
+        Long adminId = securityUtils.currentUserId(auth);
+        List<PropertyShortResponse> results = adminPropertyService.bulkReject(req, adminId);
+
+        // Trả về danh sách các tin đã bị từ chối thành công
+        return ApiResponse.success(results);
     }
 
 

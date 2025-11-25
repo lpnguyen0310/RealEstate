@@ -42,6 +42,8 @@ const initialState = {
     loadingDetail: false,
     actioningId: null,
 
+    selectedIds: [],
+
     // filters
     q: "",
     category: "",
@@ -272,6 +274,34 @@ export const hardDeletePostThunk = createAsyncThunk(
         }
     }
 );
+export const bulkApproveThunk = createAsyncThunk(
+    "adminPosts/bulkApprove",
+    async (reqBody, { getState, rejectWithValue }) => {
+        const s = getState().adminPosts;
+        try {
+            // reqBody = { ids: [1, 2, ...], listingType: "VIP", durationDays: 30, note: "..." }
+            const res = await adminPropertyApi.bulkApprove(reqBody);
+            // Payload trả về list các PropertyShortResponse đã duyệt thành công
+            return { approvedIds: reqBody.ids, results: res?.data || [] };
+        } catch (e) {
+            return rejectWithValue(e?.response?.data?.message || "Duyệt hàng loạt thất bại");
+        }
+    }
+);
+
+export const bulkRejectThunk = createAsyncThunk(
+    "adminPosts/bulkReject",
+    async (reqBody, { getState, rejectWithValue }) => {
+        const s = getState().adminPosts;
+        try {
+            // reqBody = { ids: [1, 2, ...], reason: "Lý do chung" }
+            await adminPropertyApi.bulkReject(reqBody);
+            return { rejectedIds: reqBody.ids, reason: reqBody.reason };
+        } catch (e) {
+            return rejectWithValue(e?.response?.data?.message || "Từ chối hàng loạt thất bại");
+        }
+    }
+);
 
 // ================== SLICE ==================
 const adminPostsSlice = createSlice({
@@ -330,6 +360,22 @@ const adminPostsSlice = createSlice({
             if (from && next[from] != null) next[from] = Math.max(0, (next[from] || 0) - 1);
             if (!removed && to) next[to] = (next[to] || 0) + 1;
             s.counts = next;
+        },
+        setAllSelected: (s, a) => {
+            // a.payload là array of IDs trên trang hiện tại
+            s.selectedIds = a.payload;
+        },
+        toggleSelected: (s, a) => {
+            const id = a.payload;
+            const index = s.selectedIds.indexOf(id);
+            if (index === -1) {
+                s.selectedIds.push(id);
+            } else {
+                s.selectedIds.splice(index, 1);
+            }
+        },
+        clearSelection: (s) => {
+            s.selectedIds = [];
         },
     },
     extraReducers: (builder) => {
@@ -531,6 +577,67 @@ const adminPostsSlice = createSlice({
             .addCase(hardDeletePostThunk.rejected, (s) => {
                 s.actioningId = null;
             });
+
+        builder
+            .addCase(bulkApproveThunk.pending, (s) => {
+                s.actioningId = "BULK"; // Đánh dấu đang thực hiện Bulk Action
+            })
+            .addCase(bulkApproveThunk.fulfilled, (s, { payload }) => {
+                const { approvedIds } = payload;
+                s.actioningId = null;
+                s.selectedIds = []; // Xóa selection
+
+                // Lọc bỏ các posts đã được duyệt thành công (nếu tab hiện tại là PENDING_REVIEW)
+                const fromStatus = "PENDING_REVIEW";
+                const isProcessingPending = s.selectedTab === fromStatus;
+                
+                if (isProcessingPending) {
+                    s.posts = s.posts.filter(p => !approvedIds.includes(p.id));
+                    s.totalItems = Math.max(0, s.totalItems - approvedIds.length);
+                } else {
+                    // Nếu không phải tab Pending, cập nhật status (dù ít xảy ra)
+                    s.posts = s.posts.map(p => approvedIds.includes(p.id) ? {...p, status: "PUBLISHED"} : p);
+                }
+
+                // Cập nhật Counts
+                s.counts = {
+                    ...s.counts,
+                    [fromStatus]: Math.max(0, (s.counts[fromStatus] || 0) - approvedIds.length),
+                    PUBLISHED: (s.counts.PUBLISHED || 0) + approvedIds.length,
+                };
+            })
+            .addCase(bulkApproveThunk.rejected, (s) => {
+                s.actioningId = null;
+            });
+
+
+        // ================== bulkReject ==================
+        builder
+            .addCase(bulkRejectThunk.pending, (s) => {
+                s.actioningId = "BULK";
+            })
+            .addCase(bulkRejectThunk.fulfilled, (s, { payload }) => {
+                const { rejectedIds, reason } = payload;
+                s.actioningId = null;
+                s.selectedIds = []; // Xóa selection
+                
+                // Lọc bỏ các posts đã bị từ chối
+                const fromStatus = s.selectedTab; // Có thể từ PENDING, PUBLISHED, ...
+                s.posts = s.posts.filter(p => !rejectedIds.includes(p.id));
+                s.totalItems = Math.max(0, s.totalItems - rejectedIds.length);
+                
+                // Cập nhật Counts
+                s.counts = {
+                    ...s.counts,
+                    [fromStatus]: Math.max(0, (s.counts[fromStatus] || 0) - rejectedIds.length),
+                    REJECTED: (s.counts.REJECTED || 0) + rejectedIds.length,
+                };
+
+                // Lưu ý: Sau Bulk action, cần fetchCountsThunk để đảm bảo counts chính xác
+            })
+            .addCase(bulkRejectThunk.rejected, (s) => {
+                s.actioningId = null;
+            });
     },
 });
 
@@ -548,6 +655,9 @@ export const {
     setPendingAction,
     clearPendingAction,
     bumpCounts,
+    setAllSelected,   
+    toggleSelected,   
+    clearSelection,
 } = adminPostsSlice.actions;
 
 export default adminPostsSlice.reducer;

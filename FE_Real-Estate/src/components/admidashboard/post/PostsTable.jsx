@@ -19,6 +19,10 @@ import {
   Select,
   MenuItem,
   Badge,
+  Checkbox,
+  Toolbar,
+  Button,
+  alpha,
 } from "@mui/material";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -66,7 +70,18 @@ export default function PostsTable({
   money,
   fmtDate,
   setDecision,
+  selectedIds = [],      
+  onSelectAll,           
+  onSelectOne,           
+  onBulkApprove,        
+  onBulkReject,
 }) {
+
+  const numSelected = selectedIds.length;
+  const rowCount = rows.length;
+  // Kiểm tra xem tất cả row trong trang hiện tại có nằm trong selectedIds không
+  const isAllSelected = rowCount > 0 && rows.every(r => selectedIds.includes(r.id));
+  const isIndeterminate = numSelected > 0 && !isAllSelected;
   return (
     <Paper
       elevation={0}
@@ -76,8 +91,47 @@ export default function PostsTable({
         border: "1px solid #e8edf6",
         boxShadow: "0 6px 18px rgba(13,47,97,0.06)",
         mt: 2,
+        overflow: "hidden"
       }}
     >
+      {numSelected > 0 && (
+        <Toolbar
+          sx={{
+            pl: { sm: 2 },
+            pr: { xs: 1, sm: 1 },
+            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+            borderBottom: "1px solid #eef2f9",
+            minHeight: "50px !important", // Ghi đè chiều cao mặc định của Toolbar
+          }}
+        >
+          <Typography sx={{ flex: "1 1 100%" }} color="inherit" variant="subtitle1" component="div">
+            Đã chọn <b>{numSelected}</b> tin
+          </Typography>
+          
+          <Stack direction="row" spacing={1}>
+             <Button 
+                variant="contained" 
+                color="success" 
+                size="small" 
+                startIcon={<CheckCircleOutlineIcon />}
+                onClick={onBulkApprove}
+                sx={{ whiteSpace: 'nowrap', boxShadow: 'none' }}
+             >
+               Duyệt ({numSelected})
+             </Button>
+             <Button 
+                variant="contained" 
+                color="error" 
+                size="small" 
+                startIcon={<HighlightOffOutlinedIcon />}
+                onClick={onBulkReject}
+                sx={{ whiteSpace: 'nowrap', boxShadow: 'none' }}
+             >
+               Từ chối ({numSelected})
+             </Button>
+          </Stack>
+        </Toolbar>
+      )}
       <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
         {/* ===== Table cuộn ngang + header dính (giống UsersTable) ===== */}
         <TableContainer
@@ -98,29 +152,40 @@ export default function PostsTable({
             stickyHeader
             size="small"
             sx={{
-              minWidth: { xs: 1100, sm: 0 }, // ép rộng ở mobile để có thanh cuộn ngang
+              minWidth: { xs: 1300, sm: 0 }, // ép rộng ở mobile để có thanh cuộn ngang
               tableLayout: "fixed",
             }}
           >
             <TableHead sx={{ backgroundColor: "#f3f7ff" }}>
               <TableRow>
-                <TableCell sx={styles.headCell}>Mã tin</TableCell>
-                <TableCell sx={styles.headCell}>Tiêu đề</TableCell>
+                <TableCell padding="checkbox" sx={{...styles.headCell, width: "40px !important"}}>
+                  <Checkbox
+                    color="primary"
+                    indeterminate={numSelected > 0 && !isAllSelected} // Trạng thái gạch ngang (khi chưa chọn hết)
+                    checked={rowCount > 0 && isAllSelected}
+                    onChange={onSelectAll}
+                    inputProps={{
+                      'aria-label': 'select all desserts',
+                    }}
+                    disabled={loading || rows.length === 0}
+                  />
+                </TableCell>
+                <TableCell sx={{...styles.headCell, width: 80}}>Mã tin</TableCell>
+                <TableCell sx={{...styles.headCell, width: 300}}>Tiêu đề</TableCell>
 
                 {/* Ẩn Loại ở xs */}
-                <TableCell sx={{ ...styles.headCell, display: { xs: "none", sm: "table-cell" } }}>
+                <TableCell sx={{ ...styles.headCell, width: 100, display: { xs: "none", sm: "table-cell" } }}>
                   Loại
                 </TableCell>
 
-                <TableCell sx={{ ...styles.headCell }} align="right">
+                <TableCell sx={{ ...styles.headCell, width: 120 }} align="right">
                   Giá
                 </TableCell>
 
-                <TableCell sx={styles.headCell}>Trạng thái</TableCell>
-
+                <TableCell sx={{...styles.headCell, width: 140}}>Trạng thái</TableCell>
                 {/* Ẩn Báo cáo ở xs */}
                 <TableCell
-                  sx={{ ...styles.headCell, display: { xs: "none", sm: "table-cell" } }}
+                  sx={{ ...styles.headCell, width: 80, display: { xs: "none", sm: "table-cell" } }}
                   align="right"
                 >
                   Báo cáo
@@ -157,15 +222,30 @@ export default function PostsTable({
               ) : (
                 rows.map((r) => {
                   const disabled = actioningId === r.id;
+                  const isSelected = selectedIds.includes(r.id);
                   return (
                     <TableRow
                       key={r.id}
                       hover
+                      selected={isSelected}
                       sx={{
                         "& td": { transition: "background-color 140ms ease", py: { xs: 1, sm: 1.25 } },
-                        "&:hover td": { backgroundColor: HOVER_BG },
+                        "&.Mui-selected": { backgroundColor: alpha("#3059ff", 0.08) }, // Màu nền khi chọn
+                        "&.Mui-selected:hover": { backgroundColor: alpha("#3059ff", 0.12) },
+                        "&:hover td": { backgroundColor: !isSelected && HOVER_BG },
                       }}
                     >
+                      <TableCell padding="checkbox" sx={styles.bodyCell}>
+                         <Checkbox
+                            color="primary"
+                            checked={isSelected}
+                            onChange={(event) => {
+                                // Stop propagation để tránh conflict nếu có sự kiện click row
+                                event.stopPropagation(); 
+                                onSelectOne(r.id);
+                            }}
+                         />
+                      </TableCell>
                       {/* Mã tin */}
                       <TableCell sx={{ ...styles.bodyCell, whiteSpace: "nowrap" }}>{r.id}</TableCell>
 
@@ -213,6 +293,7 @@ export default function PostsTable({
                           color={STATUS_CHIP_COLOR[r.status] ?? "default"}
                           size="small"
                           sx={{ fontWeight: 600 }}
+                          style={{width: "120px"}}
                         />
                       </TableCell>
 

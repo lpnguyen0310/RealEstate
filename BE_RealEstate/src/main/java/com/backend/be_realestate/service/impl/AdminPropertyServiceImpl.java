@@ -11,6 +11,7 @@ import com.backend.be_realestate.modals.dto.PropertyAuditDTO;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
+import com.backend.be_realestate.modals.request.AdminPropertyBulkReq;
 import com.backend.be_realestate.modals.response.PropertyShortResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.AdminPropertyService;
@@ -188,6 +189,67 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
         auditRepo.deleteByPropertyId(propertyId);
 
         propertyRepository.deleteById(propertyId);
+    }
+
+    @Override
+    @Transactional
+    public List<PropertyShortResponse> bulkApprove(AdminPropertyBulkReq req, Long adminId) {
+        if (req.getIds() == null || req.getIds().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Chuyển đổi Bulk Request thành Single Request để tái sử dụng logic approve cũ
+        ApprovePropertyRequest approveReq = new ApprovePropertyRequest(
+                req.getListingType(),
+                req.getDurationDays(),
+                req.getNote()
+        );
+
+        List<PropertyShortResponse> results = new ArrayList<>();
+
+        // Lưu ý: Tối ưu hiệu suất: bạn nên dùng propertyRepository.findAllById(req.getIds())
+        // và lặp qua danh sách đã tải về thay vì gọi database cho từng ID.
+        for (Long propertyId : req.getIds()) {
+            try {
+                // Tái sử dụng logic approve đơn lẻ
+                PropertyShortResponse response = this.approve(propertyId, approveReq, adminId);
+                results.add(response);
+            } catch (Exception e) {
+                log.error("Failed to bulk approve property ID {}: {}", propertyId, e.getMessage());
+                // Log lỗi và tiếp tục với bài tiếp theo
+            }
+        }
+        return results;
+    }
+
+    @Override
+    @Transactional
+    public List<PropertyShortResponse> bulkReject(AdminPropertyBulkReq req, Long adminId) {
+        if (req.getIds() == null || req.getIds().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // VALIDATION: Lý do từ chối là bắt buộc
+        if (req.getReason() == null || req.getReason().isBlank()) {
+            throw new IllegalArgumentException("Reason is required for bulk rejection.");
+        }
+
+        // Chuyển đổi Bulk Request thành Single Request để tái sử dụng logic reject cũ
+        RejectPropertyRequest rejectReq = new RejectPropertyRequest(req.getReason());
+
+        List<PropertyShortResponse> results = new ArrayList<>();
+
+        for (Long propertyId : req.getIds()) {
+            try {
+                // Tái sử dụng logic reject đơn lẻ
+                PropertyShortResponse response = this.reject(propertyId, rejectReq, adminId);
+                results.add(response);
+            } catch (Exception e) {
+                log.error("Failed to bulk reject property ID {}: {}", propertyId, e.getMessage());
+                // Log lỗi và tiếp tục
+            }
+        }
+        return results;
     }
 
     @Override
