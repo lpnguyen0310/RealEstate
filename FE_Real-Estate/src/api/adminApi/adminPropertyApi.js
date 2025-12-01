@@ -9,9 +9,9 @@ export const adminPropertyApi = {
         api.get(BASE, { params }).then((r) => r.data),
 
     // (optional) tổng hợp đếm theo trạng thái
-    stats: (params) =>
+    counts: (params) =>
         api.get(`${BASE}/stats`, { params }).then((r) => r.data),
-
+    
     // GET detail 1 tin
     detail: (id) =>
         api.get(`${BASE}/${id}`).then((r) => r.data),

@@ -6,6 +6,15 @@ import { normalizeStatuses, countByStatus } from "@/utils/validators";
 
 // Cho phép xác định có endpoint counts hay không
 const hasCountsApi = typeof adminPropertyApi?.counts === "function";
+const TAB_TO_API_STATUS = {
+    PENDING_REVIEW: "PENDING_REVIEW",
+    PUBLISHED: "PUBLISHED",
+    EXPIRING_SOON: "EXPIRINGSOON", // <-- quan trọng
+    EXPIRED: "EXPIRED",
+    HIDDEN: "HIDDEN",
+    REJECTED: "REJECTED",
+    ARCHIVED: "ARCHIVED",
+};
 
 /* ========= Chuẩn hoá contact từ nhiều cấu trúc khác nhau ========= */
 function normalizeContact(d = {}) {
@@ -68,13 +77,19 @@ export const fetchPostsThunk = createAsyncThunk(
     async (_, { getState, rejectWithValue }) => {
         const s = getState().adminPosts;
         try {
+            const feStatus = s.selectedTab;
+            const apiStatus =
+                feStatus === "ALL"
+                    ? undefined
+                    : TAB_TO_API_STATUS[feStatus] || feStatus;
+
             const res = await adminPropertyApi.list({
                 page: s.page - 1,
                 size: s.pageSize,
                 q: s.q || undefined,
                 categoryId: s.category || undefined,
                 listingType: s.listingType || undefined,
-                status: s.selectedTab === "ALL" ? undefined : s.selectedTab,
+                status: apiStatus,
                 sort: "postedAt,desc",
             });
 
@@ -150,6 +165,7 @@ export const fetchCountsThunk = createAsyncThunk(
 
         try {
             const res = await adminPropertyApi.counts({});
+            console.log("Fetched counts:", res);
             return res ?? null;
         } catch (e) {
             return rejectWithValue(e?.response?.data?.message || "Load counts thất bại");
@@ -361,7 +377,14 @@ const adminPostsSlice = createSlice({
             .addCase(fetchCountsThunk.fulfilled, (s, { payload }) => {
                 s.loadingCounts = false;
                 if (payload && typeof payload === "object" && Object.keys(payload).length > 0) {
-                    s.counts = payload;
+                    const normalized = Object.entries(payload).reduce((acc, [k, v]) => {
+                        if (typeof k === "string") {
+                            acc[k.toUpperCase()] = v ?? 0;
+                        }
+                        return acc;
+                    }, {});
+
+                    s.counts = normalized;
                 }
             })
             .addCase(fetchCountsThunk.rejected, (s) => {

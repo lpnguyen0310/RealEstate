@@ -8,6 +8,7 @@ import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
 import com.backend.be_realestate.modals.request.order.AdminOrderBulkReq;
 import com.backend.be_realestate.modals.response.*;
+import com.backend.be_realestate.modals.response.admin.AdminPropertyStatsResponse;
 import com.backend.be_realestate.modals.response.admin.AdminSiteReviewStatsResponse;
 import com.backend.be_realestate.modals.response.admin.NewUsersKpiResponse;
 import com.backend.be_realestate.service.*;
@@ -65,7 +66,11 @@ public class AdminController {
         Long adminId = securityUtils.currentUserId(auth);
         return adminPropertyService.reject(id, req, adminId);
     }
-
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/properties/stats")
+    public AdminPropertyStatsResponse getPropertyStats() {
+        return adminPropertyService.getAdminGlobalStats();
+    }
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/properties/{id}/hide")
     public PropertyShortResponse hide(@PathVariable Long id, Authentication auth) {

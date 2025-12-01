@@ -158,6 +158,31 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     long countByUser_UserIdAndPropertyTypeAndStatus(Long userId,
                                                     PropertyType propertyType,
                                                     PropertyStatus status);
+
+    long countAllByStatus(PropertyStatus status);
+
+    @Modifying
+    @Transactional
+    @Query("""
+    UPDATE PropertyEntity p
+    SET p.status = 'EXPIRINGSOON'
+    WHERE p.status = 'PUBLISHED'
+      AND p.expiresAt >= :now
+      AND p.expiresAt < :soon
+""")
+    int updateStatusForExpiringSoon(@Param("now") Timestamp now,
+                                    @Param("soon") Timestamp soon);
+
+
+    @Query("""
+    SELECT p
+    FROM PropertyEntity p
+    WHERE p.status = 'PUBLISHED'
+      AND p.expiresAt >= :now
+      AND p.expiresAt < :soon
+""")
+    List<PropertyEntity> findWillExpireSoon(@Param("now") Timestamp now,
+                                            @Param("soon") Timestamp soon);
 }
 
 
