@@ -367,8 +367,11 @@ export default function InfoRealEstate() {
                             <div className="rounded-xl border border-gray-200 p-4 shadow-sm">
                                 <div
                                     className="flex items-center gap-3 cursor-pointer"
-                                    onClick={() => navigate(`/agent/${agent?.id || 1}`)}
-                                >
+                                    onClick={() =>
+                                        navigate(`/agent/${agent?.id}`, {
+                                            state: { agent }, 
+                                        })
+                                    }                                >
                                     <img src={agent?.avatar} alt="avatar" className="h-12 w-12 rounded-full object-cover" />
                                     <div>
                                         <div className="font-semibold text-gray-900">{agent?.name}</div>

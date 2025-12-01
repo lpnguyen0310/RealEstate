@@ -1,3 +1,4 @@
+// src/components/admidashboard/reviews/SiteReviewsTable.jsx
 import {
     Box,
     Paper,
@@ -28,6 +29,7 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 
 import { useState } from "react";
 import { styles, STATUS_COLOR, HOVER_BG } from "../user/constants";
@@ -45,6 +47,7 @@ export default function SiteReviewsTable({
     onShow,
     onHide,
     onDelete,
+    onViewDetail, // 🔹 mới
     loading = false,
 }) {
     // menu mobile
@@ -97,7 +100,6 @@ export default function SiteReviewsTable({
 
                                 <TableCell sx={styles.headCell}>Người dùng / Email</TableCell>
 
-                                {/* Rating ẩn trên xs nếu muốn gọn */}
                                 <TableCell
                                     sx={{
                                         ...styles.headCell,
@@ -110,7 +112,6 @@ export default function SiteReviewsTable({
 
                                 <TableCell sx={styles.headCell}>Nhận xét</TableCell>
 
-                                {/* Ngày tạo: ẩn ở mobile nhỏ */}
                                 <TableCell
                                     sx={{
                                         ...styles.headCell,
@@ -142,6 +143,9 @@ export default function SiteReviewsTable({
                             ) : (
                                 rows.map((r) => {
                                     const isPublished = r.status === "PUBLISHED";
+                                    const rating = r.rating || 0;
+                                    const isNegative =
+                                        rating > 0 && rating <= 2; // 🔴 đánh giá xấu 1–2★
 
                                     return (
                                         <TableRow
@@ -151,9 +155,21 @@ export default function SiteReviewsTable({
                                                 "& td": {
                                                     transition: "background-color 140ms ease",
                                                     py: { xs: 1, sm: 1.25 },
+                                                    ...(isNegative && {
+                                                        backgroundColor: "#fef2f2",
+                                                    }),
                                                 },
-                                                "&:hover td": { backgroundColor: HOVER_BG },
-                                                cursor: "default", // không click row nữa
+                                                "&:hover td": {
+                                                    backgroundColor: isNegative
+                                                        ? "#fee2e2"
+                                                        : HOVER_BG,
+                                                },
+                                                cursor: "default",
+                                                ...(isNegative && {
+                                                    "& td:first-of-type": {
+                                                        borderLeft: "3px solid #ef4444",
+                                                    },
+                                                }),
                                             }}
                                         >
                                             <TableCell sx={styles.bodyCell}>{r.id}</TableCell>
@@ -161,7 +177,7 @@ export default function SiteReviewsTable({
                                             <TableCell sx={styles.bodyCell}>
                                                 <Stack spacing={0.3}>
                                                     <Typography fontWeight={700} noWrap>
-                                                        {r.userName || "(Người dùng)"}
+                                                        {r.name || "(Người dùng)"}
                                                     </Typography>
                                                     <Typography
                                                         fontSize={12}
@@ -169,6 +185,13 @@ export default function SiteReviewsTable({
                                                         noWrap
                                                     >
                                                         {r.email}
+                                                    </Typography>
+                                                    <Typography
+                                                        fontSize={12}
+                                                        color="#718198"
+                                                        noWrap
+                                                    >
+                                                        {r.phone || "(Chưa có số điện thoại)"}
                                                     </Typography>
                                                 </Stack>
                                             </TableCell>
@@ -185,7 +208,7 @@ export default function SiteReviewsTable({
                                                     alignItems="center"
                                                 >
                                                     <Rating
-                                                        value={r.rating || 0}
+                                                        value={rating}
                                                         precision={0.5}
                                                         readOnly
                                                         size="small"
@@ -194,9 +217,9 @@ export default function SiteReviewsTable({
                                                         fontSize={12}
                                                         color="#718198"
                                                     >
-                                                        {r.rating?.toFixed
-                                                            ? `${r.rating.toFixed(1)} / 5`
-                                                            : `${r.rating || 0} / 5`}
+                                                        {rating?.toFixed
+                                                            ? `${rating.toFixed(1)} / 5`
+                                                            : `${rating} / 5`}
                                                     </Typography>
                                                 </Stack>
                                             </TableCell>
@@ -207,6 +230,8 @@ export default function SiteReviewsTable({
                                                     maxWidth: 380,
                                                 }}
                                             >
+                                                {/* 🔴 Badge đánh giá xấu */}
+                                          
                                                 <Typography
                                                     fontSize={13}
                                                     sx={{
@@ -255,6 +280,17 @@ export default function SiteReviewsTable({
                                                         alignItems: "center",
                                                     }}
                                                 >
+                                                    {/* Xem chi tiết */}
+                                                    <Tooltip title="Xem chi tiết">
+                                                        <IconButton
+                                                            size="small"
+                                                            sx={{ ml: 0.5 }}
+                                                            onClick={() => onViewDetail?.(r)}
+                                                        >
+                                                            <ChatBubbleOutlineIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+
                                                     {isPublished ? (
                                                         <Tooltip title="Ẩn đánh giá">
                                                             <IconButton
@@ -420,6 +456,13 @@ export default function SiteReviewsTable({
 
             {/* Mobile action menu */}
             <Menu anchorEl={anchorEl} open={openMenu} onClose={handleCloseMenu}>
+                <MenuItem onClick={() => runAndClose((r) => onViewDetail?.(r))}>
+                    <ListItemIcon>
+                        <ChatBubbleOutlineIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Xem chi tiết</ListItemText>
+                </MenuItem>
+
                 {menuRow?.status === "PUBLISHED" ? (
                     <MenuItem onClick={() => runAndClose((r) => onHide?.(r))}>
                         <ListItemIcon>

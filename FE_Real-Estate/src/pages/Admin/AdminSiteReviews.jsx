@@ -15,6 +15,9 @@ import {
     DialogActions,
     Button,
     Grid,
+    Chip,
+    Divider,
+    Rating,
 } from "@mui/material";
 import { MessageSquare, CheckCircle2, AlertCircle } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
@@ -49,6 +52,7 @@ export default function AdminSiteReviews() {
     const initialStatus = searchParams.get("status") || "";
     const initialSentiment = searchParams.get("sentiment") || "";
 
+    // rows = tất cả review của trang hiện tại (đã lọc status ở BE)
     const [rows, setRows] = useState([]);
 
     // filter
@@ -74,7 +78,7 @@ export default function AdminSiteReviews() {
     // force reload sau khi update
     const [reloadKey, setReloadKey] = useState(0);
 
-    // Dialog xác nhận
+    // Dialog xác nhận ẩn/hiện/xoá
     const [confirmState, setConfirmState] = useState({
         open: false,
         type: "", // 'show' | 'hide' | 'delete'
@@ -125,6 +129,54 @@ export default function AdminSiteReviews() {
         }
     };
 
+    // ===== Modal xem chi tiết =====
+    const [detailRow, setDetailRow] = useState(null);
+    const [detailOpen, setDetailOpen] = useState(false);
+
+    const handleViewDetail = (row) => {
+        setDetailRow(row);
+        setDetailOpen(true);
+    };
+
+    const closeDetail = () => {
+        setDetailOpen(false);
+        setDetailRow(null);
+    };
+
+    const detailSentiment = detailRow ? getSentiment(detailRow.rating || 0) : null;
+
+    const detailSentimentChip = (() => {
+        if (!detailRow) return null;
+        if (detailSentiment === "POSITIVE") {
+            return (
+                <Chip
+                    label="Đánh giá tốt"
+                    color="success"
+                    size="small"
+                    sx={{ fontWeight: 600 }}
+                />
+            );
+        }
+        if (detailSentiment === "NEGATIVE") {
+            return (
+                <Chip
+                    label="Đánh giá xấu"
+                    color="error"
+                    size="small"
+                    sx={{ fontWeight: 600 }}
+                />
+            );
+        }
+        return (
+            <Chip
+                label="Trung lập"
+                color="warning"
+                size="small"
+                sx={{ fontWeight: 600 }}
+            />
+        );
+    })();
+
     // ===== Đồng bộ state -> URL query (page, size, status, sentiment) =====
     useEffect(() => {
         const params = new URLSearchParams();
@@ -137,7 +189,7 @@ export default function AdminSiteReviews() {
         setSearchParams(params);
     }, [page, pageSize, statusFilter, sentimentFilter, setSearchParams]);
 
-    // ===== Load list + global stats (status + sentiment đều gửi xuống BE) =====
+    // ===== Load list + global stats (BE chỉ lọc status, KHÔNG lọc sentiment) =====
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
@@ -147,14 +199,15 @@ export default function AdminSiteReviews() {
                         page,
                         size: pageSize,
                         status: statusFilter,
-                        sentiment: sentimentFilter,
+                        // ❌ không gửi sentiment nữa, để FE tự lọc
+                        // sentiment: sentimentFilter,
                     }),
                     adminSiteReviewApi.getStats(),
                 ]);
 
                 const data = listRes.data;
 
-                setRows(data.content || []);
+                setRows(data.content || []); // rows = tất cả review của page (sau khi lọc status)
                 setTotalItems(data.totalElements ?? 0);
                 setTotalPages(data.totalPages ?? 1);
 
@@ -174,9 +227,18 @@ export default function AdminSiteReviews() {
         };
 
         fetchData();
-    }, [page, pageSize, statusFilter, sentimentFilter, reloadKey]);
+    }, [page, pageSize, statusFilter, reloadKey]);
 
-    // Đếm sentiment trên TRANG HIỆN TẠI (sau khi BE đã filter status + sentiment)
+    // ===== FE filter theo sentiment cho phần HIỂN THỊ =====
+    const filteredRows = useMemo(() => {
+        if (!sentimentFilter) return rows;
+        return rows.filter(
+            (r) => getSentiment(r.rating || 0) === sentimentFilter
+        );
+    }, [rows, sentimentFilter]);
+
+    // Đếm sentiment trên TRANG HIỆN TẠI (chỉ sau khi BE lọc status)
+    // → luôn dùng rows (chưa lọc sentiment) để số chip không đổi
     const sentimentCounts = useMemo(() => {
         const base = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
         (rows || []).forEach((r) => {
@@ -186,15 +248,16 @@ export default function AdminSiteReviews() {
         return base;
     }, [rows]);
 
-    // Stats theo rows (page hiện tại + filter BE)
-    const totalReviews = rows.length;
+    // Stats theo dữ liệu đang hiển thị (đã filter sentiment)
+    const totalReviews = filteredRows.length;
     const avgRating =
         totalReviews === 0
             ? 0
-            : rows.reduce((sum, r) => sum + (r.rating || 0), 0) / totalReviews;
+            : filteredRows.reduce((sum, r) => sum + (r.rating || 0), 0) /
+            totalReviews;
 
     const ratingStats = [5, 4, 3, 2, 1].map((star) => {
-        const count = rows.filter(
+        const count = filteredRows.filter(
             (r) => Math.round(r.rating || 0) === star
         ).length;
         return { star, count };
@@ -208,10 +271,9 @@ export default function AdminSiteReviews() {
     const handleRequestHide = (row) => openConfirm("hide", row);
     const handleRequestDelete = (row) => openConfirm("delete", row);
 
-    // Handler đổi page & pageSize nếu muốn custom (optional)
+    // Handler đổi page & pageSize
     const handleChangePage = (newPage) => {
         setPage(newPage);
-        // Không cần set URL ở đây, useEffect sync rồi
     };
 
     const handleChangePageSize = (newSize) => {
@@ -293,18 +355,18 @@ export default function AdminSiteReviews() {
                 </Grid>
             </Grid>
 
-            {/* Thanh filter tốt/xấu (lọc BE) */}
+            {/* Thanh filter tốt/xấu (FE filter) */}
             <SentimentFilterBar
                 sentimentFilter={sentimentFilter}
                 onChangeSentiment={(val) => {
                     setSentimentFilter(val); // "", "POSITIVE", "NEUTRAL", "NEGATIVE"
                     setPage(1);
                 }}
-                totalCount={rows.length}
-                counts={sentimentCounts}
+                totalCount={rows.length}           // tất cả review của page (sau khi lọc status)
+                counts={sentimentCounts}           // đếm từ rows, nên số chip không đổi
             />
 
-            {/* Summary panel (trang hiện tại + filter BE) */}
+            {/* Summary panel (trang hiện tại + filter sentiment FE) */}
             <ReviewSummaryPanel
                 avgRating={avgRating}
                 totalReviews={totalReviews}
@@ -313,7 +375,7 @@ export default function AdminSiteReviews() {
 
             {/* Table */}
             <SiteReviewsTable
-                rows={rows}
+                rows={filteredRows}               // dùng dữ liệu đã lọc sentiment
                 page={page}
                 totalPages={totalPages}
                 start={start}
@@ -325,10 +387,11 @@ export default function AdminSiteReviews() {
                 onShow={handleRequestShow}
                 onHide={handleRequestHide}
                 onDelete={handleRequestDelete}
+                onViewDetail={handleViewDetail}
                 loading={loading}
             />
 
-            {/* Dialog xác nhận */}
+            {/* Dialog xác nhận ẩn/hiện/xoá */}
             <Dialog open={confirmState.open} onClose={closeConfirm} maxWidth="xs" fullWidth>
                 <DialogTitle>{confirmTitle}</DialogTitle>
                 <DialogContent>
@@ -346,6 +409,116 @@ export default function AdminSiteReviews() {
                     >
                         {confirmState.processing ? "Đang xử lý..." : "Xác nhận"}
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Modal xem chi tiết đánh giá – giữ nguyên như bạn đang dùng */}
+            <Dialog open={detailOpen} onClose={closeDetail} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    {detailRow ? `Chi tiết đánh giá #${detailRow.id}` : "Chi tiết đánh giá"}
+                </DialogTitle>
+                <DialogContent dividers>
+                    {detailRow && (
+                        <Stack spacing={2}>
+                            <Stack
+                                direction="row"
+                                justifyContent="space-between"
+                                alignItems="center"
+                            >
+                                <Stack spacing={0.5}>
+                                    <Typography fontWeight={600}>
+                                        {detailRow.userName || "(Người dùng)"}
+                                    </Typography>
+                                    <Typography fontSize={13} color="text.secondary">
+                                        {detailRow.email || "Không có email"}
+                                    </Typography>
+                                    <Typography fontSize={13} color="text.secondary">
+                                        SĐT: {detailRow.phone || "Không có số điện thoại"}
+                                    </Typography>
+                                </Stack>
+
+                                <Stack alignItems="flex-end" spacing={0.5}>
+                                    <Rating
+                                        value={detailRow.rating || 0}
+                                        precision={0.5}
+                                        readOnly
+                                        size="small"
+                                    />
+                                    <Typography fontSize={13} color="text.secondary">
+                                        {(detailRow.rating || 0).toFixed
+                                            ? `${detailRow.rating.toFixed(1)} / 5`
+                                            : `${detailRow.rating || 0} / 5`}
+                                    </Typography>
+                                    {detailSentimentChip}
+                                </Stack>
+                            </Stack>
+
+                            <Divider />
+
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                spacing={1.5}
+                                justifyContent="space-between"
+                            >
+                                <Typography fontSize={13} color="text.secondary">
+                                    Ngày gửi: <strong>{detailRow.createdAt || "-"}</strong>
+                                </Typography>
+
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <Typography fontSize={13} color="text.secondary">
+                                        Trạng thái:
+                                    </Typography>
+                                    <Chip
+                                        label={detailRow.status || "UNKNOWN"}
+                                        size="small"
+                                        color={
+                                            detailRow.status === "PUBLISHED"
+                                                ? "success"
+                                                : detailRow.status === "HIDDEN"
+                                                    ? "default"
+                                                    : "warning"
+                                        }
+                                        sx={{ fontWeight: 600 }}
+                                    />
+                                </Stack>
+                            </Stack>
+
+                            <Box
+                                sx={{
+                                    mt: 1,
+                                    p: 2,
+                                    borderRadius: 2,
+                                    bgcolor:
+                                        detailSentiment === "NEGATIVE"
+                                            ? "#fef2f2"
+                                            : "#f3f4ff",
+                                    border:
+                                        detailSentiment === "NEGATIVE"
+                                            ? "1px solid #fecaca"
+                                            : "1px solid #e5e7ff",
+                                }}
+                            >
+                                {detailSentiment === "NEGATIVE" && (
+                                    <Typography
+                                        fontSize={12}
+                                        fontWeight={600}
+                                        color="#b91c1c"
+                                        mb={0.5}
+                                    >
+                                        ĐÁNH GIÁ XẤU – nên xem xét kỹ trước khi quyết định
+                                        ẩn/hiện.
+                                    </Typography>
+                                )}
+
+                                <Typography fontSize={14} sx={{ whiteSpace: "pre-wrap" }}>
+                                    {detailRow.comment || "(Không có nội dung nhận xét)"}
+                                </Typography>
+                            </Box>
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeDetail}>Đóng</Button>
                 </DialogActions>
             </Dialog>
         </Box>

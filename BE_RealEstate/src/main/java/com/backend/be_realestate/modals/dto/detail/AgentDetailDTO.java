@@ -6,6 +6,7 @@ import java.util.List;
 
 @Data
 public class AgentDetailDTO {
+    private Long id;
     private String name;
     private String avatar;
     private String otherPostsText;

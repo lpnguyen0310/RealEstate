@@ -87,7 +87,7 @@ export default function SentimentFilterBar({
                             sentiment={null}
                             current={sentimentFilter}
                             onChange={onChangeSentiment}
-                            color="#0f172a"
+                            color="#440ae4ff"
                             subtleBg="#f3f4f6"
                         />
                         <SentimentFilterChip

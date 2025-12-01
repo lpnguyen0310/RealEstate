@@ -67,7 +67,7 @@ export default function SiteReviewsSection({ reviews = [] }) {
         dots: true,
         infinite: sortedReviews.length > 1, // hoặc true nếu muốn loop mãi
         speed: 400,
-        slidesToShow: 1.25,
+        slidesToShow: 1.00,
         slidesToScroll: 1,
         arrows: true,
         prevArrow: <SlickArrowLeft />,

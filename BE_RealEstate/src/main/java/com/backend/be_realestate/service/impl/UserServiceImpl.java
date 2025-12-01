@@ -1,13 +1,22 @@
 package com.backend.be_realestate.service.impl;
 
 import com.backend.be_realestate.converter.UserConverter;
+import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.entity.UserEntity;
+import com.backend.be_realestate.enums.PropertyStatus;
+import com.backend.be_realestate.enums.PropertyType;
+import com.backend.be_realestate.exceptions.ResourceNotFoundException;
+import com.backend.be_realestate.modals.dto.AgentProfileDTO;
+import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.UserDTO;
 import com.backend.be_realestate.modals.request.ChangePasswordRequest;
 import com.backend.be_realestate.modals.response.admin.NewUsersKpiResponse;
+import com.backend.be_realestate.repository.PropertyRepository;
 import com.backend.be_realestate.repository.UserRepository;
 import com.backend.be_realestate.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +38,10 @@ public class UserServiceImpl implements UserService {
     private  final UserRepository userRepo;
     private final UserConverter userConverter;
     private final PasswordEncoder passwordEncoder;
+    private final PropertyRepository propertyRepository;
+    private final com.backend.be_realestate.converter.PropertyMapper propertyMapper;
+    private static final DateTimeFormatter MONTH_YEAR = DateTimeFormatter.ofPattern("MM/yyyy");
+
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String TZ_OFFSET = "+07:00";
     @Override
@@ -169,6 +183,72 @@ public class UserServiceImpl implements UserService {
                         .build())
                 .build();
     }
+
+    @Override
+    public AgentProfileDTO getAgentProfile(Long agentId) {
+        UserEntity user = userRepo.findById(agentId)
+                .orElseThrow(() -> new ResourceNotFoundException("User/Agent not found: " + agentId));
+
+        String fullName = ((user.getLastName() == null ? "" : user.getLastName()) + " " +
+                (user.getFirstName() == null ? "" : user.getFirstName())).trim();
+        if (fullName.isBlank()) {
+            fullName = "Môi giới bất động sản";
+        }
+
+        String joinText = "";
+        if (user.getCreatedAt() != null) {
+            LocalDateTime created = user.getCreatedAt()
+                    .toInstant()
+                    .atZone(ZONE_VN)
+                    .toLocalDateTime();
+            joinText = "Đồng hành cùng chúng tôi từ " + created.format(MONTH_YEAR);
+        }
+
+        long totalPosts = propertyRepository.countByUser_UserId(agentId);
+        long sellingCount = propertyRepository.countByUser_UserIdAndPropertyTypeAndStatus(
+                agentId, PropertyType.sell, PropertyStatus.PUBLISHED
+        );
+        long rentingCount = propertyRepository.countByUser_UserIdAndPropertyTypeAndStatus(
+                agentId, PropertyType.rent, PropertyStatus.PUBLISHED
+        );
+
+        String phoneDisplay = user.getPhone(); // hoặc format lại nếu muốn
+
+        return AgentProfileDTO.builder()
+                .id(user.getUserId())
+                .name(fullName)
+                .joinText(joinText)
+                .sellingCount(sellingCount)
+                .rentingCount(rentingCount)
+                .totalPosts(totalPosts)
+                .phoneDisplay(phoneDisplay)
+                .zaloText("Zalo")
+                .build();
+    }
+
+    @Override
+    public Page<PropertyCardDTO> getAgentListings(Long agentId, String type, Pageable pageable) {
+        PropertyType propertyType = null;
+        if ("sell".equalsIgnoreCase(type)) {
+            propertyType = PropertyType.sell;
+        } else if ("rent".equalsIgnoreCase(type)) {
+            propertyType = PropertyType.rent;
+        }
+
+        Page<PropertyEntity> page;
+        if (propertyType != null) {
+            page = propertyRepository.findByUser_UserIdAndStatusAndPropertyType(
+                    agentId, PropertyStatus.PUBLISHED, propertyType, pageable
+            );
+        } else {
+            page = propertyRepository.findByUser_UserIdAndStatus(
+                    agentId, PropertyStatus.PUBLISHED, pageable
+            );
+        }
+
+        return page.map(propertyMapper::toPropertyCardDTO);
+    }
+
     private Range resolveRange(String key, LocalDate today) {
         String k = key == null ? "" : key;
         switch (k) {

@@ -1,12 +1,18 @@
 package com.backend.be_realestate.controller;
 
+import com.backend.be_realestate.modals.dto.AgentProfileDTO;
+import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.UserDTO;
 import com.backend.be_realestate.modals.request.ChangePasswordRequest;
 import com.backend.be_realestate.modals.response.ApiResponse;
+import com.backend.be_realestate.modals.response.PageResponse;
 import com.backend.be_realestate.service.UserService;
 import com.backend.be_realestate.utils.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -74,5 +80,26 @@ public class UserController {
         userService.changePassword(userId, req);
         return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu thành công"));
     }
+    @GetMapping("/{agentId}")
+    public ResponseEntity<AgentProfileDTO> getAgent(@PathVariable Long agentId) {
+        AgentProfileDTO dto = userService.getAgentProfile(agentId);
+        return ResponseEntity.ok(dto);
+    }
 
+    @GetMapping("/{agentId}/properties")
+    public ResponseEntity<PageResponse<PropertyCardDTO>> getAgentProperties(
+            @PathVariable Long agentId,
+            @RequestParam(required = false) String type, // "sell" | "rent" | null
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size
+    ) {
+        var pageable = PageRequest.of(
+                Math.max(page, 0),
+                Math.max(size, 1),
+                Sort.by(Sort.Direction.DESC, "postedAt")
+        );
+
+        Page<PropertyCardDTO> dtoPage = userService.getAgentListings(agentId, type, pageable);
+        return ResponseEntity.ok(PageResponse.from(dtoPage));
+    }
 }
