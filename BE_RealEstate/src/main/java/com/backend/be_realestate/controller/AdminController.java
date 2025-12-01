@@ -7,15 +7,10 @@ import com.backend.be_realestate.modals.dto.order.OrderDTO;
 import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
 import com.backend.be_realestate.modals.request.order.AdminOrderBulkReq;
-import com.backend.be_realestate.modals.response.AdminUserResponse;
-import com.backend.be_realestate.modals.response.ApiResponse;
-import com.backend.be_realestate.modals.response.PageResponse;
-import com.backend.be_realestate.modals.response.PropertyShortResponse;
+import com.backend.be_realestate.modals.response.*;
+import com.backend.be_realestate.modals.response.admin.AdminSiteReviewStatsResponse;
 import com.backend.be_realestate.modals.response.admin.NewUsersKpiResponse;
-import com.backend.be_realestate.service.AdminPropertyService;
-import com.backend.be_realestate.service.IAdminUserService;
-import com.backend.be_realestate.service.OrderService;
-import com.backend.be_realestate.service.UserService;
+import com.backend.be_realestate.service.*;
 import com.backend.be_realestate.utils.SecurityUtils;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +33,8 @@ public class AdminController {
     private final SecurityUtils securityUtils;
     private final IAdminUserService adminUserService;
     private final UserService userService;
+    private final ISiteReviewService siteReviewService;
+
     // Endpoint này chỉ bạn hoặc admin mới biết để dùng cho việc test
     @PostMapping("/orders/{id}/process-payment")
     public String triggerProcessPaidOrder(@PathVariable Long id) {
@@ -209,10 +206,35 @@ public class AdminController {
     @PostMapping("/orders/bulk-action")
     public ApiResponse<Void> bulkAction(@RequestBody AdminOrderBulkReq req) {
         orderService.adminBulkAction(req.getIds(), req.getAction());
-
-        // SỬA: Dùng success(null)
         return ApiResponse.success(null);
     }
 
 
+    @GetMapping("/site-reviews")
+    public ResponseEntity<Page<SiteReviewResponse>> getAdminReviews(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String sentiment,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<SiteReviewResponse> result =
+                siteReviewService.getAdminReviews(status, sentiment, page, size);
+
+        return ResponseEntity.ok(result);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/site-reviews/{id}/{action}")
+    public ResponseEntity<?> updateReview(
+            @PathVariable Long id,
+            @PathVariable String action
+    ) {
+        var updated = siteReviewService.updateStatus(id, action);
+        return ResponseEntity.ok(updated);
+    }
+
+    @GetMapping("/site-reviews/stats")
+    public ResponseEntity<AdminSiteReviewStatsResponse> getSiteReviewStats() {
+        return ResponseEntity.ok(siteReviewService.getAdminGlobalStats());
+    }
 }

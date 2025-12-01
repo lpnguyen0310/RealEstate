@@ -11,6 +11,7 @@ import "swiper/css/free-mode";
 import "swiper/css/thumbs";
 import Viewer from "viewerjs";
 import "viewerjs/dist/viewer.min.css";
+import { useNavigate } from "react-router-dom";
 
 import {
     useTrackZaloClickMutation,
@@ -103,6 +104,7 @@ export default function InfoRealEstate() {
         loading: state.property.loadingDetail,
         error: state.property.errorDetail,
     }));
+    const navigate = useNavigate();
 
     const [trackZaloClick] = useTrackZaloClickMutation();
     const [trackShareClick] = useTrackShareClickMutation();
@@ -363,7 +365,10 @@ export default function InfoRealEstate() {
                     <div className="lg:col-span-3">
                         <div className="sticky top-[88px] lg:top-[96px] z-10">
                             <div className="rounded-xl border border-gray-200 p-4 shadow-sm">
-                                <div className="flex items-center gap-3">
+                                <div
+                                    className="flex items-center gap-3 cursor-pointer"
+                                    onClick={() => navigate(`/agent/${agent?.id || 1}`)}
+                                >
                                     <img src={agent?.avatar} alt="avatar" className="h-12 w-12 rounded-full object-cover" />
                                     <div>
                                         <div className="font-semibold text-gray-900">{agent?.name}</div>

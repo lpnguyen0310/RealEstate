@@ -20,5 +20,25 @@
 }
 
 /* global.css */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Ẩn hoàn toàn nền mặc định của AntD Modal */
+.rating-modal-wrapper .ant-modal-content {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* Ẩn luôn body wrapper trắng */
+.rating-modal-wrapper .ant-modal-body {
+  background: transparent !important;
+  padding: 0 !important;
+}

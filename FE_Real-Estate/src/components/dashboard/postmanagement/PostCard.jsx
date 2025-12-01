@@ -1,6 +1,6 @@
 // src/components/dashboard/postmanagement/PostCard.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Tag, Tooltip, Dropdown, Button, Space } from "antd";
+import { Tag, Tooltip, Dropdown, Button, Space, message } from "antd";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination as SwiperPagination } from "swiper/modules";
 import "swiper/css";
@@ -14,7 +14,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchPropertyFavoritesThunk, clearFavorites } from "@/store/propertySlice";
 import FavoriteUsersModal from "./FavoriteUsersModal";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
-
+// thêm vào đầu file
+import PostRatingModal from "./PostRatingModal";
+import  siteReviewApi  from "../../../api/siteReviewApi";
 /* ---------- helpers ---------- */
 const Box = ({ children, className = "" }) => (
   <div className={"bg-white/90 rounded-xl border border-[#e9eef7] shadow-[0_6px_18px_rgba(13,47,97,0.06)] p-4 " + className}>
@@ -44,6 +46,7 @@ export default function PostCard({
   onUnhidePost = (id) => console.log("unhide post:", id),
   onUnmarkSold = (id) => console.log("unmark sold:", id), // 🆕 Đăng lại
   onViewWarning = () => { },
+  onSubmitRating = async () => { },
   isHighlighted = false,
 }) {
   /* ====== images + viewer ====== */
@@ -137,6 +140,7 @@ export default function PostCard({
     content: "",
     onConfirm: null,
   });
+  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
 
   const openConfirm = (meta) => {
     setConfirmMeta(meta);
@@ -149,7 +153,13 @@ export default function PostCard({
     setConfirmLoading(false);
     setConfirmMeta({ type: "", title: "", content: "", onConfirm: null });
   };
-
+  const handleSubmitRating = async ({ rating, comment }) => {
+    try {
+      await siteReviewApi.create({ rating, comment });
+    } catch (err) {
+      console.error(err);
+    }
+  };
   const onMenuClick = ({ key, domEvent }) => {
     domEvent?.stopPropagation?.();
 
@@ -184,6 +194,7 @@ export default function PostCard({
             setConfirmDisabled(true);
             await Promise.resolve(onConfirmSuccess(post.id));
             closeConfirm();
+            setIsRatingModalOpen(true);
           } catch (e) {
             setConfirmLoading(false);
             setConfirmDisabled(false);
@@ -454,6 +465,12 @@ export default function PostCard({
         confirmDisabled={confirmDisabled}
         onClose={closeConfirm}
         onConfirm={confirmMeta.onConfirm}
+      />
+      <PostRatingModal
+        open={isRatingModalOpen}
+        onClose={() => setIsRatingModalOpen(false)}
+        onSubmit={handleSubmitRating}
+        postId={post.id}
       />
     </>
   );

@@ -131,9 +131,6 @@ export default function WebSocketListener() {
         showBrowserNotification(notif);
       });
 
-
-      /* ===== Support Chat: broadcast toàn hệ thống =====
-         Tránh đẩy trùng cho hội thoại đang mở (đã có sub riêng) */
       client.subscribe("/topic/support", (m) => {
         const evt = safeJson(m.body);
         if (!evt) return;

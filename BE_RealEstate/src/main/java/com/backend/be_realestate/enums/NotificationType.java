@@ -38,4 +38,9 @@ public enum NotificationType {
     LISTING_UNHIDDEN,        // User bỏ ẩn tin
     LISTING_MARKED_SOLD,     // User đánh dấu đã bán
     LISTING_UNMARKED_SOLD,   // User gỡ trạng thái đã bán
+
+    SITE_REVIEW_NEW_ADMIN,   // Admin: có đánh giá mới
+    SITE_REVIEW_PUBLISHED,   // User: đánh giá đã được hiển thị
+    SITE_REVIEW_HIDDEN,      // User: đánh giá bị ẩn
+    SITE_REVIEW_DELETED      // User: đánh giá bị xóa
 }
