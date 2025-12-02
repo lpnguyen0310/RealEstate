@@ -220,7 +220,7 @@ export const createPropertyThunk = createAsyncThunk(
             };
 
             const mode =
-                submitMode?.toUpperCase() === "DRAFT" ? "DRAFT" : "PUBLISH";
+                submitMode?.toUpperCase() === "DRAFT" ? "DRAFT" : "PUBLISHED";
             const res = await api.post("/properties/create", payload, {
                 params: { mode },
             });

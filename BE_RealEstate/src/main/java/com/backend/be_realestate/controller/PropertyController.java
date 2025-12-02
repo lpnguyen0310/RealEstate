@@ -129,7 +129,7 @@ public class PropertyController {
         Long userId = securityUtils.currentUserId(authentication);
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-        var effectiveMode = (mode == null) ? SubmitMode.PUBLISH : mode;
+        var effectiveMode = (mode == null) ? SubmitMode.PUBLISHED : mode;
         var res = propertyService.create(userId, req, effectiveMode);
         return ResponseEntity.status(HttpStatus.CREATED).body(res);
     }

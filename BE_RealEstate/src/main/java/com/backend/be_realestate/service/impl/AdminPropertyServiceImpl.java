@@ -69,8 +69,6 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             p.setListingTypePolicy(policy);
             p.setListingType(targetType);
 
-            // CHÚ Ý: nếu bạn đã trừ kho lúc create theo listingType ban đầu thì thường không trừ nữa.
-            // Nếu muốn trừ khi nâng từ NORMAL -> VIP/PREMIUM ở approve thì mở block dưới:
 
             if (p.getListingType() == ListingType.NORMAL && targetType != ListingType.NORMAL) {
                 UserInventoryEntity inv = inventoryRepo.lockByUserAndType(p.getUser().getUserId(), targetType.name())

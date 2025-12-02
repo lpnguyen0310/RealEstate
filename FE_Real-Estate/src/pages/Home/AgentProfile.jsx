@@ -58,16 +58,6 @@ function AgentInfoCard({ agent }) {
                 </div>
 
                 <div className="space-y-2">
-                    <Button
-                        type="default"
-                        className="w-full font-semibold flex items-center justify-center gap-2"
-                    >
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white text-xs">
-                            Z
-                        </span>
-                        {agent?.zaloText || "Zalo"}
-                    </Button>
-
                     {agent?.phoneDisplay && (
                         <Button
                             type="primary"

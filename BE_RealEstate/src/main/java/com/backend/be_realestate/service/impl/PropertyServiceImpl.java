@@ -221,16 +221,26 @@ public class PropertyServiceImpl implements IPropertyService {
         // map field
         applyRequestToEntity(property, req, /*createMode*/ true, /*mode*/ mode);
 
-        // === Business khác CHỈ khi publish ===
-        if (mode == SubmitMode.PUBLISH) {
-            // ví dụ: kiểm tra & trừ lượt khi VIP/PREMIUM, set postedAt, duration…
-            // consumeQuotaIfNeeded(policy, user);
+        if (mode == SubmitMode.PUBLISHED) {
+            var type = policy.getListingType(); // NORMAL / VIP / PREMIUM
+            if (type != ListingType.NORMAL) {
+                UserInventoryEntity inv = inventoryRepo.lockByUserAndType(userId, type.name())
+                        .orElseGet(() -> inventoryRepo.findByUser_UserIdAndItemType(userId, type.name())
+                                .orElseThrow(() -> new IllegalStateException("Inventory not found")));
+
+                if (inv.getQuantity() == null || inv.getQuantity() <= 0) {
+                    throw new OutOfStockException(type.name());
+                }
+
+                inv.setQuantity(inv.getQuantity() - 1);
+                inventoryRepo.save(inv);
+            }
         }
 
         var saved = propertyRepository.save(property);
 
         // notify CHỈ khi publish → PENDING_REVIEW
-        if (mode == SubmitMode.PUBLISH && saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
+        if (mode == SubmitMode.PUBLISHED && saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
             try {
                 String title = (saved.getTitle() != null) ? saved.getTitle() : "không có tiêu đề";
 
@@ -291,12 +301,10 @@ public class PropertyServiceImpl implements IPropertyService {
         applyRequestToEntity(property, req, /*createMode*/ false, /*mode*/ (mode == null ? null : mode));
 
         // 5. XỬ LÝ LOGIC TRẠNG THÁI VÀ GỬI THÔNG BÁO
-        if (mode == SubmitMode.PUBLISH) {
+        if (mode == SubmitMode.PUBLISHED) {
 
             // Luôn set về PENDING_REVIEW khi nhấn "publish"
             property.setStatus(PropertyStatus.PENDING_REVIEW);
-
-            // === 💡 BẮT ĐẦU LOGIC GỬI THÔNG BÁO (COPY TỪ HÀM CREATE VÀ SỬA LẠI) ===
             try {
                 String title = (property.getTitle() != null) ? property.getTitle() : "không có tiêu đề";
 
@@ -438,7 +446,7 @@ public class PropertyServiceImpl implements IPropertyService {
         }
         // === Status khi tạo ===
         if (createMode) {
-            SubmitMode effective = (mode == null) ? SubmitMode.PUBLISH : mode;
+            SubmitMode effective = (mode == null) ? SubmitMode.PUBLISHED : mode;
             property.setStatus(effective == SubmitMode.DRAFT ? PropertyStatus.DRAFT : PropertyStatus.PENDING_REVIEW);
         }
 

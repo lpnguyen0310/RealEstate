@@ -75,7 +75,7 @@ export default function PostManagerPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [warningModal, setWarningModal] = useState({ open: false, message: "" });
     const [highlightedId, setHighlightedId] = useState(null);
-
+    
     const { list, page, size, totalElements, counts, pendingAction, rawLoading } = useSelector((s) => ({
         list: s.property.myList,
         page: s.property.myPage,

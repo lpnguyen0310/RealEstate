@@ -178,6 +178,8 @@ function mapDetailToFormData(d) {
 
         /* ===== Ảnh xây dựng ===== */
         constructionImages: Array.isArray(d.constructionImages) ? d.constructionImages : [],
+        autoRepost: !!d.autoRepost,
+
     };
 }
 
@@ -208,6 +210,8 @@ function createInitialForm() {
             agreed: false,
         },
         constructionImages: [],
+        autoRepost: false,
+
     };
 }
 
@@ -345,8 +349,9 @@ export default function PostCreateDrawer({
 
     const upperStatus = (currentProperty?.status || "").toUpperCase();
     const isDraft = upperStatus === "DRAFT";
-    const needsResubmit = upperStatus === "WARNED" || upperStatus === "REJECTED";
-
+    const needsResubmit = ["WARNED", "REJECTED", "PUBLISHED"].includes(upperStatus);
+    const isExpiringSoon =
+        upperStatus === "EXPIRINGSOON" || upperStatus === "EXPIRING_SOON";
     const posting = useSelector((s) => s.property?.creating);
 
     const [step, setStep] = useState("form");
@@ -660,16 +665,16 @@ export default function PostCreateDrawer({
             if (isVipLike && isChangingType && leftQty <= 0) { setShowPromptEdit(true); return; }
 
             const payload = { ...formData, listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId };
-            const submitMode = needsResubmit ? "publish" : undefined;
-
-            await dispatch(
-                updatePropertyThunk({
-                    id: editingId,
-                    formData: payload,
-                    listingTypePolicyId: payload.listingTypePolicyId,
-                    submitMode
-                })
-            ).unwrap();
+            const submitMode = needsResubmit ? "PUBLISHED" : undefined;
+            console.log("👉 UPDATE - submitMode:", submitMode || "no change"),
+                await dispatch(
+                    updatePropertyThunk({
+                        id: editingId,
+                        formData: payload,
+                        listingTypePolicyId: payload.listingTypePolicyId,
+                        submitMode
+                    })
+                ).unwrap();
             message.success("Cập nhật tin thành công!");
             onCreated?.();
             onClose?.();
@@ -688,13 +693,13 @@ export default function PostCreateDrawer({
             if (isVipLike && leftQty <= 0) { setShowPromptEdit(true); return; }
 
             const payload = { ...formData, listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId };
-
+            console.log("👉 PUBLISH - submitMode:", "PUBLISHED", { payload });
             await dispatch(
                 updatePropertyThunk({
                     id: editingId,
                     formData: payload,
                     listingTypePolicyId: payload.listingTypePolicyId,
-                    submitMode: "publish",
+                    submitMode: "PUBLISHED",
                 })
             ).unwrap();
 
@@ -714,11 +719,13 @@ export default function PostCreateDrawer({
                         onClick={async () => {
                             try {
                                 const payload = { ...formData, listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId };
+                                console.log("👉 CREATE lưu nháp - submitMode:", "DRAFT", { payload });
+
                                 await dispatch(
                                     createPropertyThunk({
                                         formData: payload,
                                         listingTypePolicyId: payload.listingTypePolicyId,
-                                        submitMode: "draft",
+                                        submitMode: "DRAFT",
                                     })
                                 ).unwrap();
                                 message.success("Đã lưu nháp!");
@@ -738,16 +745,51 @@ export default function PostCreateDrawer({
             return (
                 <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
                     <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
-                    <div className="flex items-center gap-2">
-                        {isDraft ? (
-                            <Button type="primary" loading={posting} className="bg-[#1b264f] hover:bg-[#22347c]" onClick={onPublishDraft}>
-                                Đăng tin
-                            </Button>
-                        ) : (
-                            <Button type="primary" loading={posting} className="bg-[#1b264f] hover:bg-[#22347c]" onClick={onUpdate}>
-                                Cập nhật
-                            </Button>
+
+                    <div className="flex items-center gap-4">
+                        {/* 🆕 chỉ hiện với tin SẮP HẾT HẠN */}
+                        {isExpiringSoon && (
+                            <div className="flex items-center gap-2">
+                                <Switch
+                                    size="small"
+                                    checked={!!formData.autoRepost}
+                                    onChange={(checked) =>
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            autoRepost: checked,
+                                        }))
+                                    }
+                                />
+                                <span className="text-xs text-gray-700">
+                                    Tự động đăng lại khi hết hạn
+                                </span>
+                                <Tooltip title="Khi hết hạn, hệ thống sẽ tự đăng lại tin với cùng gói hiện tại (nếu còn lượt).">
+                                    <InfoCircleOutlined className="text-gray-400 text-[11px]" />
+                                </Tooltip>
+                            </div>
                         )}
+
+                        <div className="flex items-center gap-2">
+                            {isDraft ? (
+                                <Button
+                                    type="primary"
+                                    loading={posting}
+                                    className="bg-[#1b264f] hover:bg-[#22347c]"
+                                    onClick={onPublishDraft}
+                                >
+                                    Đăng tin
+                                </Button>
+                            ) : (
+                                <Button
+                                    type="primary"
+                                    loading={posting}
+                                    className="bg-[#1b264f] hover:bg-[#22347c]"
+                                    onClick={onUpdate}
+                                >
+                                    Cập nhật
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -765,7 +807,7 @@ export default function PostCreateDrawer({
         );
     }, [
         step, onClose, formData, loading, goToTypeStep,
-        postTypeId, invMap, listingTypes, onCreated, isEdit, posting, onUpdate, onPublishDraft, isDraft
+        postTypeId, invMap, listingTypes, onCreated, isEdit, posting, onUpdate, onPublishDraft, isDraft, isExpiringSoon
     ]);
 
     const showBlockingSpin = loadingDetail;
@@ -967,7 +1009,7 @@ function FooterType({
                 createPropertyThunk({
                     formData: payload,
                     listingTypePolicyId: payload.listingTypePolicyId,
-                    submitMode: "publish",
+                    submitMode: "PUBLISHED",
                 })
             ).unwrap();
             message.success("Đăng tin thành công!");
