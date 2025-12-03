@@ -6,13 +6,17 @@ import com.backend.be_realestate.enums.NotificationType;
 import com.backend.be_realestate.modals.response.AdminUserResponse;
 import com.backend.be_realestate.repository.PropertyRepository;
 import com.backend.be_realestate.repository.UserRepository;
+import com.backend.be_realestate.service.EmailService;
 import com.backend.be_realestate.service.IAdminUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,6 +26,8 @@ public class AdminUserServiceImpl implements IAdminUserService {
     private final PropertyRepository propertyRepo;
     private final UserConverter converter;
     private final NotificationServiceImpl notificationService;
+    private final EmailService emailService;
+    private final PasswordEncoder passwordEncoder;
     @Override
     @Transactional(readOnly = true)
     public Page<AdminUserResponse> search(String q,
@@ -145,6 +151,39 @@ public class AdminUserServiceImpl implements IAdminUserService {
         );
     }
 
+    @Override
+    @Transactional
+    public void resetPasswordByAdmin(Long id) {
+        UserEntity u = getUserOrThrow(id);
+
+        // 1. Generate mật khẩu random
+        String newPassword = generateRandomPassword(10); // độ dài 10 ký tự
+
+        // 2. Mã hoá & lưu
+        u.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepo.save(u);
+
+        // 3. Gửi email nếu có email
+        if (u.getEmail() != null && !u.getEmail().isBlank()) {
+            emailService.sendAdminResetPassword(u.getEmail(), newPassword);
+        }
+
+        // 4. (Optional) gửi notification in-app cho user
+        String displayName = buildUserDisplayName(u);
+        String msg = String.format(
+                "Mật khẩu tài khoản của bạn (%s) đã được quản trị viên đặt lại. " +
+                        "Vui lòng kiểm tra email để nhận mật khẩu mới và đổi mật khẩu sau khi đăng nhập.",
+                displayName
+        );
+        String link = "/account/security"; // tuỳ route FE
+        notificationService.createNotification(
+                u,
+                NotificationType.USER_PASSWORD_RESET_BY_ADMIN,
+                msg,
+                link
+        );
+    }
+
     // Utils
     private String buildUserDisplayName(UserEntity u) {
         String fullName = ((u.getLastName() == null ? "" : u.getLastName()) + " " +
@@ -162,5 +201,15 @@ public class AdminUserServiceImpl implements IAdminUserService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
     }
 
+    private static final String PWD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 
+    private String generateRandomPassword(int length) {
+        Random rnd = new SecureRandom();
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int idx = rnd.nextInt(PWD_CHARS.length());
+            sb.append(PWD_CHARS.charAt(idx));
+        }
+        return sb.toString();
+    }
 }

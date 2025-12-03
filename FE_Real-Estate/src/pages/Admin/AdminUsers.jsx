@@ -26,13 +26,11 @@ export default function AdminUsersMUI() {
     const [q, setQ] = useState(searchParams.get("q") || "");
     const [role, setRole] = useState(searchParams.get("role") || "ALL");
     const [status, setStatus] = useState(searchParams.get("status") || "ALL");
-    // NEW: filter loại yêu cầu
     const [req, setReq] = useState(searchParams.get("req") || "ALL");
 
     const [page, setPage] = useState(Number(searchParams.get("page") || 1));
     const [pageSize, setPageSize] = useState(Number(searchParams.get("size") || 10));
 
-    // Viết lại URL gọn gàng (bỏ param mặc định/trống)
     const writeURL = useCallback(
         (next = {}) => {
             const sp = new URLSearchParams();
@@ -55,7 +53,6 @@ export default function AdminUsersMUI() {
         [q, role, status, req, page, pageSize, setSearchParams]
     );
 
-    // Debounce ghi URL khi state đổi (tránh spam khi gõ)
     const urlDebounceRef = useRef();
     useEffect(() => {
         if (urlDebounceRef.current) clearTimeout(urlDebounceRef.current);
@@ -63,7 +60,6 @@ export default function AdminUsersMUI() {
         return () => clearTimeout(urlDebounceRef.current);
     }, [q, role, status, req, page, pageSize, writeURL]);
 
-    // Khi Back/Forward làm URL đổi -> sync ngược vào state
     useEffect(() => {
         const sp = searchParams;
         const nq = sp.get("q") || "";
@@ -86,7 +82,6 @@ export default function AdminUsersMUI() {
     const [rows, setRows] = useState([]);
     const [totalItems, setTotalItems] = useState(0);
 
-    // 2 mức loading
     const [initialLoading, setInitialLoading] = useState(true);
     const [softLoading, setSoftLoading] = useState(false);
     const firstLoadRef = useRef(true);
@@ -106,15 +101,26 @@ export default function AdminUsersMUI() {
         onConfirm: null,
     });
     const [confirmLoading, setConfirmLoading] = useState(false);
-    const openConfirm = (cfg) => setConfirmCfg((p) => ({ ...p, ...cfg, open: true }));
+
+    const openConfirm = (cfg) =>
+        setConfirmCfg((p) => ({
+            ...p,
+            ...cfg,
+            open: true,
+        }));
+
     const closeConfirm = () => {
-        if (!confirmLoading) setConfirmCfg((p) => ({ ...p, open: false, onConfirm: null }));
+        if (!confirmLoading) {
+            setConfirmCfg((p) => ({ ...p, open: false, onConfirm: null }));
+        }
     };
+
     const runConfirm = async () => {
         if (!confirmCfg.onConfirm) return;
         try {
             setConfirmLoading(true);
             await confirmCfg.onConfirm();
+            // Confirm xong thì đóng modal
             closeConfirm();
         } finally {
             setConfirmLoading(false);
@@ -129,12 +135,9 @@ export default function AdminUsersMUI() {
         pendingRequests: 0,
     });
 
-    // load KPI tổng (system-wide)
     const fetchKpis = useCallback(async () => {
         try {
-            
             const data = await adminUsersApi.kpi();
-            console.log("KPI data:", data);
             setKpis(data || {});
         } catch (e) {
             console.error(e);
@@ -180,7 +183,10 @@ export default function AdminUsersMUI() {
 
                     return {
                         id: u.id ?? u.userId,
-                        fullName: u.fullName || `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email,
+                        fullName:
+                            u.fullName ||
+                            `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() ||
+                            u.email,
                         email: u.email,
                         phone: u.phone,
                         role: (Array.isArray(u.roles) && u.roles[0]) || u.role || "USER",
@@ -199,7 +205,9 @@ export default function AdminUsersMUI() {
                 setTotalItems(total);
             } catch (err) {
                 console.error(err);
-                message.error(err?.response?.data?.message || "Không tải được danh sách người dùng.");
+                message.error(
+                    err?.response?.data?.message || "Không tải được danh sách người dùng."
+                );
             } finally {
                 firstLoadRef.current = false;
                 setInitialLoading(false);
@@ -253,7 +261,6 @@ export default function AdminUsersMUI() {
             return next;
         });
 
-        // Sau khi trạng thái thay đổi có thể refetch KPI tổng
         fetchKpis();
     };
 
@@ -275,8 +282,14 @@ export default function AdminUsersMUI() {
             severity: "warning",
             onConfirm: async () => {
                 await adminUsersApi.lock(row.id);
-                updateRowLocal(row.id, { status: "LOCKED", lockRequested: false, deleteRequested: false });
-                message.success(isApprove ? "Đã duyệt khóa tài khoản." : "Đã khóa tài khoản.");
+                updateRowLocal(row.id, {
+                    status: "LOCKED",
+                    lockRequested: false,
+                    deleteRequested: false,
+                });
+                message.success(
+                    isApprove ? "Đã duyệt khóa tài khoản." : "Đã khóa tài khoản."
+                );
                 if (!isApprove && status === "ACTIVE") message.info(INFO_FILTER_MSG);
                 fetchList({ soft: true });
             },
@@ -305,7 +318,11 @@ export default function AdminUsersMUI() {
             severity: "default",
             onConfirm: async () => {
                 await adminUsersApi.unlock(id);
-                updateRowLocal(id, { status: "ACTIVE", lockRequested: false, deleteRequested: false });
+                updateRowLocal(id, {
+                    status: "ACTIVE",
+                    lockRequested: false,
+                    deleteRequested: false,
+                });
                 message.success("Đã mở khóa tài khoản.");
                 fetchList({ soft: true });
             },
@@ -339,6 +356,31 @@ export default function AdminUsersMUI() {
             },
         });
 
+    // ✅ Reset password: vẫn dùng ConfirmModal nhưng message chi tiết + duration lâu
+    const confirmResetPassword = (row) => {
+        openConfirm({
+            title: "Reset mật khẩu",
+            message: `Bạn có chắc muốn reset mật khẩu cho user "${row.fullName}"? Mật khẩu mới sẽ được gửi qua email của họ.`,
+            confirmText: "Reset",
+            severity: "warning",
+            onConfirm: async () => {
+                await adminUsersApi.resetPassword(row.id);
+
+                message.success({
+                    content: (
+                        <>
+                            Đã reset mật khẩu cho <b>{row.fullName}</b>.{" "}
+                            Mật khẩu mới đã được gửi tới email <b>{row.email}</b>.{" "}
+                            Vui lòng yêu cầu người dùng mở Gmail để kiểm tra hộp thư đến
+                            và cả mục <b>Spam / Thư rác</b> nếu chưa thấy email.
+                        </>
+                    ),
+                    duration: 10, // để lâu cho admin đọc
+                });
+            },
+        });
+    };
+
     /* ========== HELPERS ========== */
     const resetFilters = () => {
         setQ("");
@@ -356,14 +398,13 @@ export default function AdminUsersMUI() {
     return (
         <Box sx={{ width: "100%", display: "flex", justifyContent: "center", bgcolor: "#f8f9fc" }}>
             <Box sx={{ width: "100%", maxWidth: 1440, position: "relative" }}>
-                {/* Soft loading overlay */}
                 {softLoading && (
                     <Box sx={{ position: "sticky", top: 0, left: 0, right: 0, zIndex: 5 }}>
                         <LinearProgress />
                     </Box>
                 )}
 
-                {/* KPI Cards (toàn hệ thống) */}
+                {/* KPI Cards */}
                 <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap mb={2}>
                     <StatCard
                         title="Tổng người dùng"
@@ -375,7 +416,7 @@ export default function AdminUsersMUI() {
                     <StatCard
                         title="Đang yêu cầu khóa / xóa"
                         value={kpis.pendingRequests ?? 0}
-                        img={IMG_AGENTS} // tái dùng hình cũ
+                        img={IMG_AGENTS}
                         bg="linear-gradient(135deg,#f3e9ff 0%,#fbf7ff 100%)"
                         tint="#7a33ff"
                     />
@@ -420,7 +461,6 @@ export default function AdminUsersMUI() {
                     onReset={resetFilters}
                 />
 
-                {/* Initial Loading (lần đầu) */}
                 {showInitialSpinner && (
                     <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                         <CircularProgress size={28} />
@@ -447,6 +487,7 @@ export default function AdminUsersMUI() {
                     onRejectLock={confirmRejectLock}
                     onRejectDelete={confirmRejectDelete}
                     onApproveDelete={confirmApproveDelete}
+                    onResetPassword={confirmResetPassword}
                     loading={false}
                 />
 
@@ -462,7 +503,7 @@ export default function AdminUsersMUI() {
                     onRejectDelete={(id) => confirmRejectDelete(id)}
                 />
 
-                {/* Modal xác nhận */}
+                {/* Modal xác nhận dùng chung */}
                 <ConfirmModal
                     open={confirmCfg.open}
                     title={confirmCfg.title}

@@ -5,8 +5,8 @@ export default function NotificationsCard({ items = [] }) {
         <h3 className="text-[16px] font-bold text-[#1c396a] leading-none">
           Thông tin
         </h3>
-        <span className="text-[12px] h-5 min-w-5 px-1 grid place-items-center rounded-full bg-white border border-[#eef2f8] text-[#375a8b] leading-none">
-          {items.length}
+        <span className="text-[12px] px-8 h-7  h-5 min-w-5 px-1 grid place-items-center rounded-full bg-white border border-[#eef2f8] text-[#375a8b] leading-none">
+          Xem tất cả {items.length}
         </span>
       </div>
 

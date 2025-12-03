@@ -152,6 +152,14 @@ public class AdminController {
         adminUserService.rejectLock(id);
     }
 
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/users/{id}/reset-password")
+    public void resetUserPassword(@PathVariable Long id) {
+        adminUserService.resetPasswordByAdmin(id);
+    }
+    
+    // End admin user management endpoints
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/orders")
     public ApiResponse<PageResponse<AdminOrderListDTO>> searchOrders( // <-- SỬA ĐỔI KIỂU TRẢ VỀ TẠI ĐÂY

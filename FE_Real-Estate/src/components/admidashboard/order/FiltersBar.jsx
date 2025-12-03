@@ -1,9 +1,23 @@
 import React, { useMemo, useState, forwardRef } from "react";
 import {
-    Paper, Stack, TextField, InputAdornment, Button, IconButton, Tooltip,
-    Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem,
-    useMediaQuery, Badge, Slide
+    Paper,
+    Stack,
+    TextField,
+    InputAdornment,
+    Button,
+    IconButton,
+    Tooltip,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Select,
+    MenuItem,
+    useMediaQuery,
+    Badge,
+    Slide,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
@@ -14,18 +28,32 @@ const Transition = forwardRef(function Transition(props, ref) {
 });
 
 export default function FiltersBar({
-    q, setQ, status, setStatus, method, setMethod, sort, setSort, onSearch, loading,
+    q,
+    setQ,
+    status,
+    setStatus,
+    method,
+    setMethod,
+    sort,
+    setSort,
+    onSearch,
+    loading,
 }) {
     const [open, setOpen] = useState(false);
     const [tmpStatus, setTmpStatus] = useState(status ?? "ALL");
     const [tmpMethod, setTmpMethod] = useState(method ?? "ALL");
     const [tmpSort, setTmpSort] = useState(sort ?? "createdAt,DESC");
 
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // < 600px
+
     const isDirty = useMemo(() => {
         const def = { status: "ALL", method: "ALL", sort: "createdAt,DESC" };
-        return (status ?? def.status) !== def.status
-            || (method ?? def.method) !== def.method
-            || (sort ?? def.sort) !== def.sort;
+        return (
+            (status ?? def.status) !== def.status ||
+            (method ?? def.method) !== def.method ||
+            (sort ?? def.sort) !== def.sort
+        );
     }, [status, method, sort]);
 
     const handleOpen = () => {
@@ -34,12 +62,15 @@ export default function FiltersBar({
         setTmpSort(sort ?? "createdAt,DESC");
         setOpen(true);
     };
+
     const handleClose = () => setOpen(false);
+
     const handleReset = () => {
         setTmpStatus("ALL");
         setTmpMethod("ALL");
         setTmpSort("createdAt,DESC");
     };
+
     const handleApply = () => {
         setStatus?.(tmpStatus);
         setMethod?.(tmpMethod);
@@ -50,6 +81,7 @@ export default function FiltersBar({
 
     return (
         <>
+            {/* Thanh search + nút filter */}
             <Paper
                 elevation={0}
                 sx={{
@@ -57,11 +89,17 @@ export default function FiltersBar({
                     borderRadius: 3,
                     border: "1px solid",
                     borderColor: "divider",
-                    background: "linear-gradient(180deg, rgba(246,248,250,0.8) 0%, rgba(255,255,255,0.8) 100%)",
+                    background:
+                        "linear-gradient(180deg, rgba(246,248,250,1) 0%, rgba(255,255,255,1) 100%)",
                     backdropFilter: "blur(6px)",
                 }}
             >
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+                <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ flexWrap: "wrap" }}
+                >
                     <TextField
                         size="small"
                         placeholder="Tìm theo mã đơn / khách / email…"
@@ -104,28 +142,36 @@ export default function FiltersBar({
                 </Stack>
             </Paper>
 
-            {/* ===== Bottom Sheet (nửa màn hình) ===== */}
+            {/* Dialog filter */}
             <Dialog
                 open={open}
                 onClose={handleClose}
                 TransitionComponent={Transition}
                 keepMounted
                 PaperProps={{
-                    sx: {
-                        m: 0,
-                        position: "fixed",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: "50vh", // chỉ chiếm nửa màn hình
-                        borderTopLeftRadius: 16,
-                        borderTopRightRadius: 16,
-                        display: "flex",
-                        flexDirection: "column",
-                    },
+                    sx: isMobile
+                        ? {
+                            // MOBILE: bottom sheet
+                            m: 0,
+                            position: "fixed",
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: "50vh",
+                            borderTopLeftRadius: 16,
+                            borderTopRightRadius: 16,
+                            display: "flex",
+                            flexDirection: "column",
+                        }
+                        : {
+                            // DESKTOP: dialog giữa màn hình
+                            borderRadius: 2,
+                            minWidth: 420,
+                        },
                 }}
             >
                 <DialogTitle>Bộ lọc</DialogTitle>
+
                 <DialogContent dividers sx={{ flex: 1, overflowY: "auto" }}>
                     <Stack spacing={2} sx={{ mt: 1 }}>
                         <Select
@@ -135,7 +181,9 @@ export default function FiltersBar({
                         >
                             <MenuItem value="ALL">Tất cả trạng thái</MenuItem>
                             {Object.keys(STATUS_COLOR).map((s) => (
-                                <MenuItem key={s} value={s}>{s}</MenuItem>
+                                <MenuItem key={s} value={s}>
+                                    {s}
+                                </MenuItem>
                             ))}
                         </Select>
 
@@ -146,7 +194,9 @@ export default function FiltersBar({
                         >
                             <MenuItem value="ALL">Tất cả phương thức</MenuItem>
                             {["COD", "VNPAY", "STRIPE", "BANK_QR", "ZALOPAY"].map((m) => (
-                                <MenuItem key={m} value={m}>{m}</MenuItem>
+                                <MenuItem key={m} value={m}>
+                                    {m}
+                                </MenuItem>
                             ))}
                         </Select>
 
@@ -162,9 +212,14 @@ export default function FiltersBar({
                         </Select>
                     </Stack>
                 </DialogContent>
+
                 <DialogActions sx={{ p: 2, borderTop: "1px solid #eee" }}>
-                    <Button onClick={handleReset} color="inherit">Đặt lại</Button>
-                    <Button onClick={handleApply} variant="contained">Áp dụng</Button>
+                    <Button onClick={handleReset} color="inherit">
+                        Đặt lại
+                    </Button>
+                    <Button onClick={handleApply} variant="contained">
+                        Áp dụng
+                    </Button>
                 </DialogActions>
             </Dialog>
         </>

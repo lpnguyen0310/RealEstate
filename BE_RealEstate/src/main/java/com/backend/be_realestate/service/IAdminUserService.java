@@ -15,4 +15,6 @@ public interface IAdminUserService {
     void deleteHard(Long id);
 
     void rejectLock(Long id);
+
+    void resetPasswordByAdmin(Long id);
 }

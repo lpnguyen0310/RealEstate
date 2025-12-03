@@ -5,5 +5,5 @@ public interface EmailService {
 
     void sendOTPasswordReset(String toEmail, String otp, int expireMinutes);
 
-
+    void sendAdminResetPassword(String toEmail, String newPassword);
 }

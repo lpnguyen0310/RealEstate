@@ -21,4 +21,6 @@ export const adminUsersApi = {
 
   // Thống kê KPI
   kpi: () => api.get(`${BASE}/kpi`).then((r) => r.data),
+  resetPassword: (id) =>
+    api.post(`${BASE}/${id}/reset-password`).then((r) => r.data),
 };
