@@ -59,6 +59,19 @@ public class TransactionServiceImpl implements TransactionService {
         return transactions.map(this::convertToDto);
     }
 
+    @Override
+    public void markSucceededByOrderId(Long orderId) {
+        transactionRepository.findFirstByOrder_IdOrderByCreatedAtDesc(orderId)
+                .ifPresent(tx -> {
+                    // Chỉ update nếu chưa SUCCEEDED
+                    if (tx.getStatus() != TransactionStatus.SUCCEEDED) {
+                        tx.setStatus(TransactionStatus.SUCCEEDED);
+                        tx.setReason(null); // clear lý do thất bại nếu có
+                        transactionRepository.save(tx);
+                    }
+                });
+    }
+
     // Hàm helper để chuyển đổi Entity sang DTO và định dạng dữ liệu
     private TransactionHistoryDTO convertToDto(TransactionEntity entity) {
 

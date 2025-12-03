@@ -90,7 +90,7 @@ avgTicket: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0,
 
 // Các trường này cần được trả về từ API theo 'range'
 processing: kpiData.processingOrdersCount || 0, 
-pending: kpiData.pendingOrdersCount || 0,  
+pending: kpiData.pendingOrdersCount || 0,
 todayPaid: kpiData.summary.orders || 0, // 'todayPaid' giờ có nghĩa là 'totalPaid'
 };
 } catch (error) {

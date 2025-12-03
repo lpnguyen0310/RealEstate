@@ -1,5 +1,5 @@
-// src/components/PropertyCard.jsx
-import React, { useMemo, useRef } from "react";
+// src/components/cards/PropertyCard.jsx
+import React, { useState, useMemo, useRef } from "react";
 import {
   ShareAltOutlined,
   HeartOutlined,
@@ -13,6 +13,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { openLoginModal } from "@/store/uiSlice";
 import { makeSelectIsSaved, toggleFavorite } from "@/store/favoriteSlice";
 import { formatVNDShort } from "@/utils/money";
+import NotificationModal from "./NotificationModal"; // Import modal mới
 
 export default function PropertyCard({ item = {} }) {
   const dispatch = useDispatch();
@@ -26,7 +27,7 @@ export default function PropertyCard({ item = {} }) {
   const href = `/real-estate/${item.id}`;
   const thumb = imageUrl;
 
-  // đọc trạng thái đã lưu từ slice
+  // Đọc trạng thái đã lưu từ slice
   const isSaved = useSelector((state) => makeSelectIsSaved(item.id)(state));
 
   const favPayload = useMemo(
@@ -69,33 +70,20 @@ export default function PropertyCard({ item = {} }) {
     ]
   );
 
-  // tránh mở trùng modal đăng nhập
+  // Tránh mở trùng modal đăng nhập
   const loginModalOpenRef = useRef(false);
 
+  // State để điều khiển modal thông báo
+  const [modalVisible, setModalVisible] = useState(false);
+
   const handleHeartClick = (e) => {
-    // CHẶN điều hướng thẻ <a>, nhưng KHÔNG dùng onMouseDown
+    // Chặn điều hướng thẻ <a>, nhưng không dùng onMouseDown
     e.preventDefault();
     e.stopPropagation();
 
     if (!user) {
-      if (loginModalOpenRef.current) return;
-      loginModalOpenRef.current = true;
-
-      Modal.confirm({
-        title: "Bạn cần đăng nhập để thực hiện",
-        content: "Vui lòng đăng nhập để lưu tin và đồng bộ trên nhiều thiết bị.",
-        okText: "Đăng nhập",
-        cancelText: "Quay lại",
-        centered: true,
-        maskClosable: false,
-        onOk: () => {
-          dispatch(openLoginModal());
-        },
-        onCancel: () => { },
-        afterClose: () => {
-          loginModalOpenRef.current = false;
-        },
-      });
+      // Mở modal khi chưa đăng nhập
+      setModalVisible(true);
       return;
     }
 
@@ -113,10 +101,20 @@ export default function PropertyCard({ item = {} }) {
   };
 
   const handleShareClick = (e) => {
-    // chỉ chặn điều hướng, chưa làm share
+    // Chặn điều hướng và hiển thị thông báo chia sẻ
     e.preventDefault();
     e.stopPropagation();
     message.info("Tính năng chia sẻ sẽ có sớm!");
+  };
+
+  const handleCloseModal = () => {
+    setModalVisible(false); // Đóng modal khi người dùng nhấn đóng
+  };
+
+  // Mở modal đăng nhập
+  const handleLoginClick = () => {
+    setModalVisible(false);
+    dispatch(openLoginModal()); // Mở modal đăng nhập
   };
 
   // Badge loại tin
@@ -132,120 +130,131 @@ export default function PropertyCard({ item = {} }) {
   }
 
   return (
-    <a
-      href={href}
-      className="block no-underline rounded-[20px] border border-gray-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden"
-    >
-      {/* IMAGE */}
-      <div className="relative p-3">
-        <div className="relative overflow-hidden rounded-[16px] ring-1 ring-black/5 bg-black/5">
-          <img
-            src={imageUrl}
-            alt={item.title}
-            className="block w-full h-[220px] object-cover transition-transform duration-300 hover:scale-105"
-            loading="lazy"
-            onError={(e) => (e.currentTarget.src = "https://picsum.photos/800/480")}
-          />
+    <>
+      <a
+        href={href}
+        className="block no-underline rounded-[20px] border border-gray-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden"
+      >
+        {/* IMAGE */}
+        <div className="relative p-3">
+          <div className="relative overflow-hidden rounded-[16px] ring-1 ring-black/5 bg-black/5">
+            <img
+              src={imageUrl}
+              alt={item.title}
+              className="block w-full h-[220px] object-cover transition-transform duration-300 hover:scale-105"
+              loading="lazy"
+              onError={(e) => (e.currentTarget.src = "https://picsum.photos/800/480")}
+            />
 
-          {/* BADGE loại tin */}
-          {badge && (
-            <div
-              className={`absolute left-4 top-4 px-3 py-1 text-white text-[12px] font-bold rounded-md shadow-lg ${badgeClass}`}
-            >
-              {badge}
+            {/* BADGE loại tin */}
+            {badge && (
+              <div
+                className={`absolute left-4 top-4 px-3 py-1 text-white text-[12px] font-bold rounded-md shadow-lg ${badgeClass}`}
+              >
+                {badge}
+              </div>
+            )}
+
+            {/* QUICK ACTIONS */}
+            <div className="absolute right-4 top-4 flex gap-2 z-10">
+              <button
+                type="button"
+                className="w-9 h-9 rounded-full bg-white/95 backdrop-blur-sm hover:bg-white shadow flex items-center justify-center"
+                onClick={handleShareClick}
+                aria-label="Chia sẻ"
+                title="Chia sẻ"
+              >
+                <ShareAltOutlined />
+              </button>
+
+              {/* ❤️ Toggle */}
+              <button
+                type="button"
+                className={`w-9 h-9 rounded-full backdrop-blur-sm shadow flex items-center justify-center ${isSaved ? "bg-[#fff1ef]" : "bg-white/95 hover:bg-white"
+                  }`}
+                onClick={handleHeartClick}
+                aria-label={isSaved ? "Bỏ lưu" : "Lưu tin"}
+                title={isSaved ? "Bỏ lưu" : "Lưu tin"}
+              >
+                {isSaved ? (
+                  <HeartFilled className="text-[#d6402c] text-[16px]" />
+                ) : (
+                  <HeartOutlined className="text-[16px]" />
+                )}
+              </button>
+            </div>
+
+            {/* BADGE: thời gian */}
+            {(item.postedAt || item.postedAtText) && (
+              <div className="absolute left-4 bottom-4 flex items-center gap-1 bg-black/70 text-white text-[12px] px-3 py-1 rounded-full">
+                <ClockCircleOutlined className="text-[12px]" />
+                <span>{item.postedAtText ?? item.postedAt}</span>
+              </div>
+            )}
+
+            {/* BADGE: số ảnh */}
+            <div className="absolute right-4 bottom-4 flex items-center gap-1 bg-black/70 text-white text-[12px] px-2.5 py-1 rounded-full">
+              <CameraOutlined className="text-[12px]}" />
+              <span>{item.photos ?? item?.imageUrls?.length ?? 0}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* BODY */}
+        <div className="px-5 pb-5">
+          <h3 className="text-[20px] font-extrabold text-gray-900 leading-snug line-clamp-2 min-h-[56px]">
+            {item.title}
+          </h3>
+
+          <div className="mt-1">
+            <span className="text-[#1f5fbf] font-bold text-[20px]">
+              {item.priceDisplay || item.price || formatVNDShort(item.price)}
+            </span>
+            {item.pricePerM2 && (
+              <span className="ml-2 text-gray-500 text-[13px]">({item.pricePerM2})</span>
+            )}
+          </div>
+
+          {(item.displayAddress || item.addressMain) && (
+            <div className="mt-2 text-gray-700 text-[14px] flex items-center gap-2">
+              <EnvironmentOutlined className="text-[#1f5fbf]" />
+              <span className="truncate">{item.displayAddress || item.addressMain}</span>
             </div>
           )}
 
-          {/* QUICK ACTIONS */}
-          <div className="absolute right-4 top-4 flex gap-2 z-10">
-            <button
-              type="button"
-              className="w-9 h-9 rounded-full bg-white/95 backdrop-blur-sm hover:bg-white shadow flex items-center justify-center"
-              onClick={handleShareClick}
-              aria-label="Chia sẻ"
-              title="Chia sẻ"
-            >
-              <ShareAltOutlined />
-            </button>
-
-            {/* ❤️ Toggle */}
-            <button
-              type="button"
-              className={`w-9 h-9 rounded-full backdrop-blur-sm shadow flex items-center justify-center ${isSaved ? "bg-[#fff1ef]" : "bg-white/95 hover:bg-white"
-                }`}
-              onClick={handleHeartClick}
-              aria-label={isSaved ? "Bỏ lưu" : "Lưu tin"}
-              title={isSaved ? "Bỏ lưu" : "Lưu tin"}
-            >
-              {isSaved ? (
-                <HeartFilled className="text-[#d6402c] text-[16px]" />
-              ) : (
-                <HeartOutlined className="text-[16px]" />
-              )}
-            </button>
-          </div>
-
-          {/* BADGE: thời gian */}
-          {(item.postedAt || item.postedAtText) && (
-            <div className="absolute left-4 bottom-4 flex items-center gap-1 bg-black/70 text-white text-[12px] px-3 py-1 rounded-full">
-              <ClockCircleOutlined className="text-[12px]" />
-              <span>{item.postedAtText ?? item.postedAt}</span>
-            </div>
-          )}
-
-          {/* BADGE: số ảnh */}
-          <div className="absolute right-4 bottom-4 flex items-center gap-1 bg-black/70 text-white text-[12px] px-2.5 py-1 rounded-full">
-            <CameraOutlined className="text-[12px]}" />
-            <span>{item.photos ?? item?.imageUrls?.length ?? 0}</span>
+          <div className="mt-3 flex items-center gap-6 text-gray-700 text-[14px]">
+            {item.area ? (
+              <div className="flex items-center gap-2">
+                <span>🏠</span>
+                <span>
+                  {item.area} <span className="text-[12px] align-top">m²</span>
+                </span>
+              </div>
+            ) : null}
+            {item.bedrooms ?? item.bed ? (
+              <div className="flex items-center gap-2">
+                <span>🛏</span>
+                <span>{item.bedrooms ?? item.bed}</span>
+              </div>
+            ) : null}
+            {item.bathrooms ?? item.bath ? (
+              <div className="flex items-center gap-2">
+                <span>🛁</span>
+                <span>{item.bathrooms ?? item.bath}</span>
+              </div>
+            ) : null}
           </div>
         </div>
-      </div>
+      </a>
 
-      {/* BODY */}
-      <div className="px-5 pb-5">
-        <h3 className="text-[20px] font-extrabold text-gray-900 leading-snug line-clamp-2 min-h-[56px]">
-          {item.title}
-        </h3>
-
-        <div className="mt-1">
-          <span className="text-[#1f5fbf] font-bold text-[20px]">
-            {item.priceDisplay || item.price || formatVNDShort(item.price)}
-          </span>
-          {item.pricePerM2 && (
-            <span className="ml-2 text-gray-500 text-[13px]">({item.pricePerM2})</span>
-          )}
-        </div>
-
-        {(item.displayAddress || item.addressMain) && (
-          <div className="mt-2 text-gray-700 text-[14px] flex items-center gap-2">
-            <EnvironmentOutlined className="text-[#1f5fbf]" />
-            <span className="truncate">{item.displayAddress || item.addressMain}</span>
-          </div>
-        )}
-
-        <div className="mt-3 flex items-center gap-6 text-gray-700 text-[14px]">
-          {item.area ? (
-            <div className="flex items-center gap-2">
-              <span>🏠</span>
-              <span>
-                {item.area} <span className="text-[12px] align-top">m²</span>
-              </span>
-            </div>
-          ) : null}
-          {item.bedrooms ?? item.bed ? (
-            <div className="flex items-center gap-2">
-              <span>🛏</span>
-              <span>{item.bedrooms ?? item.bed}</span>
-            </div>
-          ) : null}
-          {item.bathrooms ?? item.bath ? (
-            <div className="flex items-center gap-2">
-              <span>🛁</span>
-              <span>{item.bathrooms ?? item.bath}</span>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </a>
+      {/* Modal thông báo khi chưa đăng nhập */}
+      <NotificationModal
+        visible={modalVisible}
+        onClose={handleCloseModal}
+        onLoginClick={handleLoginClick}
+        title="Bạn cần đăng nhập"
+        content="Vui lòng đăng nhập để lưu tin và đồng bộ trên nhiều thiết bị."
+      />
+    </>
   );
 }

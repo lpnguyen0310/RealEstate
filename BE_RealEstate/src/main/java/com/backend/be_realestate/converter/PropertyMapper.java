@@ -324,18 +324,16 @@ public class PropertyMapper {
         UserEntity u = p.getUser();
 
         AgentDetailDTO agent = new AgentDetailDTO();
-        String name = (u != null)
-                ? ((u.getFirstName() + " " + u.getLastName()).trim())
-                : "Người đăng";
-        String avatar = (u != null) ? u.getAvatar() : null;
-        String phone  = (u != null) ? u.getPhone()  : null;
-        String email  = (u != null) ? u.getEmail()  : null;
-
-        agent.setName(name);
-        agent.setAvatar(avatar);
-        agent.setPhoneFull(phone);
-        agent.setPhoneMasked(maskPhone(phone));
-        agent.setEmail(email);
+        if (u != null) {
+            agent.setId(u.getUserId());                  // 👈 FIX QUAN TRỌNG
+            agent.setName((u.getFirstName() + " " + u.getLastName()).trim());
+            agent.setAvatar(u.getAvatar());
+            agent.setPhoneFull(u.getPhone());
+            agent.setPhoneMasked(maskPhone(u.getPhone()));
+            agent.setEmail(u.getEmail());
+        } else {
+            agent.setName("Người đăng");
+        }
 
         boolean isOwner = Boolean.TRUE.equals(p.getIsOwner());
         agent.setIsOwner(isOwner);

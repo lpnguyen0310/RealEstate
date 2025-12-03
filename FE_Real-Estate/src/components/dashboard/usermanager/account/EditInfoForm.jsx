@@ -86,6 +86,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
       fullName: values.fullName,
       email: values.email,
       personalTaxCode: values.personalTaxCode,
+      mainPhone: values.__mainPhone,
       additionalPhones: (values.phones || []).filter(Boolean),
       buyerName: values.buyerName,
       invoiceEmail: values.invoiceEmail,
@@ -120,8 +121,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
               className="col-span-12 sm:col-span-6"
               label="Họ và tên"
               name="fullName"
-              rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
-            >
+              rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}>
               <Input />
             </Item>
 
@@ -136,7 +136,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
           <Title level={5} className="!mb-3">Thông tin liên hệ</Title>
           <div className="grid grid-cols-12 gap-x-4 sm:gap-x-6 gap-y-4">
             <Item className="col-span-12" label="Số điện thoại chính" name="__mainPhone">
-              <Input disabled />
+              <Input />
             </Item>
 
             <div className="col-span-12">
@@ -158,8 +158,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
                           <Form.Item
                             {...field}
                             className="!mb-0 grow"
-                            rules={[{ max: 20, message: "Số quá dài" }]}
-                          >
+                            rules={[{ max: 20, message: "Số quá dài" }]}>
                             <Input placeholder="Số điện thoại phụ" className="w-full sm:w-[320px]" />
                           </Form.Item>
                           <Button type="text" danger onClick={() => remove(field.name)}>Xoá</Button>
@@ -176,14 +175,13 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
               className="col-span-12 sm:col-span-9 !mb-0"
               label="Email"
               name="email"
-              rules={[{ type: "email", message: "Email không hợp lệ" }]}
-            >
+              rules={[{ type: "email", message: "Email không hợp lệ" }]}>
               <Input placeholder="Nhập email" />
             </Form.Item>
             <Form.Item className="col-span-12 sm:col-span-3 !mb-0 sm:flex sm:items-end">
-              <Button className="h-[44px] w-full sm:w-auto" onClick={() => window?.alert?.("Chức năng xác thực (demo).")}>
-                Xác thực
-              </Button>
+              {/* <Button className="h-[44px] w-full sm:w-auto" onClick={() => window?.alert?.("Chức năng xác thực (demo).")}>
+        Xác thực
+      </Button> */}
             </Form.Item>
           </div>
 
@@ -196,12 +194,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
               <Input />
             </Item>
 
-            <Item
-              className="col-span-12 sm:col-span-6"
-              label="Email nhận hoá đơn"
-              name="invoiceEmail"
-              rules={[{ type: "email", message: "Email không hợp lệ" }]}
-            >
+            <Item className="col-span-12 sm:col-span-6" label="Email nhận hoá đơn" name="invoiceEmail" rules={[{ type: "email", message: "Email không hợp lệ" }]}>
               <Input />
             </Item>
 
@@ -230,8 +223,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
                   { label: "Hoa Kỳ", value: "US" },
                   { label: "Nhật Bản", value: "JP" },
                   { label: "Khác", value: "OTHER" },
-                ]}
-              />
+                ]} />
             </Item>
           </div>
 
@@ -245,6 +237,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
           {/* Submit ẩn */}
           <button type="submit" id="edit-info-submit" style={{ display: "none" }} />
         </Form>
+
       </Card>
     </div>
   );

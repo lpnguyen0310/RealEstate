@@ -6,6 +6,7 @@ import com.backend.be_realestate.entity.UserInventoryEntity;
 import com.backend.be_realestate.enums.ActivityType;
 import com.backend.be_realestate.enums.ListingType;
 import com.backend.be_realestate.enums.PropertyStatus;
+import com.backend.be_realestate.enums.PropertyType;
 import com.backend.be_realestate.modals.dto.PropertyDTO;
 import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
@@ -46,7 +47,7 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     @Query("UPDATE PropertyEntity p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
     int bumpView(@Param("id") Long id);
 
-    int countByUser_UserId(Long userId);
+    long countByUser_UserIdAndStatus(Long userId, PropertyStatus status);
 
     @Query("""
            select p
@@ -143,6 +144,45 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     @Query("UPDATE PropertyEntity p SET p.status = 'EXPIRED' " +
             "WHERE p.status = 'PUBLISHED' AND p.expiresAt < :now")
     int updateStatusForExpiredPosts(@Param("now") Timestamp now);
+
+    // Custom projection for counting properties by status
+    Page<PropertyEntity> findByUser_UserIdAndStatus(Long userId,
+                                                    PropertyStatus status,
+                                                    Pageable pageable);
+
+    Page<PropertyEntity> findByUser_UserIdAndStatusAndPropertyType(Long userId,
+                                                                   PropertyStatus status,
+                                                                   PropertyType propertyType,
+                                                                   Pageable pageable);
+
+    long countByUser_UserIdAndPropertyTypeAndStatus(Long userId,
+                                                    PropertyType propertyType,
+                                                    PropertyStatus status);
+
+    long countAllByStatus(PropertyStatus status);
+
+    @Modifying
+    @Transactional
+    @Query("""
+    UPDATE PropertyEntity p
+    SET p.status = 'EXPIRINGSOON'
+    WHERE p.status = 'PUBLISHED'
+      AND p.expiresAt >= :now
+      AND p.expiresAt < :soon
+""")
+    int updateStatusForExpiringSoon(@Param("now") Timestamp now,
+                                    @Param("soon") Timestamp soon);
+
+
+    @Query("""
+    SELECT p
+    FROM PropertyEntity p
+    WHERE p.status = 'PUBLISHED'
+      AND p.expiresAt >= :now
+      AND p.expiresAt < :soon
+""")
+    List<PropertyEntity> findWillExpireSoon(@Param("now") Timestamp now,
+                                            @Param("soon") Timestamp soon);
 }
 
 

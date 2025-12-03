@@ -45,41 +45,41 @@ export default function DashboardOverview() {
   useEffect(() => {
 // Chỉ gọi API nếu state đang là 'idle' (chưa gọi)
 if (profileStatus === 'idle') {
-  dispatch(fetchMyProfile());
+dispatch(fetchMyProfile());
 }
-  }, [dispatch, profileStatus]);
+}, [dispatch, profileStatus]);
 
   // User info
   const user = useMemo(() => {
 if (!profile) {
-  // Hiển thị trạng thái loading hoặc mặc định
-  const isLoading = profileStatus === 'loading' || profileStatus === 'idle';
-  return { 
+// Hiển thị trạng thái loading hoặc mặc định
+const isLoading = profileStatus === 'loading' || profileStatus === 'idle';
+return { 
 name: isLoading ? "Đang tải..." : "Người dùng", 
 email: "", 
 phone: "", 
 avatarUrl: "", 
 balance: 0 
-  };
+};
 }
 
 // Lấy dữ liệu từ `profile` (từ API response của bạn)
 const name =
-  profile.fullName ||
-  `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim() ||
-  profile.email ||
-  "Người dùng";
+profile.fullName ||
+`${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim() ||
+profile.email ||
+"Người dùng";
 
 return {
-  name,
-  email: profile.email || "",
-  phone: profile.phone || profile.phoneNumber || "",
-  // Dùng đúng tên trường 'avatar' từ API
-  avatarUrl: profile.avatar || "", 
-  // DÙNG ĐÚNG TÊN TRƯỜNG 'mainBalance' TỪ API
-  balance: profile.mainBalance ?? 0, 
+name,
+email: profile.email || "",
+phone: profile.phone || profile.phoneNumber || "",
+// Dùng đúng tên trường 'avatar' từ API
+avatarUrl: profile.avatar || "", 
+// DÙNG ĐÚNG TÊN TRƯỜNG 'mainBalance' TỪ API
+balance: profile.mainBalance ?? 0, 
 };
-  }, [profile, profileStatus]);
+}, [profile, profileStatus]);
 
   // Favorites (REAL DATA từ Redux)
   const favList = useSelector(selectFavList); // [{id,title,thumb,href,priceDisplay,displayAddress,...}]
@@ -179,11 +179,6 @@ return {
         <div className="lg:col-span-7">
           <PostsChartCard defaultMode="day" />
         </div>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-semibold mb-2 sm:mb-3">Tổng quan</h1>
-        <p className="text-sm sm:text-base">Xin chào! Đây là bảng điều khiển của bạn.</p>
       </div>
       <LeadDetailModal
         visible={isLeadModalVisible}

@@ -38,4 +38,23 @@ public enum NotificationType {
     LISTING_UNHIDDEN,        // User bỏ ẩn tin
     LISTING_MARKED_SOLD,     // User đánh dấu đã bán
     LISTING_UNMARKED_SOLD,   // User gỡ trạng thái đã bán
+
+    SITE_REVIEW_NEW_ADMIN,   // Admin: có đánh giá mới
+    SITE_REVIEW_PUBLISHED,   // User: đánh giá đã được hiển thị
+    SITE_REVIEW_HIDDEN,      // User: đánh giá bị ẩn
+    SITE_REVIEW_DELETED   ,   // User: đánh giá bị xóa
+
+    LISTING_EXPIRING_SOON,
+
+    USER_LOCK_REQUESTED,
+    USER_LOCK_REQUEST_CANCELLED,
+    USER_DELETE_REQUESTED,
+    USER_DELETE_REQUEST_CANCELLED,
+
+    USER_LOCKED_BY_ADMIN,
+    USER_UNLOCKED_BY_ADMIN,
+    USER_DELETE_REQUEST_REJECTED,
+    USER_LOCK_REQUEST_REJECTED,
+    USER_DELETED_BY_ADMIN,
+    USER_PASSWORD_RESET_BY_ADMIN
 }

@@ -91,6 +91,11 @@ public class UserProfileConverter {
         }
 
         // --- Cập nhật UserProfile ---
+
+        if (StringUtils.hasText(request.getMainPhone())) {
+            // Cập nhật số điện thoại chính
+            user.setPhone(request.getMainPhone());
+        }
         if (request.getPersonalTaxCode() != null) {
             profile.setPersonalTaxCode(request.getPersonalTaxCode());
         }

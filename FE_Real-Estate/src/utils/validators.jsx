@@ -114,14 +114,36 @@ export const money = (v) =>
 /** Chuẩn hoá trạng thái: PUBLISHED -> EXPIRING_SOON / EXPIRED theo expiresAt */
 export const normalizeStatuses = (posts) => {
   const now = dayjs();
+
   return posts.map((p) => {
+    // Log dữ liệu gốc
+    console.log("---- CHECK POST ----");
+    console.log("ID:", p.id);
+    console.log("Raw expiresAt:", p.expiresAt);
+
+    const expires = p.expiresAt ? dayjs(p.expiresAt) : null;
+
+    console.log("Parsed expiresAt:", expires?.format());
+    console.log("Now:", now.format());
+    console.log("diff days:", expires ? expires.diff(now, "day") : null);
+
     if (p.status === "PUBLISHED") {
-      if (p.expiresAt && dayjs(p.expiresAt).isBefore(now)) return { ...p, status: "EXPIRED" };
-      if (p.expiresAt && dayjs(p.expiresAt).diff(now, "day") <= 7) return { ...p, status: "EXPIRING_SOON" };
+      if (expires && expires.isBefore(now)) {
+        console.log("→ Mark as EXPIRED");
+        return { ...p, status: "EXPIRED" };
+      }
+
+      if (expires && expires.diff(now, "day") <= 7) {
+        console.log("→ Mark as EXPIRING_SOON");
+        return { ...p, status: "EXPIRING_SOON" };
+      }
     }
+
+    console.log("→ Keep status:", p.status);
     return p;
   });
 };
+
 
 export const countByStatus = (list = []) => {
   const map = {
@@ -132,6 +154,7 @@ export const countByStatus = (list = []) => {
     EXPIRED: 0,
     EXPIRING_SOON: 0,
     HIDDEN: 0,
+    ARCHIVED: 0,
   };
 
   list.forEach((p) => {
@@ -152,7 +175,7 @@ export const fmtVND = (n) =>
 export const fmtDateOrder = (iso) =>
   iso
     ? new Date(iso).toLocaleString("vi-VN", {
-        hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit",
-      })
+      hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    })
     : "";

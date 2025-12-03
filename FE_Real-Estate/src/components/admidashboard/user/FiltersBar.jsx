@@ -1,7 +1,17 @@
 import { Paper, Stack, TextField, Select, MenuItem, Button } from "@mui/material";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
-export default function FiltersBar({ q, setQ, role, setRole, status, setStatus, onReset }) {
+export default function FiltersBar({
+    q,
+    setQ,
+    role,
+    setRole,
+    status,
+    setStatus,
+    request,        // NEW
+    setRequest,     // NEW
+    onReset,
+}) {
     return (
         <Paper
             elevation={0}
@@ -49,6 +59,18 @@ export default function FiltersBar({ q, setQ, role, setRole, status, setStatus, 
                     <MenuItem value="ALL">Tất cả trạng thái</MenuItem>
                     <MenuItem value="ACTIVE">ACTIVE</MenuItem>
                     <MenuItem value="LOCKED">LOCKED</MenuItem>
+                </Select>
+
+                {/* NEW: filter loại yêu cầu */}
+                <Select
+                    size="small"
+                    value={request}
+                    onChange={(e) => setRequest(e.target.value)}
+                    sx={{ minWidth: { xs: "100%", sm: 220 }, width: { xs: "100%", sm: "auto" } }}
+                >
+                    <MenuItem value="ALL">Tất cả yêu cầu</MenuItem>
+                    <MenuItem value="LOCK_REQUESTED">Chỉ tài khoản yêu cầu khóa</MenuItem>
+                    <MenuItem value="DELETE_REQUESTED">Chỉ tài khoản yêu cầu xóa</MenuItem>
                 </Select>
 
                 <Button

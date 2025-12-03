@@ -5,6 +5,7 @@ import LoginPage from "../pages/Login";
 import SearchResultsPage from "../pages/Search/SearchResultsBody";
 import OAuth2Callback from "../pages/Login/OAuth2Callback";
 import SavedPosts from "../pages/Home/SavedPosts";
+import AgentProfile from "../pages/Home/AgentProfile";
 export const publicRoutes = [
     { path: "/", element: <Home /> },
     { path: "/real-estate/:id", element: <InfoRealEstate /> },
@@ -12,6 +13,7 @@ export const publicRoutes = [
     { path: "/register", element: <RegisterModal /> },
     { path: "/search", element: <SearchResultsPage  /> },
     { path: "/oauth2/callback", element: <OAuth2Callback /> },
-    { path: "/tin-da-luu", element: <SavedPosts /> }
+    { path: "/tin-da-luu", element: <SavedPosts /> },
+    {path: "/agent/:id", element: <AgentProfile />},
 
 ];

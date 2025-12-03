@@ -38,7 +38,7 @@ public class UserProfileServiceImpl implements UserProfileService {
         UserProfile profile = getOrCreateUserProfile(user);
 
         userConverter.updateProfileFromRequest(request, user, profile);
-
+        userRepository.save(user);
         return userConverter.toUserProfileResponse(user, profile);
     }
 

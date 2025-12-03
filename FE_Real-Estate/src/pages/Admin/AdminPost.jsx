@@ -47,7 +47,6 @@ import {
     useSendWarningMutation // <<< IMPORT
 } from "@/services/reportApiSlice";
 
-// >>> NEW: Confirm Dialog
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 
 export default function AdminPostsMUI() {
@@ -158,7 +157,6 @@ export default function AdminPostsMUI() {
         return () => clearTimeout(t);
     }, [dispatch, selectedTab, page, pageSize, q, category, listingType]);
 
-    /* =============== FETCH COUNTS (debounce) =============== */
     useEffect(() => {
         const t = setTimeout(() => {
             dispatch(fetchCountsThunk());
@@ -166,7 +164,6 @@ export default function AdminPostsMUI() {
         return () => clearTimeout(t);
     }, [dispatch]);
 
-    /* =============== REALTIME WS =============== */
     useEffect(() => {
         const client = new Client({
             webSocketFactory: () => new SockJS("/ws"),

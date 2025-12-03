@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Form, message, Grid } from "antd";
+import { Modal, Form, message, Grid, Button } from "antd";
 import { useDispatch } from "react-redux";
 import { loginThunk } from "@/store/authSlice";
 import { redirectAfterLogin } from "@/routes/helpers/redirectAfterLogin";
@@ -12,7 +12,8 @@ import ResetPasswordForm from "@/components/auth/forms/ResetPasswordForm";
 import LoggingInPanel from "@/components/auth/panels/LoggingInPanel";
 
 import useCountdown from "@/utils/useCountdown";
-import { isPhone, isEmail, maskPhone, maskEmail } from "@/utils/validators";
+import { isPhone, isEmail, maskEmail } from "@/utils/validators";
+import authApi from "@/api/register";
 
 export default function LoginModal({
   open,
@@ -36,9 +37,12 @@ export default function LoginModal({
   const [loading, setLoading] = useState(false);
   const [forceClosed, setForceClosed] = useState(false);
   const [loginRoles, setLoginRoles] = useState([]);
+
   const [sentTo, setSentTo] = useState("");
   const [maskInfo, setMaskInfo] = useState("");
-  const [channel, setChannel] = useState("zalo");
+  const [channel, setChannel] = useState("email"); // email | zalo
+  const [resetTicket, setResetTicket] = useState("");
+  const [otpError, setOtpError] = useState(""); // 🔴 thêm state lỗi OTP
 
   const { value: resendIn, restart: restartCountdown } = useCountdown(60);
 
@@ -49,7 +53,10 @@ export default function LoginModal({
       setForceClosed(false);
       setSentTo("");
       setMaskInfo("");
-      setChannel("zalo");
+      setChannel("email");
+      setResetTicket("");
+      setOtpError("");
+
       form.resetFields();
       forgotForm.resetFields();
       otpForm.resetFields();
@@ -57,6 +64,7 @@ export default function LoginModal({
     }
   }, [open]);
 
+  // ========== LOGIN ==========
   const onFinishLogin = async (values) => {
     try {
       setLoading(true);
@@ -85,84 +93,149 @@ export default function LoginModal({
     }
   };
 
+  // ========== FORGOT – BƯỚC 1 ==========
   const onFinishForgot = async ({ account }) => {
     try {
       setLoading(true);
-      setSentTo(account);
+      setOtpError(""); // clear lỗi OTP nếu có
 
+      // Hiện tại chỉ hỗ trợ email
       if (isPhone(account)) {
-        setChannel("zalo");
-        setMaskInfo(maskPhone(account));
-        setMode("otp_zalo");
-        restartCountdown(60);
-        otpForm.resetFields();
-        await new Promise((r) => setTimeout(r, 500));
-        message.success("Đã gửi OTP qua Zalo.");
+        message.warning("Hiện tại chỉ hỗ trợ khôi phục mật khẩu qua email.");
         return;
       }
 
-      if (isEmail(account)) {
-        setChannel("email");
-        setMaskInfo(maskEmail(account));
-        setMode("otp_zalo");
-        restartCountdown(60);
-        otpForm.resetFields();
-        await new Promise((r) => setTimeout(r, 500));
-        message.success("Đã gửi OTP qua email.");
+      if (!isEmail(account)) {
+        message.error("Vui lòng nhập email hợp lệ.");
         return;
       }
 
-      message.error("Vui lòng nhập email hoặc số điện thoại hợp lệ.");
-    } catch {
-      message.error("Gửi yêu cầu thất bại, thử lại sau.");
+      setSentTo(account);
+      setChannel("email");
+
+      const res = await authApi.forgotRequestOtp(account);
+      const data = res?.data?.data || {};
+      const masked = data.maskedEmail || maskEmail(account);
+
+      setMaskInfo(masked);
+      setMode("otp_zalo");
+      restartCountdown(60);
+      otpForm.resetFields();
+
+      message.success(`Đã gửi mã OTP đến ${masked}`);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Gửi yêu cầu thất bại, thử lại sau.";
+      message.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  // ========== RESEND OTP ==========
   const resendOtp = async () => {
     try {
+      if (!sentTo) return;
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 500));
-      restartCountdown(60);
-      message.success(
-        channel === "zalo" ? "Đã gửi lại OTP qua Zalo." : "Đã gửi lại OTP qua email."
-      );
-    } catch {
-      message.error("Không gửi lại được OTP.");
+      setOtpError(""); // clear lỗi khi gửi lại
+
+      if (channel === "email") {
+        await authApi.forgotRequestOtp(sentTo);
+        restartCountdown(60);
+        message.success("Đã gửi lại OTP qua email.");
+      } else {
+        await new Promise((r) => setTimeout(r, 500));
+        restartCountdown(60);
+        message.success("Đã gửi lại OTP.");
+      }
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Không gửi lại được OTP.";
+      message.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  // ========== VERIFY OTP ==========
   const onVerifyOtp = async ({ otp }) => {
     try {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      message.success("Xác thực OTP thành công.");
-      setMode("reset");
-    } catch {
-      message.error("OTP không đúng hoặc đã hết hạn.");
+      setOtpError(""); // clear lỗi cũ
+
+      if (channel === "email") {
+        const res = await authApi.forgotVerifyOtp({
+          email: sentTo,
+          otp,
+        });
+
+        const data = res?.data?.data || {};
+        const ticket = data.token || data.ticket;
+        if (!ticket) {
+          throw new Error("Không nhận được ticket từ server.");
+        }
+
+        setResetTicket(ticket);
+        message.success("Xác thực OTP thành công.");
+        setMode("reset");
+        resetForm.resetFields();
+      } else {
+        await new Promise((r) => setTimeout(r, 600));
+        message.success("Xác thực OTP thành công.");
+        setMode("reset");
+        resetForm.resetFields();
+      }
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "OTP không đúng hoặc đã hết hạn.";
+      setOtpError(msg); // 🔴 GẮN LỖI VÀO FIELD
+      // message.error(msg);  // nếu muốn toast thêm thì mở lại
     } finally {
       setLoading(false);
     }
   };
 
-  const onFinishReset = async ({ newPassword }) => {
+  // ========== RESET PASSWORD ==========
+  const onFinishReset = async ({ newPassword, confirmPassword }) => {
     try {
+      if (!resetTicket) {
+        message.error("Thiếu ticket reset, vui lòng thực hiện lại từ đầu.");
+        return;
+      }
+
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 700));
-      message.success("Đổi mật khẩu thành công, vui lòng đăng nhập lại.");
-      setMode("login");
+
+      await authApi.forgotResetPassword({
+        ticket: resetTicket,
+        password: newPassword,
+        confirmPassword,
+      });
+
+      message.success("Đổi mật khẩu thành công.");
+      setMode("reset_success");
       resetForm.resetFields();
-      form.resetFields();
-    } catch {
-      message.error("Đổi mật khẩu thất bại.");
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Đổi mật khẩu thất bại.";
+      message.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  // ========== LOGIN DONE ==========
   const handleLoggingDone = () => {
     redirectAfterLogin({
       roles: loginRoles,
@@ -203,14 +276,13 @@ export default function LoginModal({
         className={`flex ${isMobile ? "flex-col h-full w-full" : "flex-row h-full w-full"
           }`}
       >
-        {/* Bên trái: chỉ hiện desktop */}
         {!isMobile && (
           <div className="w-[40%] h-full bg-[#ffe9e6] flex flex-col justify-center items-center rounded-l-[8px]">
             <img
               src="/assets/login-illustration.png"
               alt="illustration"
               className="max-w-[220px] object-contain"
-              onError={(e) => (e.currentTarget.style.display = 'none')}
+              onError={(e) => (e.currentTarget.style.display = "none")}
             />
             <p className="mt-6 text-[#c23a2a] text-[16px] font-semibold text-center leading-snug">
               Tìm nhà đất
@@ -220,7 +292,6 @@ export default function LoginModal({
           </div>
         )}
 
-        {/* Bên phải */}
         <div
           className={
             isMobile
@@ -254,10 +325,16 @@ export default function LoginModal({
               sentTo={sentTo}
               resendIn={resendIn}
               onResend={resendOtp}
-              onBack={() => setMode("forgot")}
+              onBack={() => {
+                setMode("forgot");
+                setOtpError("");
+                otpForm.resetFields();
+              }}
               onVerify={onVerifyOtp}
               loading={loading}
               channel={channel}
+              otpError={otpError}                  // 🔴 truyền xuống
+              onClearOtpError={() => setOtpError("")} // 🔴 clear khi user gõ lại
             />
           )}
 
@@ -269,7 +346,43 @@ export default function LoginModal({
             />
           )}
 
-          {mode === "logging_in" && <LoggingInPanel onDone={handleLoggingDone} />}
+          {mode === "reset_success" && (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <h2 className="text-[22px] font-bold text-gray-900 mb-2">
+                Mật khẩu đã được cập nhật
+              </h2>
+              <p className="text-[14px] text-gray-600 mb-6 max-w-[320px]">
+                Bạn có thể sử dụng mật khẩu mới để đăng nhập vào tài khoản của mình.
+              </p>
+
+              <div className="flex gap-3 w-full max-w-[320px]">
+                <Button
+                  block
+                  className="h-[44px]"
+                  onClick={() => {
+                    setMode("login");
+                    form.resetFields();
+                  }}
+                >
+                  Quay lại đăng nhập
+                </Button>
+                <Button
+                  type="primary"
+                  block
+                  className="h-[44px] !bg-[#d6402c] hover:!bg-[#c13628]"
+                  onClick={() => {
+                    onClose?.();
+                  }}
+                >
+                  Đóng
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {mode === "logging_in" && (
+            <LoggingInPanel onDone={handleLoggingDone} />
+          )}
         </div>
       </div>
     </Modal>

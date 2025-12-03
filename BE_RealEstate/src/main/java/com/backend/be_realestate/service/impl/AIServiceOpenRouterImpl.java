@@ -146,8 +146,12 @@ public class AIServiceOpenRouterImpl implements IAIService {
             // Log bảng điểm
             log.info("[AI-RERANK] topK results (id | base | ai | final)");
             for (ScoredProperty sp : out) {
-                log.info("  {} | {:.3f} | {:.3f} | {:.3f}",
-                        sp.getId(), sp.getBaseScore(), sp.getAiScore(), sp.getFinalScore());
+                log.info("  {} | {} | {} | {}",
+                        sp.getId(),
+                        String.format("%.3f", sp.getBaseScore()),
+                        String.format("%.3f", sp.getAiScore()),
+                        String.format("%.3f", sp.getFinalScore())
+                );
             }
             return out;
 
@@ -159,24 +163,38 @@ public class AIServiceOpenRouterImpl implements IAIService {
 
     private String buildPrompt(UserPreference pref, List<ScoredProperty> items, int limit) {
         Map<String, Object> ctx = new LinkedHashMap<>();
+        ctx.put("user_id", pref.getUserId());
         ctx.put("limit", limit);
+
+        // City signals
+        ctx.put("anchor_city_id", pref.getAnchorCityId());
+        ctx.put("near_city_ids", pref.getNearCityIds());
+        ctx.put("preferred_city_ids", pref.getPreferredCityIds());
         ctx.put("fav_city_ids", pref.getFavCityIds());
-        ctx.put("fav_types",    pref.getFavTypes());
-        ctx.put("max_price",    pref.getMaxPrice());
-        ctx.put("max_area",     pref.getMaxArea());
-        ctx.put("saved_ids",    pref.getSavedIds());
-        ctx.put("keywords",     pref.getKeywords());
+
+        // Types
+        ctx.put("fav_types", pref.getFavTypes());
+
+        // Range
+        ctx.put("price_min", pref.getPriceMin());
+        ctx.put("price_max", pref.getPriceMax());
+        ctx.put("area_min", pref.getAreaMin());
+        ctx.put("area_max", pref.getAreaMax());
+
+        // History / text signals
+        ctx.put("saved_ids", pref.getSavedIds());
+        ctx.put("keywords", pref.getKeywords());
 
         List<Map<String, Object>> cands = new ArrayList<>();
         for (ScoredProperty p : items) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", p.getId());
             m.put("city_id", p.getCityId());
-            m.put("type", p.getType()==null? null : p.getType().name());
+            m.put("type", p.getType() == null ? null : p.getType().name());
             m.put("price", p.getPrice());
-            m.put("area",  p.getArea());
+            m.put("area", p.getArea());
             m.put("title", p.getTitle());
-            m.put("desc",  p.getDescription());
+            m.put("desc", p.getDescription());
             m.put("base_score", p.getBaseScore());
             cands.add(m);
         }
@@ -184,27 +202,64 @@ public class AIServiceOpenRouterImpl implements IAIService {
         try {
             String ctxJson   = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(ctx);
             String candsJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(cands);
+
+            // ⚠️ Để tránh lỗi font log, mình dùng tiếng Anh trong prompt
             return """
-                   Hãy RERANK danh sách tin theo sở thích người dùng. Chỉ trả về JSON:
-                   - Ưu tiên city ∈ fav_city_ids, type ∈ fav_types
-                   - Ưu tiên (price ≤ max_price) và (area ≤ max_area)
-                   - Ưu tiên tiêu đề/mô tả phù hợp với saved_ids / keywords
-                   - Format:
-                       {"scores":[{"id":<Long>,"score":<0..1>}, ...]}
-                     hoặc
-                       [{"id":<Long>,"score":<0..1>}]
-                   - Trả tối đa %d mục.
+            You are a reranking model for real-estate listings.
 
-                   user_pref:
-                   %s
+            You receive:
+            - user_pref: JSON with user preferences and constraints.
+            - candidates: an array of listing objects.
 
-                   candidates:
-                   %s
-                   """.formatted(limit, ctxJson, candsJson);
+            Your task:
+            - Assign a relevance score in [0, 1] to as many candidates as possible.
+            - Higher score = more relevant.
+            - Then return ONLY JSON in one of these formats:
+              {"scores":[{"id":<Long>,"score":<0..1>}, ...]}
+              or
+              [{"id":<Long>,"score":<0..1>}]
+
+            Ranking rules (very important):
+
+            1) City priority:
+               - Strongly prioritize listings whose city_id == anchor_city_id (if present).
+               - Next, prioritize city_id in near_city_ids.
+               - Then prioritize city_id in preferred_city_ids or fav_city_ids.
+
+            2) Type priority:
+               - Prefer listings whose type is in fav_types.
+
+            3) Price and area constraints:
+               - If price_min/price_max are not null, prefer listings whose price is inside [price_min, price_max].
+               - Slightly penalize listings far outside this range.
+               - Similarly for area_min/area_max with area.
+
+            4) Text matching:
+               - If keywords are provided, prefer listings whose title/desc semantically match these keywords.
+               - If saved_ids are provided, try to favor listings similar in style/content/location to the saved ones.
+
+            5) Base score:
+               - Use base_score as a weak prior: higher base_score is slightly better,
+                 but you MAY override it when another listing is clearly more relevant
+                 according to city, price/area constraints, or text matching.
+
+            6) Output:
+               - Return at most %d items (but you may include scores for more; the caller will truncate).
+               - Do NOT include any explanation text. Return ONLY valid JSON.
+
+            user_pref:
+            %s
+
+            candidates:
+            %s
+            """.formatted(limit, ctxJson, candsJson);
+
         } catch (Exception e) {
+            log.warn("[AI-RERANK] buildPrompt error: {}", e.getMessage(), e);
             return "[]";
         }
     }
+
 
     private List<ScoredProperty> fallbackByBase(List<ScoredProperty> items, int k, String reason) {
         log.info("[AI-RERANK] fallback by base (reason={})", reason);

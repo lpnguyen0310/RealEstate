@@ -18,7 +18,7 @@ export default function PillBar({ selected, onSelect, counts = {} }) {
       { key: "EXPIRED", label: "Hết hạn", badgeBg: "#cbd5e1" },
       { key: "HIDDEN", label: "Đã ẩn", badgeBg: "#cbd5e1" },
       { key: "REJECTED", label: "Bị từ chối", badgeBg: "#fecdd3" },
-      // { key: "ARCHIVED", label: "Thành công", badgeBg: "#e2e8f0" },
+      { key: "ARCHIVED", label: "Thành công", badgeBg: "#e2e8f0" },
     ],
     []
   );

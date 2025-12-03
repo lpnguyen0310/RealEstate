@@ -106,26 +106,47 @@ public class PropertyServiceImpl implements IPropertyService {
         Float areaTo        = params.get("areaTo")    != null ? Float.parseFloat(params.get("areaTo"))      : null;
         Long cityId         = params.get("cityId")    != null ? Long.parseLong(params.get("cityId"))        : null;
 
+        // 🔹 MỚI: phòng ngủ, phòng tắm, pháp lý, tiện ích
+        Integer bedroomsFrom  = params.get("bedroomsFrom")  != null ? Integer.parseInt(params.get("bedroomsFrom"))  : null;
+        Integer bathroomsFrom = params.get("bathroomsFrom") != null ? Integer.parseInt(params.get("bathroomsFrom")) : null;
+        String legalType      = params.get("legalType"); // "Sổ hồng" / "Sổ đỏ" ...
+
+        List<Long> amenityIds = null;
+        String amenitiesRaw = params.get("amenities"); // VD: "1,3,5"
+        if (amenitiesRaw != null && !amenitiesRaw.isBlank()) {
+            amenityIds = Arrays.stream(amenitiesRaw.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .toList();
+        }
+
         boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
 
-
         Specification<PropertyEntity> spec = Specification
-                .where(PropertySpecification.isPublished());
+                .where(PropertySpecification.isPublished())
+                .and(PropertySpecification.notExpired()); // optional: lọc tin hết hạn
+
         if (cityId != null) {
             spec = spec.and(PropertySpecification.hasCity(cityId));
         } else {
             spec = spec.and(PropertySpecification.hasKeyword(keyword, matchAll));
         }
+
         spec = spec
                 .and(PropertySpecification.hasPropertyType(propertyType))
                 .and(PropertySpecification.hasCategorySlug(categorySlug))
                 .and(PropertySpecification.priceBetween(priceFrom, priceTo))
-                .and(PropertySpecification.areaBetween(areaFrom, areaTo));
+                .and(PropertySpecification.areaBetween(areaFrom, areaTo))
+                // 🔹 các điều kiện mới
+                .and(PropertySpecification.hasMinBedrooms(bedroomsFrom))
+                .and(PropertySpecification.hasMinBathrooms(bathroomsFrom))
+                .and(PropertySpecification.hasLegalStatus(legalType))
+                .and(PropertySpecification.hasAnyAmenities(amenityIds));
 
         Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
         return resultPage.map(propertyMapper::toPropertyCardDTO);
     }
-
 
 
     private Pageable createPageableFromParams(Map<String, String> params) {
@@ -200,16 +221,26 @@ public class PropertyServiceImpl implements IPropertyService {
         // map field
         applyRequestToEntity(property, req, /*createMode*/ true, /*mode*/ mode);
 
-        // === Business khác CHỈ khi publish ===
-        if (mode == SubmitMode.PUBLISH) {
-            // ví dụ: kiểm tra & trừ lượt khi VIP/PREMIUM, set postedAt, duration…
-            // consumeQuotaIfNeeded(policy, user);
+        if (mode == SubmitMode.PUBLISHED) {
+            var type = policy.getListingType(); // NORMAL / VIP / PREMIUM
+            if (type != ListingType.NORMAL) {
+                UserInventoryEntity inv = inventoryRepo.lockByUserAndType(userId, type.name())
+                        .orElseGet(() -> inventoryRepo.findByUser_UserIdAndItemType(userId, type.name())
+                                .orElseThrow(() -> new IllegalStateException("Inventory not found")));
+
+                if (inv.getQuantity() == null || inv.getQuantity() <= 0) {
+                    throw new OutOfStockException(type.name());
+                }
+
+                inv.setQuantity(inv.getQuantity() - 1);
+                inventoryRepo.save(inv);
+            }
         }
 
         var saved = propertyRepository.save(property);
 
         // notify CHỈ khi publish → PENDING_REVIEW
-        if (mode == SubmitMode.PUBLISH && saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
+        if (mode == SubmitMode.PUBLISHED && saved.getStatus() == PropertyStatus.PENDING_REVIEW) {
             try {
                 String title = (saved.getTitle() != null) ? saved.getTitle() : "không có tiêu đề";
 
@@ -270,12 +301,10 @@ public class PropertyServiceImpl implements IPropertyService {
         applyRequestToEntity(property, req, /*createMode*/ false, /*mode*/ (mode == null ? null : mode));
 
         // 5. XỬ LÝ LOGIC TRẠNG THÁI VÀ GỬI THÔNG BÁO
-        if (mode == SubmitMode.PUBLISH) {
+        if (mode == SubmitMode.PUBLISHED) {
 
             // Luôn set về PENDING_REVIEW khi nhấn "publish"
             property.setStatus(PropertyStatus.PENDING_REVIEW);
-
-            // === 💡 BẮT ĐẦU LOGIC GỬI THÔNG BÁO (COPY TỪ HÀM CREATE VÀ SỬA LẠI) ===
             try {
                 String title = (property.getTitle() != null) ? property.getTitle() : "không có tiêu đề";
 
@@ -417,7 +446,7 @@ public class PropertyServiceImpl implements IPropertyService {
         }
         // === Status khi tạo ===
         if (createMode) {
-            SubmitMode effective = (mode == null) ? SubmitMode.PUBLISH : mode;
+            SubmitMode effective = (mode == null) ? SubmitMode.PUBLISHED : mode;
             property.setStatus(effective == SubmitMode.DRAFT ? PropertyStatus.DRAFT : PropertyStatus.PENDING_REVIEW);
         }
 
@@ -582,149 +611,12 @@ public class PropertyServiceImpl implements IPropertyService {
     @Transactional(readOnly = true)
     @Override
     public List<PropertyCardDTO> getRecommendations(Long userId, int limit, Long anchorCityId) {
-        log.info("[Reco] userId={}, limit={}, anchorCityId={}", userId, limit, anchorCityId);
 
-        // 1) Hành vi người dùng
-        List<Long> savedIds = savedPropertyRepository.findPropertyIdsByUser(userId);
-        List<PropertyType> favTypes = savedPropertyRepository.topPropertyTypes(userId).stream()
-                .map(r -> (PropertyType) r[0]).limit(3).toList();
-        if (favTypes == null || favTypes.isEmpty()) {
-            favTypes = List.of(PropertyType.sell, PropertyType.rent);
-        } else {
-            Set<PropertyType> all = new HashSet<>(favTypes);
-            all.add(PropertyType.sell); all.add(PropertyType.rent);
-            favTypes = new ArrayList<>(all);
-        }
-        final List<PropertyType> finalFavTypes = List.copyOf(favTypes);
-
-        // 2) Min/Max price & area từ tin đã lưu
-        Double minPrice = null, maxPrice = null; Float minArea = null, maxArea = null;
-        List<Object[]> rows = savedPropertyRepository.priceAreaMinMax(userId);
-        if (rows != null && !rows.isEmpty()) {
-            Object[] r = rows.get(0);
-            if (r != null && r.length == 4) {
-                minPrice = toD(r[0]); maxPrice = toD(r[1]);
-                Double minAreaD = toD(r[2]); Double maxAreaD = toD(r[3]);
-                minArea = minAreaD == null ? null : minAreaD.floatValue();
-                maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
-            }
-        }
-        if (minPrice != null && maxPrice != null && minPrice.equals(maxPrice)) minPrice = 0d;
-        if (minArea  != null && maxArea  != null && minArea.equals(maxArea))   minArea  = 0f;
-
-        boolean priceOk = (minPrice != null && maxPrice != null && minPrice >= 0 && maxPrice > 0);
-        boolean areaOk  = (minArea  != null && maxArea  != null && minArea  >= 0 && maxArea  > 0);
-
-        if (!(priceOk || areaOk)) {
-            log.info("[Reco] no valid price/area -> []");
-            return Collections.emptyList();
-        }
-
-        // 3) Fav cities
-        List<Long> favCityIds = savedPropertyRepository.topCityIds(userId).stream()
-                .map(r -> (Long) r[0]).filter(Objects::nonNull).distinct().limit(3).toList();
-        final Set<Long> favCitySet = new HashSet<>(favCityIds);
-
-        // 4) Build spec
-        Specification<PropertyEntity> baseSpec = RecommendationSpec.andSafe(
-                RecommendationSpec.statusPublished(),
-                RecommendationSpec.inPropertyTypes(finalFavTypes)
-        );
-        baseSpec = RecommendationSpec.andSafe(baseSpec, RecommendationSpec.notInIds(savedIds));
-
-        Specification<PropertyEntity> rangeSpec;
-        if (priceOk && areaOk) {
-            rangeSpec = RecommendationSpec.andSafe(
-                    RecommendationSpec.priceBetween(minPrice, maxPrice),
-                    RecommendationSpec.areaBetween(minArea, maxArea)
-            );
-        } else if (priceOk) {
-            rangeSpec = RecommendationSpec.priceBetween(minPrice, maxPrice);
-        } else {
-            rangeSpec = RecommendationSpec.areaBetween(minArea, maxArea);
-        }
-
-        Specification<PropertyEntity> spec = RecommendationSpec.andSafe(baseSpec, rangeSpec);
-        if (!favCityIds.isEmpty()) {
-            spec = RecommendationSpec.andSafe(spec, RecommendationSpec.inCityIds(favCityIds));
-        }
-
-        // 5) Query lần 1
-        int pageSize = Math.max(limit * 3, 24);
-        List<PropertyEntity> candidates = propertyRepository.findAll(
-                spec, PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "postedAt"))
-        ).getContent();
-
-        // 6) Fallback lân cận (khi rỗng)
-        if (candidates.isEmpty()) {
-            Long anchor = anchorCityId != null ? anchorCityId
-                    : (!favCityIds.isEmpty() ? favCityIds.get(0) : null);
-            List<Long> nearIdsComputed = Collections.emptyList();
-            Long anchorUsed = null;
-            if (anchor != null) {
-                List<CityEntity> near = cityRepository.findNearestCities(anchor, 6);
-                List<Long> nearIds = near.stream().map(CityEntity::getId).toList();
-                nearIdsComputed = nearIds;
-                anchorUsed = anchor;
-                if (!nearIds.isEmpty()) {
-                    Specification<PropertyEntity> nearbySpec = RecommendationSpec.andSafe(baseSpec, rangeSpec);
-                    nearbySpec = RecommendationSpec.andSafe(nearbySpec, RecommendationSpec.inCityIds(nearIds));
-
-                    candidates = propertyRepository.findAll(
-                            nearbySpec, PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "postedAt"))
-                    ).getContent();
-
-                    log.info("[Reco] nearby fallback anchor={}, nearCityIds={}, got={}",
-                            anchor, nearIds, candidates.size());
-                }
-            }
-        }
-
-        if (candidates.isEmpty()) {
-            log.info("[Reco] empty after nearby fallback -> []");
-            return Collections.emptyList();
-        }
-
-        // 7) Scoring + AI rerank
-        final double priceCenter = priceOk ? maxPrice : 0d;
-        final double areaCenter  = areaOk  ? (maxArea == null ? 0d : maxArea.doubleValue()) : 0d;
-
-        List<ScoredProperty> scored = candidates.stream().map(e -> {
-            double baseScore = scoreRangeAware(e, finalFavTypes, favCitySet, priceCenter, areaCenter);
-            return ScoredProperty.builder()
-                    .id(e.getId())
-                    .title(e.getTitle())
-                    .description(e.getDescription())
-                    .price(e.getPrice())
-                    .area(e.getArea())
-                    .cityId(e.getCity() != null ? e.getCity().getId() : null)
-                    .type(e.getPropertyType())
-                    .baseScore(baseScore)
-                    .build();
-        }).toList();
-
-        UserPreference pref = UserPreference.builder()
-                .userId(userId)
-                .favCityIds(favCityIds)
-                .favTypes(finalFavTypes)
-                .maxPrice(maxPrice)
-                .maxArea(maxArea)
-                .savedIds(savedIds)
-                .keywords(List.of())
-                .build();
-
-        List<ScoredProperty> aiRanked = aiService.rerank(pref, scored, limit);
-
-        Map<Long, PropertyEntity> byId = candidates.stream()
-                .collect(Collectors.toMap(PropertyEntity::getId, it -> it));
-
-        List<PropertyCardDTO> result = new ArrayList<>();
-        for (ScoredProperty sp : aiRanked) {
-            PropertyEntity e = byId.get(sp.getId());
-            if (e != null) result.add(propertyMapper.toPropertyCardDTO(e));
-        }
-
-        return result;
+        return getRecommendations(
+                userId, limit, anchorCityId, null,
+                null, null,
+                null, null
+        ).getItems();
     }
 
     @Transactional(readOnly = true)
@@ -734,21 +626,30 @@ public class PropertyServiceImpl implements IPropertyService {
             Double minPriceIn, Double maxPriceIn,
             Float  minAreaIn,  Float  maxAreaIn
     ) {
-        log.info("[Reco] userId={}, limit={}, anchor={}, near={}, price[{},{}], area[{},{}]",
+        log.info("[Reco] userId={}, limit={}, anchor={}, near={}, priceIn[{},{}], areaIn[{},{}]",
                 userId, limit, anchorCityId, nearCityIds, minPriceIn, maxPriceIn, minAreaIn, maxAreaIn);
 
         // ===== 1) Hành vi người dùng =====
         List<Long> savedIds = savedPropertyRepository.findPropertyIdsByUser(userId);
+        log.info("[Reco][Behavior] savedIds size={} sample={}",
+                savedIds.size(),
+                savedIds.stream().limit(10).toList()
+        );
 
         List<PropertyType> favTypes = savedPropertyRepository.topPropertyTypes(userId).stream()
-                .map(r -> (PropertyType) r[0]).limit(3).toList();
+                .map(r -> (PropertyType) r[0])
+                .limit(3)
+                .toList();
         if (favTypes == null || favTypes.isEmpty()) {
             favTypes = List.of(PropertyType.sell, PropertyType.rent);
+            log.info("[Reco][Behavior] no favTypes from history -> fallback [sell, rent]");
         } else {
+            log.info("[Reco][Behavior] raw favTypes from history={}", favTypes);
             Set<PropertyType> all = new HashSet<>(favTypes);
             all.add(PropertyType.sell);
             all.add(PropertyType.rent);
             favTypes = new ArrayList<>(all);
+            log.info("[Reco][Behavior] merged favTypes (with defaults)={}", favTypes);
         }
         final List<PropertyType> finalFavTypes = List.copyOf(favTypes);
 
@@ -759,6 +660,7 @@ public class PropertyServiceImpl implements IPropertyService {
                 .limit(3)
                 .toList();
         final Set<Long> favCitySet = new HashSet<>(favCityIds);
+        log.info("[Reco][Behavior] favCityIds={} (set={})", favCityIds, favCitySet);
 
         // ===== 2) Range: ưu tiên FE, rỗng thì lấy thống kê từ saved =====
         Double minPrice = minPriceIn, maxPrice = maxPriceIn;
@@ -766,18 +668,46 @@ public class PropertyServiceImpl implements IPropertyService {
 
         if (minPrice == null && maxPrice == null && minArea == null && maxArea == null) {
             List<Object[]> rows = savedPropertyRepository.priceAreaMinMax(userId);
+            log.info("[Reco][Behavior] FE range empty -> lookup priceAreaMinMax rows.size={}",
+                    rows == null ? 0 : rows.size());
+
+//            if (rows != null && !rows.isEmpty()) {
+//                Object[] r = rows.get(0);
+//                if (r != null && r.length == 4) {
+//                    minPrice = toD(r[0]);
+//                    maxPrice = toD(r[1]);
+//                    Double minAreaD = toD(r[2]);
+//                    Double maxAreaD = toD(r[3]);
+//                    minArea = minAreaD == null ? null : minAreaD.floatValue();
+//                    maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
+//                }
+//            }
             if (rows != null && !rows.isEmpty()) {
                 Object[] r = rows.get(0);
                 if (r != null && r.length == 4) {
-                    minPrice = toD(r[0]);
-                    maxPrice = toD(r[1]);
-                    Double minAreaD = toD(r[2]);
-                    Double maxAreaD = toD(r[3]);
-                    minArea = minAreaD == null ? null : minAreaD.floatValue();
-                    maxArea = maxAreaD == null ? null : maxAreaD.floatValue();
+                    Double maxPriceD = toD(r[1]);   // max price từ history
+                    Double maxAreaD  = toD(r[3]);   // max area từ history
+                    if (maxPriceD != null && maxPriceD > 0) {
+                        minPrice = 0d;
+                        maxPrice = maxPriceD;
+                    }
+
+                    if (maxAreaD != null && maxAreaD > 0) {
+                        minArea = 0f;
+                        maxArea = maxAreaD.floatValue();
+                    }
                 }
             }
+            log.info("[Reco][Behavior] range from history (0→max) -> price[{},{}], area[{},{}]",
+                    minPrice, maxPrice, minArea, maxArea);
+
+            log.info("[Reco][Behavior] range from history -> price[{},{}], area[{},{}]",
+                    minPrice, maxPrice, minArea, maxArea);
+        } else {
+            log.info("[Reco][Behavior] range from FE -> price[{},{}], area[{},{}]",
+                    minPrice, maxPrice, minArea, maxArea);
         }
+
         if (minPrice != null && maxPrice != null && minPrice.equals(maxPrice)) minPrice = 0d;
         if (minArea  != null && maxArea  != null && minArea.equals(maxArea))   minArea  = 0f;
 
@@ -791,6 +721,10 @@ public class PropertyServiceImpl implements IPropertyService {
                         (!favCityIds.isEmpty());
 
         boolean hasAnyRangeSignal = priceOk || areaOk;
+
+        log.info("[Reco][Behavior] hasAnyCitySignal={}, hasAnyRangeSignal={}, priceOk={}, areaOk={}",
+                hasAnyCitySignal, hasAnyRangeSignal, priceOk, areaOk);
+
         if (!hasAnyCitySignal && !hasAnyRangeSignal) {
             log.info("[Reco] no-signal guard -> return empty to avoid dumping all posts");
             return RecoResult.builder()
@@ -830,6 +764,7 @@ public class PropertyServiceImpl implements IPropertyService {
                 }
             }
         }
+        log.info("[Reco][Behavior] preferredCityIds (from FE + near)={}", preferredCityIds);
 
         Specification<PropertyEntity> spec = RecommendationSpec.andSafe(baseSpec, rangeSpec);
         if (!preferredCityIds.isEmpty()) {
@@ -851,7 +786,28 @@ public class PropertyServiceImpl implements IPropertyService {
                 .map(e -> e.getCity() != null ? e.getCity().getId() : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        log.info("[Reco] hitCityIds from initial candidates: {}", hitCityIds);
+        log.info("[Reco] hitCityIds from initial candidates: {} (candidates={})",
+                hitCityIds, candidates.size());
+
+        // ========== LOG DANH SÁCH CANDIDATES TRƯỚC KHI RERANK ==========
+        log.info("\n=========================== CANDIDATES BEFORE AI ===========================");
+        log.info("[Reco][Candidates] total candidates = {}", candidates.size());
+        log.info("[Reco][Candidates] show up to first 20 items:");
+        int idx = 1;
+        for (PropertyEntity e : candidates.stream().limit(20).toList()) {
+            Long cid = e.getCity() != null ? e.getCity().getId() : null;
+            log.info(String.format(
+                    " #%02d | id=%d | city=%s | type=%s | price=%.0f | area=%.0f | postedAt=%s",
+                    idx++,
+                    e.getId(),
+                    cid,
+                    e.getPropertyType(),
+                    e.getPrice(),
+                    e.getArea(),
+                    e.getPostedAt()
+            ));
+        }
+        log.info("============================================================================\n");
 
         String source = preferredCityIds.isEmpty() ? "personalized" : "personalized";
         List<Long> usedNearIds = new ArrayList<>();
@@ -870,7 +826,6 @@ public class PropertyServiceImpl implements IPropertyService {
         anchors.addAll(favCityIds);
         anchors = new ArrayList<>(new LinkedHashSet<>(anchors)); // de-dup giữ thứ tự
 
-        // Chỉ fallback cho các anchor CHƯA có bài nào trong candidates
         List<Long> fallbackAnchors = anchors.stream()
                 .filter(a -> a != null && !hitCityIds.contains(a))
                 .toList();
@@ -963,15 +918,62 @@ public class PropertyServiceImpl implements IPropertyService {
                     .build();
         }).toList();
 
+        // ========== LOG BẢNG BASE SCORE ==========
+        log.info("=========================== BASE SCORE TABLE ===========================");
+        idx = 1;
+        for (ScoredProperty sp : scored.stream().limit(20).toList()) {
+            log.info(String.format(
+                    " #%02d | id=%d | baseScore=%.4f | city=%s | price=%.0f | area=%.0f | type=%s",
+                    idx++,
+                    sp.getId(),
+                    sp.getBaseScore(),
+                    sp.getCityId(),
+                    sp.getPrice(),
+                    sp.getArea(),
+                    sp.getType()
+            ));
+        }
+        log.info("=========================================================================\n");
+
+        if (anchorCityId != null) preferredCityIds.add(anchorCityId);
+        if (nearCityIds != null) preferredCityIds.addAll(nearCityIds);
+        preferredCityIds.addAll(favCityIds);
+        preferredCityIds = new ArrayList<>(new LinkedHashSet<>(preferredCityIds)); // de-dup
+
         UserPreference pref = UserPreference.builder()
                 .userId(userId)
+
+                // Cities
+                .anchorCityId(usedAnchor)
+                .nearCityIds(usedNearIds)
+                .preferredCityIds(preferredCityIds)
                 .favCityIds(favCityIds)
+
+                // Types
                 .favTypes(finalFavTypes)
-                .maxPrice(priceCenter)
-                .maxArea(areaCenter)
+
+                // Range
+                .priceMin(minPrice)
+                .priceMax(maxPrice)
+                .areaMin(minArea)
+                .areaMax(maxArea)
+
+                // Lịch sử, keyword
                 .savedIds(savedIds)
                 .keywords(List.of())
+                .limit(limit)
                 .build();
+
+        log.info("[Reco][Behavior] final UserPreference: {}", pref);
+
+        // ========== LOG TRƯỚC KHI GỬI AI ==========
+        log.info("=========================== SEND TO AI ==========================");
+        log.info("[AI] sending {} items for rerank (limit={})", scored.size(), limit);
+        for (ScoredProperty sp : scored.stream().limit(20).toList()) {
+            log.info(" [AI] cand id={} | baseScore={}", sp.getId(),
+                    String.format("%.4f", sp.getBaseScore()));
+        }
+        log.info("=================================================================\n");
 
         List<ScoredProperty> aiRanked = aiService.rerank(pref, scored, limit);
 
@@ -986,6 +988,9 @@ public class PropertyServiceImpl implements IPropertyService {
             }
         }
 
+        log.info("[Reco] done -> resultSize={}, source={}, usedAnchor={}, usedNear={}",
+                result.size(), source, usedAnchor, usedNearIds);
+
         return RecoResult.builder()
                 .items(result)
                 .source(source)
@@ -993,6 +998,8 @@ public class PropertyServiceImpl implements IPropertyService {
                 .nearCityIds(usedNearIds)
                 .build();
     }
+
+
 
 
 

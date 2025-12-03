@@ -29,14 +29,16 @@ import LockOpenOutlinedIcon from "@mui/icons-material/LockOpenOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import BlockIcon from "@mui/icons-material/Block";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import UndoIcon from "@mui/icons-material/Undo";
+import PasswordIcon from "@mui/icons-material/Password";
 import { useState } from "react";
 import { styles, ROLE_COLOR, STATUS_COLOR, HOVER_BG } from "./constants";
 import { initials } from "../../../utils/validators";
 
 /**
  * rows: [{ id, fullName, email, phone, role, status, displayStatus, lockRequested, deleteRequested, postsCount, createdAtText }]
- * onLock(row), onUnlock(id), onRejectLock(id), onApproveDelete(id), onRejectDelete(id)
+ * onLock(row), onUnlock(id), onRejectLock(id), onApproveDelete(id), onRejectDelete(id), onResetPassword(id)
  */
 export default function UsersTable({
     rows,
@@ -54,6 +56,7 @@ export default function UsersTable({
     onRejectLock,
     onApproveDelete,
     onRejectDelete,
+    onResetPassword,
     loading = false,
 }) {
     // mobile action menu
@@ -95,7 +98,6 @@ export default function UsersTable({
                         borderRadius: "10px",
                         overflow: "auto",
                         border: "1px solid #eef2f9",
-                        // cho phép cuộn ngang trên mobile
                         maxWidth: "100%",
                     }}
                 >
@@ -104,37 +106,27 @@ export default function UsersTable({
                             <TableRow>
                                 <TableCell sx={styles.headCell}>ID</TableCell>
                                 <TableCell sx={styles.headCell}>Họ tên / Email</TableCell>
-
-                                {/* Ẩn SĐT ở xs */}
                                 <TableCell sx={{ ...styles.headCell, display: { xs: "none", sm: "table-cell" } }}>
                                     SĐT
                                 </TableCell>
-
                                 <TableCell sx={styles.headCell}>Vai trò</TableCell>
                                 <TableCell sx={styles.headCell}>Trạng thái</TableCell>
-
-                                {/* Ẩn Yêu cầu xóa ở xs */}
                                 <TableCell
                                     sx={{ ...styles.headCell, display: { xs: "none", md: "table-cell" } }}
                                     align="center"
                                 >
                                     Yêu cầu xóa
                                 </TableCell>
-
-                                {/* Ẩn Tin đăng ở xs */}
                                 <TableCell
                                     sx={{ ...styles.headCell, display: { xs: "none", sm: "table-cell" }, textAlign: "center" }}
                                 >
                                     Tin đăng
                                 </TableCell>
-
-                                {/* Ẩn Tạo lúc ở sm- */}
                                 <TableCell
                                     sx={{ ...styles.headCell, display: { xs: "none", md: "table-cell" } }}
                                 >
                                     Tạo lúc
                                 </TableCell>
-
                                 <TableCell sx={styles.headCell} align="right">
                                     Thao tác
                                 </TableCell>
@@ -158,15 +150,29 @@ export default function UsersTable({
                                     const isPending = (r.displayStatus || r.status) === "PENDING";
                                     const isLockPending = !!r.lockRequested && !r.deleteRequested;
                                     const isDeletePending = !!r.deleteRequested && !r.lockRequested;
+                                    const hasRequest = r.lockRequested || r.deleteRequested;
 
                                     return (
                                         <TableRow
                                             key={r.id}
                                             hover
                                             sx={{
-                                                "& td": { transition: "background-color 140ms ease", py: { xs: 1, sm: 1.25 } },
-                                                "&:hover td": { backgroundColor: HOVER_BG },
+                                                "& td": {
+                                                    transition: "background-color 140ms ease",
+                                                    py: { xs: 1, sm: 1.25 },
+                                                    backgroundColor: hasRequest
+                                                        ? "rgba(250, 204, 21, 0.06)"
+                                                        : "inherit",
+                                                },
+                                                "&:hover td": {
+                                                    backgroundColor: HOVER_BG,
+                                                },
                                                 cursor: "pointer",
+                                                borderLeft: r.lockRequested
+                                                    ? "3px solid #f59e0b"
+                                                    : r.deleteRequested
+                                                        ? "3px solid #ef4444"
+                                                        : "3px solid transparent",
                                             }}
                                             onClick={() => onOpenDetail(r)}
                                         >
@@ -328,29 +334,43 @@ export default function UsersTable({
                                                     )}
 
                                                     {!isPending && (
-                                                        !isLocked ? (
-                                                            <Tooltip title="Khóa">
-                                                                <IconButton
-                                                                    size="small"
-                                                                    color="error"
-                                                                    onClick={() => onLock(r)}
-                                                                    sx={{ ml: 0.5 }}
-                                                                >
-                                                                    <LockOutlinedIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                        ) : (
-                                                            <Tooltip title="Mở khóa">
+                                                        <>
+                                                            <Tooltip title="Reset mật khẩu">
                                                                 <IconButton
                                                                     size="small"
                                                                     color="primary"
-                                                                    onClick={() => onUnlock(r.id)}
+                                                                    onClick={() => onResetPassword?.(r)}
                                                                     sx={{ ml: 0.5 }}
                                                                 >
-                                                                    <LockOpenOutlinedIcon fontSize="small" />
+                                                                    <PasswordIcon fontSize="small" />
                                                                 </IconButton>
                                                             </Tooltip>
-                                                        )
+
+                                                            {/* Khóa / Mở khóa */}
+                                                            {!isLocked ? (
+                                                                <Tooltip title="Khóa">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        color="error"
+                                                                        onClick={() => onLock(r)}
+                                                                        sx={{ ml: 0.5 }}
+                                                                    >
+                                                                        <LockOutlinedIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            ) : (
+                                                                <Tooltip title="Mở khóa">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        color="primary"
+                                                                        onClick={() => onUnlock(r.id)}
+                                                                        sx={{ ml: 0.5 }}
+                                                                    >
+                                                                        <LockOpenOutlinedIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </Box>
 
@@ -462,13 +482,17 @@ export default function UsersTable({
             {/* Mobile action menu */}
             <Menu anchorEl={anchorEl} open={openMenu} onClose={handleCloseMenu}>
                 {/* Chi tiết */}
-                <MenuItem
-                    onClick={() => runAndClose((r) => onOpenDetail(r))}
-                >
+                <MenuItem onClick={() => runAndClose((r) => onOpenDetail(r))}>
                     <ListItemIcon>
                         <InfoOutlinedIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Chi tiết</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => runAndClose((r) => onResetPassword?.(r))}>
+                    <ListItemIcon>
+                        <PasswordIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Reset mật khẩu</ListItemText>
                 </MenuItem>
 
                 {/* PENDING do lock */}
@@ -507,9 +531,16 @@ export default function UsersTable({
                     </>
                 )}
 
-                {/* Không pending → lock / unlock */}
+                {/* Không pending → reset mật khẩu + lock / unlock */}
                 {!menuRow?.lockRequested && !menuRow?.deleteRequested && (
                     <>
+                        <MenuItem onClick={() => runAndClose((r) => onResetPassword?.(r.id))}>
+                            <ListItemIcon>
+                                <PasswordIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText>Reset mật khẩu</ListItemText>
+                        </MenuItem>
+
                         {menuRow?.status !== "LOCKED" ? (
                             <MenuItem onClick={() => runAndClose((r) => onLock(r))}>
                                 <ListItemIcon>

@@ -14,7 +14,7 @@ public class UpdateUserProfileRequest {
     // Thông tin UserProfile
     private String personalTaxCode;
     private List<String> additionalPhones;
-
+    private String mainPhone;
     // Thông tin Hoá đơn (Invoice)
     private String buyerName;
     private String invoiceEmail;

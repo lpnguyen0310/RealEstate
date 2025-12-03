@@ -1,20 +1,19 @@
-// File: src/main/java/com/backend/be_realestate/repository/specification/PropertySpecification.java
+// File: PropertySpecification.java
 package com.backend.be_realestate.repository.specification;
 
 import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.enums.PropertyType;
 import jakarta.persistence.criteria.Expression;
-import org.springframework.data.jpa.domain.Specification;
 import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class PropertySpecification {
 
-    // === PHƯƠNG THỨC BỊ THIẾU 1 ===
-    // Helper: escape cho LIKE
-
+    // === Helper LIKE ===
     private static String escapeLike(String s) {
         return s.replace("\\","\\\\").replace("%","\\%").replace("_","\\_");
     }
@@ -23,18 +22,15 @@ public class PropertySpecification {
         return (root, query, cb) -> {
             if (keyword == null || keyword.isBlank()) return cb.conjunction();
 
-            // --- normalize + tokenize ---
             String kwRaw = keyword.trim().toLowerCase();
             String[] raw = kwRaw.split("\\s+");
             List<String> tokens = new ArrayList<>();
             for (String t : raw) if (t.length() >= 2) tokens.add(t);
             if (tokens.isEmpty()) return cb.conjunction();
 
-            // --- fields: title + displayAddress ---
             Expression<String> titleExpr = cb.lower(cb.coalesce(root.get("title"), ""));
             Expression<String> addrExpr  = cb.lower(cb.coalesce(root.get("displayAddress"), ""));
 
-            // --- exact phrase ---
             String phraseLike   = "%" + escapeLike(kwRaw) + "%";
             String phrasePrefix = escapeLike(kwRaw) + "%";
             Predicate phrase = cb.or(
@@ -42,7 +38,6 @@ public class PropertySpecification {
                     cb.like(titleExpr, phraseLike, '\\')
             );
 
-            // --- per-token ---
             List<Predicate> perToken = new ArrayList<>();
             for (String t : tokens) {
                 String like = "%" + escapeLike(t) + "%";
@@ -57,20 +52,20 @@ public class PropertySpecification {
 
             Predicate finalPred = cb.or(phrase, tokenGroup);
 
-            // --- relevance ordering ---
             if (PropertyEntity.class.equals(query.getResultType())) {
                 Expression<Long> sAddrStarts  = cb.<Long>selectCase().when(cb.like(addrExpr,  phrasePrefix, '\\'), 8L).otherwise(0L);
                 Expression<Long> sTitleStarts = cb.<Long>selectCase().when(cb.like(titleExpr, phrasePrefix, '\\'), 5L).otherwise(0L);
                 Expression<Long> sAddr        = cb.<Long>selectCase().when(cb.like(addrExpr,  phraseLike,   '\\'), 4L).otherwise(0L);
                 Expression<Long> sTitle       = cb.<Long>selectCase().when(cb.like(titleExpr, phraseLike,   '\\'), 2L).otherwise(0L);
-                Expression<Long> score = cb.sum(cb.sum(cb.sum(sAddrStarts, sTitleStarts), cb.sum(sAddr, sTitle)), cb.literal(0L));
-
+                Expression<Long> score = cb.sum(
+                        cb.sum(sAddrStarts, sTitleStarts),
+                        cb.sum(sAddr, sTitle)
+                );
                 query.orderBy(cb.desc(score), cb.desc(root.get("postedAt")));
             }
             return finalPred;
         };
     }
-
 
     public static Specification<PropertyEntity> isPublished() {
         return (root, query, cb) -> cb.equal(root.get("status"), PropertyStatus.PUBLISHED);
@@ -83,7 +78,6 @@ public class PropertySpecification {
         );
     }
 
-    // --- Phương thức bạn đã có ---
     public static Specification<PropertyEntity> hasPropertyType(String propertyType) {
         return (root, query, cb) -> {
             if (propertyType == null || propertyType.trim().isEmpty()) {
@@ -97,7 +91,6 @@ public class PropertySpecification {
         };
     }
 
-    // --- Phương thức bạn đã có ---
     public static Specification<PropertyEntity> hasCategorySlug(String categorySlug) {
         return (root, query, cb) -> {
             if (categorySlug == null || categorySlug.trim().isEmpty()) {
@@ -108,7 +101,6 @@ public class PropertySpecification {
         };
     }
 
-    // === PHƯƠNG THỨC BỊ THIẾU 2 ===
     public static Specification<PropertyEntity> priceBetween(Double priceFrom, Double priceTo) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -122,7 +114,6 @@ public class PropertySpecification {
         };
     }
 
-    // === PHƯƠNG THỨC BỊ THIẾU 3 ===
     public static Specification<PropertyEntity> areaBetween(Float areaFrom, Float areaTo) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -138,9 +129,49 @@ public class PropertySpecification {
 
     public static Specification<PropertyEntity> hasCity(Long cityId) {
         return (root, query, cb) -> {
-            if (cityId == null) return cb.conjunction(); // không lọc nếu không có cityId
+            if (cityId == null) return cb.conjunction();
             return cb.equal(root.get("city").get("id"), cityId);
         };
     }
 
+    public static Specification<PropertyEntity> hasMinBedrooms(Integer bedroomsFrom) {
+        return (root, query, cb) -> {
+            if (bedroomsFrom == null || bedroomsFrom <= 0) {
+                return cb.conjunction();
+            }
+            return cb.greaterThanOrEqualTo(root.get("bedrooms"), bedroomsFrom);
+        };
+    }
+
+    public static Specification<PropertyEntity> hasMinBathrooms(Integer bathroomsFrom) {
+        return (root, query, cb) -> {
+            if (bathroomsFrom == null || bathroomsFrom <= 0) {
+                return cb.conjunction();
+            }
+            return cb.greaterThanOrEqualTo(root.get("bathrooms"), bathroomsFrom);
+        };
+    }
+
+    public static Specification<PropertyEntity> hasLegalStatus(String legalType) {
+        return (root, query, cb) -> {
+            if (legalType == null || legalType.trim().isEmpty()) {
+                return cb.conjunction();
+            }
+            return cb.equal(root.get("legalStatus"), legalType.trim());
+        };
+    }
+
+    public static Specification<PropertyEntity> hasAnyAmenities(List<Long> amenityIds) {
+        return (root, query, cb) -> {
+            if (amenityIds == null || amenityIds.isEmpty()) {
+                return cb.conjunction();
+            }
+            // tránh duplicate row khi join many-to-many
+            if (PropertyEntity.class.equals(query.getResultType())) {
+                query.distinct(true);
+            }
+            var amenityJoin = root.join("amenities", jakarta.persistence.criteria.JoinType.LEFT);
+            return amenityJoin.get("id").in(amenityIds);
+        };
+    }
 }

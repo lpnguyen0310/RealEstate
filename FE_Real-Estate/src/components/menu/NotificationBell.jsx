@@ -82,7 +82,7 @@ export default function NotificationBell() {
 
   const { data: items = [], isLoading, refetch } = useGetNotificationsQuery(undefined, {
 skip: !isAuthenticated || !isOpen,
-  });
+});
 
   const [markAllAsRead] = useMarkAllAsReadMutation();
   const [markAsRead] = useMarkAsReadMutation();
@@ -91,9 +91,9 @@ skip: !isAuthenticated || !isOpen,
 // Khi dropdown được mở (isOpen = true)
 // và component đã render lại, hãy gọi refetch.
 if (isOpen) {
-  refetch();
+refetch();
 }
-  }, [isOpen, refetch]);
+}, [isOpen, refetch]);
 
   // --- Memo ---
   const filteredItems = useMemo(() => {

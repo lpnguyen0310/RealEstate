@@ -20,4 +20,7 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
     Page<TransactionEntity> findByOrder_User(UserEntity user, Pageable pageable);
     // PHƯƠNG THỨC BỊ THIẾU MÀ BẠN CẦN THÊM VÀO
     Page<TransactionEntity> findByOrder_UserAndStatus(UserEntity user, TransactionStatus status, Pageable pageable);
+
+    Optional<TransactionEntity> findFirstByOrder_IdOrderByCreatedAtDesc(Long orderId);
+
 }

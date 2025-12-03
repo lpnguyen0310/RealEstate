@@ -13,6 +13,7 @@ import com.backend.be_realestate.modals.property.ApprovePropertyRequest;
 import com.backend.be_realestate.modals.property.RejectPropertyRequest;
 import com.backend.be_realestate.modals.request.AdminPropertyBulkReq;
 import com.backend.be_realestate.modals.response.PropertyShortResponse;
+import com.backend.be_realestate.modals.response.admin.AdminPropertyStatsResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.AdminPropertyService;
 import com.backend.be_realestate.service.NotificationService;
@@ -69,8 +70,6 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             p.setListingTypePolicy(policy);
             p.setListingType(targetType);
 
-            // CHÚ Ý: nếu bạn đã trừ kho lúc create theo listingType ban đầu thì thường không trừ nữa.
-            // Nếu muốn trừ khi nâng từ NORMAL -> VIP/PREMIUM ở approve thì mở block dưới:
 
             if (p.getListingType() == ListingType.NORMAL && targetType != ListingType.NORMAL) {
                 UserInventoryEntity inv = inventoryRepo.lockByUserAndType(p.getUser().getUserId(), targetType.name())
@@ -385,6 +384,36 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
 
             return dto;
         });
+    }
+
+    @Override
+    public AdminPropertyStatsResponse getAdminGlobalStats() {
+        AdminPropertyStatsResponse dto = new AdminPropertyStatsResponse();
+
+        dto.setPENDING_REVIEW(
+                propertyRepository.countAllByStatus(PropertyStatus.PENDING_REVIEW)
+        );
+        dto.setPUBLISHED(
+                propertyRepository.countAllByStatus(PropertyStatus.PUBLISHED)
+        );
+        dto.setHIDDEN(
+                propertyRepository.countAllByStatus(PropertyStatus.HIDDEN)
+        );
+        dto.setREJECTED(
+                propertyRepository.countAllByStatus(PropertyStatus.REJECTED)
+        );
+        dto.setEXPIRED(
+                propertyRepository.countAllByStatus(PropertyStatus.EXPIRED)
+        );
+        // enum của bạn là EXPIRINGSOON (không có _)
+        dto.setEXPIRING_SOON(
+                propertyRepository.countAllByStatus(PropertyStatus.EXPIRINGSOON)
+        );
+        dto.setARCHIVED(
+                propertyRepository.countAllByStatus(PropertyStatus.ARCHIVED)
+        );
+
+        return dto;
     }
 
     private void saveAudit(PropertyEntity p, Long adminId, String type, String message) {

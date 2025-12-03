@@ -1,13 +1,25 @@
 package com.backend.be_realestate.service.impl;
 
 import com.backend.be_realestate.converter.UserConverter;
+import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.entity.UserEntity;
+import com.backend.be_realestate.enums.NotificationType;
+import com.backend.be_realestate.enums.PropertyStatus;
+import com.backend.be_realestate.enums.PropertyType;
+import com.backend.be_realestate.exceptions.ResourceNotFoundException;
+import com.backend.be_realestate.modals.dto.AgentProfileDTO;
+import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.UserDTO;
 import com.backend.be_realestate.modals.request.ChangePasswordRequest;
+import com.backend.be_realestate.modals.response.admin.AdminUsersKpiResponse;
 import com.backend.be_realestate.modals.response.admin.NewUsersKpiResponse;
+import com.backend.be_realestate.repository.PropertyRepository;
 import com.backend.be_realestate.repository.UserRepository;
 import com.backend.be_realestate.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,11 +36,17 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl implements UserService {
 
     private  final UserRepository userRepo;
     private final UserConverter userConverter;
     private final PasswordEncoder passwordEncoder;
+    private final PropertyRepository propertyRepository;
+    private final com.backend.be_realestate.converter.PropertyMapper propertyMapper;
+    private final NotificationServiceImpl notificationService;
+    private static final DateTimeFormatter MONTH_YEAR = DateTimeFormatter.ofPattern("MM/yyyy");
+
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String TZ_OFFSET = "+07:00";
     @Override
@@ -50,6 +69,14 @@ public class UserServiceImpl implements UserService {
         }
         user.setLockRequested(true); // chỉ set flag, chưa khóa thật
         userRepo.save(user);
+        String displayName = buildUserDisplayName(user);
+        String msg = String.format(
+                "Người dùng %s (ID: %d) vừa gửi yêu cầu KHÓA tài khoản.",
+                displayName, user.getUserId()
+        );
+        String link = "/users?req=LOCK_REQUESTED";
+        notifyAdminsAboutUserAction(user, NotificationType.USER_LOCK_REQUESTED, msg, link);
+
     }
 
     @Override
@@ -58,6 +85,13 @@ public class UserServiceImpl implements UserService {
         UserEntity user = findUser(userId);
         user.setLockRequested(false);
         userRepo.save(user);
+        String displayName = buildUserDisplayName(user);
+        String msg = String.format(
+                "Người dùng %s (ID: %d) vừa HUỶ yêu cầu khóa tài khoản.",
+                displayName, user.getUserId()
+        );
+        String link = "/admin/users?tab=lock-requests";
+        notifyAdminsAboutUserAction(user, NotificationType.USER_LOCK_REQUEST_CANCELLED, msg, link);
     }
 
     /* ================== GỬI YÊU CẦU XÓA ================== */
@@ -67,6 +101,13 @@ public class UserServiceImpl implements UserService {
         UserEntity user = findUser(userId);
         user.setDeleteRequested(true);
         userRepo.save(user);
+        String displayName = buildUserDisplayName(user);
+        String msg = String.format(
+                "Người dùng %s (ID: %d) vừa gửi yêu cầu XOÁ tài khoản.",
+                displayName, user.getUserId()
+        );
+        String link = "/admin/users?req=DELETE_REQUESTED";
+        notifyAdminsAboutUserAction(user, NotificationType.USER_DELETE_REQUESTED, msg, link);
     }
 
     @Override
@@ -75,6 +116,13 @@ public class UserServiceImpl implements UserService {
         UserEntity user = findUser(userId);
         user.setDeleteRequested(false);
         userRepo.save(user);
+        String displayName = buildUserDisplayName(user);
+        String msg = String.format(
+                "Người dùng %s (ID: %d) vừa HUỶ yêu cầu xoá tài khoản.",
+                displayName, user.getUserId()
+        );
+        String link = "/admin/users?tab=delete-requests";
+        notifyAdminsAboutUserAction(user, NotificationType.USER_DELETE_REQUEST_CANCELLED, msg, link);
     }
 
     @Override
@@ -169,6 +217,87 @@ public class UserServiceImpl implements UserService {
                         .build())
                 .build();
     }
+
+    @Override
+    public AgentProfileDTO getAgentProfile(Long agentId) {
+        UserEntity user = userRepo.findById(agentId)
+                .orElseThrow(() -> new ResourceNotFoundException("User/Agent not found: " + agentId));
+
+        String fullName = ((user.getLastName() == null ? "" : user.getLastName()) + " " +
+                (user.getFirstName() == null ? "" : user.getFirstName())).trim();
+        if (fullName.isBlank()) {
+            fullName = "Môi giới bất động sản";
+        }
+
+        String joinText = "";
+        if (user.getCreatedAt() != null) {
+            LocalDateTime created = user.getCreatedAt()
+                    .toInstant()
+                    .atZone(ZONE_VN)
+                    .toLocalDateTime();
+            joinText = "Đồng hành cùng chúng tôi từ " + created.format(MONTH_YEAR);
+        }
+
+        long totalPosts = propertyRepository.countByUser_UserIdAndStatus(agentId, PropertyStatus.PUBLISHED);
+        long sellingCount = propertyRepository.countByUser_UserIdAndPropertyTypeAndStatus(
+                agentId, PropertyType.sell, PropertyStatus.PUBLISHED
+        );
+        long rentingCount = propertyRepository.countByUser_UserIdAndPropertyTypeAndStatus(
+                agentId, PropertyType.rent, PropertyStatus.PUBLISHED
+        );
+
+        String phoneDisplay = user.getPhone(); // hoặc format lại nếu muốn
+
+        return AgentProfileDTO.builder()
+                .id(user.getUserId())
+                .name(fullName)
+                .joinText(joinText)
+                .sellingCount(sellingCount)
+                .rentingCount(rentingCount)
+                .totalPosts(totalPosts)
+                .phoneDisplay(phoneDisplay)
+                .zaloText("Zalo")
+                .build();
+    }
+
+    @Override
+    public Page<PropertyCardDTO> getAgentListings(Long agentId, String type, Pageable pageable) {
+        PropertyType propertyType = null;
+        if ("sell".equalsIgnoreCase(type)) {
+            propertyType = PropertyType.sell;
+        } else if ("rent".equalsIgnoreCase(type)) {
+            propertyType = PropertyType.rent;
+        }
+
+        Page<PropertyEntity> page;
+        if (propertyType != null) {
+            page = propertyRepository.findByUser_UserIdAndStatusAndPropertyType(
+                    agentId, PropertyStatus.PUBLISHED, propertyType, pageable
+            );
+        } else {
+            page = propertyRepository.findByUser_UserIdAndStatus(
+                    agentId, PropertyStatus.PUBLISHED, pageable
+            );
+        }
+
+        return page.map(propertyMapper::toPropertyCardDTO);
+    }
+
+    @Override
+    public AdminUsersKpiResponse adminUsersKpi() {
+        long total = userRepo.count();
+        long active = userRepo.countByIsActiveTrue();
+        long locked = userRepo.countByIsActiveFalse();
+        long pending = userRepo.countByLockRequestedTrueOrDeleteRequestedTrue();
+
+        return new AdminUsersKpiResponse(
+                total,
+                active,
+                locked,
+                pending
+        );
+    }
+
     private Range resolveRange(String key, LocalDate today) {
         String k = key == null ? "" : key;
         switch (k) {
@@ -215,4 +344,30 @@ public class UserServiceImpl implements UserService {
         return userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
     }
+
+    private String buildUserDisplayName(UserEntity user) {
+        String fullName = ((user.getLastName() == null ? "" : user.getLastName()) + " " +
+                (user.getFirstName() == null ? "" : user.getFirstName())).trim();
+        if (fullName.isBlank()) {
+            fullName = user.getEmail() != null ? user.getEmail() : ("User#" + user.getUserId());
+        }
+        return fullName;
+    }
+
+    private void notifyAdminsAboutUserAction(UserEntity user,
+                                             NotificationType type,
+                                             String message,
+                                             String link) {
+        try {
+            var admins = userRepo.findAllByRoles_Code("ADMIN");
+            if (admins == null || admins.isEmpty()) return;
+
+            for (UserEntity admin : admins) {
+                notificationService.createNotification(admin, type, message, link);
+            }
+        } catch (Exception e) {
+            log.error("Notify admins about user action failed: {}", e.getMessage(), e);
+        }
+    }
+
 }

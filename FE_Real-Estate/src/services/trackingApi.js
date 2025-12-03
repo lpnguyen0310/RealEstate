@@ -3,32 +3,32 @@ import { axiosBaseQuery } from "./axiosBaseQuery";
 import api from "@/api/axios"; 
 
 export const trackingApi = createApi({
-  reducerPath: "trackingApi", 
-  baseQuery: axiosBaseQuery({ axiosInstance: api }), 
-  
-  tagTypes: ['Leads'], // Giữ nguyên
-  
-  endpoints: (builder) => ({
+reducerPath: "trackingApi", 
+baseQuery: axiosBaseQuery({ axiosInstance: api }), 
+
+tagTypes: ['Leads'], // Giữ nguyên
+
+endpoints: (builder) => ({
 trackZaloClick: builder.mutation({
         // ... (code giữ nguyên)
         query: (propertyId) => ({
 url: `/tracking/interaction/${propertyId}?type=ZALO_CLICK`,
 method: "POST",
-  }),
+}),
 }),
 trackShareClick: builder.mutation({
         // ... (code giữ nguyên)
         query: (propertyId) => ({
 url: `/tracking/interaction/${propertyId}?type=SHARE`,
 method: "POST",
-  }),
+}),
 }),
 trackViewPhone: builder.mutation({
         // ... (code giữ nguyên)
         query: (propertyId) => ({
 url: `/tracking/lead/view-phone/${propertyId}`,
 method: "POST",
-  }),
+}),
 }),
 
     getMyLeads: builder.query({
@@ -57,13 +57,13 @@ method: "POST",
     }),
     // ==================================
 
-  }),
+}),
 });
 
 export const {
-  useTrackZaloClickMutation,
-  useTrackShareClickMutation,
-  useTrackViewPhoneMutation,
+useTrackZaloClickMutation,
+useTrackShareClickMutation,
+useTrackViewPhoneMutation,
   useGetMyLeadsQuery,
   useDeleteLeadMutation, // <-- XUẤT HOOK MỚI
 } = trackingApi;

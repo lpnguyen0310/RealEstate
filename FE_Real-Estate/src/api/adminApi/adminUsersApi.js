@@ -4,10 +4,10 @@ const BASE = "/admin/users";
 
 export const adminUsersApi = {
   // GET danh sách + filter + paging (server-side)
-  list: ({ q, role, status, page, size }) =>
+  list: ({ q, role, status, requestType, page, size }) =>
     api
-      .get(BASE, { params: { q, role, status, page, size } })
-      .then((r) => r.data), // BE trả Page<AdminUserResponse> bọc ApiResponse? tuỳ interceptor của bạn
+      .get(BASE, { params: { q, role, status, requestType, page, size } })
+      .then((r) => r.data),
 
   // (tuỳ chọn) lấy chi tiết 1 user nếu cần
   detail: (id) => api.get(`${BASE}/${id}`).then((r) => r.data),
@@ -17,7 +17,10 @@ export const adminUsersApi = {
   unlock: (id) => api.post(`${BASE}/${id}/unlock`).then((r) => r.data),
   rejectDelete: (id) => api.post(`${BASE}/${id}/reject-delete`).then((r) => r.data),
   hardDelete: (id) => api.delete(`${BASE}/${id}`).then((r) => r.data),
-  rejectLock : (id) => api.post(`${BASE}/${id}/reject-lock`).then((r) => r.data),
+  rejectLock: (id) => api.post(`${BASE}/${id}/reject-lock`).then((r) => r.data),
 
-  
+  // Thống kê KPI
+  kpi: () => api.get(`${BASE}/kpi`).then((r) => r.data),
+  resetPassword: (id) =>
+    api.post(`${BASE}/${id}/reset-password`).then((r) => r.data),
 };
