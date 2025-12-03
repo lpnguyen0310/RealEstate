@@ -238,7 +238,7 @@ public class UserServiceImpl implements UserService {
             joinText = "Đồng hành cùng chúng tôi từ " + created.format(MONTH_YEAR);
         }
 
-        long totalPosts = propertyRepository.countByUser_UserId(agentId);
+        long totalPosts = propertyRepository.countByUser_UserIdAndStatus(agentId, PropertyStatus.PUBLISHED);
         long sellingCount = propertyRepository.countByUser_UserIdAndPropertyTypeAndStatus(
                 agentId, PropertyType.sell, PropertyStatus.PUBLISHED
         );

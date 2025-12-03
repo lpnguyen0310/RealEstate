@@ -47,7 +47,7 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
     @Query("UPDATE PropertyEntity p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
     int bumpView(@Param("id") Long id);
 
-    int countByUser_UserId(Long userId);
+    long countByUser_UserIdAndStatus(Long userId, PropertyStatus status);
 
     @Query("""
            select p

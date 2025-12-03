@@ -132,9 +132,9 @@ export default function Header() {
           <Flex align="center" gap={32}>
             <a href="/" className="flex items-center h-full cursor-pointer px-4 py-3">
               <img
-                src="/src/assets/logo2.svg"
+                src="/src/assets/logo.jpg"
                 alt="logo"
-                className="w-[160px] h-[48px] object-contain"
+                className="w-[160px] h-[80px] object-contain"
               />
             </a>
 

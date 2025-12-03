@@ -3,6 +3,7 @@ package com.backend.be_realestate.service.impl;
 import com.backend.be_realestate.converter.UserConverter;
 import com.backend.be_realestate.entity.UserEntity;
 import com.backend.be_realestate.enums.NotificationType;
+import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.modals.response.AdminUserResponse;
 import com.backend.be_realestate.repository.PropertyRepository;
 import com.backend.be_realestate.repository.UserRepository;
@@ -50,7 +51,7 @@ public class AdminUserServiceImpl implements IAdminUserService {
 
         List<AdminUserResponse> content = users.getContent().stream()
                 .map(u -> {
-                    int postsCount = propertyRepo.countByUser_UserId(u.getUserId());
+                    int postsCount = (int) propertyRepo.countByUser_UserIdAndStatus(u.getUserId(), PropertyStatus.PUBLISHED);
                     return converter.convertToAdminResponse(u, postsCount);
                 })
                 .collect(Collectors.toList());

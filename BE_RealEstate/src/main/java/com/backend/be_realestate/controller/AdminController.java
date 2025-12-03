@@ -158,7 +158,7 @@ public class AdminController {
     public void resetUserPassword(@PathVariable Long id) {
         adminUserService.resetPasswordByAdmin(id);
     }
-    
+
     // End admin user management endpoints
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/orders")

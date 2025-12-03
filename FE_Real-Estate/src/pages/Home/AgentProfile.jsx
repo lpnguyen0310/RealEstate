@@ -1,4 +1,3 @@
-// src/pages/UserDashboard/AgentProfile.jsx
 import React, { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { Button } from "antd";
@@ -7,6 +6,14 @@ import PropertyCard from "../../components/cards/PropertyCard";
 
 /* ================== CARD THÔNG TIN MÔI GIỚI ================== */
 function AgentInfoCard({ agent }) {
+    const [phoneRevealed, setPhoneRevealed] = useState(false);
+
+    // Hàm thay đổi trạng thái hiển thị số điện thoại
+    const togglePhoneVisibility = () => setPhoneRevealed(!phoneRevealed);
+
+    // Mã hóa số điện thoại, chỉ hiển thị 4 số cuối
+    const maskedPhone = agent?.phoneDisplay?.slice(0, -4) + " XXXX";
+
     return (
         <aside className="w-full lg:w-[280px]">
             <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4">
@@ -63,8 +70,9 @@ function AgentInfoCard({ agent }) {
                             type="primary"
                             className="w-full font-semibold"
                             size="large"
+                            onClick={togglePhoneVisibility}
                         >
-                            {agent.phoneDisplay}
+                            {phoneRevealed ? agent.phoneDisplay : maskedPhone}
                         </Button>
                     )}
                 </div>
@@ -101,7 +109,6 @@ export default function AgentProfile() {
         }
     }, [agent]);
 
-    // Fetch agent profile (fallback khi F5 / vào thẳng URL)
     useEffect(() => {
         if (!id) return;
 
@@ -111,6 +118,7 @@ export default function AgentProfile() {
             try {
                 setLoading(true);
                 const res = await agentApi.getProfile(id);
+                console.log("Agent profile data", res.data);
                 if (!cancelled) {
                     setAgent(res.data);
                 }
@@ -260,7 +268,6 @@ export default function AgentProfile() {
 
                                     return <PropertyCard key={item.id} item={item} />;
                                 })}
-
                             </div>
                         )}
                     </section>

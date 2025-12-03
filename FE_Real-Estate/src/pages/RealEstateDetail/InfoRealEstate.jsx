@@ -1,6 +1,6 @@
 // src/pages/detail/InfoRealEstate.jsx
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button, Tag, message } from "antd";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode, Thumbs } from "swiper/modules";
@@ -11,7 +11,6 @@ import "swiper/css/free-mode";
 import "swiper/css/thumbs";
 import Viewer from "viewerjs";
 import "viewerjs/dist/viewer.min.css";
-import { useNavigate } from "react-router-dom";
 
 import {
     useTrackZaloClickMutation,
@@ -38,6 +37,8 @@ import {
 } from "@/data/properties";
 
 import SimilarNews from "../../components/cards/SimilarNews";
+import NotificationModal from "@/components/cards/NotificationModal";
+import { openLoginModal } from "@/store/uiSlice";
 
 /* ================= SVG ICONS (Giữ nguyên) ================= */
 const ChatIcon = (p) => (
@@ -91,20 +92,21 @@ const IconBtn = ({ children, ...rest }) => (
 
 /* =================================== COMPONENT =================================== */
 export default function InfoRealEstate() {
-    // ===== Hooks
     const { id } = useParams();
     const dispatch = useDispatch();
+    const navigate = useNavigate();
+
     const numericId = useMemo(() => Number(id), [id]);
 
+    // redux state
     const selectIsSaved = useMemo(() => makeSelectIsSaved(numericId), [numericId]);
     const liked = useSelector(selectIsSaved);
-
     const { property, loading, error } = useSelector((state) => ({
         property: state.property.currentProperty,
         loading: state.property.loadingDetail,
         error: state.property.errorDetail,
     }));
-    const navigate = useNavigate();
+    const user = useSelector((s) => s.auth.user);
 
     const [trackZaloClick] = useTrackZaloClickMutation();
     const [trackShareClick] = useTrackShareClickMutation();
@@ -114,6 +116,8 @@ export default function InfoRealEstate() {
     const [thumbsSwiper, setThumbsSwiper] = useState(null);
     const [showPhone, setShowPhone] = useState(false);
     const [isReportModalVisible, setIsReportModalVisible] = useState(false);
+
+    const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
     const hiddenGalleryRef = useRef(null);
     const viewerRef = useRef(null);
@@ -127,7 +131,6 @@ export default function InfoRealEstate() {
         if (!id) return;
         dispatch(fetchPropertyByIdThunk(id));
         return () => {
-            // Cleanup data khi rời trang
             dispatch(clearCurrentProperty());
         };
     }, [id, dispatch]);
@@ -194,6 +197,7 @@ export default function InfoRealEstate() {
         map = DEFAULT_MAP,
         mapMeta = DEFAULT_MAP_META,
         agent = DEFAULT_AGENT,
+        listings = [], // nếu trong object có field này; nếu không có thì mặc định []
     } = property || {};
 
     const openViewerAt = (i) => viewerRef.current?.view(i ?? activeIndex);
@@ -227,11 +231,18 @@ export default function InfoRealEstate() {
     const onLike = () => {
         if (!id || !property) return;
 
+        // ✳️ CHẶN KHÁCH: yêu cầu đăng nhập trước khi lưu tin
+        if (!user) {
+            setLoginPromptOpen(true);
+            return;
+        }
+
         const getFeature = (key) =>
             property?.features?.left?.find((f) => f.label === key)?.value ??
             property?.features?.right?.find((f) => f.label === key)?.value;
 
-        const parseNum = (str) => parseFloat(String(str ?? "").replace(/[^0-9.-]+/g, "")) || 0;
+        const parseNum = (str) =>
+            parseFloat(String(str ?? "").replace(/[^0-9.-]+/g, "")) || 0;
 
         const favoritePayload = {
             id: numericId,
@@ -251,6 +262,11 @@ export default function InfoRealEstate() {
         dispatch(toggleFavorite({ id: numericId, payload: favoritePayload }));
         if (liked) message.info("Đã bỏ khỏi yêu thích");
         else message.success("Đã thêm vào yêu thích");
+    };
+
+    const handleLoginFromPrompt = () => {
+        setLoginPromptOpen(false);
+        dispatch(openLoginModal());
     };
 
     return (
@@ -274,10 +290,18 @@ export default function InfoRealEstate() {
                                     <IconBtn aria-label="Chia sẻ" title="Chia sẻ" onClick={onShare}>
                                         <ShareIcon />
                                     </IconBtn>
-                                    <IconBtn aria-label="Yêu thích" title="Yêu thích" onClick={onLike}>
+                                    <IconBtn
+                                        aria-label="Yêu thích"
+                                        title="Yêu thích"
+                                        onClick={onLike}
+                                    >
                                         <HeartIcon filled={!!liked} />
                                     </IconBtn>
-                                    <IconBtn aria-label="Phóng to" title="Phóng to" onClick={() => openViewerAt(activeIndex)}>
+                                    <IconBtn
+                                        aria-label="Phóng to"
+                                        title="Phóng to"
+                                        onClick={() => openViewerAt(activeIndex)}
+                                    >
                                         <ExpandIcon />
                                     </IconBtn>
                                 </div>
@@ -303,7 +327,10 @@ export default function InfoRealEstate() {
                                     modules={[Navigation, Thumbs]}
                                     onSwiper={(s) => (mainSwiperRef.current = s)}
                                     onSlideChange={(s) => setActiveIndex(s.activeIndex)}
-                                    thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
+                                    thumbs={{
+                                        swiper:
+                                            thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null,
+                                    }}
                                     spaceBetween={10}
                                     className="w-full h-[46vh] min-h-[320px] lg:h-[56vh]"
                                 >
@@ -351,7 +378,11 @@ export default function InfoRealEstate() {
                                                             : "border-gray-200 opacity-60 hover:opacity-90 filter grayscale",
                                                     ].join(" ")}
                                                 >
-                                                    <img src={src} alt={`thumb-${idx + 1}`} className="h-full w-full object-cover" />
+                                                    <img
+                                                        src={src}
+                                                        alt={`thumb-${idx + 1}`}
+                                                        className="h-full w-full object-cover"
+                                                    />
                                                 </div>
                                             </SwiperSlide>
                                         );
@@ -369,13 +400,39 @@ export default function InfoRealEstate() {
                                     className="flex items-center gap-3 cursor-pointer"
                                     onClick={() =>
                                         navigate(`/agent/${agent?.id}`, {
-                                            state: { agent }, 
+                                            state: { agent },
                                         })
-                                    }                                >
-                                    <img src={agent?.avatar} alt="avatar" className="h-12 w-12 rounded-full object-cover" />
+                                    }
+                                >
+                                    <img
+                                        src={agent?.avatar}
+                                        alt="avatar"
+                                        className="h-12 w-12 rounded-full object-cover"
+                                    />
                                     <div>
-                                        <div className="font-semibold text-gray-900">{agent?.name}</div>
-                                        <div className="text-gray-500 text-sm">{agent?.otherPostsText}</div>
+                                        <div className="font-semibold text-gray-900">
+                                            {agent?.name}
+                                        </div>
+                                        <div className="text-gray-500 text-sm">
+                                            {agent?.totalPosts > 1 &&
+                                                agent?.totalPosts - 1 > (listings?.length || 0) ? (
+                                                <>
+                                                    Đang hiển thị {listings.length} tin trong tổng số{" "}
+                                                    {agent?.totalPosts - 1} tin.
+                                                    <button
+                                                        onClick={() =>
+                                                            navigate(`/agent/${agent?.id}/posts`)
+                                                        }
+                                                        className="text-blue-600 hover:text-blue-800 ml-1"
+                                                    >
+                                                        Xem thêm {agent?.totalPosts - 1 - listings.length} tin
+                                                        + khác
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                "Không có bài đăng"
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -396,7 +453,9 @@ export default function InfoRealEstate() {
                                         className="w-full"
                                         onClick={handleShowPhone}
                                     >
-                                        {showPhone ? agent?.phoneFull : `${agent?.phoneMasked} · Hiện số`}
+                                        {showPhone
+                                            ? agent?.phoneFull
+                                            : `${agent?.phoneMasked} · Hiện số`}
                                     </Button>
                                 </div>
 
@@ -406,7 +465,8 @@ export default function InfoRealEstate() {
                                         let color = "blue";
                                         if (lc.includes("đã xác thực")) color = "green";
                                         if (lc.includes("không phải chính chủ")) color = "volcano";
-                                        if (lc.includes("chính chủ") && !lc.includes("không")) color = "geekblue";
+                                        if (lc.includes("chính chủ") && !lc.includes("không"))
+                                            color = "geekblue";
                                         return (
                                             <Tag key={t} color={color}>
                                                 {t}
@@ -433,22 +493,36 @@ export default function InfoRealEstate() {
                     </div>
 
                     {/* Title */}
-                    <h1 className="mt-2 text-2xl font-bold text-gray-900 leading-snug">{postInfo?.title}</h1>
+                    <h1 className="mt-2 text-2xl font-bold text-gray-900 leading-snug">
+                        {postInfo?.title}
+                    </h1>
 
                     {/* Address */}
                     <div className="mt-2 text-gray-600">{postInfo?.address}</div>
 
                     {/* Actions */}
                     <div className="mt-3 flex items-center gap-3 text-gray-500">
-                        <button className="hover:text-gray-700 inline-flex items-center gap-1" onClick={onShare}>
-                            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+                        <button
+                            className="hover:text-gray-700 inline-flex items-center gap-1"
+                            onClick={onShare}
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                className="w-5 h-5"
+                                fill="currentColor"
+                            >
                                 <path d="M18 16a3 3 0 00-2.24 1.02L8.91 13.7a3.06 3.06 0 000-3.4l6.85-3.33A3 3 0 1015 5a3 3 0 00.09.72L8.24 9.05a3 3 0 100 5.9l6.85 3.33A3 3 0 1018 16z" />
                             </svg>
                             Chia sẻ
                         </button>
 
                         <button
-                            className={["inline-flex items-center gap-1", liked ? "text-blue-600 font-semibold hover:text-blue-700" : "text-gray-500 hover:text-gray-700"].join(" ")}
+                            className={[
+                                "inline-flex items-center gap-1",
+                                liked
+                                    ? "text-blue-600 font-semibold hover:text-blue-700"
+                                    : "text-gray-500 hover:text-gray-700",
+                            ].join(" ")}
                             onClick={onLike}
                         >
                             <svg
@@ -463,8 +537,15 @@ export default function InfoRealEstate() {
                             {liked ? "Đã lưu" : "Lưu tin"}
                         </button>
 
-                        <button className="hover:text-gray-700 inline-flex items-center gap-1" onClick={() => setIsReportModalVisible(true)}>
-                            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+                        <button
+                            className="hover:text-gray-700 inline-flex items-center gap-1"
+                            onClick={() => setIsReportModalVisible(true)}
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                className="w-5 h-5"
+                                fill="currentColor"
+                            >
                                 <path d="M13 3l-1 2H6v12h6l1 2h5V3h-5z" />
                             </svg>
                             Báo cáo
@@ -475,13 +556,21 @@ export default function InfoRealEstate() {
                     <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-6">
                         <div>
                             <div className="text-sm text-gray-500">Khoảng giá</div>
-                            <div className="mt-1 text-2xl font-semibold text-gray-900">{postInfo?.stats?.priceText}</div>
-                            <div className="text-xs text-gray-500">{postInfo?.stats?.pricePerM2}</div>
+                            <div className="mt-1 text-2xl font-semibold text-gray-900">
+                                {postInfo?.stats?.priceText}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                                {postInfo?.stats?.pricePerM2}
+                            </div>
                         </div>
                         <div>
                             <div className="text-sm text-gray-500">Diện tích</div>
-                            <div className="mt-1 text-2xl font-semibold text-gray-900">{postInfo?.stats?.areaText}</div>
-                            <div className="text-xs text-gray-500">{postInfo?.stats?.frontageText}</div>
+                            <div className="mt-1 text-2xl font-semibold text-gray-900">
+                                {postInfo?.stats?.areaText}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                                {postInfo?.stats?.frontageText}
+                            </div>
                         </div>
                         <div className="sm:block hidden" />
                     </div>
@@ -490,7 +579,11 @@ export default function InfoRealEstate() {
                     <div className="mt-4 flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
                         <div className="flex items-center gap-2 text-emerald-700 font-medium">
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white border border-emerald-300">
-                                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-4 h-4"
+                                    fill="currentColor"
+                                >
                                     <path d="M7 14l5-5 5 5H7z" />
                                 </svg>
                             </span>
@@ -503,9 +596,15 @@ export default function InfoRealEstate() {
 
                     {/* Description */}
                     <div className="mt-6">
-                        <h2 className="text-lg font-semibold text-gray-900">Thông tin mô tả</h2>
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            Thông tin mô tả
+                        </h2>
                         <div className="mt-3 space-y-3 text-gray-800 leading-relaxed">
-                            {description?.headline && <p className="uppercase font-medium">{description.headline}</p>}
+                            {description?.headline && (
+                                <p className="uppercase font-medium">
+                                    {description.headline}
+                                </p>
+                            )}
 
                             <ul className="list-disc pl-5 space-y-1">
                                 {(description?.bullets ?? []).map((b, i) => (
@@ -515,7 +614,9 @@ export default function InfoRealEstate() {
 
                             <div className="space-y-1">
                                 {description?.nearbyTitle && (
-                                    <div className="font-semibold text-gray-900">{description.nearbyTitle}</div>
+                                    <div className="font-semibold text-gray-900">
+                                        {description.nearbyTitle}
+                                    </div>
                                 )}
                                 {(description?.nearby ?? []).map((n, i) => (
                                     <p key={`${n}-${i}`}>{n}</p>
@@ -523,7 +624,11 @@ export default function InfoRealEstate() {
                             </div>
 
                             <div className="space-y-2">
-                                {description?.priceLine && <p><b>{description.priceLine}</b></p>}
+                                {description?.priceLine && (
+                                    <p>
+                                        <b>{description.priceLine}</b>
+                                    </p>
+                                )}
                                 {description?.suggest && <p>{description.suggest}</p>}
                                 <div className="flex items-center gap-2">
                                     <span className="text-gray-600">Lh.</span>
@@ -543,13 +648,18 @@ export default function InfoRealEstate() {
 
                     {/* Features */}
                     <div className="mt-10">
-                        <h2 className="text-xl font-semibold text-gray-900">Đặc điểm bất động sản</h2>
+                        <h2 className="text-xl font-semibold text-gray-900">
+                            Đặc điểm bất động sản
+                        </h2>
 
                         <div className="mt-4 w-full">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10">
                                 <div className="divide-y">
                                     {(features?.left ?? []).map(({ label, value }) => (
-                                        <div key={label} className="flex items-center justify-between py-4">
+                                        <div
+                                            key={label}
+                                            className="flex items-center justify-between py-4"
+                                        >
                                             <span className="text-gray-700">{label}</span>
                                             <span className="text-gray-900">{value}</span>
                                         </div>
@@ -558,7 +668,10 @@ export default function InfoRealEstate() {
 
                                 <div className="divide-y">
                                     {(features?.right ?? []).map(({ label, value }) => (
-                                        <div key={label} className="flex items-center justify-between py-4">
+                                        <div
+                                            key={label}
+                                            className="flex items-center justify-between py-4"
+                                        >
                                             <span className="text-gray-700">{label}</span>
                                             <span className="text-gray-900">{value}</span>
                                         </div>
@@ -570,7 +683,9 @@ export default function InfoRealEstate() {
 
                     {/* Map + meta */}
                     <div className="mt-10">
-                        <h2 className="text-xl font-semibold text-gray-900">Khám phá tiện ích</h2>
+                        <h2 className="text-xl font-semibold text-gray-900">
+                            Khám phá tiện ích
+                        </h2>
                         <NearbyAmenities
                             center={{
                                 lat: map?.lat ?? 10.792,
@@ -580,9 +695,14 @@ export default function InfoRealEstate() {
                         />
                         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                             {(mapMeta ?? []).map(({ label, value }) => (
-                                <div key={label} className="rounded-lg border border-gray-200 p-4">
+                                <div
+                                    key={label}
+                                    className="rounded-lg border border-gray-200 p-4"
+                                >
                                     <div className="text-gray-500 text-sm">{label}</div>
-                                    <div className="mt-1 font-semibold text-gray-900">{value}</div>
+                                    <div className="mt-1 font-semibold text-gray-900">
+                                        {value}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -600,6 +720,15 @@ export default function InfoRealEstate() {
                     />
                 </div>
             </div>
+
+            {/* 🔔 Modal nhắc đăng nhập khi bấm Lưu tin mà chưa login */}
+            <NotificationModal
+                visible={loginPromptOpen}
+                onClose={() => setLoginPromptOpen(false)}
+                onLoginClick={handleLoginFromPrompt}
+                title="Bạn cần đăng nhập"
+                content="Vui lòng đăng nhập để lưu tin và đồng bộ trên nhiều thiết bị."
+            />
         </div>
     );
 }
