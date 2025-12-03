@@ -112,10 +112,11 @@ public class AdminController {
             @RequestParam(defaultValue = "") String q,
             @RequestParam(defaultValue = "ALL") String role,
             @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(defaultValue = "ALL") String requestType,
             @RequestParam(defaultValue = "1") int page,      // FE đang 1-based
             @RequestParam(defaultValue = "10") int size
     ) {
-        return adminUserService.search(q, role, status, page, size);
+        return adminUserService.search(q, role, status, requestType, page, size);
     }
 
     @PreAuthorize("hasRole('ADMIN')")

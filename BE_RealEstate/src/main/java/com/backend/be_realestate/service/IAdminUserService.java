@@ -4,7 +4,7 @@ import com.backend.be_realestate.modals.response.AdminUserResponse;
 import org.springframework.data.domain.Page;
 
 public interface IAdminUserService {
-    Page<AdminUserResponse> search(String q, String role, String status, int page, int size);
+    Page<AdminUserResponse> search(String q, String role, String status, String requestType, int page, int size);
 
     void lockUser(Long id);
 

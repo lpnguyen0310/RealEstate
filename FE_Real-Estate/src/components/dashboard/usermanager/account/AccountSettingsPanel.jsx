@@ -1,10 +1,24 @@
 // src/components/dashboard/usermanager/account/AccountSettingsPanel.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Card, Form, Input, Button, Divider, Collapse, Typography, message, Modal,
+  Card,
+  Form,
+  Input,
+  Button,
+  Divider,
+  Collapse,
+  Typography,
+  message,
+  Modal,
 } from "antd";
-import { LockOutlined, DeleteOutlined, StopOutlined, RollbackOutlined } from "@ant-design/icons";
+import {
+  LockOutlined,
+  DeleteOutlined,
+  StopOutlined,
+  RollbackOutlined,
+} from "@ant-design/icons";
 import { userAccountApi } from "@/api/adminApi/userAccountApi";
+import ForgotPasswordModal from "./ForgotPasswordModal";
 
 const { Title, Text } = Typography;
 
@@ -13,11 +27,26 @@ export default function AccountSettingsPanel({ user, onChanged }) {
   const [lockForm] = Form.useForm();
 
   const [loading, setLoading] = useState({
-    lock: false, cancelLock: false, del: false, cancelDel: false, changePwd: false,
+    lock: false,
+    cancelLock: false,
+    del: false,
+    cancelDel: false,
+    changePwd: false,
   });
 
-  const lockRequested = !!user?.lockRequested;
-  const deleteRequested = !!user?.deleteRequested;
+  // ======= STATE LOCAL CHO LOCK / DELETE =======
+  const [lockRequested, setLockRequested] = useState(!!user?.lockRequested);
+  const [deleteRequested, setDeleteRequested] = useState(
+    !!user?.deleteRequested
+  );
+
+  useEffect(() => {
+    setLockRequested(!!user?.lockRequested);
+    setDeleteRequested(!!user?.deleteRequested);
+  }, [user]);
+
+  // ======= MODAL QUÊN MẬT KHẨU =======
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   // ===== Modal phản hồi CHUNG (success / error) =====
   const [feedback, setFeedback] = useState({
@@ -33,8 +62,7 @@ export default function AccountSettingsPanel({ user, onChanged }) {
   const openError = (title, content) =>
     setFeedback({ open: true, type: "error", title, content });
 
-  const closeFeedback = () =>
-    setFeedback((s) => ({ ...s, open: false }));
+  const closeFeedback = () => setFeedback((s) => ({ ...s, open: false }));
 
   /* ========== ĐỔI MẬT KHẨU ========== */
   const onChangePassword = async (values) => {
@@ -50,12 +78,15 @@ export default function AccountSettingsPanel({ user, onChanged }) {
 
       openSuccess(
         "Thay đổi mật khẩu thành công",
-        (res?.data || res?.message || "Mật khẩu của bạn đã được cập nhật.")
+        res?.data || res?.message || "Mật khẩu của bạn đã được cập nhật."
       );
 
       pwdForm.resetFields(["oldPassword", "newPassword", "confirmPassword"]);
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || "Đổi mật khẩu thất bại.";
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Đổi mật khẩu thất bại.";
       openError("Không thể đổi mật khẩu", msg);
     } finally {
       setLoading((s) => ({ ...s, changePwd: false }));
@@ -68,10 +99,13 @@ export default function AccountSettingsPanel({ user, onChanged }) {
     try {
       await userAccountApi.requestLock(values.lockPassword);
       message.success("Đã gửi yêu cầu khóa tài khoản.");
+
+      setLockRequested(true);
       lockForm.resetFields(["lockPassword"]);
       onChanged?.();
     } catch (err) {
-      const msg = err?.response?.data?.message || "Gửi yêu cầu khóa thất bại.";
+      const msg =
+        err?.response?.data?.message || "Gửi yêu cầu khóa thất bại.";
       openError("Lỗi yêu cầu khóa tài khoản", msg);
     } finally {
       setLoading((s) => ({ ...s, lock: false }));
@@ -82,10 +116,13 @@ export default function AccountSettingsPanel({ user, onChanged }) {
     setLoading((s) => ({ ...s, cancelLock: true }));
     try {
       await userAccountApi.cancelLock();
-      message.success("Đã hủy yêu cầu khóa.");
+      message.success("Đã hủy yêu cầu khóa tài khoản.");
+
+      setLockRequested(false);
       onChanged?.();
     } catch (err) {
-      const msg = err?.response?.data?.message || "Hủy yêu cầu khóa thất bại.";
+      const msg =
+        err?.response?.data?.message || "Hủy yêu cầu khóa thất bại.";
       openError("Lỗi hủy yêu cầu khóa", msg);
     } finally {
       setLoading((s) => ({ ...s, cancelLock: false }));
@@ -98,25 +135,58 @@ export default function AccountSettingsPanel({ user, onChanged }) {
 
   const onConfirmOk = async () => {
     setConfirmLoading(true);
+    setLoading((s) => ({ ...s, del: true }));
     try {
       const res = await userAccountApi.requestDelete();
-      message.success(res?.data || res?.message || "Đã gửi yêu cầu xóa tài khoản.");
+      message.success(
+        res?.data || res?.message || "Đã gửi yêu cầu xóa tài khoản."
+      );
+
+      setDeleteRequested(true);
       setConfirmOpen(false);
       onChanged?.();
     } catch (err) {
-      const msg = err?.response?.data?.message || "Gửi yêu cầu xóa thất bại.";
+      const msg =
+        err?.response?.data?.message || "Gửi yêu cầu xóa thất bại.";
       openError("Lỗi yêu cầu xóa", msg);
     } finally {
       setConfirmLoading(false);
+      setLoading((s) => ({ ...s, del: false }));
+    }
+  };
+
+  const onCancelDelete = async () => {
+    setLoading((s) => ({ ...s, cancelDel: true }));
+    try {
+      const res = await userAccountApi.cancelDelete();
+      message.success(
+        res?.data || res?.message || "Đã hủy yêu cầu xóa tài khoản."
+      );
+
+      setDeleteRequested(false);
+      onChanged?.();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message || "Hủy yêu cầu xóa thất bại.";
+      openError("Lỗi hủy yêu cầu xóa", msg);
+    } finally {
+      setLoading((s) => ({ ...s, cancelDel: false }));
     }
   };
 
   return (
     <div className="max-w-[700px] mx-auto">
-      <Card bordered={false} styles={{ body: { padding: "8px 16px" } }} className="sm:!px-6">
+      <Card
+        bordered={false}
+        styles={{ body: { padding: "8px 16px" } }}
+        className="sm:!px-6"
+      >
         {/* ========== ĐỔI MẬT KHẨU ========== */}
         <div className="mb-2 sm:mb-4">
-          <Title level={5} className="!mt-0 !mb-1 sm:!mb-2 !text-[18px] sm:!text-[20px] font-semibold">
+          <Title
+            level={5}
+            className="!mt-0 !mb-1 sm:!mb-2 !text-[18px] sm:!text-[20px] font-semibold"
+          >
             Đổi mật khẩu
           </Title>
           <Text type="secondary" className="text-sm">
@@ -125,13 +195,13 @@ export default function AccountSettingsPanel({ user, onChanged }) {
         </div>
 
         <Form layout="vertical" form={pwdForm} onFinish={onChangePassword}>
-          {/* Hàng 1: Mật khẩu cũ + link quên MK (link xuống dòng trên mobile) */}
+          {/* Hàng 1: Mật khẩu cũ + link quên MK */}
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 sm:gap-3">
             <Form.Item
               name="oldPassword"
               label="Mật khẩu hiện tại"
               rules={[{ required: true, message: "Nhập mật khẩu hiện tại" }]}
-              className="!mb-0"
+              style={{ marginBottom: 0 }}
             >
               <Input.Password placeholder="Nhập mật khẩu hiện tại" />
             </Form.Item>
@@ -140,7 +210,7 @@ export default function AccountSettingsPanel({ user, onChanged }) {
               <Button
                 type="link"
                 className="!px-0 !h-[40px] text-red-500"
-                onClick={() => message.info("Đi tới màn quên mật khẩu")}
+                onClick={() => setForgotOpen(true)}
               >
                 Bạn quên mật khẩu?
               </Button>
@@ -154,11 +224,13 @@ export default function AccountSettingsPanel({ user, onChanged }) {
               { required: true, message: "Nhập mật khẩu mới" },
               { min: 8, message: "Ít nhất 8 ký tự" },
             ]}
-            className="mt-3 !mb-0"
+            style={{ marginBottom: 0 }}
+            className="mt-3"
           >
             <Input.Password placeholder="Nhập mật khẩu mới" />
           </Form.Item>
 
+          {/* Hàng 3: Nhập lại + nút Lưu */}
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 sm:gap-3 mt-3">
             <Form.Item
               name="confirmPassword"
@@ -168,17 +240,20 @@ export default function AccountSettingsPanel({ user, onChanged }) {
                 { required: true, message: "Nhập lại mật khẩu" },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
-                    if (!value || getFieldValue("newPassword") === value) return Promise.resolve();
-                    return Promise.reject(new Error("Mật khẩu nhập lại không khớp"));
+                    if (!value || getFieldValue("newPassword") === value)
+                      return Promise.resolve();
+                    return Promise.reject(
+                      new Error("Mật khẩu nhập lại không khớp")
+                    );
                   },
                 }),
               ]}
-              className="!mb-0"
+              style={{ marginBottom: 0 }}
             >
               <Input.Password placeholder="Nhập lại mật khẩu mới" />
             </Form.Item>
 
-            <Form.Item className="!mb-0">
+            <Form.Item style={{ marginBottom: 0 }} className="sm:self-end">
               <Button
                 type="primary"
                 danger
@@ -210,17 +285,26 @@ export default function AccountSettingsPanel({ user, onChanged }) {
               children: (
                 <div className="space-y-3">
                   {!lockRequested ? (
-                    <Form layout="vertical" form={lockForm} onFinish={onLockFinish}>
+                    <Form
+                      layout="vertical"
+                      form={lockForm}
+                      onFinish={onLockFinish}
+                    >
                       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 sm:gap-3">
                         <Form.Item
                           label="Nhập mật khẩu hiện tại"
                           name="lockPassword"
-                          className="!mb-0"
-                          rules={[{ required: true, message: "Nhập mật khẩu" }]}
+                          rules={[
+                            { required: true, message: "Nhập mật khẩu" },
+                          ]}
+                          style={{ marginBottom: 0 }}
                         >
                           <Input.Password placeholder="••••••••" />
                         </Form.Item>
-                        <Form.Item className="!mb-0">
+                        <Form.Item
+                          style={{ marginBottom: 0 }}
+                          className="sm:self-end"
+                        >
                           <Button
                             type="primary"
                             danger
@@ -236,7 +320,9 @@ export default function AccountSettingsPanel({ user, onChanged }) {
                     </Form>
                   ) : (
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-8">
-                      <Text type="warning">Bạn đã gửi yêu cầu khóa. Chờ admin xử lý.</Text>
+                      <Text type="warning">
+                        Bạn đã gửi yêu cầu khóa. Chờ admin xử lý.
+                      </Text>
                       <Button
                         icon={<RollbackOutlined />}
                         onClick={onCancelLock}
@@ -265,16 +351,20 @@ export default function AccountSettingsPanel({ user, onChanged }) {
                       icon={<DeleteOutlined />}
                       className="h-11 sm:h-10 rounded-md font-semibold w-full sm:w-auto"
                       onClick={() => setConfirmOpen(true)}
+                      loading={loading.del}
                     >
                       Gửi yêu cầu xóa tài khoản
                     </Button>
                   ) : (
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-8">
-                      <Text type="danger">Bạn đã gửi yêu cầu xóa. Chờ admin xử lý.</Text>
+                      <Text type="danger">
+                        Bạn đã gửi yêu cầu xóa. Chờ admin xử lý.
+                      </Text>
                       <Button
                         icon={<StopOutlined />}
                         className="w-full sm:w-auto"
-                        onClick={() => message.info("Liên hệ hỗ trợ để hủy yêu cầu xóa.")}
+                        onClick={onCancelDelete}
+                        loading={loading.cancelDel}
                       >
                         Hủy yêu cầu xóa
                       </Button>
@@ -303,7 +393,10 @@ export default function AccountSettingsPanel({ user, onChanged }) {
         confirmLoading={confirmLoading}
       >
         <div>
-          <p>Sau khi gửi yêu cầu xóa, admin sẽ xử lý và <b>không thể hoàn tác</b>.</p>
+          <p>
+            Sau khi gửi yêu cầu xóa, admin sẽ xử lý và{" "}
+            <b>không thể hoàn tác</b>.
+          </p>
           <ul style={{ paddingLeft: 18 }}>
             <li>Tin đang hiển thị có thể bị gỡ theo chính sách.</li>
             <li>Số dư (nếu có) sẽ không hoàn lại.</li>
@@ -326,6 +419,12 @@ export default function AccountSettingsPanel({ user, onChanged }) {
       >
         <div>{feedback.content}</div>
       </Modal>
+
+      {/* Modal quên mật khẩu */}
+      <ForgotPasswordModal
+        open={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+      />
     </div>
   );
 }

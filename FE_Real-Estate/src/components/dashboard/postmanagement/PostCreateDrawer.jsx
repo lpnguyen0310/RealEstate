@@ -350,8 +350,8 @@ export default function PostCreateDrawer({
     const upperStatus = (currentProperty?.status || "").toUpperCase();
     const isDraft = upperStatus === "DRAFT";
     const needsResubmit = ["WARNED", "REJECTED", "PUBLISHED"].includes(upperStatus);
-    const isExpiringSoon =
-        upperStatus === "EXPIRINGSOON" || upperStatus === "EXPIRING_SOON";
+    const isExpiringSoon = upperStatus === "EXPIRINGSOON" || upperStatus === "EXPIRING_SOON";
+    const isExpired = upperStatus === "EXPIRED" || upperStatus === "REJECTED";
     const posting = useSelector((s) => s.property?.creating);
 
     const [step, setStep] = useState("form");
@@ -747,49 +747,27 @@ export default function PostCreateDrawer({
                     <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
 
                     <div className="flex items-center gap-4">
-                        {/* 🆕 chỉ hiện với tin SẮP HẾT HẠN */}
-                        {isExpiringSoon && (
-                            <div className="flex items-center gap-2">
-                                <Switch
-                                    size="small"
-                                    checked={!!formData.autoRepost}
-                                    onChange={(checked) =>
-                                        setFormData((prev) => ({
-                                            ...prev,
-                                            autoRepost: checked,
-                                        }))
-                                    }
-                                />
-                                <span className="text-xs text-gray-700">
-                                    Tự động đăng lại khi hết hạn
-                                </span>
-                                <Tooltip title="Khi hết hạn, hệ thống sẽ tự đăng lại tin với cùng gói hiện tại (nếu còn lượt).">
-                                    <InfoCircleOutlined className="text-gray-400 text-[11px]" />
-                                </Tooltip>
-                            </div>
+                        {/* Chỉ hiển thị nút Đăng lại nếu bài đã hết hạn */}
+                        {isExpired && (
+                            <Button
+                                type="primary"
+                                className="bg-[#1b264f] hover:bg-[#22347c]"
+                                onClick={onPublishDraft} // Đăng lại bài viết
+                            >
+                                Đăng lại
+                            </Button>
                         )}
 
-                        <div className="flex items-center gap-2">
-                            {isDraft ? (
-                                <Button
-                                    type="primary"
-                                    loading={posting}
-                                    className="bg-[#1b264f] hover:bg-[#22347c]"
-                                    onClick={onPublishDraft}
-                                >
-                                    Đăng tin
-                                </Button>
-                            ) : (
-                                <Button
-                                    type="primary"
-                                    loading={posting}
-                                    className="bg-[#1b264f] hover:bg-[#22347c]"
-                                    onClick={onUpdate}
-                                >
-                                    Cập nhật
-                                </Button>
-                            )}
-                        </div>
+                        {!isExpired && (
+                            <Button
+                                type="primary"
+                                loading={posting}
+                                className="bg-[#1b264f] hover:bg-[#22347c]"
+                                onClick={onUpdate}
+                            >
+                                Cập nhật
+                            </Button>
+                        )}
                     </div>
                 </div>
             );
@@ -807,7 +785,7 @@ export default function PostCreateDrawer({
         );
     }, [
         step, onClose, formData, loading, goToTypeStep,
-        postTypeId, invMap, listingTypes, onCreated, isEdit, posting, onUpdate, onPublishDraft, isDraft, isExpiringSoon
+        postTypeId, invMap, listingTypes, onCreated, isEdit, posting, onUpdate, onPublishDraft, isExpired
     ]);
 
     const showBlockingSpin = loadingDetail;
@@ -995,15 +973,31 @@ function FooterType({
     const qty = isVipLike ? (inventory?.[currentType] ?? 0) : Infinity;
     const outOfStock = isVipLike && qty <= 0;
 
-    const [autoRepostVal, setAutoRepostVal] = useState(false);
+    const [autoRepostVal, setAutoRepostVal] = useState(formData.autoRepost);
 
+    // Thực hiện tự động đăng lại khi bật 'autoRepost'
+    const handleAutoRepostChange = useCallback((checked) => {
+        setAutoRepostVal(checked);
+
+        // Gọi API hoặc trigger để tự động đăng lại
+        if (checked) {
+            handlePost(); // tự động đăng khi bật autoRepost
+        }
+    }, [formData]);
+
+    // Hàm đăng tin
     const handlePost = async () => {
-        if (outOfStock) { setShowPrompt(true); return; }
+        if (outOfStock) {
+            setShowPrompt(true);
+            return;
+        }
+
         const payload = {
             ...formData,
             listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
-            autoRepost: autoRepostVal,
+            autoRepost: autoRepostVal,  // Truyền autoRepost vào payload
         };
+
         try {
             await dispatch(
                 createPropertyThunk({
@@ -1014,7 +1008,9 @@ function FooterType({
             ).unwrap();
             message.success("Đăng tin thành công!");
             onCreated?.();
-        } catch (e) { message.error(e || "Đăng tin thất bại"); }
+        } catch (e) {
+            message.error(e || "Đăng tin thất bại");
+        }
     };
 
     return (
@@ -1022,7 +1018,10 @@ function FooterType({
             <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
                 <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
                 <div className="flex items-center gap-2">
-                    <Switch checked={autoRepostVal} onChange={setAutoRepostVal} />
+                    <Switch
+                        checked={autoRepostVal}
+                        onChange={handleAutoRepostChange}
+                    />
                     <span className="text-gray-700 text-sm">Tự động đăng lại</span>
                     <Tooltip title="Tự động đăng lại tin khi hết hạn">
                         <InfoCircleOutlined className="text-gray-500 text-xs" />
@@ -1032,12 +1031,13 @@ function FooterType({
                     type="primary"
                     loading={posting}
                     className="bg-[#1b264f] hover:bg-[#22347c]"
-                    onClick={handlePost}
+                    onClick={handlePost} // Nếu bạn muốn có một nút đăng tin khác, có thể dùng cả 2
                 >
                     Đăng tin
                 </Button>
             </div>
 
+            {/* Modal nhắc mua thêm */}
             <Modal centered open={showPrompt} footer={null} onCancel={() => setShowPrompt(false)} title={null}>
                 <div className="text-center space-y-3">
                     <div className="text-lg font-semibold text-[#0f223a]">

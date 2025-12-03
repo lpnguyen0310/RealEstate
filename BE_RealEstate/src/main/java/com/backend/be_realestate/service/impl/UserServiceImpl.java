@@ -3,6 +3,7 @@ package com.backend.be_realestate.service.impl;
 import com.backend.be_realestate.converter.UserConverter;
 import com.backend.be_realestate.entity.PropertyEntity;
 import com.backend.be_realestate.entity.UserEntity;
+import com.backend.be_realestate.enums.NotificationType;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.enums.PropertyType;
 import com.backend.be_realestate.exceptions.ResourceNotFoundException;
@@ -15,6 +16,7 @@ import com.backend.be_realestate.repository.PropertyRepository;
 import com.backend.be_realestate.repository.UserRepository;
 import com.backend.be_realestate.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -33,6 +35,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl implements UserService {
 
     private  final UserRepository userRepo;
@@ -40,6 +43,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final PropertyRepository propertyRepository;
     private final com.backend.be_realestate.converter.PropertyMapper propertyMapper;
+    private final NotificationServiceImpl notificationService;
     private static final DateTimeFormatter MONTH_YEAR = DateTimeFormatter.ofPattern("MM/yyyy");
 
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
@@ -64,6 +68,14 @@ public class UserServiceImpl implements UserService {
         }
         user.setLockRequested(true); // chỉ set flag, chưa khóa thật
         userRepo.save(user);
+        String displayName = buildUserDisplayName(user);
+        String msg = String.format(
+                "Người dùng %s (ID: %d) vừa gửi yêu cầu KHÓA tài khoản.",
+                displayName, user.getUserId()
+        );
+        String link = "/users?req=LOCK_REQUESTED";
+        notifyAdminsAboutUserAction(user, NotificationType.USER_LOCK_REQUESTED, msg, link);
+
     }
 
     @Override
@@ -72,6 +84,13 @@ public class UserServiceImpl implements UserService {
         UserEntity user = findUser(userId);
         user.setLockRequested(false);
         userRepo.save(user);
+        String displayName = buildUserDisplayName(user);
+        String msg = String.format(
+                "Người dùng %s (ID: %d) vừa HUỶ yêu cầu khóa tài khoản.",
+                displayName, user.getUserId()
+        );
+        String link = "/admin/users?tab=lock-requests";
+        notifyAdminsAboutUserAction(user, NotificationType.USER_LOCK_REQUEST_CANCELLED, msg, link);
     }
 
     /* ================== GỬI YÊU CẦU XÓA ================== */
@@ -81,6 +100,13 @@ public class UserServiceImpl implements UserService {
         UserEntity user = findUser(userId);
         user.setDeleteRequested(true);
         userRepo.save(user);
+        String displayName = buildUserDisplayName(user);
+        String msg = String.format(
+                "Người dùng %s (ID: %d) vừa gửi yêu cầu XOÁ tài khoản.",
+                displayName, user.getUserId()
+        );
+        String link = "/admin/users?req=DELETE_REQUESTED";
+        notifyAdminsAboutUserAction(user, NotificationType.USER_DELETE_REQUESTED, msg, link);
     }
 
     @Override
@@ -89,6 +115,13 @@ public class UserServiceImpl implements UserService {
         UserEntity user = findUser(userId);
         user.setDeleteRequested(false);
         userRepo.save(user);
+        String displayName = buildUserDisplayName(user);
+        String msg = String.format(
+                "Người dùng %s (ID: %d) vừa HUỶ yêu cầu xoá tài khoản.",
+                displayName, user.getUserId()
+        );
+        String link = "/admin/users?tab=delete-requests";
+        notifyAdminsAboutUserAction(user, NotificationType.USER_DELETE_REQUEST_CANCELLED, msg, link);
     }
 
     @Override
@@ -295,4 +328,30 @@ public class UserServiceImpl implements UserService {
         return userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
     }
+
+    private String buildUserDisplayName(UserEntity user) {
+        String fullName = ((user.getLastName() == null ? "" : user.getLastName()) + " " +
+                (user.getFirstName() == null ? "" : user.getFirstName())).trim();
+        if (fullName.isBlank()) {
+            fullName = user.getEmail() != null ? user.getEmail() : ("User#" + user.getUserId());
+        }
+        return fullName;
+    }
+
+    private void notifyAdminsAboutUserAction(UserEntity user,
+                                             NotificationType type,
+                                             String message,
+                                             String link) {
+        try {
+            var admins = userRepo.findAllByRoles_Code("ADMIN");
+            if (admins == null || admins.isEmpty()) return;
+
+            for (UserEntity admin : admins) {
+                notificationService.createNotification(admin, type, message, link);
+            }
+        } catch (Exception e) {
+            log.error("Notify admins about user action failed: {}", e.getMessage(), e);
+        }
+    }
+
 }

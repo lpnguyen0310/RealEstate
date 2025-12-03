@@ -1,11 +1,15 @@
 package com.backend.be_realestate.controller;
 
+import com.backend.be_realestate.modals.ForgotPassword.ForgotPasswordRequestOtp;
+import com.backend.be_realestate.modals.ForgotPassword.ForgotPasswordResetRequest;
+import com.backend.be_realestate.modals.ForgotPassword.ForgotPasswordVerifyOtp;
 import com.backend.be_realestate.modals.dto.UserDTO;
 import com.backend.be_realestate.modals.request.*;
 import com.backend.be_realestate.modals.response.*;
 
 import com.backend.be_realestate.security.JwtService;
 import com.backend.be_realestate.service.AuthService;
+import com.backend.be_realestate.service.IPasswordResetService;
 import com.backend.be_realestate.service.RegisterService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +30,7 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwt;
     private final RegisterService registerService;
+    private final IPasswordResetService passwordResetService;
 
     public record AccessOnly(String access) {}
 
@@ -105,5 +110,34 @@ public class AuthController {
                 Map.of("message", "Đăng ký thành công", "user", dto)));
     }
 
+
+    // Password reset endpoints
+    @PostMapping("/forgot-password/request-otp")
+    public ResponseEntity<ApiResponse<StartOtpResponse>> forgotRequestOtp(
+            @Valid @RequestBody ForgotPasswordRequestOtp req) {
+
+        StartOtpResponse res = passwordResetService.startResetByEmail(req.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(res));
+    }
+
+    // ========== FORGOT PASSWORD – BƯỚC 2: VERIFY OTP ==========
+    @PostMapping("/forgot-password/verify-otp")
+    public ResponseEntity<ApiResponse<VerifyOtpResponse>> forgotVerifyOtp(
+            @Valid @RequestBody ForgotPasswordVerifyOtp req) {
+
+        VerifyOtpResponse res = passwordResetService.verifyResetOtp(req.getEmail(), req.getOtp());
+        return ResponseEntity.ok(ApiResponse.success(res));
+    }
+
+    // ========== FORGOT PASSWORD – BƯỚC 3: ĐẶT LẠI MẬT KHẨU ==========
+    @PostMapping("/forgot-password/reset")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> resetPassword(
+            @Valid @RequestBody ForgotPasswordResetRequest req) {
+
+        passwordResetService.resetPassword(req);
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("message", "Đặt lại mật khẩu thành công")
+        ));
+    }
 
 }

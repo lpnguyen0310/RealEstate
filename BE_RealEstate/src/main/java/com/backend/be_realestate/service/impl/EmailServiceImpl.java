@@ -19,4 +19,13 @@ public class EmailServiceImpl implements EmailService {
         msg.setText("Mã OTP của bạn là: " + otp + "\nHiệu lực: " + expireMinutes + " phút.");
         mailSender.send(msg);
     }
+
+    @Override
+    public void sendOTPasswordReset(String toEmail, String otp, int expireMinutes) {
+        SimpleMailMessage msg = new SimpleMailMessage();
+        msg.setTo(toEmail);
+        msg.setSubject("[RealEstate] Mã xác minh đặt lại mật khẩu");
+        msg.setText("Mã OTP của bạn là: " + otp + "\nHiệu lực: " + expireMinutes + " phút.");
+        mailSender.send(msg);
+    }
 }

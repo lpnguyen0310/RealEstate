@@ -26,6 +26,9 @@ export default function AdminUsersMUI() {
     const [q, setQ] = useState(searchParams.get("q") || "");
     const [role, setRole] = useState(searchParams.get("role") || "ALL");
     const [status, setStatus] = useState(searchParams.get("status") || "ALL");
+    // NEW: filter loại yêu cầu
+    const [req, setReq] = useState(searchParams.get("req") || "ALL");
+
     const [page, setPage] = useState(Number(searchParams.get("page") || 1));
     const [pageSize, setPageSize] = useState(Number(searchParams.get("size") || 10));
 
@@ -37,17 +40,19 @@ export default function AdminUsersMUI() {
                 q: next.q ?? q,
                 role: next.role ?? role,
                 status: next.status ?? status,
+                req: next.req ?? req,          // NEW
                 page: next.page ?? page,
                 size: next.size ?? pageSize,
             };
             if (kv.q) sp.set("q", kv.q);
             if (kv.role && kv.role !== "ALL") sp.set("role", kv.role);
             if (kv.status && kv.status !== "ALL") sp.set("status", kv.status);
+            if (kv.req && kv.req !== "ALL") sp.set("req", kv.req);      // NEW
             if (kv.page && kv.page !== 1) sp.set("page", String(kv.page));
             if (kv.size && kv.size !== 10) sp.set("size", String(kv.size));
             setSearchParams(sp, { replace: true });
         },
-        [q, role, status, page, pageSize, setSearchParams]
+        [q, role, status, req, page, pageSize, setSearchParams]
     );
 
     // Debounce ghi URL khi state đổi (tránh spam khi gõ)
@@ -56,7 +61,7 @@ export default function AdminUsersMUI() {
         if (urlDebounceRef.current) clearTimeout(urlDebounceRef.current);
         urlDebounceRef.current = setTimeout(() => writeURL(), 200);
         return () => clearTimeout(urlDebounceRef.current);
-    }, [q, role, status, page, pageSize, writeURL]);
+    }, [q, role, status, req, page, pageSize, writeURL]); // thêm req
 
     // Khi Back/Forward làm URL đổi -> sync ngược vào state
     useEffect(() => {
@@ -64,6 +69,7 @@ export default function AdminUsersMUI() {
         const nq = sp.get("q") || "";
         const nr = sp.get("role") || "ALL";
         const ns = sp.get("status") || "ALL";
+        const nreq = sp.get("req") || "ALL";              // NEW
         const np = Number(sp.get("page") || 1);
         const nz = Number(sp.get("size") || 10);
 
@@ -71,6 +77,7 @@ export default function AdminUsersMUI() {
         if (nq !== q) setQ(nq);
         if (nr !== role) setRole(nr);
         if (ns !== status) setStatus(ns);
+        if (nreq !== req) setReq(nreq);                   // NEW
         if (np !== page) setPage(np);
         if (nz !== pageSize) setPageSize(nz);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,7 +122,6 @@ export default function AdminUsersMUI() {
         }
     };
 
-    /* ========== LOAD LIST FROM API (2 chế độ) ========== */
     const fetchList = useCallback(
         async ({ soft = false } = {}) => {
             if (firstLoadRef.current && !soft) setInitialLoading(true);
@@ -126,6 +132,7 @@ export default function AdminUsersMUI() {
                     q: q || undefined,
                     role,
                     status,
+                    requestType: req === "ALL" ? undefined : req,  // NEW
                     page: Math.max(0, page - 1),
                     size: pageSize,
                 });
@@ -165,7 +172,7 @@ export default function AdminUsersMUI() {
                     };
                 });
 
-                setRows(mapped);                // KHÔNG clear để tránh giật
+                setRows(mapped); // KHÔNG clear để tránh giật
                 setTotalItems(total);
             } catch (err) {
                 console.error(err);
@@ -176,7 +183,7 @@ export default function AdminUsersMUI() {
                 setSoftLoading(false);
             }
         },
-        [q, role, status, page, pageSize]
+        [q, role, status, req, page, pageSize] // thêm req
     );
 
     // Lần đầu
@@ -191,7 +198,7 @@ export default function AdminUsersMUI() {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => fetchList({ soft: true }), 250);
         return () => clearTimeout(debounceRef.current);
-    }, [q, role, status, page, pageSize, fetchList]);
+    }, [q, role, status, req, page, pageSize, fetchList]); // thêm req
 
     /* ========== PAGINATION / RENDER DATA ========== */
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -318,16 +325,17 @@ export default function AdminUsersMUI() {
         setQ("");
         setRole("ALL");
         setStatus("ALL");
+        setReq("ALL");              // NEW
         setPage(1);
         setPageSize(10);
-        writeURL({ q: "", role: "ALL", status: "ALL", page: 1, size: 10 });
+        writeURL({ q: "", role: "ALL", status: "ALL", req: "ALL", page: 1, size: 10 });
     };
 
     /* ========== RENDER ========== */
     const showInitialSpinner = initialLoading && rows.length === 0;
 
     return (
-        <Box sx={{ width: "100%", display: "flex", justifyContent: "center", bgcolor: "#f8f9fc"}}>
+        <Box sx={{ width: "100%", display: "flex", justifyContent: "center", bgcolor: "#f8f9fc" }}>
             <Box sx={{ width: "100%", maxWidth: 1440, position: "relative" }}>
                 {/* Soft loading overlay */}
                 {softLoading && (
@@ -356,6 +364,8 @@ export default function AdminUsersMUI() {
                     setRole={(v) => { setRole(v); setPage(1); }}
                     status={status}
                     setStatus={(v) => { setStatus(v); setPage(1); }}
+                    request={req}                        // NEW
+                    setRequest={(v) => { setReq(v); setPage(1); }} // NEW
                     onReset={resetFilters}
                 />
 
