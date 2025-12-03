@@ -10,6 +10,7 @@ import com.backend.be_realestate.modals.request.order.AdminOrderBulkReq;
 import com.backend.be_realestate.modals.response.*;
 import com.backend.be_realestate.modals.response.admin.AdminPropertyStatsResponse;
 import com.backend.be_realestate.modals.response.admin.AdminSiteReviewStatsResponse;
+import com.backend.be_realestate.modals.response.admin.AdminUsersKpiResponse;
 import com.backend.be_realestate.modals.response.admin.NewUsersKpiResponse;
 import com.backend.be_realestate.service.*;
 import com.backend.be_realestate.utils.SecurityUtils;
@@ -184,8 +185,6 @@ public class AdminController {
     @PostMapping("/orders/{id}/mark-paid")
     public ApiResponse<Void> markPaid(@PathVariable Long id) {
         orderService.adminMarkPaid(id);
-
-        // SỬA: Dùng success(null) và message thành công sẽ nằm trong trường 'message' của ApiResponse
         return ApiResponse.success(null);
     }
 
@@ -242,5 +241,11 @@ public class AdminController {
     @GetMapping("/site-reviews/stats")
     public ResponseEntity<AdminSiteReviewStatsResponse> getSiteReviewStats() {
         return ResponseEntity.ok(siteReviewService.getAdminGlobalStats());
+    }
+
+
+    @GetMapping("/users/kpi")
+    public ResponseEntity<AdminUsersKpiResponse> getUsersKpi() {
+        return ResponseEntity.ok(userService.adminUsersKpi());
     }
 }

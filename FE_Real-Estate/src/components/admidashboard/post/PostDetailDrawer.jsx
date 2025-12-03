@@ -1,4 +1,4 @@
-// src/components/.../PostDetailDrawer.jsx 
+// src/components/.../PostDetailDrawer.jsx
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
     Drawer,
@@ -115,8 +115,15 @@ export default function PostDetailDrawer({
     }, [open, hasDetail, d.policyDurationDays, decision.durationDays, setDecision]);
 
     const [rejectConfirm, setRejectConfirm] = useState({ open: false, loading: false });
-    const openRejectConfirm = useCallback(() => setRejectConfirm({ open: true, loading: false }), []);
-    const closeRejectConfirm = useCallback(() => setRejectConfirm({ open: false, loading: false }), []);
+    const openRejectConfirm = useCallback(
+        () => setRejectConfirm({ open: true, loading: false }),
+        []
+    );
+    const closeRejectConfirm = useCallback(
+        () => setRejectConfirm({ open: false, loading: false }),
+        []
+    );
+
     const doReject = useCallback(
         async () => {
             try {
@@ -432,6 +439,63 @@ export default function PostDetailDrawer({
                                         </Stack>
                                     </Grid>
                                 </Grid>
+                            </Card>
+
+                            {/* Lịch sử */}
+                            <Divider sx={{ my: 2 }}>Lịch sử</Divider>
+                            <Card sx={{ borderRadius: 2 }}>
+                                <CardContent sx={{ p: 2 }}>
+                                    <Stack spacing={1.2}>
+                                        {(d.audit || []).map((i, idx) => {
+                                            const { color, Icon, label } = getAuditMeta(i.type);
+                                            return (
+                                                <Card
+                                                    key={idx}
+                                                    variant="outlined"
+                                                    sx={{
+                                                        borderRadius: 1.5,
+                                                        borderColor: "#e6eaf2",
+                                                        p: 1.2,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1.2,
+                                                        bgcolor: "#fafafa",
+                                                    }}
+                                                >
+                                                    <Icon sx={{ fontSize: 18, color }} />
+                                                    <Box flex={1}>
+                                                        <Typography variant="body2" sx={{ fontWeight: 700, color }}>
+                                                            {label}
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{ color: "text.secondary" }}
+                                                        >
+                                                            {i.message || "Không có ghi chú"}
+                                                            {i.by ? (
+                                                                <>
+                                                                    &nbsp;•&nbsp;
+                                                                    <em>{i.by}</em>
+                                                                </>
+                                                            ) : null}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{ color: "text.disabled" }}
+                                                    >
+                                                        {fmtDate ? fmtDate(i.at) : i.at}
+                                                    </Typography>
+                                                </Card>
+                                            );
+                                        })}
+                                        {!(d.audit || []).length && (
+                                            <Typography color="text.secondary">
+                                                Chưa có lịch sử
+                                            </Typography>
+                                        )}
+                                    </Stack>
+                                </CardContent>
                             </Card>
                         </>
                     )}

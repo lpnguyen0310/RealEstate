@@ -68,4 +68,13 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     List<Object[]> dailyNewUsersSeries(@Param("startUtc") Instant startUtc,
                                        @Param("endUtc") Instant endUtc,
                                        @Param("tz") String tz);
+
+
+
+    // count methods for admin dashboard KPI
+    long countByIsActiveTrue();   // user đang hoạt động
+    long countByIsActiveFalse();  // user bị khoá
+
+    long countByLockRequestedTrueOrDeleteRequestedTrue();
+
 }

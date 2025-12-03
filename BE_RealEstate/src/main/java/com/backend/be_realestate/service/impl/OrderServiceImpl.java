@@ -11,6 +11,7 @@ import com.backend.be_realestate.modals.response.admin.OrderKpiResponse;
 import com.backend.be_realestate.repository.*;
 import com.backend.be_realestate.service.NotificationService;
 import com.backend.be_realestate.service.OrderService;
+import com.backend.be_realestate.service.TransactionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stripe.model.PaymentIntent;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class OrderServiceImpl implements OrderService {
     private final ListingPackageRepository listingPackageRepository;
     private final OrderConverter orderConverter;
     private final ObjectMapper objectMapper;
+    private final TransactionService transactionService;
 
     private final UserRepository userRepository;
 
@@ -668,9 +670,6 @@ public class OrderServiceImpl implements OrderService {
         return new Range(prevStart, prevEnd);
     }
 
-    /**
-     * HÀM QUAN TRỌNG NHẤT (ĐÃ SỬA)
-     */
     @Override
     @Transactional
     public void processPaidOrder(Long orderId) {
@@ -684,35 +683,26 @@ public class OrderServiceImpl implements OrderService {
                 return;
             }
 
-            // ----- Cập nhật trạng thái (Logic chung) -----
+            // ----- Cập nhật trạng thái ORDER -----
             order.setStatus(OrderStatus.PAID);
             orderRepository.save(order);
             log.info("Đã cập nhật orderId={} thành PAID", order.getId());
 
             UserEntity user = order.getUser();
-
-            // ==========================================================
-            // <-- SỬA ĐỔI LỚN: PHÂN LUỒNG LOGIC DỰA TRÊN LOẠI ĐƠN HÀNG -->
-            // ==========================================================
             OrderType type = order.getType();
 
             if (type == OrderType.TOP_UP) {
-                // ---------- LOGIC MỚI: XỬ LÝ NẠP TIỀN ----------
                 Long amount = order.getTotal();
-                Long bonus = calculateBonus(amount); // <-- Gọi hàm tính bonus
-
-                // Cộng tiền vào tài khoản user
+                Long bonus = calculateBonus(amount);
                 user.setMainBalance(user.getMainBalance() + amount);
                 user.setBonusBalance(user.getBonusBalance() + bonus);
                 userRepository.save(user);
 
                 log.info("Đã nạp {} (Thưởng: {}) vào tài khoản user {}", amount, bonus, user.getEmail());
-
-                // Gửi thông báo NẠP TIỀN thành công
                 try {
                     notificationService.createNotification(
                             user,
-                            NotificationType.TOP_UP_SUCCESSFUL, // <-- Bạn cần thêm Enum này
+                            NotificationType.TOP_UP_SUCCESSFUL,
                             "Nạp tiền thành công. +" + amount + " VND (Thưởng: " + bonus + " VND) đã được cộng vào tài khoản.",
                             "/dashboard/wallet"
                     );
@@ -721,17 +711,15 @@ public class OrderServiceImpl implements OrderService {
                 }
 
             } else if (type == OrderType.PACKAGE_PURCHASE) {
-                // ---------- LOGIC CŨ: XỬ LÝ MUA GÓI ----------
                 for (OrderItemEntity orderItem : order.getItems()) {
                     creditItemsFromOrderItem(user, orderItem);
                 }
                 log.info("Đã cộng vật phẩm thành công cho orderId={}", orderId);
 
-                // Gửi thông báo MUA GÓI thành công (logic cũ)
                 try {
                     notificationService.createNotification(
                             user,
-                            NotificationType.PACKAGE_PURCHASED, // Sửa lại tên enum nếu cần
+                            NotificationType.PACKAGE_PURCHASED,
                             "Thanh toán thành công cho đơn hàng #" + order.getId() + ". Gói tin đã được cộng vào tài khoản.",
                             "/dashboard/transactions?order_id=" + order.getId()
                     );
@@ -759,22 +747,21 @@ public class OrderServiceImpl implements OrderService {
             } else {
                 log.error("Order {} có OrderType không xác định: {}", orderId, type);
             }
-            // <-- KẾT THÚC PHÂN LUỒNG LOGIC -->
+            try {
+                transactionService.markSucceededByOrderId(orderId);
+                log.info("Đã cập nhật transaction thành SUCCEEDED cho orderId={}", orderId);
+            } catch (Exception ex) {
+                // Không được làm fail cả process chỉ vì transaction; chỉ log
+                log.error("!!! Lỗi khi cập nhật transaction SUCCEEDED cho orderId={}", orderId, ex);
+            }
 
             log.info("--- Kết thúc PROCESS PAID ORDER thành công cho orderId={} ---", orderId);
         } catch (Exception e) {
             log.error("!!! Lỗi trong quá trình processPaidOrder cho orderId={}", orderId, e);
-            throw new RuntimeException("Lỗi khi process paid order", e); // Re-throw
+            throw new RuntimeException("Lỗi khi process paid order", e);
         }
     }
 
-    // <-- THÊM MỚI: Hàm tính khuyến mãi (dựa trên ảnh) -->
-    /**
-     * Tính toán số tiền khuyến mãi dựa trên số tiền nạp.
-     * (Dựa trên ảnh bạn cung cấp)
-     * @param amount Số tiền nạp (VND)
-     * @return Số tiền thưởng (VND)
-     */
     private Long calculateBonus(Long amount) {
         BigDecimal amountDecimal = BigDecimal.valueOf(amount);
 

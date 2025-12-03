@@ -11,6 +11,7 @@ import com.backend.be_realestate.modals.dto.AgentProfileDTO;
 import com.backend.be_realestate.modals.dto.PropertyCardDTO;
 import com.backend.be_realestate.modals.dto.UserDTO;
 import com.backend.be_realestate.modals.request.ChangePasswordRequest;
+import com.backend.be_realestate.modals.response.admin.AdminUsersKpiResponse;
 import com.backend.be_realestate.modals.response.admin.NewUsersKpiResponse;
 import com.backend.be_realestate.repository.PropertyRepository;
 import com.backend.be_realestate.repository.UserRepository;
@@ -280,6 +281,21 @@ public class UserServiceImpl implements UserService {
         }
 
         return page.map(propertyMapper::toPropertyCardDTO);
+    }
+
+    @Override
+    public AdminUsersKpiResponse adminUsersKpi() {
+        long total = userRepo.count();
+        long active = userRepo.countByIsActiveTrue();
+        long locked = userRepo.countByIsActiveFalse();
+        long pending = userRepo.countByLockRequestedTrueOrDeleteRequestedTrue();
+
+        return new AdminUsersKpiResponse(
+                total,
+                active,
+                locked,
+                pending
+        );
     }
 
     private Range resolveRange(String key, LocalDate today) {

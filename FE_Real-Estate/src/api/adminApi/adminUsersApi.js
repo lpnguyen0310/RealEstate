@@ -19,5 +19,6 @@ export const adminUsersApi = {
   hardDelete: (id) => api.delete(`${BASE}/${id}`).then((r) => r.data),
   rejectLock: (id) => api.post(`${BASE}/${id}/reject-lock`).then((r) => r.data),
 
-
+  // Thống kê KPI
+  kpi: () => api.get(`${BASE}/kpi`).then((r) => r.data),
 };

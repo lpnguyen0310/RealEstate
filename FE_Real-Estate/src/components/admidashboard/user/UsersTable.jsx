@@ -159,14 +159,29 @@ export default function UsersTable({
                                     const isLockPending = !!r.lockRequested && !r.deleteRequested;
                                     const isDeletePending = !!r.deleteRequested && !r.lockRequested;
 
+                                    const hasRequest = r.lockRequested || r.deleteRequested;
+
                                     return (
                                         <TableRow
                                             key={r.id}
                                             hover
                                             sx={{
-                                                "& td": { transition: "background-color 140ms ease", py: { xs: 1, sm: 1.25 } },
-                                                "&:hover td": { backgroundColor: HOVER_BG },
+                                                "& td": {
+                                                    transition: "background-color 140ms ease",
+                                                    py: { xs: 1, sm: 1.25 },
+                                                    backgroundColor: hasRequest
+                                                        ? "rgba(250, 204, 21, 0.06)" // vàng nhạt cho row đang yêu cầu
+                                                        : "inherit",
+                                                },
+                                                "&:hover td": {
+                                                    backgroundColor: HOVER_BG,
+                                                },
                                                 cursor: "pointer",
+                                                borderLeft: r.lockRequested
+                                                    ? "3px solid #f59e0b" // yêu cầu khóa: cam
+                                                    : r.deleteRequested
+                                                        ? "3px solid #ef4444" // yêu cầu xóa: đỏ
+                                                        : "3px solid transparent",
                                             }}
                                             onClick={() => onOpenDetail(r)}
                                         >
