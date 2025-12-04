@@ -177,7 +177,7 @@ export default function OrdersTable({
                                                         </Avatar>
                                                     </Badge>
                                                     <Box sx={{ minWidth: 0 }}>
-                                                        <Typography fontWeight={700} noWrap>
+                                                        <Typography fontWeight={700} >
                                                             {fmtOrderId(r.orderId)}
                                                         </Typography>
                                                         <Typography
@@ -228,10 +228,10 @@ export default function OrdersTable({
                                                 <Stack direction="row" spacing={1} alignItems="center">
                                                     <Avatar src={r.user?.avatar} sx={{ width: 28, height: 28 }} />
                                                     <Box sx={{ minWidth: 0 }}>
-                                                        <Typography fontWeight={600} noWrap>
+                                                        <Typography fontWeight={600} >
                                                             {r.user?.fullName}
                                                         </Typography>
-                                                        <Typography fontSize={12} color="#718198" noWrap>
+                                                        <Typography fontSize={12} color="#718198" >
                                                             {r.user?.email}
                                                         </Typography>
                                                     </Box>

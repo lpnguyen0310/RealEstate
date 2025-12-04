@@ -69,8 +69,8 @@ export default function FiltersBar({
                     sx={{ minWidth: { xs: "100%", sm: 220 }, width: { xs: "100%", sm: "auto" } }}
                 >
                     <MenuItem value="ALL">Tất cả yêu cầu</MenuItem>
-                    <MenuItem value="LOCK_REQUESTED">Chỉ tài khoản yêu cầu khóa</MenuItem>
-                    <MenuItem value="DELETE_REQUESTED">Chỉ tài khoản yêu cầu xóa</MenuItem>
+                    <MenuItem value="LOCK_REQUESTED">Tài khoản yêu cầu khóa</MenuItem>
+                    <MenuItem value="DELETE_REQUESTED">Tài khoản yêu cầu xóa</MenuItem>
                 </Select>
 
                 <Button

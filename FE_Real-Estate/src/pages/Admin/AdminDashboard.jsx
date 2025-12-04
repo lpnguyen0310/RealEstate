@@ -3,6 +3,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 import NotificationsCard from "@/components/admidashboard/dashboard/NotificationsCard";
+import ReviewAnalyticsCard from "@/components/admidashboard/dashboard/ReviewAnalyticsCard";
+
 import { kpiApi } from "@/api/adminApi/kpiApi";
 
 /* ========== UTILITIES ========== */
@@ -67,7 +69,13 @@ function StatCard({
 }) {
     const tooltipTitle = useMemo(() => {
         // Chỉ hiển thị tooltip nếu có giá trị kỳ trước, không đang tải và không lỗi
-        if (prevValue === null || prevValue === undefined || !hint || hint === "Đang tải…" || hint.startsWith("Lỗi:")) {
+        if (
+            prevValue === null ||
+            prevValue === undefined ||
+            !hint ||
+            hint === "Đang tải…" ||
+            hint.startsWith("Lỗi:")
+        ) {
             return null;
         }
 
@@ -80,6 +88,7 @@ function StatCard({
         // \n (xuống dòng) sẽ được render bởi tooltip native của trình duyệt
         return `${title}: ${currentValueFmt}\nKỳ trước: ${prevValueFmt}\nThay đổi: ${pctHint}`;
     }, [title, value, prevValue, valueFormatter, hint]);
+
     return (
         <div
             className={`relative p-6 rounded-2xl shadow-md border border-[#e5ebf5] flex flex-col justify-between
@@ -90,7 +99,9 @@ function StatCard({
             </div>
 
             <div>
-                <p className="text-[15px] font-semibold text-[#1c396a] mb-2 tracking-wide">{title}</p>
+                <p className="text-[15px] font-semibold text-[#1c396a] mb-2 tracking-wide">
+                    {title}
+                </p>
                 <p className="text-3xl font-bold text-gray-900 leading-tight">{value}</p>
 
                 <div className="mt-3">
@@ -103,12 +114,34 @@ function StatCard({
                         title={tooltipTitle}
                     >
                         {trend === "down" ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4 mr-1"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                                />
                             </svg>
                         ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4 mr-1"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M5 10l7-7m0 0l7 7m-7-7v18"
+                                />
                             </svg>
                         )}
                         {hint}
@@ -139,7 +172,9 @@ function RecentTransactionsCard({ items = [] }) {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Giao dịch gần đây</h3>
+                <h3 className="text-lg font-semibold text-gray-800">
+                    Giao dịch gần đây
+                </h3>
                 <button
                     className="text-sm px-3 h-8 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
                     type="button"
@@ -161,11 +196,19 @@ function RecentTransactionsCard({ items = [] }) {
                     >
                         {/* LEFT */}
                         <div className="flex items-center gap-3 min-w-0">
-                            <div className={`shrink-0 w-10 h-10 rounded-full ${t.iniBg} flex items-center justify-center ring-1 ring-black/5`}>
-                                <span className={`font-bold ${t.iniText} text-sm tracking-wide`}>{t.ini}</span>
+                            <div
+                                className={`shrink-0 w-10 h-10 rounded-full ${t.iniBg} flex items-center justify-center ring-1 ring-black/5`}
+                            >
+                                <span
+                                    className={`font-bold ${t.iniText} text-sm tracking-wide`}
+                                >
+                                    {t.ini}
+                                </span>
                             </div>
                             <div className="min-w-0">
-                                <p className="font-medium text-sm text-gray-900 truncate leading-tight">{t.name}</p>
+                                <p className="font-medium text-sm text-gray-900 truncate leading-tight">
+                                    {t.name}
+                                </p>
                                 <p className="text-xs text-gray-500 leading-none mt-1">
                                     {t.time || "vừa xong"} · {t.wallet || "ví MoMo"}
                                 </p>
@@ -174,25 +217,49 @@ function RecentTransactionsCard({ items = [] }) {
 
                         {/* MIDDLE */}
                         <div className="flex justify-center">
-                            <span className={`inline-flex items-center h-6 px-2.5 rounded-full ${chipClass(t.desc)}`} title={t.desc}>
-                                <span className="text-[12px] font-medium leading-none">{t.desc}</span>
+                            <span
+                                className={`inline-flex items-center h-6 px-2.5 rounded-full ${chipClass(
+                                    t.desc
+                                )}`}
+                                title={t.desc}
+                            >
+                                <span className="text-[12px] font-medium leading-none">
+                                    {t.desc}
+                                </span>
                             </span>
                         </div>
 
                         {/* RIGHT */}
                         <div className="flex items-center justify-end gap-2 ">
-                            <p className={`font-semibold text-sm tabular-nums leading-none ${signClass(t.amount)}`} style={{ marginBottom: 0 }}>
+                            <p
+                                className={`font-semibold text-sm tabular-nums leading-none ${signClass(
+                                    t.amount
+                                )}`}
+                                style={{ marginBottom: 0 }}
+                            >
                                 {t.amount}
                             </p>
-                            <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                            <svg
+                                className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                            >
+                                <path
+                                    d="M9 18l6-6-6-6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
                             </svg>
                         </div>
                     </li>
                 ))}
 
                 {items.length === 0 && (
-                    <li className="py-6 text-center text-sm text-gray-500">Chưa có giao dịch</li>
+                    <li className="py-6 text-center text-sm text-gray-500">
+                        Chưa có giao dịch
+                    </li>
                 )}
             </ul>
         </div>
@@ -209,7 +276,7 @@ export default function AdminDashboard() {
     const [newUsers, setNewUsers] = useState({
         total: 0,
         compareToPrev: 0,
-        previousTotal: 0, 
+        previousTotal: 0,
         series: [],
         loading: false,
         error: null,
@@ -219,7 +286,8 @@ export default function AdminDashboard() {
         let mounted = true;
         (async () => {
             try {
-                if (mounted) setNewUsers((s) => ({ ...s, loading: true, error: null }));
+                if (mounted)
+                    setNewUsers((s) => ({ ...s, loading: true, error: null }));
                 const { data } = await kpiApi.getNewUsers(range);
                 if (!mounted) return;
                 setNewUsers({
@@ -235,7 +303,10 @@ export default function AdminDashboard() {
                 setNewUsers((s) => ({
                     ...s,
                     loading: false,
-                    error: e?.response?.data?.message || e?.message || "Không tải được KPI",
+                    error:
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        "Không tải được KPI",
                 }));
             }
         })();
@@ -252,16 +323,22 @@ export default function AdminDashboard() {
         const pctText =
             pct === 0 && total === 0
                 ? "—"
-                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
+                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(
+                    1
+                )}% so với kỳ trước`;
         const spark = (newUsers.series || []).map((p) => p.count);
-        const hint = newUsers.error ? `Lỗi: ${newUsers.error}` : newUsers.loading ? "Đang tải…" : pctText;
+        const hint = newUsers.error
+            ? `Lỗi: ${newUsers.error}`
+            : newUsers.loading
+                ? "Đang tải…"
+                : pctText;
         return {
             title: "Người dùng mới",
             value: newUsers.loading ? "…" : nfmt(total),
             hint,
             trend,
             spark: spark.length ? spark : [1, 2, 1, 3, 2, 4, 5],
-            prevValue: newUsers.loading ? null : prevTotal, // <-- TRUYỀN
+            prevValue: newUsers.loading ? null : prevTotal,
             valueFormatter: nfmt,
             trendColor: trend === "down" ? "text-red-500" : "text-green-600",
         };
@@ -273,8 +350,8 @@ export default function AdminDashboard() {
         revenue: 0,
         compareOrders: 0,
         compareRevenue: 0,
-        previousOrders: 0, // <-- THÊM
-        previousRevenue: 0, // <-- THÊM
+        previousOrders: 0,
+        previousRevenue: 0,
         series: [],
         loading: false,
         error: null,
@@ -284,7 +361,8 @@ export default function AdminDashboard() {
         let mounted = true;
         (async () => {
             try {
-                if (mounted) setOrderKpi((s) => ({ ...s, loading: true, error: null }));
+                if (mounted)
+                    setOrderKpi((s) => ({ ...s, loading: true, error: null }));
                 const { data } = await kpiApi.getOrders(range, "PAID");
                 if (!mounted) return;
                 setOrderKpi({
@@ -292,8 +370,8 @@ export default function AdminDashboard() {
                     revenue: data?.summary?.revenue ?? 0,
                     compareOrders: data?.summary?.compareOrders ?? 0,
                     compareRevenue: data?.summary?.compareRevenue ?? 0,
-                    previousOrders: data?.summary?.previousOrders ?? 0, // <-- THÊM
-                    previousRevenue: data?.summary?.previousRevenue ?? 0, // <-- THÊM
+                    previousOrders: data?.summary?.previousOrders ?? 0,
+                    previousRevenue: data?.summary?.previousRevenue ?? 0,
                     series: Array.isArray(data?.series) ? data.series : [],
                     loading: false,
                     error: null,
@@ -303,7 +381,10 @@ export default function AdminDashboard() {
                 setOrderKpi((s) => ({
                     ...s,
                     loading: false,
-                    error: e?.response?.data?.message || e?.message || "Không tải được KPI đơn hàng",
+                    error:
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        "Không tải được KPI đơn hàng",
                 }));
             }
         })();
@@ -320,9 +401,15 @@ export default function AdminDashboard() {
         const pctText =
             pct === 0 && total === 0
                 ? "—"
-                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
+                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(
+                    1
+                )}% so với kỳ trước`;
         const spark = (orderKpi.series || []).map((p) => p.orders);
-        const hint = orderKpi.error ? `Lỗi: ${orderKpi.error}` : orderKpi.loading ? "Đang tải…" : pctText;
+        const hint = orderKpi.error
+            ? `Lỗi: ${orderKpi.error}`
+            : orderKpi.loading
+                ? "Đang tải…"
+                : pctText;
         return {
             title: "Đơn hàng mới",
             value: orderKpi.loading ? "…" : nfmt(total),
@@ -343,17 +430,25 @@ export default function AdminDashboard() {
         const pctText =
             pct === 0 && totalVnd === 0
                 ? "—"
-                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
-        const spark = (orderKpi.series || []).map((p) => Math.round((p.revenue ?? 0) / 1_000_000));
-        const hint = orderKpi.error ? `Lỗi: ${orderKpi.error}` : orderKpi.loading ? "Đang tải…" : pctText;
+                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(
+                    1
+                )}% so với kỳ trước`;
+        const spark = (orderKpi.series || []).map((p) =>
+            Math.round((p.revenue ?? 0) / 1_000_000)
+        );
+        const hint = orderKpi.error
+            ? `Lỗi: ${orderKpi.error}`
+            : orderKpi.loading
+                ? "Đang tải…"
+                : pctText;
         return {
             title: "Doanh thu",
             value: orderKpi.loading ? "…" : vnd(totalVnd),
             hint,
             trend,
             spark: spark.length ? spark : [60, 63, 66, 70, 73, 75],
-            prevValue: orderKpi.loading ? null : prevTotal, // <-- TRUYỀN
-            valueFormatter: vnd, // <-- TRUYỀN
+            prevValue: orderKpi.loading ? null : prevTotal,
+            valueFormatter: vnd,
             trendColor: trend === "down" ? "text-red-500" : "text-green-600",
         };
     }, [orderKpi]);
@@ -373,13 +468,18 @@ export default function AdminDashboard() {
         let mounted = true;
         (async () => {
             try {
-                if (mounted) setPropKpi((s) => ({ ...s, loading: true, error: null }));
-                const { data } = await kpiApi.getProperties(range, "PUBLISHED", "PENDING_REVIEW");
+                if (mounted)
+                    setPropKpi((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getProperties(
+                    range,
+                    "PUBLISHED",
+                    "PENDING_REVIEW"
+                );
                 if (!mounted) return;
                 setPropKpi({
                     total: data?.summary?.total ?? 0,
                     compareToPrev: data?.summary?.compareToPrev ?? 0,
-                    previousTotal: data?.summary?.previousTotal ?? 0, // <-- THÊM
+                    previousTotal: data?.summary?.previousTotal ?? 0,
                     pending: data?.summary?.pending ?? 0,
                     series: Array.isArray(data?.series) ? data.series : [],
                     loading: false,
@@ -390,7 +490,10 @@ export default function AdminDashboard() {
                 setPropKpi((s) => ({
                     ...s,
                     loading: false,
-                    error: e?.response?.data?.message || e?.message || "Không tải được KPI tin đăng",
+                    error:
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        "Không tải được KPI tin đăng",
                 }));
             }
         })();
@@ -407,7 +510,9 @@ export default function AdminDashboard() {
         const pctText =
             pct === 0 && total === 0
                 ? "—"
-                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(1)}% so với kỳ trước`;
+                : `${trend === "down" ? "-" : "+"}${(Math.abs(pct) * 100).toFixed(
+                    1
+                )}% so với kỳ trước`;
         const seriesCounts = (propKpi.series || []).map((p) => p.count ?? 0);
         const hasSeries = seriesCounts.length > 0;
         const allZero = hasSeries && seriesCounts.every((v) => (v ?? 0) === 0);
@@ -424,7 +529,7 @@ export default function AdminDashboard() {
             trend,
             spark,
             lineColor: "#6366f1",
-            prevValue: propKpi.loading ? null : prevTotal, // <-- TRUYỀN
+            prevValue: propKpi.loading ? null : prevTotal,
             valueFormatter: nfmt,
             trendColor: trend === "down" ? "text-red-500" : "text-green-600",
         };
@@ -434,7 +539,9 @@ export default function AdminDashboard() {
     const revenueChart = useMemo(() => {
         const series = Array.isArray(orderKpi.series) ? orderKpi.series : [];
         const labels = series.map((p) => p.date);
-        const data = series.map((p) => Math.round((p.revenue ?? 0) / 1_000_000));
+        const data = series.map((p) =>
+            Math.round((p.revenue ?? 0) / 1_000_000)
+        );
         return {
             data: {
                 labels,
@@ -456,7 +563,10 @@ export default function AdminDashboard() {
                 maintainAspectRatio: false,
                 scales: {
                     y: { beginAtZero: true, ticks: { color: "#6b7280" } },
-                    x: { grid: { display: false }, ticks: { color: "#6b7280", maxRotation: 0, autoSkip: true } },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: "#6b7280", maxRotation: 0, autoSkip: true },
+                    },
                 },
                 plugins: { legend: { display: false } },
             },
@@ -481,8 +591,13 @@ export default function AdminDashboard() {
         let mounted = true;
         const timer = setTimeout(async () => {
             try {
-                if (mounted) setPendingList((s) => ({ ...s, loading: true, error: null }));
-                const { data } = await kpiApi.getPendingProperties({ q: pendingQ, page: 0, size: 8 });
+                if (mounted)
+                    setPendingList((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getPendingProperties({
+                    q: pendingQ,
+                    page: 0,
+                    size: 8,
+                });
                 if (!mounted) return;
                 setPendingList({
                     content: Array.isArray(data?.content) ? data.content : [],
@@ -500,7 +615,10 @@ export default function AdminDashboard() {
                 setPendingList((s) => ({
                     ...s,
                     loading: false,
-                    error: e?.response?.data?.message || e?.message || "Không tải được danh sách tin chờ duyệt",
+                    error:
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        "Không tải được danh sách tin chờ duyệt",
                 }));
             }
         }, 300);
@@ -521,8 +639,13 @@ export default function AdminDashboard() {
         let mounted = true;
         const t = setTimeout(async () => {
             try {
-                if (mounted) setRecentOrders((s) => ({ ...s, loading: true, error: null }));
-                const { data } = await kpiApi.getRecentOrders({ q: orderSearch, page: 0, size: 8 });
+                if (mounted)
+                    setRecentOrders((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getRecentOrders({
+                    q: orderSearch,
+                    page: 0,
+                    size: 8,
+                });
                 if (!mounted) return;
                 setRecentOrders({
                     content: Array.isArray(data?.content) ? data.content : [],
@@ -534,7 +657,10 @@ export default function AdminDashboard() {
                 setRecentOrders((s) => ({
                     ...s,
                     loading: false,
-                    error: e?.response?.data?.message || e?.message || "Không tải được đơn hàng mới",
+                    error:
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        "Không tải được đơn hàng mới",
                 }));
             }
         }, 300); // debounce
@@ -545,14 +671,23 @@ export default function AdminDashboard() {
     }, [orderSearch]);
 
     /* ===================== Recent Transactions (BE) ===================== */
-    const [recentTx, setRecentTx] = useState({ rows: [], loading: false, error: null });
+    const [recentTx, setRecentTx] = useState({
+        rows: [],
+        loading: false,
+        error: null,
+    });
 
     useEffect(() => {
         let mounted = true;
         (async () => {
             try {
-                if (mounted) setRecentTx((s) => ({ ...s, loading: true, error: null }));
-                const { data } = await kpiApi.getRecentTransactions({ status: "PAID", page: 0, size: 4 });
+                if (mounted)
+                    setRecentTx((s) => ({ ...s, loading: true, error: null }));
+                const { data } = await kpiApi.getRecentTransactions({
+                    status: "PAID",
+                    page: 0,
+                    size: 4,
+                });
                 if (!mounted) return;
 
                 const rows = Array.isArray(data) ? data : [];
@@ -573,7 +708,10 @@ export default function AdminDashboard() {
                 setRecentTx({
                     rows: [],
                     loading: false,
-                    error: e?.response?.data?.message || e?.message || "Không tải được giao dịch",
+                    error:
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        "Không tải được giao dịch",
                 });
             }
         })();
@@ -608,7 +746,14 @@ export default function AdminDashboard() {
                     gradientFrom="from-blue-50"
                     gradientTo="to-white"
                     icon={
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-6 h-6"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                        >
                             <path d="M18 21a8 8 0 0 0-16 0" />
                             <circle cx="10" cy="8" r="4" />
                         </svg>
@@ -621,7 +766,14 @@ export default function AdminDashboard() {
                     gradientFrom="from-green-50"
                     gradientTo="to-white"
                     icon={
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-6 h-6"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                        >
                             <rect width="18" height="18" x="3" y="3" rx="2" />
                             <path d="M21 12a9 9 0 0 0-9-9h-1a9 9 0 0 0-9 9v1a9 9 0 0 0 9 9h1a9 9 0 0 0 9-9Z" />
                         </svg>
@@ -634,7 +786,14 @@ export default function AdminDashboard() {
                     gradientFrom="from-indigo-50"
                     gradientTo="to-white"
                     icon={
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-6 h-6"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                        >
                             <rect width="7" height="7" x="3" y="3" rx="1" />
                             <rect width="7" height="7" x="3" y="14" rx="1" />
                             <path d="M14 4h7M14 9h7M14 15h7M14 20h7" />
@@ -649,7 +808,14 @@ export default function AdminDashboard() {
                     gradientFrom="from-amber-50"
                     gradientTo="to-white"
                     icon={
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-6 h-6"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                        >
                             <circle cx="8" cy="21" r="1" />
                             <circle cx="19" cy="21" r="1" />
                             <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
@@ -663,35 +829,70 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-2">
                     <NotificationsCard
                         items={[
-                            { type: "report", text: "<strong>Nguyễn Văn An</strong> đã gửi một báo cáo cho tin đăng 'Bán nhà quận 1...'", time: "5 phút trước" },
-                            { type: "new_user", text: "<strong>Trần Thị Bình</strong> vừa đăng ký tài khoản mới.", time: "1 giờ trước" },
-                            { type: "comment", text: "<strong>Lê Văn Cường</strong> đã bình luận về một tin đăng.", time: "3 giờ trước" },
-                            { type: "report", text: "Tin đăng 'Cho thuê chung cư...' đã nhận được <strong>3 báo cáo</strong>.", time: "1 ngày trước" },
+                            {
+                                type: "report",
+                                text: "<strong>Nguyễn Văn An</strong> đã gửi một báo cáo cho tin đăng 'Bán nhà quận 1...'",
+                                time: "5 phút trước",
+                            },
+                            {
+                                type: "new_user",
+                                text: "<strong>Trần Thị Bình</strong> vừa đăng ký tài khoản mới.",
+                                time: "1 giờ trước",
+                            },
+                            {
+                                type: "comment",
+                                text: "<strong>Lê Văn Cường</strong> đã bình luận về một tin đăng.",
+                                time: "3 giờ trước",
+                            },
+                            {
+                                type: "report",
+                                text: "Tin đăng 'Cho thuê chung cư...' đã nhận được <strong>3 báo cáo</strong>.",
+                                time: "1 ngày trước",
+                            },
                         ]}
                     />
                 </div>
 
                 <div className="lg:col-span-2">
-                    <RecentTransactionsCard items={recentTx.loading ? [] : recentTx.rows} />
-                    {recentTx.error && <div className="mt-2 text-sm text-red-600">{recentTx.error}</div>}
+                    <RecentTransactionsCard
+                        items={recentTx.loading ? [] : recentTx.rows}
+                    />
+                    {recentTx.error && (
+                        <div className="mt-2 text-sm text-red-600">{recentTx.error}</div>
+                    )}
                 </div>
 
-                {/* Biểu đồ Doanh thu */}
-                <div className="lg:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
+                {/* Biểu đồ Doanh thu + Đánh giá hệ thống (cùng hàng) */}
+                <div className="lg:col-span-1">
+                    <ReviewAnalyticsCard />
+                </div>
+                <div className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7]">
                     <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-800">Phân tích doanh thu theo ngày</h3>
+                        <h3 className="text-lg font-semibold text-gray-800">
+                            Phân tích doanh thu theo ngày
+                        </h3>
                     </div>
-                    <p className="text-sm text-gray-500 mb-4">Nguồn dữ liệu: đơn hàng (status=PAID) • Kỳ: {range}</p>
+                    <p className="text-sm text-gray-500 mb-4">
+                        Nguồn dữ liệu: đơn hàng (status=PAID) • Kỳ: {range}
+                    </p>
                     <div className="h-80 w-full">
-                        <Line ref={chartRef} data={revenueChart.data} options={revenueChart.options} />
+                        <Line
+                            ref={chartRef}
+                            data={revenueChart.data}
+                            options={revenueChart.options}
+                        />
                     </div>
                 </div>
+
+
 
                 {/* Tin đăng mới cần duyệt */}
                 <div className="lg:col-span-2">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
                         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                            <h3 className="text-lg font-semibold text-gray-800">Tin đăng mới cần duyệt</h3>
+                            <h3 className="text-lg font-semibold text-gray-800">
+                                Tin đăng mới cần duyệt
+                            </h3>
                             <div className="relative">
                                 <input
                                     value={pendingQ}
@@ -699,7 +900,13 @@ export default function AdminDashboard() {
                                     placeholder="Tìm tiêu đề/người đăng…"
                                     className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
                                 />
-                                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <svg
+                                    className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                >
                                     <circle cx="11" cy="11" r="7" />
                                     <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
                                 </svg>
@@ -718,7 +925,10 @@ export default function AdminDashboard() {
                                 <tbody className="divide-y divide-gray-100">
                                     {pendingList.loading && (
                                         <tr>
-                                            <td colSpan={3} className="py-8 text-center text-gray-500">
+                                            <td
+                                                colSpan={3}
+                                                className="py-8 text-center text-gray-500"
+                                            >
                                                 Đang tải…
                                             </td>
                                         </tr>
@@ -726,9 +936,15 @@ export default function AdminDashboard() {
                                     {!pendingList.loading &&
                                         !pendingList.error &&
                                         pendingList.content.map((p) => (
-                                            <tr key={p.id} className="bg-white hover:bg-slate-50 transition-colors">
+                                            <tr
+                                                key={p.id}
+                                                className="bg-white hover:bg-slate-50 transition-colors"
+                                            >
                                                 <td className="py-3 px-4 font-medium text-gray-900">
-                                                    <div className="max-w-xs truncate" title={p.title}>
+                                                    <div
+                                                        className="max-w-xs truncate"
+                                                        title={p.title}
+                                                    >
                                                         {p.title}
                                                     </div>
                                                 </td>
@@ -737,24 +953,37 @@ export default function AdminDashboard() {
                                                         <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">
                                                             {initials(p.author)}
                                                         </div>
-                                                        <span className="text-gray-700 truncate" title={p.author}>
+                                                        <span
+                                                            className="text-gray-700 truncate"
+                                                            title={p.author}
+                                                        >
                                                             {p.author}
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{p.postedDate || "—"}</td>
+                                                <td className="py-3 px-4 text-gray-700 whitespace-nowrap">
+                                                    {p.postedDate || "—"}
+                                                </td>
                                             </tr>
                                         ))}
-                                    {!pendingList.loading && !pendingList.error && pendingList.content.length === 0 && (
-                                        <tr>
-                                            <td colSpan={3} className="py-8 text-center text-gray-500">
-                                                Không có tin phù hợp
-                                            </td>
-                                        </tr>
-                                    )}
+                                    {!pendingList.loading &&
+                                        !pendingList.error &&
+                                        pendingList.content.length === 0 && (
+                                            <tr>
+                                                <td
+                                                    colSpan={3}
+                                                    className="py-8 text-center text-gray-500"
+                                                >
+                                                    Không có tin phù hợp
+                                                </td>
+                                            </tr>
+                                        )}
                                     {pendingList.error && (
                                         <tr>
-                                            <td colSpan={3} className="py-8 text-center text-red-500">
+                                            <td
+                                                colSpan={3}
+                                                className="py-8 text-center text-red-500"
+                                            >
                                                 {pendingList.error}
                                             </td>
                                         </tr>
@@ -763,7 +992,9 @@ export default function AdminDashboard() {
                             </table>
                         </div>
 
-                        <div className="mt-3 text-xs text-gray-500">Tổng: {pendingList.totalElements} tin cần duyệt</div>
+                        <div className="mt-3 text-xs text-gray-500">
+                            Tổng: {pendingList.totalElements} tin cần duyệt
+                        </div>
                     </div>
                 </div>
 
@@ -771,7 +1002,9 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-2">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
                         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                            <h3 className="text-lg font-semibold text-gray-800">Đơn hàng mới nhất</h3>
+                            <h3 className="text-lg font-semibold text-gray-800">
+                                Đơn hàng mới nhất
+                            </h3>
                             <div className="relative">
                                 <input
                                     value={orderSearch}
@@ -779,7 +1012,13 @@ export default function AdminDashboard() {
                                     placeholder="Tìm mã đơn (id)/khách hàng…"
                                     className="h-9 pl-9 pr-3 rounded-xl border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
                                 />
-                                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <svg
+                                    className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                >
                                     <circle cx="11" cy="11" r="7" />
                                     <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
                                 </svg>
@@ -800,7 +1039,10 @@ export default function AdminDashboard() {
                                 <tbody className="divide-y divide-gray-100">
                                     {recentOrders.loading && (
                                         <tr>
-                                            <td colSpan={5} className="py-8 text-center text-gray-500">
+                                            <td
+                                                colSpan={5}
+                                                className="py-8 text-center text-gray-500"
+                                            >
                                                 Đang tải…
                                             </td>
                                         </tr>
@@ -810,18 +1052,28 @@ export default function AdminDashboard() {
                                         !recentOrders.error &&
                                         recentOrders.content.map((o) => {
                                             const name =
-                                                o.customerName || o.userName || o.fullName || (o.userId != null ? `User #${o.userId}` : "");
+                                                o.customerName ||
+                                                o.userName ||
+                                                o.fullName ||
+                                                (o.userId != null ? `User #${o.userId}` : "");
                                             return (
-                                                <tr key={o.id} className="bg-white hover:bg-slate-50 transition-colors">
+                                                <tr
+                                                    key={o.id}
+                                                    className="bg-white hover:bg-slate-50 transition-colors"
+                                                >
                                                     <td className="py-3 px-4 font-semibold text-gray-900 whitespace-nowrap">
-                                                        {o.orderCode ?? `ORD-${String(o.id).padStart(6, "0")}`}
+                                                        {o.orderCode ??
+                                                            `ORD-${String(o.id).padStart(6, "0")}`}
                                                     </td>
                                                     <td className="py-3 px-4">
                                                         <div className="inline-flex items-center gap-2">
                                                             <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold shrink-0">
                                                                 {initials(name) || "KH"}
                                                             </div>
-                                                            <span className="text-gray-700 truncate" title={name}>
+                                                            <span
+                                                                className="text-gray-700 truncate"
+                                                                title={name}
+                                                            >
                                                                 {name || "(Ẩn danh)"}
                                                             </span>
                                                         </div>
@@ -832,10 +1084,10 @@ export default function AdminDashboard() {
                                                     <td className="py-3 px-4">
                                                         <span
                                                             className={`text-xs font-medium px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${o.status === "PAID"
-                                                                    ? "bg-green-50 text-green-700 ring-green-100"
-                                                                    : o.status?.startsWith("PENDING")
-                                                                        ? "bg-amber-50 text-amber-700 ring-amber-100"
-                                                                        : "bg-gray-50 text-gray-700 ring-gray-100"
+                                                                ? "bg-green-50 text-green-700 ring-green-100"
+                                                                : o.status?.startsWith("PENDING")
+                                                                    ? "bg-amber-50 text-amber-700 ring-amber-100"
+                                                                    : "bg-gray-50 text-gray-700 ring-gray-100"
                                                                 }`}
                                                         >
                                                             {o.status === "PAID"
@@ -845,22 +1097,32 @@ export default function AdminDashboard() {
                                                                     : o.status || "—"}
                                                         </span>
                                                     </td>
-                                                    <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{fmtDate(o.createdAt)}</td>
+                                                    <td className="py-3 px-4 text-gray-700 whitespace-nowrap">
+                                                        {fmtDate(o.createdAt)}
+                                                    </td>
                                                 </tr>
                                             );
                                         })}
 
-                                    {!recentOrders.loading && !recentOrders.error && recentOrders.content.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} className="py-8 text-center text-gray-500">
-                                                Không có đơn hàng phù hợp
-                                            </td>
-                                        </tr>
-                                    )}
+                                    {!recentOrders.loading &&
+                                        !recentOrders.error &&
+                                        recentOrders.content.length === 0 && (
+                                            <tr>
+                                                <td
+                                                    colSpan={5}
+                                                    className="py-8 text-center text-gray-500"
+                                                >
+                                                    Không có đơn hàng phù hợp
+                                                </td>
+                                            </tr>
+                                        )}
 
                                     {recentOrders.error && (
                                         <tr>
-                                            <td colSpan={5} className="py-8 text-center text-red-500">
+                                            <td
+                                                colSpan={5}
+                                                className="py-8 text-center text-red-500"
+                                            >
                                                 {recentOrders.error}
                                             </td>
                                         </tr>

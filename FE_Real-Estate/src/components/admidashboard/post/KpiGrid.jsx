@@ -89,16 +89,9 @@ function KpiTile({ label, value, percent, icon, gradient, chip, bar }) {
     );
 }
 
-/**
- * Dùng mới: <KpiGrid counts={counts} />
- *  - counts = { PENDING_REVIEW, PUBLISHED, EXPIRING_SOON, EXPIRED, HIDDEN, REJECTED, ACTIVE? }
- *    (active = PUBLISHED; nếu BE vẫn trả ACTIVE, sẽ cộng gộp vào PUBLISHED)
- *
- * Vẫn hỗ trợ kiểu cũ (truyền total/pending/active/expSoon/expired) để không vỡ code cũ.
- */
 export default function KpiGrid({
-    counts,                // ✅ cách mới, khuyến nghị
-    loading = false,       // (nếu cần, có thể dùng để chuyển sang indeterminate)
+    counts,              
+    loading = false,      
     // backward-compat props (tuỳ ý)
     total: totalProp = 0,
     pending: pendingProp = 0,

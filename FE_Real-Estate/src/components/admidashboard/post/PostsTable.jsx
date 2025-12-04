@@ -29,7 +29,11 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined";
 import { HOVER_BG, STATUS_LABEL, STATUS_CHIP_COLOR, styles } from "./constants";
-
+const LISTING_TYPE_BADGE = {
+  PREMIUM: { label: "PRE", bg: "#f97316" },  // màu cam
+  VIP: { label: "VIP", bg: "#facc15" },      // vàng
+  NORMAL: { label: "NOR", bg: "#9ca3af" },   // xám
+};
 /* ===== Helpers ===== */
 const shortMoney = (value) => {
   if (value == null || isNaN(value)) return "-";
