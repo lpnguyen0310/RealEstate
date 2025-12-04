@@ -10,7 +10,7 @@ import "swiper/css/free-mode";
 import "swiper/css/thumbs";
 import Viewer from "viewerjs";
 import "viewerjs/dist/viewer.min.css";
-
+import axios from "axios";
 import {
     useTrackZaloClickMutation,
     useTrackShareClickMutation,
@@ -159,7 +159,10 @@ export default function InfoRealEstate() {
         mapMeta = DEFAULT_MAP_META,
         agent = DEFAULT_AGENT,
     } = property || {};
-
+    const [center, setCenter] = useState({
+        lat: map?.lat ?? 10.792,
+        lng: map?.lng ?? 106.68,
+    });
     // 🔹 Gọi API lấy danh sách tin của môi giới để tính totalPosts - 1
     useEffect(() => {
         if (!agent?.id) return;
@@ -236,6 +239,78 @@ export default function InfoRealEstate() {
         s.navigation.init();
         s.navigation.update();
     }, [mainSwiperRef.current, prevRef.current, nextRef.current, gallery]);
+
+    // 
+    // Geocode địa chỉ BĐS -> lat/lng
+    useEffect(() => {
+        if (!postInfo?.address) return;
+
+        let cancelled = false;
+
+        async function geocode() {
+            try {
+                const res = await axios.get("/api/maps/geocode", {
+                    params: { q: postInfo.address },
+                });
+
+                const data = res.data;
+                console.log("Geocode raw:", data);
+
+                let first = null;
+
+                // 1) Case SerpApi trả place_results (địa chỉ cụ thể)
+                if (data?.place_results) {
+                    first = data.place_results;
+                }
+
+                // 2) local_results dạng mảng (search quanh khu vực)
+                if (!first && Array.isArray(data?.local_results) && data.local_results.length) {
+                    first = data.local_results[0];
+                }
+
+                // 3) Một số cấu trúc khác
+                if (!first && Array.isArray(data?.results) && data.results.length) {
+                    first = data.results[0];
+                }
+                if (!first && Array.isArray(data?.places) && data.places.length) {
+                    first = data.places[0];
+                }
+
+                if (!first) {
+                    console.warn("❌ Không tìm thấy kết quả geocode cho:", postInfo.address);
+                    return;
+                }
+
+                const gps = first.gps_coordinates || {};
+                const lat =
+                    gps.latitude ??
+                    gps.lat ??
+                    first.latitude;
+
+                const lng =
+                    gps.longitude ??
+                    gps.lng ??
+                    first.longitude;
+
+                if (!cancelled && typeof lat === "number" && typeof lng === "number") {
+                    console.log("%c📍 Geocode success", "color: green; font-size: 14px;");
+                    console.log("Địa chỉ:", postInfo.address);
+                    console.log("Lat:", lat, "| Lng:", lng);
+
+                    setCenter({ lat, lng });
+                } else {
+                    console.warn("❌ Không đọc được lat/lng từ kết quả:", first);
+                }
+            } catch (e) {
+                console.error("Geocode address error", e);
+            }
+        }
+
+        geocode();
+        return () => {
+            cancelled = true;
+        };
+    }, [postInfo?.address]);
 
     // ===== Guards return
     if (loading) {
@@ -746,10 +821,7 @@ export default function InfoRealEstate() {
                             Khám phá tiện ích
                         </h2>
                         <NearbyAmenities
-                            center={{
-                                lat: map?.lat ?? 10.792,
-                                lng: map?.lng ?? 106.68,
-                            }}
+                            center={center}
                             address={postInfo?.address}
                         />
                         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">

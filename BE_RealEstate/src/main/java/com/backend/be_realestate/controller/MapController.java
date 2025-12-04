@@ -23,4 +23,10 @@ public class MapController {
         String ll = "@" + lat + "," + lng + "," + zoom + "z";
         return serp.searchGoogleMaps(q, ll);
     }
+
+
+    @GetMapping("/geocode")
+    public Mono<String> geocode(@RequestParam("q") String address) {
+        return serp.geocodeAddress(address);
+    }
 }

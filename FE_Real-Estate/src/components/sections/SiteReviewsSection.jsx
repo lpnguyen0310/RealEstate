@@ -7,13 +7,15 @@ const SlickArrowLeft = ({ currentSlide, slideCount, ...props }) => (
     <button
         {...props}
         className={
-            "absolute left-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-600 hover:text-[#2856d5] hover:border-[#2856d5] transition-all " +
+            "absolute -left-5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full " +
+            "bg-white shadow-md border border-slate-200 flex items-center justify-center " +
+            "text-slate-600 hover:text-[#2856d5] hover:border-[#2856d5] transition-all " +
             (currentSlide === 0 ? " opacity-40 cursor-not-allowed" : "")
         }
         aria-hidden="true"
         aria-disabled={currentSlide === 0}
     >
-        <LeftOutlined style={{ fontSize: 13 }} />
+        <LeftOutlined style={{ fontSize: 14 }} />
     </button>
 );
 
@@ -21,13 +23,15 @@ const SlickArrowRight = ({ currentSlide, slideCount, ...props }) => (
     <button
         {...props}
         className={
-            "absolute right-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-600 hover:text-[#2856d5] hover:border-[#2856d5] transition-all " +
+            "absolute -right-5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full " +
+            "bg-white shadow-md border border-slate-200 flex items-center justify-center " +
+            "text-slate-600 hover:text-[#2856d5] hover:border-[#2856d5] transition-all " +
             (currentSlide === slideCount - 1 ? " opacity-40 cursor-not-allowed" : "")
         }
         aria-hidden="true"
         aria-disabled={currentSlide === slideCount - 1}
     >
-        <RightOutlined style={{ fontSize: 13 }} />
+        <RightOutlined style={{ fontSize: 14 }} />
     </button>
 );
 
@@ -130,7 +134,7 @@ export default function SiteReviewsSection({ reviews = [] }) {
                         </span>
                         <h2 className="text-2xl sm:text-3xl lg:text-[32px] font-extrabold text-slate-900 leading-tight">
                             Khách hàng nói gì về{" "}
-                            <span className="text-[#2856d5]">Radanhadat</span>?
+                            <span className="text-[#2856d5]">N2RealEstate</span>?
                         </h2>
                         <p className="mt-3 text-slate-500 text-sm sm:text-[15px]">
                             Các đánh giá được ghi nhận sau khi khách hàng hoàn tất giao dịch
@@ -143,59 +147,85 @@ export default function SiteReviewsSection({ reviews = [] }) {
                     ) : (
                         // CARD chung 2 cột, cùng chiều cao
                         <div className="bg-white rounded-2xl shadow-md border border-slate-100 px-5 py-6 lg:px-7 lg:py-7 flex flex-col lg:flex-row gap-6 lg:gap-10 items-stretch">
-                            {/* STATS (trái) */}
-                            <div className="w-full lg:w-[38%] flex-shrink-0 flex flex-col justify-between">
-                                <div>
-                                    {/* phần trên giống hình bạn gửi */}
-                                    <div className="flex items-start gap-4 mb-5">
-                                        <div className="flex flex-col items-start">
+                            {/* STATS (trái) – Compact Modern */}
+                            <div className="w-full lg:w-[38%] flex-shrink-0">
+                                <div
+                                    className="
+            relative
+            rounded-xl
+            bg-gradient-to-br from-[#eef3ff] via-white to-[#e7efff]
+            border border-[#d6e4ff]
+            shadow-[0_10px_25px_rgba(15,23,42,0.06)]
+            p-5 lg:p-5
+            overflow-hidden
+        "
+                                >
+                                    {/* Decorative blur circles */}
+                                    <div className="pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full bg-white/40 blur-xl" />
+                                    <div className="pointer-events-none absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-[#2856d5]/10 blur-xl" />
+
+                                    {/* Chip */}
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 backdrop-blur-sm border border-white/80 mb-3">
+                                        <span className="text-[#2856d5] text-xs">⭐</span>
+                                        <span className="text-[11px] font-semibold tracking-wide uppercase text-slate-600">
+                                            Đánh giá tổng quan
+                                        </span>
+                                    </div>
+
+                                    {/* Rating header */}
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div>
                                             <div className="flex items-end gap-1">
-                                                <span className="text-4xl lg:text-5xl font-extrabold text-slate-900 leading-none">
+                                                <span className="text-[34px] font-extrabold text-slate-900 leading-none">
                                                     {avgRating.toFixed(1)}
                                                 </span>
-                                                <span className="text-sm text-slate-400 mb-1">
-                                                    /5
-                                                </span>
+                                                <span className="text-sm text-slate-500 mb-1">/5</span>
                                             </div>
+
                                             <Rate
                                                 disabled
                                                 allowHalf
                                                 value={avgRating}
-                                                className="mt-2 text-[16px]"
+                                                className="text-[16px] mt-1"
                                             />
+
+                                            <p className="text-[12px] text-slate-600 mt-1">
+                                                Dựa trên{" "}
+                                                <span className="font-semibold text-slate-900">
+                                                    {reviews.length} đánh giá
+                                                </span>
+                                            </p>
                                         </div>
-                                        <div className="flex-1">
-                                            <p className="text-sm font-semibold text-slate-900">
-                                                {reviews.length} đánh giá & phản hồi
-                                            </p>
-                                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                                Dữ liệu từ người dùng thực sau khi giao dịch hoặc sử dụng
-                                                các tính năng trên nền tảng.
-                                            </p>
+
+                                        {/* Trust badge */}
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[11px] text-slate-500 mb-1">
+                                                Mức độ hài lòng
+                                            </span>
+
+                                            <div className="inline-flex items-center gap-2 bg-white/80 px-3 py-1 rounded-full border border-white shadow-sm text-[11px] font-medium text-emerald-700">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                Tin tưởng bởi người dùng
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* thanh sao 5→1, màu cam */}
-                                    <div className="space-y-2.5">
+                                    {/* Star bars */}
+                                    <div className="space-y-1.5 mt-2">
                                         {ratingBuckets.map(({ star, count }) => {
                                             const percent = (count / totalReviews) * 100;
                                             return (
-                                                <div
-                                                    key={star}
-                                                    className="flex items-center gap-3 text-[13px]"
-                                                >
-                                                    <span className="w-12 text-[12px] text-slate-500">
-                                                        {star} Sao
-                                                    </span>
-                                                    <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                                <div key={star} className="flex items-center gap-2 text-[12px]">
+                                                    <span className="w-10 text-slate-600">{star} Sao</span>
+
+                                                    <div className="flex-1 h-1.5 rounded-full bg-white/60 border border-white overflow-hidden">
                                                         <div
-                                                            className="h-full rounded-full bg-amber-400 transition-[width] duration-300 ease-out"
+                                                            className="h-full rounded-full bg-gradient-to-r from-[#fbbf24] via-[#f59e0b] to-[#f97316]"
                                                             style={{ width: `${percent}%` }}
                                                         />
                                                     </div>
-                                                    <span className="w-5 text-right text-[12px] text-slate-500">
-                                                        {count || ""}
-                                                    </span>
+
+                                                    <span className="w-4 text-right text-slate-600">{count || ""}</span>
                                                 </div>
                                             );
                                         })}
@@ -231,72 +261,122 @@ function getReviewTitle(rating) {
     if (rating >= 3) return "Trải nghiệm tốt";
     return "Đánh giá từ khách hàng";
 }
-
 function ReviewCard({ review }) {
+    const rating = review.rating || 0;
+    const title = getReviewTitle(rating);
+
     return (
-        <div className="h-full bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-[2px] transition-all duration-200 px-6 py-6 flex flex-col justify-between min-h-[260px]">
-            <div>
-                {/* Header */}
-                <div className="flex items-center gap-4 mb-4">
-                    <Avatar
-                        size={48}
-                        icon={<UserOutlined />}
-                        className="bg-blue-50 text-[#2856d5] border border-blue-100 flex-shrink-0"
-                        src={review.avatarUrl}
-                    />
-                    <div className="min-w-0">
-                        <h4 className="font-semibold text-slate-900 text-[15px] truncate">
-                            {review.name || "Người dùng ẩn danh"}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-1">
-                            <Rate
-                                disabled
-                                allowHalf
-                                value={review.rating}
-                                className="text-[13px]"
-                            />
-                            <span className="text-[12px] text-slate-400">
-                                {review.rating ? review.rating.toFixed(1) : "—"}
-                            </span>
+        <div
+            className="
+                relative
+                bg-white
+                rounded-2xl
+                border border-slate-100
+                shadow-[0_6px_18px_rgba(15,23,42,0.06)]
+                hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)]
+                hover:-translate-y-0.5
+                transition-all duration-300
+                overflow-hidden
+                group
+            "
+        >
+            {/* Thanh gradient trên */}
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#2856d5] via-[#4f8bff] to-[#22c55e]" />
+
+            {/* Quote trang trí */}
+            <div className="absolute -right-1 -bottom-4 text-6xl text-[#2856d5]/5 group-hover:text-[#2856d5]/10 transition-colors select-none leading-none">
+                “
+            </div>
+
+            <div className="px-5 pt-4 pb-4 flex flex-col gap-3 relative z-[1] min-h-[190px]">
+                {/* Header: avatar + info + badge rating */}
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <Avatar
+                            size={42}
+                            icon={<UserOutlined />}
+                            className="bg-blue-50 text-[#2856d5] border border-blue-100 flex-shrink-0"
+                            src={review.avatarUrl}
+                        />
+
+                        <div className="min-w-0">
+                            <h4 className="font-semibold text-slate-900 text-[14px] leading-tight truncate">
+                                {review.name || "Người dùng ẩn danh"}
+                            </h4>
+
+                            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                                {review.date || "Mới đây"} ·{" "}
+                                <span className="text-[#2856d5] font-medium">
+                                    {title}
+                                </span>
+                            </p>
                         </div>
+                    </div>
+
+                    {/* Badge rating */}
+                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#eef3ff] border border-[#dbe5ff]">
+                        <StarFilled className="text-[12px] text-[#fbbf24]" />
+                        <span className="text-[12px] font-semibold text-slate-800 leading-none">
+                            {rating.toFixed(1)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 leading-none">/5</span>
                     </div>
                 </div>
 
-                {/* Content */}
-                <h5 className="font-semibold text-slate-800 text-[14px] mb-2">
-                    {getReviewTitle(review.rating || 0)}
-                </h5>
-                <p className="text-slate-600 text-[14px] leading-relaxed line-clamp-4">
-                    “{review.comment ?? review.content}”
-                </p>
-            </div>
-
-            {/* Footer */}
-            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-[12px] text-slate-400">
-                    {review.date || "Mới đây"}
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                    <svg
-                        width="11"
-                        height="11"
-                        viewBox="0 0 10 10"
-                        fill="none"
-                        className="stroke-current"
-                    >
-                        <path
-                            d="M8.33325 2.5L3.74992 7.08333L1.66659 5"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                {/* Rating + title + content */}
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                        <Rate
+                            disabled
+                            allowHalf
+                            value={rating}
+                            className="text-[13px]"
                         />
-                    </svg>
-                    Đã xác thực
-                </span>
+                        <span className="text-[11px] text-slate-400">
+                            {rating.toFixed(1)} điểm · {title}
+                        </span>
+                    </div>
+
+                    <p className="text-slate-600 text-[13px] leading-relaxed line-clamp-4">
+                        “{review.comment ?? review.content}”
+                    </p>
+                </div>
+
+                {/* Footer: đã xác thực */}
+                <div className="pt-2 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400">
+                        Đánh giá cho{" "}
+                        <span className="font-medium text-slate-600">
+                            N2RealEstate
+                        </span>
+                    </span>
+
+                    <span
+                        className="
+                            inline-flex items-center gap-1.5
+                            text-[11px] font-medium 
+                            text-emerald-700 bg-emerald-50
+                            px-2.5 py-0.5 rounded-full
+                            border border-emerald-100
+                        "
+                    >
+                        <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
+                            <path
+                                d="M8.33325 2.5L3.74992 7.08333L1.66659 5"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        Đã xác thực
+                    </span>
+                </div>
             </div>
         </div>
     );
 }
+
 
 function EmptyState() {
     return (
@@ -309,7 +389,7 @@ function EmptyState() {
             </h3>
             <p className="text-[14px] text-slate-600 max-w-md mx-auto">
                 Hãy là người đầu tiên chia sẻ trải nghiệm của bạn với{" "}
-                <span className="font-semibold text-[#2856d5]">Radanhadat.vn</span>.
+                <span className="font-semibold text-[#2856d5]">N2RealEstate.vn</span>.
             </p>
         </div>
     );
