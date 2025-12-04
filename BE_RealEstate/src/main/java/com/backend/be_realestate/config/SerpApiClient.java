@@ -28,4 +28,16 @@ public class SerpApiClient {
                 .retrieve()
                 .bodyToMono(String.class);
     }
+
+    public Mono<String> geocodeAddress(String q) {
+        return webClient.get()
+                .uri(uri -> uri
+                        .queryParam("engine", "google_maps")
+                        .queryParam("q", q)          // địa chỉ đầy đủ
+                        .queryParam("type", "search")// cho chắc là search
+                        .queryParam("api_key", apiKey)
+                        .build())
+                .retrieve()
+                .bodyToMono(String.class);
+    }
 }

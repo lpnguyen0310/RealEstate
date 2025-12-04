@@ -11,23 +11,105 @@ import {
 
 import AllNotificationsModal from "./AllNotificationsModal";
 
-/* ---------- Skeleton ---------- */
+/* -------------------------------------------------------------------------- */
+/* SUB COMPONENTS (UI)                                                        */
+/* -------------------------------------------------------------------------- */
+
+/* --- Skeleton Loading --- */
 const SkeletonItem = () => (
-    <li className="flex items-start gap-3 py-3 px-2 -mx-2">
-        <div className="shrink-0 w-10 h-10 rounded-full bg-gray-200 animate-pulse" />
-        <div className="min-w-0 flex-1">
-            <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
-            <div className="h-3 bg-gray-200 rounded w-1/4 mt-2 animate-pulse" />
+    <li className="flex items-start gap-4 p-4 border-b border-gray-50 last:border-0">
+        <div className="shrink-0 w-10 h-10 rounded-full bg-gray-100 animate-pulse" />
+        <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-4 bg-gray-100 rounded w-3/4 animate-pulse" />
+            <div className="h-3 bg-gray-100 rounded w-1/3 animate-pulse" />
         </div>
     </li>
 );
 
-/* ---------- Relative time ---------- */
+/* --- Empty State --- */
+const EmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+            <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+        </div>
+        <p className="text-gray-500 text-sm font-medium">Không có thông báo mới</p>
+    </div>
+);
+
+/* --- Icons (Updated: Finance $, User +, Report !) --- */
+const IconBubble = ({ variant = "default" }) => {
+    // Hiệu ứng hover: scale nhẹ
+    const baseClass = "relative shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110";
+
+    const variants = {
+        // 1. Cảnh báo (Tam giác chấm than - Đỏ)
+        report: {
+            bg: "bg-red-50 text-red-500 ring-1 ring-red-100",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+            )
+        },
+        // 2. User mới (Hình người dấu cộng - Xanh dương)
+        new_user: {
+            bg: "bg-blue-50 text-blue-600 ring-1 ring-blue-100",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                </svg>
+            )
+        },
+        // 3. Tài chính/Đơn hàng (Đồng tiền $ - Xanh lá)
+        finance: {
+            bg: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            )
+        },
+        // 4. Tin nhắn/Khác (Hộp thoại - Tím/Xanh đậm)
+        comment: {
+            bg: "bg-indigo-50 text-indigo-500 ring-1 ring-indigo-100",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                </svg>
+            )
+        },
+        // Mặc định
+        default: {
+            bg: "bg-gray-50 text-gray-500 ring-1 ring-gray-200",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+            )
+        }
+    };
+
+    const style = variants[variant] || variants.default;
+
+    return (
+        <div className={`${baseClass} ${style.bg}`}>
+            {style.icon}
+        </div>
+    );
+};
+
+/* -------------------------------------------------------------------------- */
+/* LOGIC HELPERS                                                              */
+/* -------------------------------------------------------------------------- */
+
 function formatRelativeTime(isoDate) {
     if (!isoDate) return "";
     try {
         const date = new Date(isoDate);
         const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return "Vừa xong";
         let interval = seconds / 31536000;
         if (interval > 1) return Math.floor(interval) + " năm trước";
         interval = seconds / 2592000;
@@ -38,126 +120,46 @@ function formatRelativeTime(isoDate) {
         if (interval > 1) return Math.floor(interval) + " giờ trước";
         interval = seconds / 60;
         if (interval > 1) return Math.floor(interval) + " phút trước";
-        return "Vài giây trước";
+        return "Vừa xong";
     } catch {
         return "Không rõ";
     }
 }
 
-/* ---------- Map BE type -> FE icon variant ---------- */
 function mapApiTypeToIconType(apiType) {
     const type = (apiType || "").toUpperCase();
     switch (type) {
+        // --- NHÓM CẢNH BÁO ---
         case "NEW_LISTING_PENDING":
         case "LISTING_PENDING_USER":
         case "POST_WARNING":
         case "REPORT_RECEIVED":
             return "report";
 
+        // --- NHÓM USER MỚI ---
         case "NEW_USER_REGISTERED":
             return "new_user";
 
+        // --- NHÓM TÀI CHÍNH/ĐƠN HÀNG ---
         case "ORDER_PENDING":
         case "PACKAGE_PURCHASED":
         case "NEW_ORDER_PAID":
             return "finance";
 
+        // --- NHÓM DUYỆT BÀI/COMMENT ---
         case "LISTING_APPROVED":
         case "LISTING_REJECTED":
+        case "CATALOG_UPDATED":
             return "comment";
 
-        case "CATALOG_UPDATED":
         default:
-            return "comment";
+            return "default";
     }
 }
 
-/* ---------- Icons cho card nhỏ ---------- */
-const IconBubble = ({ variant = "default" }) => {
-    switch (variant) {
-        case "report":
-            return (
-                <div className="relative shrink-0 w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center ring-1 ring-red-200">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                    </svg>
-                </div>
-            );
-        case "new_user":
-            return (
-                <div className="relative shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center ring-1 ring-blue-200">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                    >
-                        <path d="M18 21a8 8 0 0 0-16 0" />
-                        <circle cx="10" cy="8" r="4" />
-                    </svg>
-                </div>
-            );
-        case "finance":
-            return (
-                <div className="relative shrink-0 w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center ring-1 ring-emerald-200">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                    >
-                        <path d="M12 8c-1.657 0-3 .843-3 1.882C9 11.157 10.343 12 12 12s3 .843 3 1.882C15 15.157 13.657 16 12 16s-3-.843-3-1.882M12 6v2m0 8v2" />
-                        <circle cx="12" cy="12" r="9" />
-                    </svg>
-                </div>
-            );
-        default:
-            return (
-                <div className="relative shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center ring-1 ring-gray-200">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                        />
-                    </svg>
-                </div>
-            );
-    }
-};
-
-const Dot = () => <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />;
-
-const NewPing = () => (
-    <span className="absolute -left-1 top-2.5">
-        <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-30" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
-        </span>
-    </span>
-);
+/* -------------------------------------------------------------------------- */
+/* MAIN COMPONENT                                                             */
+/* -------------------------------------------------------------------------- */
 
 export default function NotificationsCard() {
     const { data: apiData, isLoading, isError } = useGetNotificationsQuery();
@@ -174,7 +176,7 @@ export default function NotificationsCard() {
                 const rawType = (n.type || n.notificationType || "").toUpperCase();
                 return {
                     id: n.id,
-                    rawType, // dùng cho filter tabs trong modal
+                    rawType,
                     type: mapApiTypeToIconType(rawType),
                     text: n.message,
                     time: formatRelativeTime(n.createdAt),
@@ -193,20 +195,7 @@ export default function NotificationsCard() {
 
     const displayItems = items.slice(0, 4);
 
-    const liClass = (it) => {
-        if (!it.read) {
-            return [
-                "relative",
-                "flex items-start gap-3 py-3 px-2 -mx-2 rounded-xl transition-colors",
-                "bg-blue-50/70 hover:bg-blue-50",
-                "ring-1 ring-blue-100",
-                "before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-blue-400/70",
-            ].join(" ");
-        }
-        return "flex items-start gap-3 py-3 px-2 -mx-2 rounded-xl hover:bg-gray-50/70 transition-colors";
-    };
-
-    // Optimistic update vào cache getNotifications
+    // Optimistic update vào cache RTK Query
     const markReadInCache = (id) => {
         try {
             dispatch(
@@ -228,8 +217,7 @@ export default function NotificationsCard() {
 
     const handleItemClick = async (e, item) => {
         const to = item.link || "#";
-
-        if (item.read) return; // đã đọc thì để Link tự navigate
+        if (item.read) return; // Đã đọc thì để Link tự navigate
 
         e.preventDefault();
 
@@ -240,7 +228,7 @@ export default function NotificationsCard() {
         try {
             await markAsRead(item.id).unwrap();
         } catch {
-            // refetch sau sẽ sync nếu lệch
+            // ignore
         } finally {
             // 3) Điều hướng
             navigate(to);
@@ -249,122 +237,117 @@ export default function NotificationsCard() {
 
     return (
         <>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#e9eef7] h-full">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold text-gray-800">
-                            Thông báo mới
+            {/* Card Container */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden font-sans">
+
+                {/* --- HEADER --- */}
+                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 sticky top-0 z-10">
+
+                    {/* Title + Badge */}
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-bold text-gray-800">
+                            Thông báo
                         </h3>
                         {unreadCount > 0 && (
-                            <span
-                                className="
-                                    inline-flex items-center justify-center
-                                    min-w-[1.75rem] h-6 px-2
-                                    rounded-full text-xs font-semibold
-                                    bg-blue-100 text-blue-700 ring-1 ring-blue-200
-                                "
-                                title={`${unreadCount} thông báo chưa đọc`}
-                            >
+                            <span className="
+                                flex items-center justify-center 
+                                h-6 min-w-[1.5rem] px-1.5 
+                                rounded-full text-xs font-bold 
+                                bg-red-100 text-red-600 
+                                ring-1 ring-red-200 shadow-sm
+                            ">
                                 {unreadCount}
                             </span>
                         )}
                     </div>
 
+                    {/* View All Button */}
                     <button
-                        className="text-sm px-3 h-8 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
                         type="button"
                         onClick={() => setShowAllModal(true)}
+                        className="
+                            text-sm font-semibold text-blue-600 
+                            hover:text-blue-700 hover:bg-white 
+                            px-3 py-1.5 rounded-lg 
+                            transition-all duration-200 
+                            active:scale-95 shadow-sm border border-transparent hover:border-blue-100
+                        "
                     >
-                        {unreadCount > 0
-                            ? `Xem tất cả (${unreadCount})`
-                            : "Xem tất cả"}
+                        Xem tất cả
                     </button>
                 </div>
 
-                {/* List nhỏ (4 item mới nhất) */}
-                <ul className="divide-y divide-gray-100">
+                {/* --- BODY LIST --- */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+
                     {/* Loading */}
                     {isLoading && (
-                        <>
+                        <ul className="divide-y divide-gray-50">
                             <SkeletonItem />
                             <SkeletonItem />
                             <SkeletonItem />
-                            <SkeletonItem />
-                        </>
+                        </ul>
                     )}
 
                     {/* Error */}
                     {isError && (
-                        <li className="py-6 text-center text-sm text-red-500">
+                        <div className="py-8 text-center text-sm text-red-500 bg-red-50/50 m-4 rounded-xl border border-red-100">
                             Đã xảy ra lỗi khi tải thông báo.
-                        </li>
+                        </div>
                     )}
 
                     {/* Empty */}
-                    {!isLoading &&
-                        !isError &&
-                        displayItems.length === 0 && (
-                            <li className="py-6 text-center text-sm text-gray-500">
-                                Chưa có thông báo mới
-                            </li>
-                        )}
+                    {!isLoading && !isError && displayItems.length === 0 && (
+                        <EmptyState />
+                    )}
 
-                    {/* Data */}
-                    {!isLoading &&
-                        !isError &&
-                        displayItems.map((item) => (
-                            <li key={item.id} className="relative">
-                                <Link
-                                    to={item.link || "#"}
-                                    className={liClass(item)}
-                                    onClick={(e) => handleItemClick(e, item)}
-                                >
-                                    {!item.read && <NewPing />}
-
-                                    <IconBubble variant={item.type} />
-
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-start gap-2">
-                                            {!item.read && (
-                                                <span className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 ring-1 ring-blue-200">
-                                                    Mới
-                                                </span>
-                                            )}
-                                            <p
-                                                className="font-medium text-sm leading-snug text-gray-900"
-                                                dangerouslySetInnerHTML={{
-                                                    __html: item.text,
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
-                                            {!item.read && <Dot />}
-                                            <span>{item.time}</span>
-                                        </div>
-                                    </div>
-
-                                    <svg
-                                        className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition ml-2 mt-1 shrink-0"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
+                    {/* Data Items */}
+                    {!isLoading && !isError && displayItems.length > 0 && (
+                        <ul className="flex flex-col">
+                            {displayItems.map((item) => (
+                                <li key={item.id} className="border-b border-gray-200 last:border-0">
+                                    <Link
+                                        to={item.link || "#"}
+                                        onClick={(e) => handleItemClick(e, item)}
+                                        className={`
+                                            group relative flex items-start gap-4 p-4 transition-all duration-200
+                                            ${!item.read
+                                                ? "bg-blue-50/40 hover:bg-blue-50" // Chưa đọc: Nền xanh rất nhạt
+                                                : "hover:bg-gray-50 bg-white"      // Đã đọc: Nền trắng
+                                            }
+                                        `}
                                     >
-                                        <path
-                                            d="M9 18l6-6-6-6"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        />
-                                    </svg>
-                                </Link>
-                            </li>
-                        ))}
-                </ul>
+                                        {/* Thanh dọc đánh dấu chưa đọc (Left Indicator) */}
+                                        {!item.read && (
+                                            <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-500" />
+                                        )}
+
+                                        {/* Icon */}
+                                        <div className="mt-1">
+                                            <IconBubble variant={item.type} />
+                                        </div>
+
+                                        {/* Text Content */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex flex-col gap-1">
+                                                <p
+                                                    className={`text-[14px] leading-snug ${!item.read ? "font-semibold text-gray-900" : "text-gray-600"}`}
+                                                    dangerouslySetInnerHTML={{ __html: item.text }}
+                                                />
+                                                <span className={`text-xs ${!item.read ? "text-blue-600 font-medium" : "text-gray-400"}`}>
+                                                    {item.time}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
             </div>
 
-            {/* Modal xem tất cả + tabs phân loại */}
+            {/* Modal xem tất cả */}
             <AllNotificationsModal
                 open={showAllModal}
                 onClose={() => setShowAllModal(false)}

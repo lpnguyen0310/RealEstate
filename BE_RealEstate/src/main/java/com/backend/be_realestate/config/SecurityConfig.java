@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/amenities/**").permitAll()
                         .requestMatchers("/api/categories/**").permitAll()
                         .requestMatchers("/api/listingtype/**").permitAll()
+                        .requestMatchers("/api/site-reviews/**").permitAll()
                         .requestMatchers("/api/payments/**").permitAll()
                         .requestMatchers( "/api/admin/**").permitAll()
                         .requestMatchers("/ws/**", "/topic/**", "/queue/**").permitAll()
@@ -48,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/support/**").permitAll()
                         .requestMatchers("/api/locations/**").permitAll()
                         .requestMatchers("/api/tracking/**").permitAll()
+                        .requestMatchers("/api/user/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // bật oauth2 login
