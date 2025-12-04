@@ -29,11 +29,29 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined";
 import { HOVER_BG, STATUS_LABEL, STATUS_CHIP_COLOR, styles } from "./constants";
+
 const LISTING_TYPE_BADGE = {
-  PREMIUM: { label: "PRE", bg: "#f97316" },  // màu cam
-  VIP: { label: "VIP", bg: "#facc15" },      // vàng
-  NORMAL: { label: "NOR", bg: "#9ca3af" },   // xám
+  PREMIUM: { label: "PRE", bg: "#f97316" }, // màu cam
+  VIP: { label: "VIP", bg: "#facc15" }, // vàng
+  NORMAL: { label: "NOR", bg: "#9ca3af" }, // xám
 };
+
+// Cấu hình màu sắc và kiểu dáng cho Ribbon (Tag dán)
+const RIBBON_STYLES = {
+  PREMIUM: {
+    label: "PREMIUM",
+    bg: "#f97316", // Màu cam chủ đạo (như hình mẫu)
+    fold: "#c2410c", // Màu nếp gấp tối hơn (tạo hiệu ứng 3D)
+    color: "#fff",
+  },
+  VIP: {
+    label: "VIP",
+    bg: "#eab308", // Màu vàng
+    fold: "#a16207", // Màu nếp gấp tối hơn
+    color: "#000", // Chữ đen cho dễ đọc
+  },
+};
+
 /* ===== Helpers ===== */
 const shortMoney = (value) => {
   if (value == null || isNaN(value)) return "-";
@@ -154,13 +172,19 @@ export default function PostsTable({
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 6, color: "#7a8aa1", bgcolor: "#fff" }}>
+                  <TableCell
+                    colSpan={10}
+                    align="center"
+                    sx={{ py: 6, color: "#7a8aa1", bgcolor: "#fff" }}
+                  >
                     {loading ? "Đang tải dữ liệu..." : "Không có dữ liệu"}
                   </TableCell>
                 </TableRow>
               ) : (
                 rows.map((r) => {
                   const disabled = actioningId === r.id;
+                  const ribbon = r.listingType ? RIBBON_STYLES[r.listingType] : null;
+
                   return (
                     <TableRow
                       key={r.id}
@@ -170,8 +194,50 @@ export default function PostsTable({
                         "&:hover td": { backgroundColor: HOVER_BG },
                       }}
                     >
-                      {/* Mã tin */}
-                      <TableCell sx={{ ...styles.bodyCell, whiteSpace: "nowrap" }}>{r.id}</TableCell>
+                      {/* Mã tin + Ribbon dán đè lên góc trái */}
+                      <TableCell
+                        sx={{
+                          ...styles.bodyCell,
+                          whiteSpace: "nowrap",
+                          position: "relative",
+                          // chừa chút padding bên trái để ribbon không đè lên số
+                          pl: ribbon ? 3 : styles.bodyCell?.pl,
+                        }}
+                      >
+                        {ribbon && (
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              top: -8, // Nhô lên trên
+                              left: -6, // Nhô sang trái ngoài cell
+                              bgcolor: ribbon.bg,
+                              color: ribbon.color,
+                              fontSize: "9px",
+                              fontWeight: "bold",
+                              lineHeight: 1,
+                              py: 0.5,
+                              px: 0.8,
+                              borderRadius: "4px",
+                              zIndex: 10,
+                              boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+
+                              // Hiệu ứng nếp gấp tam giác (3D fold)
+                              "&::after": {
+                                content: '""',
+                                position: "absolute",
+                                bottom: "-4px", // Nằm ngay dưới tag
+                                left: "4px", // Canh vị trí nếp gấp
+                                borderWidth: "4px 4px 0 0",
+                                borderStyle: "solid",
+                                borderColor: `${ribbon.fold} transparent transparent transparent`,
+                              },
+                            }}
+                          >
+                            {ribbon.label}
+                          </Box>
+                        )}
+                        {r.id}
+                      </TableCell>
 
                       {/* Tiêu đề */}
                       <TableCell sx={styles.bodyCell}>
@@ -199,13 +265,20 @@ export default function PostsTable({
                       </TableCell>
 
                       {/* Loại (ẩn ở xs) */}
-                      <TableCell sx={{ ...styles.bodyCell, display: { xs: "none", sm: "table-cell" } }}>
+                      <TableCell
+                        sx={{ ...styles.bodyCell, display: { xs: "none", sm: "table-cell" } }}
+                      >
                         {r.category}
                       </TableCell>
 
                       {/* Giá */}
                       <TableCell
-                        sx={{ ...styles.bodyCell, textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}
+                        sx={{
+                          ...styles.bodyCell,
+                          textAlign: "right",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                        }}
                       >
                         {shortMoney(r.price)}
                       </TableCell>
@@ -250,17 +323,23 @@ export default function PostsTable({
                       </TableCell>
 
                       {/* Tạo lúc (ẩn ở md-) */}
-                      <TableCell sx={{ ...styles.bodyCell, display: { xs: "none", md: "table-cell" } }}>
+                      <TableCell
+                        sx={{ ...styles.bodyCell, display: { xs: "none", md: "table-cell" } }}
+                      >
                         {fmtDate(r.createdAt)}
                       </TableCell>
 
                       {/* Hết hạn (ẩn ở md-) */}
-                      <TableCell sx={{ ...styles.bodyCell, display: { xs: "none", md: "table-cell" } }}>
+                      <TableCell
+                        sx={{ ...styles.bodyCell, display: { xs: "none", md: "table-cell" } }}
+                      >
                         {fmtDate(r.expiresAt)}
                       </TableCell>
 
                       {/* Người tạo (ẩn ở sm-) */}
-                      <TableCell sx={{ ...styles.bodyCell, display: { xs: "none", sm: "table-cell" } }}>
+                      <TableCell
+                        sx={{ ...styles.bodyCell, display: { xs: "none", sm: "table-cell" } }}
+                      >
                         {r.author?.name || "-"}
                       </TableCell>
 
@@ -273,7 +352,10 @@ export default function PostsTable({
                               disabled={disabled}
                               onClick={() => {
                                 onOpenDetail(r);
-                                setDecision?.((s) => ({ ...s, listingType: r.listingType || "NORMAL" }));
+                                setDecision?.((s) => ({
+                                  ...s,
+                                  listingType: r.listingType || "NORMAL",
+                                }));
                               }}
                             >
                               <InfoOutlinedIcon fontSize="small" />
@@ -285,14 +367,24 @@ export default function PostsTable({
                           <>
                             <Tooltip title="Duyệt đăng">
                               <span>
-                                <IconButton size="small" color="success" disabled={disabled} onClick={() => onApprove(r.id)}>
+                                <IconButton
+                                  size="small"
+                                  color="success"
+                                  disabled={disabled}
+                                  onClick={() => onApprove(r.id)}
+                                >
                                   <CheckCircleOutlineIcon fontSize="small" />
                                 </IconButton>
                               </span>
                             </Tooltip>
                             <Tooltip title="Từ chối">
                               <span>
-                                <IconButton size="small" color="error" disabled={disabled} onClick={() => onReject(r.id)}>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  disabled={disabled}
+                                  onClick={() => onReject(r.id)}
+                                >
                                   <HighlightOffOutlinedIcon fontSize="small" />
                                 </IconButton>
                               </span>
@@ -303,7 +395,12 @@ export default function PostsTable({
                         {(r.status === "PUBLISHED" || r.status === "EXPIRING_SOON") && (
                           <Tooltip title="Ẩn bài">
                             <span>
-                              <IconButton size="small" color="default" disabled={disabled} onClick={() => onHide(r.id)}>
+                              <IconButton
+                                size="small"
+                                color="default"
+                                disabled={disabled}
+                                onClick={() => onHide(r.id)}
+                              >
                                 <VisibilityOffOutlinedIcon fontSize="small" />
                               </IconButton>
                             </span>
@@ -313,22 +410,34 @@ export default function PostsTable({
                         {r.status === "HIDDEN" && (
                           <Tooltip title="Hiện lại">
                             <span>
-                              <IconButton size="small" color="primary" disabled={disabled} onClick={() => onUnhide(r.id)}>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                disabled={disabled}
+                                onClick={() => onUnhide(r.id)}
+                              >
                                 <VisibilityOutlinedIcon fontSize="small" />
                               </IconButton>
                             </span>
                           </Tooltip>
                         )}
 
-                        {(r.status === "DRAFT" || r.status === "REJECTED" || r.status === "EXPIRED") && (
-                          <Tooltip title="Xóa vĩnh viễn">
-                            <span>
-                              <IconButton size="small" color="error" disabled={disabled} onClick={() => onHardDelete(r.id)}>
-                                <DeleteOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        )}
+                        {(r.status === "DRAFT" ||
+                          r.status === "REJECTED" ||
+                          r.status === "EXPIRED") && (
+                            <Tooltip title="Xóa vĩnh viễn">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  disabled={disabled}
+                                  onClick={() => onHardDelete(r.id)}
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
                       </TableCell>
                     </TableRow>
                   );
