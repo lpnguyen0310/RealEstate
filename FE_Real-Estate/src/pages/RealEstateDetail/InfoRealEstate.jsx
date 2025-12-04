@@ -38,6 +38,7 @@ import {
 import SimilarNews from "../../components/cards/SimilarNews";
 import NotificationModal from "@/components/cards/NotificationModal";
 import { openLoginModal } from "@/store/uiSlice";
+import agentApi from "@/api/agentApi";
 
 /* ================= SVG ICONS (Giữ nguyên) ================= */
 const ChatIcon = (p) => (
@@ -125,6 +126,10 @@ export default function InfoRealEstate() {
     const mainSwiperRef = useRef(null);
     const phoneTrackedRef = useRef(false);
 
+    // 🔹 state riêng cho listing môi giới
+    const [agentListings, setAgentListings] = useState([]);
+    const [agentTotalPosts, setAgentTotalPosts] = useState(0);
+
     // ===== Fetch detail via Redux
     useEffect(() => {
         if (!id) return;
@@ -144,6 +149,62 @@ export default function InfoRealEstate() {
         }
     }, [id, property]);
 
+    // ===== Data with safe fallbacks
+    const {
+        gallery = DEFAULT_GALLERY_IMAGES,
+        postInfo = DEFAULT_POST_INFO,
+        description = DEFAULT_DESCRIPTION,
+        features = DEFAULT_FEATURES,
+        map = DEFAULT_MAP,
+        mapMeta = DEFAULT_MAP_META,
+        agent = DEFAULT_AGENT,
+    } = property || {};
+
+    // 🔹 Gọi API lấy danh sách tin của môi giới để tính totalPosts - 1
+    useEffect(() => {
+        if (!agent?.id) return;
+
+        let cancelled = false;
+
+        async function fetchAgentListings() {
+            try {
+                const res = await agentApi.getListings(agent.id, {
+                    type: "all", // hoặc "sell"/"rent" tuỳ bạn
+                    page: 0,
+                    size: 3,     // lấy vài tin để preview
+                });
+
+                const data = res.data;
+                const items = Array.isArray(data)
+                    ? data
+                    : data?.content || data?.items || [];
+
+                const total =
+                    data?.totalPosts ??
+                    data?.totalElements ??
+                    data?.total ??
+                    agent?.totalPosts ??
+                    items.length;
+
+                if (!cancelled) {
+                    setAgentListings(items || []);
+                    setAgentTotalPosts(total || 0);
+                }
+            } catch (err) {
+                console.error("Load agent listings in InfoRealEstate error", err);
+                if (!cancelled) {
+                    setAgentListings([]);
+                    setAgentTotalPosts(agent?.totalPosts || 0);
+                }
+            }
+        }
+
+        fetchAgentListings();
+        return () => {
+            cancelled = true;
+        };
+    }, [agent?.id]);
+
     // ===== Init ViewerJS khi gallery đổi
     useEffect(() => {
         if (!hiddenGalleryRef.current) return;
@@ -160,7 +221,7 @@ export default function InfoRealEstate() {
             zoomRatio: 0.3,
         });
         return () => viewerRef.current?.destroy?.();
-    }, [property?.gallery]);
+    }, [gallery]);
 
     // ===== Bind prev/next cho Swiper Navigation
     useEffect(() => {
@@ -174,7 +235,7 @@ export default function InfoRealEstate() {
         s.navigation.destroy();
         s.navigation.init();
         s.navigation.update();
-    }, [mainSwiperRef.current, prevRef.current, nextRef.current, property?.gallery]);
+    }, [mainSwiperRef.current, prevRef.current, nextRef.current, gallery]);
 
     // ===== Guards return
     if (loading) {
@@ -186,18 +247,6 @@ export default function InfoRealEstate() {
     if (!property) {
         return <div className="text-center py-20">Không tìm thấy thông tin bất động sản.</div>;
     }
-
-    // ===== Data with safe fallbacks
-    const {
-        gallery = DEFAULT_GALLERY_IMAGES,
-        postInfo = DEFAULT_POST_INFO,
-        description = DEFAULT_DESCRIPTION,
-        features = DEFAULT_FEATURES,
-        map = DEFAULT_MAP,
-        mapMeta = DEFAULT_MAP_META,
-        agent = DEFAULT_AGENT,
-        listings = [], // nếu trong object có field này; nếu không có thì mặc định []
-    } = property || {};
 
     const openViewerAt = (i) => viewerRef.current?.view(i ?? activeIndex);
 
@@ -413,25 +462,28 @@ export default function InfoRealEstate() {
                                             {agent?.name}
                                         </div>
                                         <div className="text-gray-500 text-sm">
-                                            {agent?.totalPosts > 1 &&
-                                                agent?.totalPosts - 1 > (listings?.length || 0) ? (
-                                                <>
-                                                    Đang hiển thị {listings.length} tin trong tổng số{" "}
-                                                    {agent?.totalPosts - 1} tin.
+                                            {(() => {
+                                                const total = Number(agentTotalPosts || agent?.totalPosts || 0);
+                                                const totalOther = Math.max(total - 1, 0); // trừ tin hiện tại
+
+                                                if (totalOther <= 0) {
+                                                    return "Không có bài đăng khác.";
+                                                }
+
+                                                return (
                                                     <button
-                                                        onClick={() =>
-                                                            navigate(`/agent/${agent?.id}/posts`)
-                                                        }
-                                                        className="text-blue-600 hover:text-blue-800 ml-1"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // tránh click cả card
+                                                            navigate(`/agent/${agent?.id}`);
+                                                        }}
+                                                        className="text-blue-600 hover:text-blue-800"
                                                     >
-                                                        Xem thêm {agent?.totalPosts - 1 - listings.length} tin
-                                                        + khác
+                                                        Xem thêm {totalOther} tin khác
                                                     </button>
-                                                </>
-                                            ) : (
-                                                "Không có bài đăng"
-                                            )}
+                                                );
+                                            })()}
                                         </div>
+
                                     </div>
                                 </div>
 
@@ -441,7 +493,15 @@ export default function InfoRealEstate() {
                                         icon={<ChatIcon />}
                                         size="large"
                                         className="w-full"
-                                        onClick={() => trackZaloClick(id)}
+                                        onClick={() => {
+                                            trackZaloClick(id);
+                                            if (agent?.phoneFull) {
+                                                window.open(
+                                                    `https://zalo.me/${agent.phoneFull}`,
+                                                    "_blank"
+                                                );
+                                            }
+                                        }}
                                     >
                                         Chat qua Zalo
                                     </Button>

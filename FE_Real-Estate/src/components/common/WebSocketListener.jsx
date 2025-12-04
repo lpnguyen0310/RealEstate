@@ -1,14 +1,14 @@
-// src/components/ws/WebSocketListener.jsx
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Client } from "@stomp/stompjs";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+
 import { getAccessToken } from "@/utils/auth";
 import { notificationApi } from "@/services/notificationApi";
 import { supportSliceActions } from "@/store/supportSlice";
+import { logoutThunk } from "@/store/authSlice";
+import ForceLogoutModal from "@/components/common/ForceLogoutModal";
 
-/* ===========================
-   Helpers
-=========================== */
 function safeJson(str) {
   try {
     return JSON.parse(str);
@@ -17,7 +17,7 @@ function safeJson(str) {
   }
 }
 
-/** Xin quyền notification 1 lần/khi cần */
+// Show notification permission request one time
 function ensureNotificationPermission() {
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission === "default") {
@@ -27,7 +27,7 @@ function ensureNotificationPermission() {
   }
 }
 
-/** Hiển thị thông báo trình duyệt (đã chắc chắn đúng người nhận) */
+// Show browser notification (ensured to be for the correct recipient)
 function showBrowserNotification(payload) {
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (window.Notification.permission !== "granted") return;
@@ -39,9 +39,9 @@ function showBrowserNotification(payload) {
 
   try {
     console.log("[Notify] showBrowserNotification CALLED with:", payload);
-    window.__ALLOW_NOTIFICATION__ = true;             // ✅ bật cờ
+    window.__ALLOW_NOTIFICATION__ = true; // bật cờ cho patch ở App.jsx
     const n = new window.Notification(title, { body, icon });
-    window.__ALLOW_NOTIFICATION__ = false;            // ✅ tắt cờ
+    window.__ALLOW_NOTIFICATION__ = false; // tắt lại
     n.onclick = () => {
       window.focus();
       window.location.href = link;
@@ -52,7 +52,7 @@ function showBrowserNotification(payload) {
   }
 }
 
-/** Lấy receiverId từ payload với nhiều khả năng đặt tên khác nhau */
+// Extract receiverId from various possible payload structures
 function extractReceiverId(payload) {
   if (!payload) return null;
   return (
@@ -68,36 +68,48 @@ function extractReceiverId(payload) {
 }
 
 export default function WebSocketListener() {
-  const clientRef = useRef(null);   // giữ instance STOMP client
-  const convoSubRef = useRef(null); // sub của hội thoại đang mở
-  const activeIdRef = useRef(null); // cache id hội thoại đang mở cho callback
+  const clientRef = useRef(null);   // WebSocket client STOMP
+  const convoSubRef = useRef(null); // subscription 
+  const activeIdRef = useRef(null); // active conversationId
 
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const token = getAccessToken();
 
-  // id user đang đăng nhập (dùng để so khớp receiver)
   const currentUserId = useSelector((s) => s.auth?.user?.id);
   const activeConversationId = useSelector(
     (s) => s.support.activeConversationId
   );
 
-  // đồng bộ activeConversationId tới ref để callback có giá trị mới
-  useEffect(() => {
-    activeIdRef.current =
-      activeConversationId != null ? String(activeConversationId) : null;
-  }, [activeConversationId]);
+  // ======= state for force logout modal (reset / locked) =======
+  const [forceOpen, setForceOpen] = useState(false);
+  const [forceType, setForceType] = useState(null);       // "reset" | "locked"
+  const [forceMessage, setForceMessage] = useState("");
 
   const WS_URL =
     (location.protocol === "https:" ? "wss://" : "ws://") +
     location.host +
     "/ws";
 
-  /* ========== 0) Xin quyền notification ngay khi mount (nếu cần) ========== */
+  // synchronize conversationId into ref
+  useEffect(() => {
+    activeIdRef.current =
+      activeConversationId != null ? String(activeConversationId) : null;
+  }, [activeConversationId]);
+
+  // request notification permission one time
   useEffect(() => {
     ensureNotificationPermission();
   }, []);
 
-  /* ========== 1) Khởi tạo WebSocket một lần ========== */
+  // ======= LOGOUT FUNCTION =======
+  const handleLogout = useCallback(() => {
+    dispatch(logoutThunk());
+    setForceOpen(false);
+    navigate("/login");
+  }, [dispatch, navigate]);
+
+  /* ========== 1) Initialize WebSocket once ========== */
   useEffect(() => {
     if (!token || clientRef.current) return;
 
@@ -113,24 +125,63 @@ export default function WebSocketListener() {
     client.onConnect = () => {
       console.log("[WS] ✅ Connected");
 
-      /* ===== Notifications (queue riêng theo user) ===== */
+      /* ===== Notifications (user-specific queue) ===== */
       client.subscribe("/user/queue/notifications", (m) => {
         const notif = safeJson(m.body) || { message: m.body };
-        dispatch(notificationApi.util.invalidateTags(["UnreadCount", "Notifications"]));
+        console.log("[Notify] Received:", notif);
+
+        // invalid cache notification list/unread
+        dispatch(
+          notificationApi.util.invalidateTags([
+            "UnreadCount",
+            "Notifications",
+          ])
+        );
 
         const receiverId = extractReceiverId(notif);
         const uid = currentUserId;
-        const canShow = receiverId != null && uid != null && String(receiverId) === String(uid);
+        const canShow =
+          receiverId != null &&
+          uid != null &&
+          String(receiverId) === String(uid);
 
-        console.log("[Notify] decision => receiverId:", receiverId, " currentUserId:", uid, " canShow:", canShow);
+        console.log(
+          "[Notify] decision => receiverId:",
+          receiverId,
+          " currentUserId:",
+          uid,
+          " canShow:",
+          canShow
+        );
         if (!canShow) return;
 
-        // (tuỳ chọn) nếu tab đang visible thì bỏ qua
-        // if (document.visibilityState === "visible") return;
+        // 🔐 1. Password reset by admin
+        if (notif.type === "USER_PASSWORD_RESET_BY_ADMIN") {
+          setForceType("reset");
+          setForceMessage(
+            notif.message ||
+            "Mật khẩu tài khoản của bạn đã được quản trị viên đặt lại. Vui lòng đăng nhập lại bằng mật khẩu mới được gửi qua email."
+          );
+          setForceOpen(true);
+          return;
+        }
 
+        // 🔐 2. Account locked by admin
+        if (notif.type === "USER_LOCKED_BY_ADMIN") {
+          setForceType("locked");
+          setForceMessage(
+            notif.message ||
+            "Tài khoản của bạn đã bị khóa bởi quản trị viên. Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ bộ phận hỗ trợ."
+          );
+          setForceOpen(true);
+          return;
+        }
+
+        // 🔔 3. Other types of notifications → browser notification as before
         showBrowserNotification(notif);
       });
 
+      /* ===== Common support topic ===== */
       client.subscribe("/topic/support", (m) => {
         const evt = safeJson(m.body);
         if (!evt) return;
@@ -149,13 +200,14 @@ export default function WebSocketListener() {
           cidFromEvt != null &&
           String(cidFromEvt) === String(activeIdRef.current)
         ) {
-          return; // đã sub kênh riêng, bỏ qua broadcast
+          // đã sub kênh riêng rồi, bỏ broadcast
+          return;
         }
 
         dispatch(supportSliceActions.handleTopicEvent(evt));
       });
 
-      /* ===== Support Chat: queue riêng (agent/admin) ===== */
+      /* ===== Common support queue (agent/admin) ===== */
       client.subscribe("/user/queue/support", (m) => {
         const evt = safeJson(m.body);
         if (!evt) return;
@@ -180,8 +232,9 @@ export default function WebSocketListener() {
         clientRef.current = null;
       }
     };
-  }, [token, WS_URL, dispatch, currentUserId]);
+  }, [token, WS_URL, dispatch, currentUserId, handleLogout]);
 
+  // Subscribe to the currently open conversation
   useEffect(() => {
     const client = clientRef.current;
     if (!client || !client.connected) return;
@@ -193,7 +246,6 @@ export default function WebSocketListener() {
 
     if (!activeConversationId) return;
 
-    // sub topic riêng của hội thoại đang mở
     convoSubRef.current = client.subscribe(
       `/topic/support.conversation.${activeConversationId}`,
       (m) => {
@@ -220,5 +272,15 @@ export default function WebSocketListener() {
     };
   }, [activeConversationId, dispatch]);
 
-  return null;
+  return (
+    <>
+      <ForceLogoutModal
+        open={forceOpen}
+        type={forceType}         // "reset" hoặc "locked"
+        message={forceMessage}
+        onLogout={handleLogout}
+        seconds={10}
+      />
+    </>
+  );
 }
