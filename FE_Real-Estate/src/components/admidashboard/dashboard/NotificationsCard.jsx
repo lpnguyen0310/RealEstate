@@ -305,7 +305,7 @@ export default function NotificationsCard() {
                     {!isLoading && !isError && displayItems.length > 0 && (
                         <ul className="flex flex-col">
                             {displayItems.map((item) => (
-                                <li key={item.id} className="border-b border-gray-50 last:border-0">
+                                <li key={item.id} className="border-b border-gray-200 last:border-0">
                                     <Link
                                         to={item.link || "#"}
                                         onClick={(e) => handleItemClick(e, item)}
