@@ -44,17 +44,11 @@ import ReportDetailsModal from "@/components/admidashboard/post/ReportDetailsMod
 import {
     useLazyGetReportsForPostQuery,
     useDeleteSelectedReportsMutation,
-    useSendWarningMutation,
+    useSendWarningMutation // <<< IMPORT
 } from "@/services/reportApiSlice";
 
+// >>> NEW: Confirm Dialog
 import ConfirmDialog from "@/components/common/ConfirmDialog";
-
-/* =============== ƯU TIÊN REVIEW THEO LISTING TYPE =============== */
-const LISTING_REVIEW_PRIORITY = {
-    PREMIUM: 3,
-    VIP: 2,
-    NORMAL: 1,
-};
 
 export default function AdminPostsMUI() {
     const dispatch = useDispatch();
@@ -102,24 +96,25 @@ export default function AdminPostsMUI() {
 
         // --- Xử lý logic Q và TAB theo yêu cầu ---
         if (reportId) {
-            dispatch(setPendingAction({ type: "report", postId: reportId }));
+            dispatch(setPendingAction({ type: 'report', postId: reportId }));
             // 1. Set Q bằng ID từ thông báo
             if (q !== String(reportId)) {
                 dispatch(setQ(String(reportId)));
             }
             // 2. Chuyển sang tab PUBLISHED
-            if (selectedTab !== "PUBLISHED") {
-                dispatch(setSelectedTab("PUBLISHED"));
+            if (selectedTab !== 'PUBLISHED') {
+                dispatch(setSelectedTab('PUBLISHED'));
             }
-        } else if (reviewId) {
-            dispatch(setPendingAction({ type: "review", postId: reviewId }));
+        }
+        else if (reviewId) {
+            dispatch(setPendingAction({ type: 'review', postId: reviewId }));
             // 1. Set Q bằng ID từ thông báo
             if (q !== String(reviewId)) {
                 dispatch(setQ(String(reviewId)));
             }
             // 2. Chuyển sang tab PENDING_REVIEW
-            if (selectedTab !== "PENDING_REVIEW") {
-                dispatch(setSelectedTab("PENDING_REVIEW"));
+            if (selectedTab !== 'PENDING_REVIEW') {
+                dispatch(setSelectedTab('PENDING_REVIEW'));
             }
         }
         // Bình thường: Không có thông báo
@@ -163,6 +158,7 @@ export default function AdminPostsMUI() {
         return () => clearTimeout(t);
     }, [dispatch, selectedTab, page, pageSize, q, category, listingType]);
 
+    /* =============== FETCH COUNTS (debounce) =============== */
     useEffect(() => {
         const t = setTimeout(() => {
             dispatch(fetchCountsThunk());
@@ -170,6 +166,7 @@ export default function AdminPostsMUI() {
         return () => clearTimeout(t);
     }, [dispatch]);
 
+    /* =============== REALTIME WS =============== */
     useEffect(() => {
         const client = new Client({
             webSocketFactory: () => new SockJS("/ws"),
@@ -182,8 +179,9 @@ export default function AdminPostsMUI() {
                         // 1. Luôn tải lại counts
                         await dispatch(fetchCountsThunk());
 
-                        // 2. Luôn tải lại danh sách
+                        // 2. SỬA LẠI: Luôn tải lại danh sách
                         await dispatch(fetchPostsThunk());
+
                     } catch (e) {
                         console.warn("Invalid WS payload:", e);
                     }
@@ -192,6 +190,8 @@ export default function AdminPostsMUI() {
         });
         client.activate();
         return () => client.deactivate();
+
+        // SỬA LẠI: Xóa 'selectedTab' khỏi dependency array
     }, [dispatch]);
 
     /* =============== MUI Confirm Modal state (EXISTING) =============== */
@@ -250,7 +250,7 @@ export default function AdminPostsMUI() {
         [dispatch]
     );
 
-    // === mở dialog yêu cầu lý do thay vì confirm trống
+    // === CHANGED: mở dialog yêu cầu lý do thay vì confirm trống
     const reject = useCallback((id) => {
         setRejectDlg({ open: true, id, reason: "" });
     }, []);
@@ -313,156 +313,160 @@ export default function AdminPostsMUI() {
 
     const [deleteReports, { isLoading: isDeletingReports }] = useDeleteSelectedReportsMutation();
     const [triggerGetReports, { isLoading: isLoadingReports }] = useLazyGetReportsForPostQuery();
-    const [sendWarning, { isLoading: isSendingWarning }] = useSendWarningMutation();
+    const [sendWarning, { isLoading: isSendingWarning }] = useSendWarningMutation(); // <<< GỌI HOOK
 
     const [reportsModal, setReportsModal] = useState({
         open: false,
         postId: null,
         reports: [],
+        // loading: false 
     });
 
     const [warningDlg, setWarningDlg] = useState({ open: false, id: null, message: "" });
 
-    const openReports = useCallback(
-        async (postId) => {
-            setReportsModal({ open: true, postId: postId, reports: [] });
+    const openReports = useCallback(async (postId) => {
+        // Mở modal, nhưng chưa có data, loading sẽ được lấy từ hook
+        setReportsModal({ open: true, postId: postId, reports: [] });
 
-            try {
-                const data = await triggerGetReports(postId).unwrap();
-                setReportsModal({ open: true, postId, reports: data });
-            } catch (err) {
-                console.error("Failed to fetch reports:", err);
-                setReportsModal({ open: false, postId: null, reports: [] });
-            }
-        },
-        [triggerGetReports]
-    );
+        try {
+            // === THAY THẾ DATA GIẢ BẰNG CODE THẬT ===
+
+            // Gọi API bằng hook "lazy"
+            // .unwrap() sẽ trả về data hoặc throw lỗi
+            const data = await triggerGetReports(postId).unwrap();
+
+            // Cập nhật modal với dữ liệu thật
+            setReportsModal({ open: true, postId, reports: data });
+
+        } catch (err) {
+            console.error("Failed to fetch reports:", err);
+            // (Hiển thị message.error ở đây, ví dụ: message.error("Tải báo cáo thất bại"))
+            setReportsModal({ open: false, postId: null, reports: [] });
+        }
+    }, [triggerGetReports]); // <-- Thêm triggerGetReports vào dependency
 
     const closeReports = useCallback(() => {
         setReportsModal({ open: false, postId: null, reports: [] });
     }, []);
 
-    const handleLockPost = useCallback(
-        (postId) => {
-            // 1. Đóng modal chi tiết báo cáo
-            closeReports();
-            // 2. Mở modal "Nhập lý do" (chính là hàm 'reject')
-            reject(postId);
-        },
-        [reject, closeReports]
-    );
+    const handleLockPost = useCallback((postId) => {
+        // 1. Đóng modal chi tiết báo cáo
+        closeReports();
 
-    const handleDeleteReports = useCallback(
-        async (postId, reportIds) => {
-            console.log(`Admin yêu cầu xóa ${reportIds.length} báo cáo cho bài: ${postId}`);
+        // 2. Mở modal "Nhập lý do" (chính là hàm 'reject' của bạn)
+        reject(postId);
 
-            try {
-                await deleteReports({ postId, reportIds }).unwrap();
-                await dispatch(fetchCountsThunk());
-                await dispatch(fetchPostsThunk());
-            } catch (err) {
-                console.error("Xóa báo cáo thất bại:", err);
-            }
+    }, [reject, closeReports]);
 
-            closeReports();
-        },
-        [deleteReports, dispatch, closeReports]
-    );
+    const handleDeleteReports = useCallback(async (postId, reportIds) => {
+        console.log(`Admin yêu cầu xóa ${reportIds.length} báo cáo cho bài: ${postId}`);
+
+        try {
+            // 1. Gọi API XÓA
+            await deleteReports({ postId, reportIds }).unwrap();
+
+            // 2. (Tùy chọn: Hiển thị thông báo thành công)
+            // 3. Tự động đóng modal (Hàm onLockPost/onSendWarning đã làm điều này, nhưng 
+            //với hàm này thì nên để ReportDetailsModal tự đóng qua onClose nếu cần)
+
+            // 4. Reload danh sách Posts & Counts để cập nhật `reportCount` (nếu cần)
+            await dispatch(fetchCountsThunk());
+            await dispatch(fetchPostsThunk());
+
+        } catch (err) {
+            console.error("Xóa báo cáo thất bại:", err);
+            // (Hiển thị message.error)
+        }
+
+        // Lưu ý: Hàm này được gọi từ ReportDetailsModal, modal này sẽ tự đóng sau khi gọi
+        // hoặc bạn có thể gọi closeReports() ở đây
+        closeReports();
+
+    }, [deleteReports, dispatch, closeReports]);
 
     const handleSendWarning = useCallback((postId) => {
         // Đóng modal chi tiết, mở modal nhập cảnh báo
         setWarningDlg({ open: true, id: postId, message: "" });
     }, []);
 
-    // chỉ set open: false
+    // 👇 SỬA HÀM NÀY: Chỉ set open: false
     const closeWarning = useCallback(() => {
         setWarningDlg((s) => ({ ...s, open: false }));
     }, []);
 
-    // dọn dẹp state SAU KHI modal đã đóng xong
+    // 🆕 THÊM HÀM MỚI NÀY
+    // Hàm này sẽ dọn dẹp state SAU KHI modal đã đóng xong
     const handleWarningExited = useCallback(() => {
         setWarningDlg({ open: false, id: null, message: "" });
     }, []);
 
-    const confirmSendWarning = useCallback(
-        async () => {
-            const message = warningDlg.message.trim();
-            if (message.length < 10) return;
+    const confirmSendWarning = useCallback(async () => {
+        const message = warningDlg.message.trim();
+        if (message.length < 10) return; // (Validation cơ bản)
 
-            try {
-                await sendWarning({ postId: warningDlg.id, message }).unwrap();
-                closeWarning();
-            } catch (err) {
-                console.error("Gửi cảnh báo thất bại:", err);
-            }
-        },
-        [warningDlg, closeWarning, sendWarning]
-    );
+        try {
+            await sendWarning({ postId: warningDlg.id, message }).unwrap();
+
+            // (Hiển thị message.success, ví dụ: "Đã gửi cảnh báo")
+            closeWarning();
+
+        } catch (err) {
+            console.error("Gửi cảnh báo thất bại:", err);
+            // (Hiển thị message.error)
+        }
+    }, [warningDlg, closeWarning, sendWarning]);
+    // === (Hết bước 4) ===
 
     /* =============== XỬ LÝ HÀNH ĐỘNG CHỜ (Mở modal/drawer) =============== */
     useEffect(() => {
+        // Guard 1: Phải có hành động đang chờ
         if (!pendingAction) return;
 
+        // Guard 2: BẮT BUỘC CHỜ 'posts' tải xong
+        // (Vì chúng ta cần 'posts' đã được lọc bằng 'q' hiển thị ở background)
         if (loadingList || !posts || posts.length === 0) {
-            return;
+            return; // Chờ cho lần render sau khi `posts` tải xong
         }
 
         const { type, postId } = pendingAction;
-        const postToOpen = posts.find((p) => p.id === postId);
 
+        // Tìm post trong danh sách (danh sách này đã được lọc bằng q=postId)
+        const postToOpen = posts.find(p => p.id === postId);
+
+        // Guard 3: Phải tìm thấy post
         if (!postToOpen) {
-            console.warn(
-                `Pending Action: Không tìm thấy Post #${postId} (Backend đã hỗ trợ tìm 'q' bằng ID chưa?)`
-            );
-            dispatch(clearPendingAction());
+            console.warn(`Pending Action: Không tìm thấy Post #${postId} (Backend đã hỗ trợ tìm 'q' bằng ID chưa?)`);
+            dispatch(clearPendingAction()); // Xóa action
             return;
         }
 
-        if (type === "report") {
+        // Mọi thứ OK -> Thực thi hành động
+        if (type === 'report') {
             openReports(postToOpen.id);
-        } else if (type === "review") {
+        } else if (type === 'review') {
             onOpenDetail(postToOpen);
         }
 
+        // Quan trọng: Xóa action khỏi global state sau khi đã dùng
         dispatch(clearPendingAction());
         dispatch(setQ(""));
-
+        // Và xóa param khỏi URL
         const newParams = new URLSearchParams(searchParams);
         newParams.delete("reportPostId");
         newParams.delete("reviewPostId");
         newParams.delete("q");
         setSearchParams(newParams, { replace: true });
+
     }, [
-        pendingAction,
-        posts,
-        loadingList,
+        pendingAction,  // 1. Chạy khi có action
+        posts,          // 2. Chạy khi 'posts' thay đổi
+        loadingList,    // 3. Chạy khi 'loadingList' thay đổi
         dispatch,
         onOpenDetail,
         openReports,
         searchParams,
-        setSearchParams,
+        setSearchParams
     ]);
-
-    /* =============== ƯU TIÊN LISTING TYPE KHI CHỜ DUYỆT =============== */
-    const sortedPosts = useMemo(() => {
-        if (!posts || posts.length === 0) return [];
-
-        // Chỉ ưu tiên trong tab PENDING_REVIEW
-        if (selectedTab !== "PENDING_REVIEW") return posts;
-
-        return [...posts].sort((a, b) => {
-            const pa = LISTING_REVIEW_PRIORITY[a.listingType] ?? 0;
-            const pb = LISTING_REVIEW_PRIORITY[b.listingType] ?? 0;
-
-            // 1. Ưu tiên theo loại: PREMIUM > VIP > NORMAL
-            if (pa !== pb) return pb - pa;
-
-            // 2. Nếu cùng loại thì ưu tiên bài tạo sớm hơn (FIFO)
-            const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return ta - tb;
-        });
-    }, [posts, selectedTab]);
 
     /* =============== KPI calc =============== */
     const kpi = useMemo(() => {
@@ -605,7 +609,7 @@ export default function AdminPostsMUI() {
                 />
 
                 <PostsTable
-                    rows={sortedPosts}            // <<< DÙNG LIST ĐÃ SORT
+                    rows={posts}
                     loading={loadingList}
                     actioningId={actioningId}
                     page={page}
@@ -621,7 +625,7 @@ export default function AdminPostsMUI() {
                     }}
                     onOpenDetail={onOpenDetail}
                     onApprove={approve}
-                    onReject={reject}
+                    onReject={reject}           // <<< CHANGED: mở dialog nhập lý do
                     onHide={hide}
                     onUnhide={unhide}
                     onHardDelete={hardDelete}
@@ -645,13 +649,13 @@ export default function AdminPostsMUI() {
                     money={money}
                     fmtDate={fmtDate}
                     onApprove={approve}
-                    onReject={reject}
+                    onReject={reject}       // <<< CHANGED: mở dialog nhập lý do
                     actioningId={actioningId}
                     canEditDuration={false}
                 />
             </Box>
 
-            {/* Modal xác nhận dùng chung */}
+            {/* === Modal xác nhận dùng chung (giữ nguyên) === */}
             <ConfirmDialog
                 open={confirm.open}
                 title={confirm.title}
@@ -662,7 +666,7 @@ export default function AdminPostsMUI() {
                 onConfirm={runConfirm}
             />
 
-            {/* Dialog nhập lý do từ chối */}
+            {/* === NEW: Dialog bắt buộc nhập lý do từ chối === */}
             <ConfirmDialog
                 open={rejectDlg.open}
                 title="Từ chối bài đăng"
@@ -685,9 +689,7 @@ export default function AdminPostsMUI() {
                             maxRows={6}
                             placeholder="Nhập lý do..."
                             value={rejectDlg.reason}
-                            onChange={(e) =>
-                                setRejectDlg((s) => ({ ...s, reason: e.target.value }))
-                            }
+                            onChange={(e) => setRejectDlg((s) => ({ ...s, reason: e.target.value }))}
                             inputProps={{ maxLength: 500 }}
                             FormHelperTextProps={{ sx: { m: 0 } }}
                             helperText={
@@ -702,19 +704,16 @@ export default function AdminPostsMUI() {
                 }
             />
 
-            {/* Dialog gửi cảnh báo */}
             <ConfirmDialog
                 open={warningDlg.open}
                 title={`Gửi cảnh báo cho tin #${warningDlg.id}`}
                 confirmText="Gửi"
-                loading={isSendingWarning}
+                loading={isSendingWarning} // Dùng state loading
                 onClose={closeWarning}
                 onConfirm={confirmSendWarning}
-                confirmDisabled={
-                    !warningDlg.message.trim() || warningDlg.message.trim().length < 10
-                }
+                confirmDisabled={!warningDlg.message.trim() || warningDlg.message.trim().length < 10}
                 TransitionProps={{
-                    onExited: handleWarningExited,
+                    onExited: handleWarningExited
                 }}
                 content={
                     <Stack spacing={1} sx={{ pt: 1 }}>
@@ -726,10 +725,7 @@ export default function AdminPostsMUI() {
                             placeholder="Ví dụ: Ảnh của bạn bị mờ, vui lòng cập nhật lại..."
                             value={warningDlg.message}
                             onChange={(e) => {
-                                setWarningDlg((s) => ({
-                                    ...s,
-                                    message: e.target.value,
-                                }));
+                                setWarningDlg((s) => ({ ...s, message: e.target.value }))
                             }}
                             helperText={
                                 warningDlg.message.trim().length < 10
