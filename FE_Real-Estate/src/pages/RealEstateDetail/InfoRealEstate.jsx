@@ -1,4 +1,3 @@
-// src/pages/detail/InfoRealEstate.jsx
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button, Tag, message } from "antd";
