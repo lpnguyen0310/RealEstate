@@ -140,12 +140,13 @@ export default function AdminLayout() {
                                 <div className="flex items-center gap-1.5 sm:gap-2">
                                     <button
                                         onClick={handleGoHome}
-                                        className="hidden xs:inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-[#dfe6f3] bg-white text-[#0f2f63] text-sm font-medium hover:bg-[#f1f4f9] transition"
+                                        className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-[#dfe6f3] bg-white text-[#0f2f63] text-sm font-medium hover:bg-[#f1f4f9] transition"
                                         title="Về trang chính"
                                     >
                                         <Home size={16} />
                                         <span className="hidden sm:inline">Trang chính</span>
                                     </button>
+
 
                                     {/* User chip (hide on very small) */}
                                     <div className="hidden md:flex items-center gap-3 px-2 py-1.5 rounded-xl border border-[#dfe6f3] bg-white/80">

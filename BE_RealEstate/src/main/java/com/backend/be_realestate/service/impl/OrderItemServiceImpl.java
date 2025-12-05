@@ -3,7 +3,9 @@ package com.backend.be_realestate.service.impl;
 import com.backend.be_realestate.converter.OrderItemConverter;
 import com.backend.be_realestate.entity.OrderItemEntity;
 import com.backend.be_realestate.enums.OrderStatus;
+import com.backend.be_realestate.modals.dto.packageEstate.PackageSalesStatsDTO;
 import com.backend.be_realestate.modals.dto.transactions.RecentTransactionDTO;
+import com.backend.be_realestate.repository.ListingPackageRepository;
 import com.backend.be_realestate.repository.OrderItemRepository;
 import com.backend.be_realestate.service.OrderItemService;
 import com.backend.be_realestate.modals.dto.order.OrderItemDTO;
@@ -19,7 +21,7 @@ public class OrderItemServiceImpl implements OrderItemService {
 
     private final OrderItemRepository orderItemRepository;
     private final OrderItemConverter orderItemConverter;
-
+    private final ListingPackageRepository listingPackageRepository;
     @Override
     @Transactional(readOnly = true)
     public List<OrderItemDTO> getItemsByOrder(Long orderId) {
@@ -31,5 +33,13 @@ public class OrderItemServiceImpl implements OrderItemService {
     public List<RecentTransactionDTO> recentTransactions(List<OrderStatus> statuses, int page, int size) {
         return orderItemRepository.findRecentTransactions(statuses, PageRequest.of(page, size));
 
+    }
+
+    @Override
+    public List<PackageSalesStatsDTO> getPackageSalesStats(List<OrderStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            statuses = List.of(OrderStatus.PAID); // mặc định chỉ tính gói đã thanh toán
+        }
+        return listingPackageRepository.findPackageSalesStats(statuses);
     }
 }

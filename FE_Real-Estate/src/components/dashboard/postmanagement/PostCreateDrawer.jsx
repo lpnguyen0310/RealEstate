@@ -740,19 +740,32 @@ export default function PostCreateDrawer({
                 </div>
             );
         }
-
         if (isEdit) {
             return (
                 <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
                     <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
 
                     <div className="flex items-center gap-4">
+                        {/* 👉 Thêm block AutoRepost cho mode Edit */}
+                        <div className="flex items-center gap-2 mr-2">
+                            <Switch
+                                checked={formData.autoRepost}
+                                onChange={(checked) =>
+                                    setFormData((p) => ({ ...p, autoRepost: checked }))
+                                }
+                            />
+                            <span className="text-gray-700 text-sm">Tự động đăng lại</span>
+                            <Tooltip title="Tự động đăng lại tin khi hết hạn">
+                                <InfoCircleOutlined className="text-gray-500 text-xs" />
+                            </Tooltip>
+                        </div>
+
                         {/* Chỉ hiển thị nút Đăng lại nếu bài đã hết hạn */}
                         {isExpired && (
                             <Button
                                 type="primary"
                                 className="bg-[#1b264f] hover:bg-[#22347c]"
-                                onClick={onPublishDraft} // Đăng lại bài viết
+                                onClick={onPublishDraft}
                             >
                                 Đăng lại
                             </Button>

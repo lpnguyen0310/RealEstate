@@ -22,5 +22,8 @@ export const kpiApi = {
     return api.get("/admin/kpi/orders/recent-transactions", {
       params: { status, page, size },
     });
-  },            
+  },       
+  getPackageStats(status = "PAID") {
+    return api.get("/admin/kpi/package-stats", { params: { status } });
+  },     
 };

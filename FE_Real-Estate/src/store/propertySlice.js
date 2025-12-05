@@ -879,14 +879,16 @@ const propertySlice = createSlice({
                 const { type, slot, mode } = a.meta?.arg || {};
 
                 // ===== FOR YOU logic (history đè filter) =====
+                // ===== FOR YOU logic: filter hiển thị trước, khi có "for you" thì override =====
                 if (type === "forYou" || pageData._forYou) {
-                    const m = mode || "filter"; // default: filter
+                    const m = mode || "filter"; // "filter" | "history"
 
-                    // A = list đã filter, B = history
                     if (m === "history") {
-                        s.forYouFromHistory = sorted;    // List B
+                        // Đây là list "For You" thật sự (personalized theo history)
+                        s.forYouFromHistory = sorted;
                     } else {
-                        s.forYouFromFilters = sorted;    // List A
+                        // Đây là list theo tiêu chí filter user chọn
+                        s.forYouFromFilters = sorted;
                     }
 
                     if (pageData._source) {
@@ -897,13 +899,17 @@ const propertySlice = createSlice({
                         : [];
                     s.forYouAnchorCity = pageData._anchorCityId ?? null;
 
-                    // 🎯 Ưu tiên:
-                    // - Nếu đã có history (forYouFromHistory) => dùng history
-                    // - Nếu chưa có history thì fallback sang list đã filter
-                    if (Array.isArray(s.forYouFromHistory) && s.forYouFromHistory.length > 0) {
-                        s.forYouList = s.forYouFromHistory;
+                    // 💡 Quy ước:
+                    // - m === "filter": render list filter NẾU hiện chưa có list forYou (history)
+                    // - m === "history": luôn override → dùng list forYou (history)
+                    if (m === "history") {
+                        // For You trả về sau → override UI
+                        s.forYouList = s.forYouFromHistory || [];
                     } else {
-                        s.forYouList = s.forYouFromFilters || [];
+                        // Chỉ set list filter nếu hiện CHƯA có forYouList hoặc nó đang rỗng
+                        if (!Array.isArray(s.forYouList) || s.forYouList.length === 0) {
+                            s.forYouList = s.forYouFromFilters || [];
+                        }
                     }
 
                     s.forYouLoading = false;

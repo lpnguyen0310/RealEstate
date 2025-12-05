@@ -2,6 +2,7 @@ package com.backend.be_realestate.controller.admin;
 
 import com.backend.be_realestate.enums.OrderStatus;
 import com.backend.be_realestate.modals.dto.order.OrderSimpleDTO;
+import com.backend.be_realestate.modals.dto.packageEstate.PackageSalesStatsDTO;
 import com.backend.be_realestate.modals.dto.propertydashboard.PendingPropertyDTO;
 import com.backend.be_realestate.modals.dto.transactions.RecentTransactionDTO;
 import com.backend.be_realestate.modals.response.PageResponse;
@@ -32,6 +33,7 @@ public class AdminKpiController {
     private final OrderService orderService;
     private final IPropertyService propertyService;
     private final OrderItemService orderItemService;
+
     @GetMapping("/new-users")
     public ResponseEntity<NewUsersKpiResponse> newUsers(
             @RequestParam(name = "range", defaultValue = "last_30d") String range) {
@@ -84,6 +86,20 @@ public class AdminKpiController {
                 .toList();
 
         List<RecentTransactionDTO> data = orderItemService.recentTransactions(statuses, page, size);
+        return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/package-stats")
+    public ResponseEntity<List<PackageSalesStatsDTO>> getPackageStats(
+            @RequestParam(defaultValue = "PAID") String status // "PAID", hoặc "PAID,CANCELLED"...
+    ) {
+        List<OrderStatus> statuses = Arrays.stream(status.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(OrderStatus::valueOf)
+                .toList();
+
+        List<PackageSalesStatsDTO> data = orderItemService.getPackageSalesStats(statuses);
         return ResponseEntity.ok(data);
     }
 }

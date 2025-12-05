@@ -30,11 +30,17 @@ export default function UserDropDownHeader({
 
     const clickOrHref = (fn, href) =>
         fn
-            ? { onClick: (e) => { e.preventDefault(); fn(); }, href: href || "#" }
+            ? {
+                onClick: (e) => {
+                    e.preventDefault();
+                    fn();
+                },
+                href: href || "#",
+            }
             : { href };
 
     if (!isLoggedIn) {
-        // Không đổi: phần này đã thân thiện mobile
+        // Guest: Đăng nhập / Đăng ký
         return (
             <Flex align="center" gap={12} className="px-2 py-1.5">
                 <a
@@ -60,6 +66,9 @@ export default function UserDropDownHeader({
         user?.email?.charAt(0)?.toUpperCase() ||
         "U";
 
+    // ===== Check quyền admin =====
+    const isAdmin = user?.roles?.includes?.("ADMIN");
+
     // ===== Reusable menu content =====
     const MenuList = ({ dense = false, showHeader = true }) => (
         <div className={`${dense ? "p-2" : "p-3"}`}>
@@ -68,7 +77,9 @@ export default function UserDropDownHeader({
                 <div className="bg-[#d6402c] text-white p-4 rounded-xl">
                     <h3 className="font-bold text-[16px]">Gói Hội viên</h3>
                     <p className="text-[13px] leading-snug mt-1">
-                        Tiết kiệm đến <strong>39%</strong> chi phí so với<br />đăng tin/đẩy tin lẻ
+                        Tiết kiệm đến <strong>39%</strong> chi phí so với
+                        <br />
+                        đăng tin/đẩy tin lẻ
                     </p>
                     <button className="mt-3 w-full bg-white text-[#d6402c] font-semibold text-[14px] py-1.5 rounded-lg hover:opacity-90">
                         Tìm hiểu thêm
@@ -102,7 +113,9 @@ export default function UserDropDownHeader({
                             )}
                         </div>
                         {item.badge2 && (
-                            <span className="text-[11px] text-[#0ba989] font-semibold">{item.badge2}</span>
+                            <span className="text-[11px] text-[#0ba989] font-semibold">
+                                {item.badge2}
+                            </span>
                         )}
                     </a>
                 ))}
@@ -110,6 +123,22 @@ export default function UserDropDownHeader({
 
             <Divider className="!my-2" />
 
+            {/* ===== NÚT ADMIN: chỉ admin mới thấy ===== */}
+            {isAdmin && (
+                <button
+                    onClick={() => {
+                        if (isMobile) setSheetOpen(false);
+                        nav("/admin"); // đường dẫn trang quản lý admin
+                    }}
+                    className={`w-full text-left flex items-center gap-2 rounded-lg
+            ${isMobile ? "px-3 py-3" : "px-4 py-2.5"}
+            text-[14px] font-medium !text-[#d6402c] hover:!text-[#b83224] hover:bg-[#fff4f2]`}
+                >
+                    🛠️ Đi tới trang quản lý
+                </button>
+            )}
+
+            {/* ===== Đăng xuất ===== */}
             <button
                 onClick={() => {
                     if (isMobile) setSheetOpen(false);
@@ -124,7 +153,7 @@ export default function UserDropDownHeader({
         </div>
     );
 
-    // ===== Mobile renders a bottom-sheet Drawer =====
+    // ===== Mobile: bottom-sheet Drawer =====
     if (isMobile) {
         return (
             <>
@@ -135,7 +164,6 @@ export default function UserDropDownHeader({
                     {loadingUser ? (
                         <>
                             <Skeleton.Avatar active size={40} shape="circle" />
-                            {/* Ẩn text + mũi tên ở mobile */}
                         </>
                     ) : (
                         <>
@@ -146,7 +174,6 @@ export default function UserDropDownHeader({
                             >
                                 {!user?.avatarUrl && initial}
                             </Avatar>
-                            {/* Ẩn tên + mũi tên ở mobile */}
                         </>
                     )}
                 </button>
@@ -163,7 +190,7 @@ export default function UserDropDownHeader({
                     }}
                 >
                     <div className="w-full max-w-[640px] mx-auto p-3">
-                        {/* Top bar nhỏ: avatar + tên gọn (có thể ẩn tên nếu muốn) */}
+                        {/* Top bar nhỏ: avatar + tên */}
                         <div className="flex items-center gap-3 pb-2 px-1">
                             <Avatar
                                 size={44}
@@ -174,14 +201,12 @@ export default function UserDropDownHeader({
                             </Avatar>
                             <div className="flex-1 min-w-0">
                                 <div className="text-[15px] font-semibold text-gray-900 truncate">
-                                    {/* Ẩn tên ở mobile nếu bạn muốn tuyệt đối: để trống hoặc dùng hidden */}
-                                    {/* <span className="hidden">{user?.fullName || user?.email}</span> */}
                                     {user?.fullName || user?.email}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Nội dung cuộn: giới hạn chiều cao cho vừa màn hình */}
+                        {/* Nội dung cuộn */}
                         <div className="max-h-[65vh] overflow-y-auto">
                             <MenuList dense showHeader={false} />
                         </div>
@@ -191,7 +216,7 @@ export default function UserDropDownHeader({
         );
     }
 
-    // ===== Desktop: giữ Dropdown như cũ (chỉ thêm responsive width) =====
+    // ===== Desktop: Dropdown =====
     return (
         <Dropdown
             trigger={["click"]}
@@ -225,7 +250,6 @@ export default function UserDropDownHeader({
                         >
                             {!user?.avatarUrl && initial}
                         </Avatar>
-                        {/* Ẩn tên ở mobile, desktop hiển thị */}
                         <span className="hidden sm:inline">
                             {`${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || user?.email}
                         </span>

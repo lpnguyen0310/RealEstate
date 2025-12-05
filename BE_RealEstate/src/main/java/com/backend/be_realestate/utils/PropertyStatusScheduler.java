@@ -67,4 +67,8 @@ public class PropertyStatusScheduler {
 
         log.info("Update property status: expiringSoon={}, expired={}", expiring, expired);
     }
+
+
+
+
 }
