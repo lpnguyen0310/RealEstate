@@ -30,4 +30,8 @@ export const adminPropertyApi = {
 
     hardDelete: (id) =>
         api.delete(`${BASE}/${id}`).then((r) => r.data),
+    bulkApprove: (payload) =>
+        api.post(`${BASE}/bulk-approve`, payload).then((r) => r.data),
+    bulkReject: (payload) =>
+        api.post(`${BASE}/bulk-reject`, payload).then((r) => r.data),
 };

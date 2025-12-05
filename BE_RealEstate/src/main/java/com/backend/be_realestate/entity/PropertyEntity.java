@@ -74,7 +74,7 @@ import java.util.List;
             @Column(name = "direction", length = 255)
             private String direction;
 
-            @Column(name = "description")
+            @Column(name = "description" , columnDefinition = "TEXT")
             private String description;
 
             @CreationTimestamp
