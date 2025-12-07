@@ -244,4 +244,24 @@ public class PropertyController {
             );
         }
     }
+
+    @PatchMapping("/{id}/auto-renew")
+    public ResponseEntity<Void> toggleAutoRenew(
+            @PathVariable Long id,
+            @RequestParam boolean enable,
+            Authentication auth
+    ) {
+        Long userId = securityUtils.currentUserId(auth);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        try {
+            propertyService.toggleAutoRenew(userId, id, enable);
+            return ResponseEntity.ok().build();
+        } catch (IllegalStateException e) {
+            // Trả về lỗi 400 hoặc 409 nếu trạng thái tin không hợp lệ
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }

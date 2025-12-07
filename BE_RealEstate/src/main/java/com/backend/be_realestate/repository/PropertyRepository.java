@@ -183,6 +183,12 @@ public interface PropertyRepository extends JpaRepository<PropertyEntity,Long>, 
 """)
     List<PropertyEntity> findWillExpireSoon(@Param("now") Timestamp now,
                                             @Param("soon") Timestamp soon);
+
+    @Query("SELECT p FROM PropertyEntity p " +
+            "WHERE p.expiresAt <= :now " +
+            "AND p.autoRenew = true " +
+            "AND p.status IN ('PUBLISHED', 'EXPIRINGSOON')")
+    List<PropertyEntity> findExpiredCandidatesForAutoRenew(@Param("now") Timestamp now);
 }
 
 

@@ -56,5 +56,8 @@ public enum NotificationType {
     USER_DELETE_REQUEST_REJECTED,
     USER_LOCK_REQUEST_REJECTED,
     USER_DELETED_BY_ADMIN,
-    USER_PASSWORD_RESET_BY_ADMIN
+    USER_PASSWORD_RESET_BY_ADMIN,
+
+    LISTING_AUTO_RENEWED,   // Gia hạn thành công
+    LISTING_RENEW_FAILED    // Gia hạn thất bại (do hết tiền/hết gói)
 }

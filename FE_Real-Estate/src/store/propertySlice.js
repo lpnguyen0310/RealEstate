@@ -130,6 +130,22 @@ export const fetchPropertyFavoritesThunk = createAsyncThunk(
     }
 );
 
+export const toggleAutoRenewThunk = createAsyncThunk(
+    "property/toggleAutoRenew",
+    async ({ id, enable }, { rejectWithValue }) => {
+        try {
+            // enable là boolean true/false
+            await api.patch(`/properties/${id}/auto-renew`, null, {
+                params: { enable }
+            });
+            return { id, enable };
+        } catch (e) {
+            const msg = e?.response?.data?.message || "Không thể thay đổi trạng thái tự động gia hạn";
+            return rejectWithValue(msg);
+        }
+    }
+);
+
 // Tạo tin
 export const createPropertyThunk = createAsyncThunk(
     "property/create",
@@ -190,6 +206,9 @@ export const createPropertyThunk = createAsyncThunk(
                 listingTypePolicyId:
                     listingTypePolicyId ?? formData.listingTypePolicyId,
                 imageUrls,
+
+                autoRenew: !!formData.autoRepost,
+
                 amenityIds: formData.amenityIds || [],
                 constructionImages: formData.constructionImages || [], // CONSTRUCTION
                 isOwner,
@@ -306,6 +325,8 @@ export const updatePropertyThunk = createAsyncThunk(
                 addressStreet: formData.streetName || "",
                 propertyType: formData.propertyType || "sell",
                 priceType: formData.priceType || "SELL_PRICE",
+
+                autoRenew: !!formData.autoRepost,
 
                 legalStatus: formData.legalDocument || "",
                 direction: formData.direction || "",
@@ -592,6 +613,7 @@ function mapDtoToPostCard(p) {
         audits: Array.isArray(p?.audit) ? p.audit : [],
 
         latestWarningMessage: p?.latestWarningMessage || null,
+        autoRenew: !!p.autoRenew,
     };
 }
 
@@ -1068,6 +1090,20 @@ const propertySlice = createSlice({
                 if (pIdx >= 0) {
                     s.list[pIdx].statusTag = toStatusTag(newStatus);
                     s.list[pIdx].statusKey = nextKey;
+                }
+            })
+            .addCase(toggleAutoRenewThunk.fulfilled, (s, a) => {
+                const { id, enable } = a.payload;
+                // Cập nhật trong myList (Dashboard)
+                const myIdx = s.myList.findIndex(x => String(x.id) === String(id));
+                if (myIdx >= 0) {
+                    s.myList[myIdx].autoRenew = enable; 
+                    // Lưu ý: Cần đảm bảo mapDtoToPostCard có map field autoRenew
+                }
+                
+                // Cập nhật trong currentProperty (nếu đang xem chi tiết)
+                if (s.currentProperty && String(s.currentProperty.id) === String(id)) {
+                    s.currentProperty.autoRenew = enable;
                 }
             })
             .addCase(performPropertyActionThunk.rejected, (s) => {

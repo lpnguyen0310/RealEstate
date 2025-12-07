@@ -56,6 +56,8 @@ export default function ForYouList() {
   // cờ: đã hiện modal nearby cho lần search hiện tại chưa
   const [hasSeenNearbyModal, setHasSeenNearbyModal] = useState(false);
 
+  const [hasSeenEmptyModal, setHasSeenEmptyModal] = useState(false);
+
   const screens = Grid.useBreakpoint();
   const modalWidth = 640;
 
@@ -99,6 +101,9 @@ export default function ForYouList() {
         }
         if (saved?.meta?.hasSeenNearbyModal) {
           setHasSeenNearbyModal(true);
+        }
+        if (saved?.meta?.hasSeenEmptyModal) {
+          setHasSeenEmptyModal(true);
         }
       }
     } catch {
@@ -276,6 +281,7 @@ export default function ForYouList() {
     setForYouLocalLoading(true);
     setHasSearched(true);
     setHasSeenNearbyModal(false); // 🔹 reset cho lần search mới
+    setHasSeenEmptyModal(false);
     setShowEmptyModal(false);
     const start = performance.now();
 
@@ -328,13 +334,53 @@ export default function ForYouList() {
   };
 
   // Nếu đã tìm + hết loading + không có dữ liệu → modal “Rất tiếc...”
+  // Nếu đã tìm + hết loading + không có dữ liệu → modal “Rất tiếc...”
   useEffect(() => {
+    // 1. Các điều kiện chặn
     if (!hasSearched) return;
     if (forYouLoading || forYouLocalLoading) return;
+    
+    // Nếu đã xem rồi thì return luôn, không hiện nữa
+    if (hasSeenEmptyModal) return; 
+
+    // 2. Nếu không có dữ liệu -> Hiện Modal VÀ Lưu Session
     if (!effectiveHasData) {
       setShowEmptyModal(true);
+      
+      // --- PHẦN BỔ SUNG QUAN TRỌNG ---
+      setHasSeenEmptyModal(true); // Cập nhật state ngay lập tức
+
+      // Lưu vào sessionStorage để khi reload không bị hiện lại
+      if (userKey) {
+        try {
+          const raw = sessionStorage.getItem(userKey);
+          const saved = raw ? JSON.parse(raw) : {};
+          
+          sessionStorage.setItem(
+            userKey,
+            JSON.stringify({
+              ...saved,
+              meta: {
+                ...(saved.meta || {}),
+                hasSearched: true,
+                hasSeenEmptyModal: true, // <--- CỜ QUAN TRỌNG
+              },
+            })
+          );
+        } catch (error) {
+          console.error("Lỗi lưu session empty modal:", error);
+        }
+      }
+      // -------------------------------
     }
-  }, [hasSearched, forYouLoading, forYouLocalLoading, effectiveHasData]);
+  }, [
+    hasSearched, 
+    forYouLoading, 
+    forYouLocalLoading, 
+    effectiveHasData, 
+    hasSeenEmptyModal, // Nhớ thêm dependency này vào
+    userKey
+  ]);
 
   if (!userId) {
     return (

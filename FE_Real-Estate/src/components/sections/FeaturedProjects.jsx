@@ -4,6 +4,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
+import { Link } from "react-router-dom";
 
 import ProjectCard from "../cards/ProjectCard";
 import { fetchPropertiesThunk } from "@/store/propertySlice";
@@ -83,9 +84,12 @@ export default function FeaturedProjects() {
         <section className="mt-12">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-3xl font-extrabold text-[#1b2a57]">Dự án nổi bật</h2>
-                <a href="/du-an" className="text-[#1f5fbf] font-semibold hover:underline">
-                    Tất cả
-                </a>
+                <Link 
+          to="/search?sort=postedAt,desc" 
+          className="text-[#1f5fbf] font-semibold hover:underline"
+        >
+          Tất cả
+        </Link>
             </div>
 
             <div className="relative overflow-visible">

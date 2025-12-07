@@ -72,6 +72,7 @@ public class PropertyConverter {
         dto.setExpiresAt(entity.getExpiresAt());
         dto.setFavoriteCount(entity.getFavoriteCount());
         dto.setLatestWarningMessage(entity.getLatestWarningMessage());
+        dto.setAutoRenew(entity.getAutoRenew());
         dto.setConstructionImages(
                 entity.getConstructionImages()
                         .stream()
@@ -185,6 +186,7 @@ public class PropertyConverter {
         dto.setPostedAt(entity.getPostedAt());
         dto.setExpiresAt(entity.getExpiresAt());
         dto.setFavoriteCount(entity.getFavoriteCount());
+        dto.setAutoRenew(entity.getAutoRenew());
 
         if (entity.getListingType() != null) {
             dto.setListingType(entity.getListingType().name());

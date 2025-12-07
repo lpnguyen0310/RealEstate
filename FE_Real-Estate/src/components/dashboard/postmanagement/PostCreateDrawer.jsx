@@ -13,6 +13,7 @@ import {
     updatePropertyThunk,
     fetchPropertyEditByIdThunk,
     clearCurrentProperty,
+    toggleAutoRenewThunk,
 } from "@/store/propertySlice";
 import { fetchUserInventory } from "@/store/inventorySlice";
 
@@ -178,7 +179,7 @@ function mapDetailToFormData(d) {
 
         /* ===== Ảnh xây dựng ===== */
         constructionImages: Array.isArray(d.constructionImages) ? d.constructionImages : [],
-        autoRepost: !!d.autoRepost,
+        autoRepost: d.autoRenew !== undefined ? d.autoRenew : (!!d.autoRepost),
 
     };
 }
@@ -740,49 +741,65 @@ export default function PostCreateDrawer({
                 </div>
             );
         }
+        // if (isEdit) {
+        //     return (
+        //         <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
+        //             <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
+
+        //             <div className="flex items-center gap-4">
+        //                 {/* 👉 Thêm block AutoRepost cho mode Edit */}
+        //                 <div className="flex items-center gap-2 mr-2">
+        //                     <Switch
+        //                         checked={formData.autoRepost}
+        //                         onChange={(checked) =>
+        //                             setFormData((p) => ({ ...p, autoRepost: checked }))
+        //                         }
+        //                     />
+        //                     <span className="text-gray-700 text-sm">Tự động đăng lại</span>
+        //                     <Tooltip title="Tự động đăng lại tin khi hết hạn">
+        //                         <InfoCircleOutlined className="text-gray-500 text-xs" />
+        //                     </Tooltip>
+        //                 </div>
+
+        //                 {/* Chỉ hiển thị nút Đăng lại nếu bài đã hết hạn */}
+        //                 {isExpired && (
+        //                     <Button
+        //                         type="primary"
+        //                         className="bg-[#1b264f] hover:bg-[#22347c]"
+        //                         onClick={onPublishDraft}
+        //                     >
+        //                         Đăng lại
+        //                     </Button>
+        //                 )}
+
+        //                 {!isExpired && (
+        //                     <Button
+        //                         type="primary"
+        //                         loading={posting}
+        //                         className="bg-[#1b264f] hover:bg-[#22347c]"
+        //                         onClick={onUpdate}
+        //                     >
+        //                         Cập nhật
+        //                     </Button>
+        //                 )}
+        //             </div>
+        //         </div>
+        //     );
+        // }
+
         if (isEdit) {
-            return (
-                <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
-                    <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
-
-                    <div className="flex items-center gap-4">
-                        {/* 👉 Thêm block AutoRepost cho mode Edit */}
-                        <div className="flex items-center gap-2 mr-2">
-                            <Switch
-                                checked={formData.autoRepost}
-                                onChange={(checked) =>
-                                    setFormData((p) => ({ ...p, autoRepost: checked }))
-                                }
-                            />
-                            <span className="text-gray-700 text-sm">Tự động đăng lại</span>
-                            <Tooltip title="Tự động đăng lại tin khi hết hạn">
-                                <InfoCircleOutlined className="text-gray-500 text-xs" />
-                            </Tooltip>
-                        </div>
-
-                        {/* Chỉ hiển thị nút Đăng lại nếu bài đã hết hạn */}
-                        {isExpired && (
-                            <Button
-                                type="primary"
-                                className="bg-[#1b264f] hover:bg-[#22347c]"
-                                onClick={onPublishDraft}
-                            >
-                                Đăng lại
-                            </Button>
-                        )}
-
-                        {!isExpired && (
-                            <Button
-                                type="primary"
-                                loading={posting}
-                                className="bg-[#1b264f] hover:bg-[#22347c]"
-                                onClick={onUpdate}
-                            >
-                                Cập nhật
-                            </Button>
-                        )}
-                    </div>
-                </div>
+             return (
+                <FooterType
+                    setStep={setStep}
+                    formData={formData}
+                    setFormData={setFormData} // Nhớ truyền cái này!
+                    postTypeId={postTypeId}
+                    inventory={invMap}
+                    listingTypes={listingTypes}
+                    onCreated={onCreated}
+                    isEdit={isEdit}           // Nhớ truyền cái này!
+                    editingId={editingId}     // Nhớ truyền cái này!
+                />
             );
         }
 
@@ -790,10 +807,13 @@ export default function PostCreateDrawer({
             <FooterType
                 setStep={setStep}
                 formData={formData}
+                setFormData={setFormData}
                 postTypeId={postTypeId}
                 inventory={invMap}
                 listingTypes={listingTypes}
                 onCreated={onCreated}
+                isEdit={false}
+                editingId={null}
             />
         );
     }, [
@@ -965,10 +985,13 @@ export default function PostCreateDrawer({
 function FooterType({
     setStep,
     formData,
+    setFormData,
     postTypeId,
     inventory = {},
     listingTypes = [],
     onCreated,
+    isEdit,
+    editingId  
 }) {
     const navigate = useNavigate();
     const [showPrompt, setShowPrompt] = useState(false);
@@ -988,27 +1011,57 @@ function FooterType({
 
     const [autoRepostVal, setAutoRepostVal] = useState(formData.autoRepost);
 
-    // Thực hiện tự động đăng lại khi bật 'autoRepost'
-    const handleAutoRepostChange = useCallback((checked) => {
+    // Đồng bộ khi formData thay đổi từ bên ngoài (lúc mới mở drawer)
+    useEffect(() => {
+        setAutoRepostVal(!!formData.autoRepost);
+    }, [formData.autoRepost]);
+
+    // --- LOGIC XỬ LÝ KHI GẠT NÚT SWITCH ---
+    const handleAutoRepostChange = async (checked) => {
+        console.log("1. Switch clicked. Value:", checked);
+        
+        // 1. Cập nhật UI ngay lập tức
         setAutoRepostVal(checked);
 
-        // Gọi API hoặc trigger để tự động đăng lại
-        if (checked) {
-            handlePost(); // tự động đăng khi bật autoRepost
+        // 2. Cập nhật state cha (để đồng bộ dữ liệu nếu user lỡ bấm Cập nhật sau đó)
+        if (setFormData) {
+             setFormData(prev => ({ ...prev, autoRepost: checked }));
         }
-    }, [formData]);
 
-    // Hàm đăng tin
+        // 3. Nếu đang ở chế độ SỬA (Edit) -> Gọi API Toggle ngay lập tức
+        if (isEdit && editingId) {
+            console.log("2. Mode EDIT detected. Calling toggle API for ID:", editingId);
+            try {
+                // Gọi API Patch
+                await dispatch(toggleAutoRenewThunk({ id: editingId, enable: checked })).unwrap();
+                
+                console.log("3. API Success");
+                message.success(`Đã ${checked ? "bật" : "tắt"} tự động đăng lại`);
+            } catch (e) {
+                console.error("3. API Failed:", e);
+                
+                // Nếu lỗi, revert UI lại như cũ
+                setAutoRepostVal(!checked);
+                if (setFormData) setFormData(prev => ({ ...prev, autoRepost: !checked }));
+                message.error("Lỗi cập nhật trạng thái: " + e);
+            }
+        } else {
+            console.log("2. Mode CREATE detected. Saved to state only.");
+        }
+    };
+
+    // Hàm đăng tin (cho nút Đăng tin / Cập nhật lớn)
     const handlePost = async () => {
         if (outOfStock) {
             setShowPrompt(true);
             return;
         }
 
+        // Lấy giá trị từ formData (đã được sync ở handleAutoRepostChange)
         const payload = {
             ...formData,
             listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
-            autoRepost: autoRepostVal,  // Truyền autoRepost vào payload
+            autoRepost: formData.autoRepost, // Dùng giá trị từ formData
         };
 
         try {

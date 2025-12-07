@@ -278,7 +278,7 @@ public class PropertyServiceImpl implements IPropertyService {
         var property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new IllegalArgumentException("Property not found: " + propertyId));
 
-        // === 💡 BƯỚC MỚI: LƯU LẠI TRẠNG THÁI GỐC ===
+        // Lưu lại trạng thái gốc để kiểm tra xem có phải là Đăng lại (Repost) không
         final PropertyStatus originalStatus = property.getStatus();
 
         // 2. KIỂM TRA QUYỀN SỞ HỮU
@@ -286,7 +286,7 @@ public class PropertyServiceImpl implements IPropertyService {
             throw new AccessDeniedException("Bạn không có quyền sửa tin này");
         }
 
-        // 3. CẬP NHẬT GÓI TIN (NẾU CÓ)
+        // 3. CẬP NHẬT GÓI TIN (NẾU CÓ THAY ĐỔI GÓI)
         if (req.getListingTypePolicyId() != null) {
             var policy = policyRepo.findById(req.getListingTypePolicyId())
                     .orElseThrow(() -> new IllegalArgumentException("Invalid listingTypePolicyId"));
@@ -303,28 +303,65 @@ public class PropertyServiceImpl implements IPropertyService {
         // 5. XỬ LÝ LOGIC TRẠNG THÁI VÀ GỬI THÔNG BÁO
         if (mode == SubmitMode.PUBLISHED) {
 
+            // =========================================================================
+            // 🔥 [THÊM MỚI] LOGIC ĐĂNG LẠI (REPOST) KHI TIN HẾT HẠN
+            // =========================================================================
+            if (originalStatus == PropertyStatus.EXPIRED) {
+                ListingType type = property.getListingType(); // Lấy loại tin hiện tại (đã update ở bước 3/4)
+
+                // 1. Kiểm tra kho gói tin
+                // (Giả sử Normal cũng cần trừ, nếu Normal free thì bạn thêm if check ở đây)
+                UserInventoryEntity inv = inventoryRepo.lockByUserAndType(userId, type.name())
+                        .orElseGet(() -> inventoryRepo.findByUser_UserIdAndItemType(userId, type.name())
+                                .orElseThrow(() -> new IllegalStateException("Bạn không có gói tin " + type.name() + " trong kho.")));
+
+                if (inv.getQuantity() == null || inv.getQuantity() <= 0) {
+                    throw new OutOfStockException("Bạn đã hết lượt đăng tin loại " + type.name() + ". Vui lòng mua thêm.");
+                }
+
+                // 2. Trừ gói tin
+                inv.setQuantity(inv.getQuantity() - 1);
+                inventoryRepo.save(inv);
+
+                // 3. Reset thời gian hiển thị
+                // Xem như tin mới đăng ngay lúc này
+                property.setPostedAt(Timestamp.from(Instant.now()));
+                // Xóa ngày hết hạn cũ (sẽ được tính lại khi Admin duyệt bài)
+                property.setExpiresAt(null);
+
+                log.info("User {} reposted property {}. Deducted 1 {} package.", userId, propertyId, type);
+            }
+            // =========================================================================
+
             // Luôn set về PENDING_REVIEW khi nhấn "publish"
             property.setStatus(PropertyStatus.PENDING_REVIEW);
+
             try {
                 String title = (property.getTitle() != null) ? property.getTitle() : "không có tiêu đề";
 
-                // 5.1 Gửi thông báo cho Admin (DỰA TRÊN TRẠNG THÁI GỐC)
+                // 5.1 Gửi thông báo cho Admin
                 var admins = userRepository.findAllByRoles_Code("ADMIN");
                 if (!admins.isEmpty()) {
 
                     String adminMessage;
                     NotificationType adminNotificationType;
 
-                    // === 💡 ĐÂY LÀ LOGIC BẠN YÊU CẦU ===
                     if (originalStatus == PropertyStatus.WARNED || originalStatus == PropertyStatus.REJECTED) {
-                        // Nếu sửa từ bài bị Cảnh cáo hoặc Từ chối
+                        // Sửa từ bài bị Cảnh cáo/Từ chối
                         adminMessage = String.format("Tin '%s' (ID: %d) vừa được sửa (từ %s) và đang chờ duyệt lại.",
                                 title, property.getId(), originalStatus.name());
-                        // Bạn nên tạo type này trong Enum: LISTING_EDITED_PENDING
                         adminNotificationType = NotificationType.LISTING_EDITED_PENDING;
-                    } else {
-                        // Mặc định, nếu là từ DRAFT
-                        adminMessage = String.format("Tin đăng mới '%s' (ID: %d) đang chờ duyệt.",
+                    }
+                    // 🔥 [THÊM MỚI] Thông báo cho trường hợp Đăng lại
+                    else if (originalStatus == PropertyStatus.EXPIRED) {
+                        adminMessage = String.format("Tin '%s' (ID: %d) vừa được ĐĂNG LẠI và đang chờ duyệt.",
+                                title, property.getId());
+                        // Có thể dùng NEW_LISTING_PENDING hoặc tạo enum mới REPOST_PENDING
+                        adminNotificationType = NotificationType.NEW_LISTING_PENDING;
+                    }
+                    else {
+                        // Mặc định (từ Draft hoặc sửa tin đang Active)
+                        adminMessage = String.format("Tin đăng '%s' (ID: %d) đang chờ duyệt.",
                                 title, property.getId());
                         adminNotificationType = NotificationType.NEW_LISTING_PENDING;
                     }
@@ -339,7 +376,7 @@ public class PropertyServiceImpl implements IPropertyService {
 
                 // 5.2 Gửi thông báo cho User (Luôn giống nhau)
                 String userMessage = String.format("Tin đăng '%s' của bạn đã được cập nhật và đang chờ duyệt lại.", title);
-                String userLink = "/dashboard/posts?tab=pending"; // Điều hướng user đến tab Chờ duyệt
+                String userLink = "/dashboard/posts?tab=pending";
                 notificationService.createNotification(
                         property.getUser(), NotificationType.LISTING_PENDING_USER, userMessage, userLink
                 );
@@ -347,12 +384,10 @@ public class PropertyServiceImpl implements IPropertyService {
             } catch (Exception e) {
                 log.error("Notify error (listing updated OK): {}", e.getMessage(), e);
             }
-            // === KẾT THÚC LOGIC GỬI THÔNG BÁO ===
 
         } else if (mode == SubmitMode.DRAFT) {
             property.setStatus(PropertyStatus.DRAFT);
         }
-        // mode == null → giữ nguyên status hiện tại (ví dụ: sửa lỗi chính tả khi đang PUBLISHED)
 
         // 6. LƯU VÀO DB
         var saved = propertyRepository.save(property);
@@ -365,8 +400,7 @@ public class PropertyServiceImpl implements IPropertyService {
         }
 
         return new CreatePropertyResponse(saved.getId(), saved.getStatus());
-    }
-    private void applyRequestToEntity(PropertyEntity property,
+    }private void applyRequestToEntity(PropertyEntity property,
                                       CreatePropertyRequest req,
                                       boolean createMode,
                                       @org.springframework.lang.Nullable SubmitMode mode) {
@@ -448,6 +482,13 @@ public class PropertyServiceImpl implements IPropertyService {
         if (createMode) {
             SubmitMode effective = (mode == null) ? SubmitMode.PUBLISHED : mode;
             property.setStatus(effective == SubmitMode.DRAFT ? PropertyStatus.DRAFT : PropertyStatus.PENDING_REVIEW);
+        }
+
+        if (req.getAutoRenew() != null) {
+            property.setAutoRenew(req.getAutoRenew());
+        } else if (createMode) {
+            // Mặc định false nếu tạo mới mà không gửi lên
+            property.setAutoRenew(false);
         }
 
 
@@ -1249,6 +1290,37 @@ public class PropertyServiceImpl implements IPropertyService {
                 .newStatus(target)
                 .message("OK")
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void toggleAutoRenew(Long userId, Long propertyId, boolean enable) {
+        PropertyEntity property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found"));
+
+        if (!property.getUser().getUserId().equals(userId)) {
+            throw new AccessDeniedException("Unauthorized");
+        }
+
+        // --- LOGIC VALIDATION MỚI ---
+        if (enable) {
+            // Chỉ cho phép bật khi tin đang hiển thị, sắp hết hạn, hoặc đang ẩn (để khi bỏ ẩn nó tự chạy)
+            // Tuyệt đối chặn: REJECTED, ARCHIVED, DRAFT
+            // Với EXPIRED: Bạn có thể chặn luôn, bắt user phải dùng nút "Đăng lại".
+            List<PropertyStatus> allowedStatuses = List.of(
+                    PropertyStatus.PUBLISHED,
+                    PropertyStatus.EXPIRINGSOON,
+                    PropertyStatus.HIDDEN, // Cho phép bật lúc ẩn, nhưng Scheduler sẽ không quét tin ẩn (như query trên)
+                    PropertyStatus.WARNED
+            );
+
+            if (!allowedStatuses.contains(property.getStatus())) {
+                throw new IllegalStateException("Trạng thái tin hiện tại (" + property.getStatus() + ") không hỗ trợ bật tự động gia hạn.");
+            }
+        }
+
+        property.setAutoRenew(enable);
+        propertyRepository.save(property);
     }
 
     /* =========================================================

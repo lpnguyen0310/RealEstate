@@ -69,7 +69,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
             src={currentAvatarUrl}
             alt="Avatar"
             className="rounded-full object-cover"
-            style={box}
+            style={{ ...box, maxWidth: 'none' }}
           />
         ) : (
           <div className="text-center" style={boxSm}>
@@ -110,7 +110,7 @@ export default function EditInfoForm({ initialData, onSubmit, onUploadAvatar }) 
         </div>
 
         {/* Avatar center */}
-        <div className="flex justify-center py-2">
+        <div className="flex justify-center py-6">
           <RenderUploadAvatar />
         </div>
 

@@ -53,4 +53,5 @@ public class CreatePropertyRequest {
     private String contactPhone;
     private String contactEmail;
     private String contactRelationship;
+    private Boolean autoRenew;
 }

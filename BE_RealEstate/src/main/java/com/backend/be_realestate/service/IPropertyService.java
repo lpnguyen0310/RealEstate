@@ -61,4 +61,5 @@ public interface IPropertyService {
     List<PropertyCardDTO> getBannerListings();
     PropertyActionResponse performAction(Long userId, Long propertyId, PropertyAction action, String note);
 
+    void toggleAutoRenew(Long userId, Long propertyId, boolean enable);
 }

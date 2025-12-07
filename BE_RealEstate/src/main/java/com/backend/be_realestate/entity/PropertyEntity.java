@@ -212,4 +212,8 @@ import java.util.List;
             private String contactEmail;
             @Column(name = "contact_relationship", length = 255)
             private String contactRelationship;
+
+            @Column(name = "auto_renew")
+            @Builder.Default
+            private Boolean autoRenew = false;
         }
