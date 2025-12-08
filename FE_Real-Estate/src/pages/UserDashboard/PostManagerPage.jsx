@@ -76,7 +76,7 @@ export default function PostManagerPage() {
     const [warningModal, setWarningModal] = useState({ open: false, message: "" });
     const [highlightedId, setHighlightedId] = useState(null);
     
-    const { list, page, size, totalElements, counts, pendingAction, rawLoading } = useSelector((s) => ({
+    const { list, page, size, totalElements, counts, pendingAction, rawLoading, refreshSignal } = useSelector((s) => ({
         list: s.property.myList,
         page: s.property.myPage,
         size: s.property.mySize,
@@ -84,6 +84,7 @@ export default function PostManagerPage() {
         counts: s.property.counts,
         pendingAction: s.property.pendingAction,
         rawLoading: s.property.loading,
+        refreshSignal: s.property.refreshSignal,
     }));
 
     const [status, setStatus] = useState(searchParams.get("tab") || "active");
@@ -176,7 +177,7 @@ export default function PostManagerPage() {
     /* ========== FETCH ========== */
     useEffect(() => {
         dispatch(fetchMyPropertiesThunk({ page, size, status, ...filters }));
-    }, [dispatch, page, size, status, filters]);
+    }, [dispatch, page, size, status, filters, refreshSignal]);
 
     useEffect(() => {
         dispatch(fetchMyPropertyCountsThunk());

@@ -113,13 +113,11 @@ function mapDetailToFormData(d) {
     if (!d) return null;
 
     const isOwner = toBool(d.isOwner ?? d.is_owner, false);
-    // Fallback liên hệ: ưu tiên contact_*, nếu trống thì dùng author*/phoneNumber
     const fbName = d.contactName || d.authorName || "";
     const fbPhone = d.contactPhone || d.phoneNumber || "";
     const fbEmail = d.contactEmail || d.authorEmail || "";
 
     return {
-        /* ===== Bài đăng cơ bản ===== */
         title: d.title ?? "",
         description: d.description ?? "",
         categoryId: d.categoryId ?? "",
@@ -127,17 +125,14 @@ function mapDetailToFormData(d) {
         priceType: d.priceType ?? "SELL_PRICE",
         price: d.price ?? "",
 
-        /* ===== Media ===== */
         images: Array.isArray(d.imageUrls) ? d.imageUrls : [],
         videoUrls: Array.isArray(d.videoUrls) ? d.videoUrls : ["", ""],
         amenityIds: Array.isArray(d.amenityIds) ? d.amenityIds : [],
 
-        /* ===== Địa giới ===== */
         provinceId: d.cityId ?? "",
         districtId: d.districtId ?? "",
         wardId: d.wardId ?? "",
 
-        /* ===== Địa chỉ hiển thị ===== */
         suggestedAddress: d.displayAddress || "",
         displayAddress: d.displayAddress || d.addressFull || "",
         streetName: d.addressStreet || "",
@@ -145,19 +140,17 @@ function mapDetailToFormData(d) {
         addressSuggestions: [],
         streetOptions: [],
 
-        /* ===== Thuộc tính BĐS ===== */
         position: d.position || "",
         direction: d.direction || "",
         landArea: d.landArea ?? "",
-        usableArea: d.usableArea ?? d.floorArea ?? "",          // NEW
-        floors: d.floors ?? d.numberOfFloors ?? 0,              // NEW
+        usableArea: d.usableArea ?? d.floorArea ?? "",
+        floors: d.floors ?? d.numberOfFloors ?? 0,
         bedrooms: d.bedrooms ?? 0,
         bathrooms: d.bathrooms ?? 0,
         width: d.width ?? "",
         length: d.height ?? "",
         legalDocument: d.legalStatus || "",
 
-        /* ===== Liên hệ cho UI ===== */
         contact: {
             name: fbName,
             phone: fbPhone,
@@ -165,14 +158,11 @@ function mapDetailToFormData(d) {
             zalo: d.zaloPhone || "",
         },
 
-        /* ===== Gói tin ===== */
         listingType: d.listingType || null,
         listingTypePolicyId: d.listingTypePolicyId ?? null,
 
-        /* ===== Chủ sở hữu ===== */
         ownerAuth: {
             isOwner,
-            // Khi KHÔNG chính chủ, BE hiện đang lưu trong các cột contact_*
             ownerName: d.contactName || d.ownerName || "",
             phoneNumber: d.contactPhone || d.ownerPhone || "",
             ownerEmail: d.contactEmail || d.ownerEmail || "",
@@ -185,10 +175,8 @@ function mapDetailToFormData(d) {
             agreed: toBool(d.ownerAuth?.agreed ?? d.owner_agreed, false),
         },
 
-        /* ===== Ảnh xây dựng ===== */
         constructionImages: Array.isArray(d.constructionImages) ? d.constructionImages : [],
         autoRepost: d.autoRenew !== undefined ? d.autoRenew : (!!d.autoRepost),
-
     };
 }
 
@@ -201,8 +189,8 @@ function createInitialForm() {
         provinceId: "", districtId: "", wardId: "", suggestedAddress: "",
         addressSuggestions: [], streetName: "", streetOptions: [], houseNumber: "",
         displayAddress: "", position: "", landArea: "", legalDocument: "",
-        usableArea: "",                // NEW
-        floors: 0,                     // NEW
+        usableArea: "",
+        floors: 0,
         bedrooms: 0, bathrooms: 0, width: "", length: "",
         direction: "",
         listingType: null,
@@ -220,11 +208,9 @@ function createInitialForm() {
         },
         constructionImages: [],
         autoRepost: false,
-
     };
 }
 
-/* ===== Tìm theo tên/ID cho địa giới ===== */
 const findProvinceId = (provinces, nameOrId) => {
     if (!nameOrId) return "";
     const asNum = Number(nameOrId);
@@ -259,7 +245,6 @@ const findWardId = (wards, nameOrId) => {
     return m?.id || "";
 };
 
-/* ===== Map 1 dòng Excel → formData (partial) ===== */
 const excelRowToForm = (row) => {
     const images = splitList(row.ImageURLs);
     const videos = splitList(row.VideoURLs);
@@ -275,7 +260,7 @@ const excelRowToForm = (row) => {
         title: row.Title || "",
         description: row.Description || "",
         categoryId: row.CategoryId || "",
-        propertyType: (row.PropertyType || "sell").toLowerCase(),      // sell | rent
+        propertyType: (row.PropertyType || "sell").toLowerCase(),
         priceType: row.PriceType || "SELL_PRICE",
         price: parseNumber(row.Price),
 
@@ -283,7 +268,6 @@ const excelRowToForm = (row) => {
         videoUrls: videos.length ? videos : ["", ""],
         amenityIds: amenities,
 
-        // Ưu tiên ID; fallback tên (để handler sau khớp)
         provinceId: row.ProvinceId || row.Province || "",
         districtId: row.DistrictId || row.District || "",
         wardId: row.WardId || row.Ward || "",
@@ -295,8 +279,8 @@ const excelRowToForm = (row) => {
         position: row.Position || "",
         direction: row.Direction || "",
         landArea: parseNumber(row.LandArea),
-        usableArea: parseNumber(row.UsableArea),   // NEW
-        floors: parseIntOr0(row.Floors),           // NEW
+        usableArea: parseNumber(row.UsableArea),
+        floors: parseIntOr0(row.Floors),
         bedrooms: parseIntOr0(row.Bedrooms),
         bathrooms: parseIntOr0(row.Bathrooms),
         width: parseNumber(row.Width),
@@ -310,7 +294,7 @@ const excelRowToForm = (row) => {
             zalo: row.Zalo || "",
         },
 
-        listingType: row.ListingType || null,                 // NORMAL | VIP | PREMIUM
+        listingType: row.ListingType || null,
         listingTypePolicyId: row.ListingTypePolicyId || null,
 
         ownerAuth: {
@@ -343,7 +327,7 @@ export default function PostCreateDrawer({
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const screens = Grid.useBreakpoint();
-    const isMobile = !screens.sm;     // < 640px
+    const isMobile = !screens.sm;
     const isTablet = screens.sm && !screens.md;
 
     const drawerWidth = isMobile ? "100vw" : (isTablet ? 640 : 760);
@@ -379,7 +363,6 @@ export default function PostCreateDrawer({
         []
     );
 
-    /* ===== Địa giới & gói tin ===== */
     const {
         provinces, districts, wards,
         loadingDistricts, loadingWards,
@@ -396,7 +379,7 @@ export default function PostCreateDrawer({
         return m;
     }, [invItems]);
 
-    /* ===== 2. TÍNH TOÁN GIỚI HẠN ẢNH DỰA TRÊN GÓI TIN ===== */
+    /* ===== 2. TÍNH TOÁN GIỚI HẠN ẢNH ===== */
     const currentListingTypeObj = useMemo(() => {
         if (!listingTypes || !postTypeId) return null;
         return listingTypes.find(t => t.id === postTypeId);
@@ -405,7 +388,7 @@ export default function PostCreateDrawer({
     const typeCode = currentListingTypeObj?.listingType || formData.listingType || "NORMAL";
     const maxImages = IMAGE_LIMITS[typeCode] || IMAGE_LIMITS.DEFAULT;
 
-    /* ===== 3. TỰ ĐỘNG CẮT ẢNH NẾU ĐỔI GÓI TIN MÀ DƯ ẢNH ===== */
+    /* ===== 3. TỰ ĐỘNG CẮT ẢNH KHI ĐỔI GÓI ===== */
     useEffect(() => {
         if (formData.images.length > maxImages) {
             message.warning(`Gói ${typeCode} chỉ cho phép tối đa ${maxImages} ảnh. Hệ thống đã tự động cắt bớt.`);
@@ -416,7 +399,6 @@ export default function PostCreateDrawer({
         }
     }, [maxImages, typeCode, formData.images.length]);
 
-    /* ---- Reset + prefill contact (CREATE) hoặc fetch detail (EDIT) ---- */
     useEffect(() => {
         if (!open) return;
 
@@ -440,12 +422,10 @@ export default function PostCreateDrawer({
             return;
         }
 
-        // CHỈNH SỬA
         dispatch(fetchPropertyEditByIdThunk(editingId));
         setStep("form");
     }, [open, editingId, user, displayNameFromUser, dispatch]);
 
-    /* ===== Khi có currentProperty (edit) -> map ra form + merge contact ===== */
     useEffect(() => {
         if (!open || !editingId || !currentProperty) return;
         const mapped = mapDetailToFormData(currentProperty);
@@ -474,7 +454,6 @@ export default function PostCreateDrawer({
         })();
     }, [open, editingId, currentProperty, reloadAllByIds, loadWards]);
 
-    /* ===== gói mặc định / map text -> id ===== */
     useEffect(() => {
         if (!open || !listingTypes?.length) return;
 
@@ -494,7 +473,6 @@ export default function PostCreateDrawer({
         }
     }, [open, isEdit, listingTypes, postTypeId, formData.listingType, formData.listingTypePolicyId]);
 
-    /* ===== change handlers ===== */
     const onFieldChange = useCallback((name, value) => {
         setFormData((p) => ({ ...p, [name]: value }));
         setErrors((prev) => {
@@ -509,7 +487,6 @@ export default function PostCreateDrawer({
 
     useAddressSuggestions(formData, setFormData, provinces, districts, wards);
 
-    /* ===== Prefill ownerAuth từ contact nếu là chính chủ và các field trống ===== */
     useEffect(() => {
         if (!open) return;
         setFormData((prev) => {
@@ -534,7 +511,6 @@ export default function PostCreateDrawer({
         });
     }, [open]);
 
-    /* ===== Excel: Import handler ===== */
     const handleImportExcel = useCallback(async (file) => {
         try {
             const buf = await file.arrayBuffer();
@@ -549,18 +525,13 @@ export default function PostCreateDrawer({
             const row = rows[0];
             const mapped = excelRowToForm(row);
 
-            // XỬ LÝ ẢNH TỪ EXCEL VỚI GIỚI HẠN
-            // Lấy loại tin từ file hoặc mặc định NORMAL để tính limit
+            // ===== CẮT ẢNH KHI IMPORT =====
             const importedType = mapped.listingType || "NORMAL";
             const limitForImport = IMAGE_LIMITS[importedType] || IMAGE_LIMITS.DEFAULT;
-            
-            // Cắt ảnh
             mapped.images = mapped.images.slice(0, limitForImport);
 
-            // set các field đơn trước
             setFormData((prev) => ({ ...prev, ...mapped }));
 
-            // map địa giới (ưu tiên ID; nếu là tên → khớp theo name)
             let provinceId = mapped.provinceId;
             let districtId = mapped.districtId;
             let wardId = mapped.wardId;
@@ -590,14 +561,13 @@ export default function PostCreateDrawer({
                 wardId: wardId || prev.wardId,
             }));
 
-            message.success(`Đã nhập dữ liệu! (Giới hạn ${limitForImport} ảnh cho gói ${importedType})`);
+            message.success(`Đã nhập dữ liệu! (Giới hạn ${limitForImport} ảnh)`);
         } catch (err) {
             console.error(err);
-            message.error("Không đọc được file Excel. Vui lòng kiểm tra định dạng.");
+            message.error("Không đọc được file Excel.");
         }
     }, [provinces, districts, wards, loadDistricts, loadWards]);
 
-    /* ===== Excel: Download template ===== */
     const downloadExcelTemplate = useCallback(() => {
         const header = [
             "Title", "Description", "CategoryId", "PropertyType", "PriceType", "Price",
@@ -618,7 +588,7 @@ export default function PostCreateDrawer({
             PropertyType: "sell",
             PriceType: "SELL_PRICE",
             Price: 3500000000,
-            ProvinceId: 79,          // ví dụ (tuỳ dataset của bạn)
+            ProvinceId: 79,
             DistrictId: 760,
             WardId: 26734,
             StreetName: "Lê Lợi",
@@ -664,7 +634,6 @@ export default function PostCreateDrawer({
         XLSX.writeFile(wb, "post_template_with_ids.xlsx");
     }, []);
 
-    /* ===== sang bước type ===== */
     const goToTypeStep = useCallback(() => {
         if (isEdit) { setStep("type"); onContinue?.(formData); return; }
 
@@ -688,65 +657,6 @@ export default function PostCreateDrawer({
         setTimeout(() => { setLoading(false); setStep("type"); onContinue?.(formData); }, 400);
     }, [isEdit, formData, onContinue]);
 
-    /* ===== ACTION: UPDATE (isEdit) ===== */
-    const onUpdate = useCallback(async () => {
-        try {
-            const idToType = {};
-            (listingTypes || []).forEach((x) => (idToType[x.id] = x.listingType));
-            const selectedType =
-                idToType[postTypeId ?? formData.listingTypePolicyId] || formData.listingType || null;
-            const isVipLike = selectedType === "VIP" || selectedType === "PREMIUM";
-            const isChangingType = selectedType && selectedType !== formData.listingType;
-            const leftQty = isVipLike ? (invMap?.[selectedType] ?? 0) : Infinity;
-
-            if (isVipLike && isChangingType && leftQty <= 0) { setShowPromptEdit(true); return; }
-
-            const payload = { ...formData, listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId };
-            const submitMode = needsResubmit ? "PUBLISHED" : undefined;
-            console.log("👉 UPDATE - submitMode:", submitMode || "no change"),
-                await dispatch(
-                    updatePropertyThunk({
-                        id: editingId,
-                        formData: payload,
-                        listingTypePolicyId: payload.listingTypePolicyId,
-                        submitMode
-                    })
-                ).unwrap();
-            message.success("Cập nhật tin thành công!");
-            onCreated?.();
-            onClose?.();
-        } catch (e) { message.error(e || "Cập nhật tin thất bại"); }
-    }, [dispatch, editingId, formData, postTypeId, onCreated, onClose, listingTypes, invMap, needsResubmit]);
-
-    const onPublishDraft = useCallback(async () => {
-        try {
-            const idToType = {};
-            (listingTypes || []).forEach((x) => (idToType[x.id] = x.listingType));
-            const selectedType =
-                idToType[postTypeId ?? formData.listingTypePolicyId] || formData.listingType || null;
-
-            const isVipLike = selectedType === "VIP" || selectedType === "PREMIUM";
-            const leftQty = isVipLike ? (invMap?.[selectedType] ?? 0) : Infinity;
-            if (isVipLike && leftQty <= 0) { setShowPromptEdit(true); return; }
-
-            const payload = { ...formData, listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId };
-            console.log("👉 PUBLISH - submitMode:", "PUBLISHED", { payload });
-            await dispatch(
-                updatePropertyThunk({
-                    id: editingId,
-                    formData: payload,
-                    listingTypePolicyId: payload.listingTypePolicyId,
-                    submitMode: "PUBLISHED",
-                })
-            ).unwrap();
-
-            message.success("Đăng tin thành công! Tin đã gửi duyệt.");
-            onCreated?.();
-            onClose?.();
-        } catch (e) { message.error(e || "Đăng tin thất bại"); }
-    }, [dispatch, editingId, formData, postTypeId, listingTypes, invMap, onCreated, onClose]);
-
-    /* ===== Footer ===== */
     const footerNode = useMemo(() => {
         if (step === "form") {
             return (
@@ -778,22 +688,6 @@ export default function PostCreateDrawer({
             );
         }
 
-        if (isEdit) {
-             return (
-                <FooterType
-                    setStep={setStep}
-                    formData={formData}
-                    setFormData={setFormData} // Nhớ truyền cái này!
-                    postTypeId={postTypeId}
-                    inventory={invMap}
-                    listingTypes={listingTypes}
-                    onCreated={onCreated}
-                    isEdit={isEdit}           // Nhớ truyền cái này!
-                    editingId={editingId}     // Nhớ truyền cái này!
-                />
-            );
-        }
-
         return (
             <FooterType
                 setStep={setStep}
@@ -803,13 +697,13 @@ export default function PostCreateDrawer({
                 inventory={invMap}
                 listingTypes={listingTypes}
                 onCreated={onCreated}
-                isEdit={false}
-                editingId={null}
+                isEdit={isEdit}
+                editingId={editingId}
             />
         );
     }, [
         step, onClose, formData, loading, goToTypeStep,
-        postTypeId, invMap, listingTypes, onCreated, isEdit, posting, onUpdate, onPublishDraft, isExpired
+        postTypeId, invMap, listingTypes, onCreated, isEdit
     ]);
 
     const showBlockingSpin = loadingDetail;
@@ -845,24 +739,19 @@ export default function PostCreateDrawer({
                     mask: { backgroundColor: "rgba(15,23,42,.35)", backdropFilter: "blur(3px)" },
                 }}
             >
-                {/* Header sticky */}
                 <div className="sticky top-0 z-10">
                     <Header step={step} onClose={onClose} isEdit={isEdit} />
                 </div>
 
-                {/* Overlay loading when fetching edit detail */}
                 {showBlockingSpin && (
                     <div className="absolute inset-0 z-20 grid place-items-center bg-white/60">
                         <Spin tip="Đang tải chi tiết tin..." size="large" />
                     </div>
                 )}
 
-                {/* === BODY + FOOTER (sticky bottom) === */}
                 <div className="flex flex-col min-h-0 flex-1">
-                    {/* CONTENT */}
                     {step === "form" ? (
                         <div className="flex-1 min-h-0">
-                            {/* Thanh nhập Excel */}
                             <ExcelImportBar
                                 onImport={handleImportExcel}
                                 onDownloadTemplate={downloadExcelTemplate}
@@ -883,7 +772,6 @@ export default function PostCreateDrawer({
                                     loadingWards={loadingWards}
                                 />
 
-                                {/* ====== SECTION GỘP: Chính chủ + Ảnh xây dựng ====== */}
                                 <OwnerAndConstructionSection
                                     ownerValue={formData.ownerAuth}
                                     onOwnerChange={(next) => setFormData((p) => ({ ...p, ownerAuth: next }))}
@@ -948,12 +836,11 @@ export default function PostCreateDrawer({
                         </div>
                     )}
 
-                    {/* FOOTER (sticky bottom) */}
                     <div className="sticky bottom-0 z-10">{footerNode}</div>
                 </div>
             </Drawer>
 
-            {/* Modal nhắc mua thêm (Edit) */}
+            {/* Modal nhắc mua thêm (Edit - dùng chung nếu cần) */}
             <Modal centered open={showPromptEdit} footer={null} onCancel={() => setShowPromptEdit(false)} title={null}>
                 <div className="text-center space-y-3">
                     <div className="text-lg font-semibold text-[#0f223a]">Bạn không còn lượt cho gói đã chọn</div>
@@ -979,7 +866,7 @@ export default function PostCreateDrawer({
     );
 }
 
-/* ========== FooterType cho tạo mới ========== */
+/* ========== FooterType (Đã tách logic Update/Create) ========== */
 function FooterType({
     setStep,
     formData,
@@ -993,6 +880,7 @@ function FooterType({
 }) {
     const navigate = useNavigate();
     const [showPrompt, setShowPrompt] = useState(false);
+    const [showPromptEdit, setShowPromptEdit] = useState(false);
     const dispatch = useDispatch();
     const posting = useSelector((s) => s.property?.creating);
 
@@ -1002,74 +890,52 @@ function FooterType({
         return m;
     }, [listingTypes]);
 
-    const currentType = idToTypeMap?.[postTypeId];
-    const isVipLike = currentType === "VIP" || currentType === "PREMIUM";
-    const qty = isVipLike ? (inventory?.[currentType] ?? 0) : Infinity;
+    const selectedTypeName = idToTypeMap?.[postTypeId] || "NORMAL";
+    const isVipLike = selectedTypeName === "VIP" || selectedTypeName === "PREMIUM";
+    const qty = isVipLike ? (inventory?.[selectedTypeName] ?? 0) : Infinity;
     const outOfStock = isVipLike && qty <= 0;
 
     const [autoRepostVal, setAutoRepostVal] = useState(formData.autoRepost);
 
-    // Đồng bộ khi formData thay đổi từ bên ngoài (lúc mới mở drawer)
     useEffect(() => {
         setAutoRepostVal(!!formData.autoRepost);
     }, [formData.autoRepost]);
 
-    // --- LOGIC XỬ LÝ KHI GẠT NÚT SWITCH ---
     const handleAutoRepostChange = async (checked) => {
-        console.log("1. Switch clicked. Value:", checked);
-        
-        // 1. Cập nhật UI ngay lập tức
         setAutoRepostVal(checked);
-
-        // 2. Cập nhật state cha (để đồng bộ dữ liệu nếu user lỡ bấm Cập nhật sau đó)
-        if (setFormData) {
-             setFormData(prev => ({ ...prev, autoRepost: checked }));
-        }
-
-        // 3. Nếu đang ở chế độ SỬA (Edit) -> Gọi API Toggle ngay lập tức
+        if (setFormData) setFormData(prev => ({ ...prev, autoRepost: checked }));
+        
         if (isEdit && editingId) {
-            console.log("2. Mode EDIT detected. Calling toggle API for ID:", editingId);
             try {
-                // Gọi API Patch
                 await dispatch(toggleAutoRenewThunk({ id: editingId, enable: checked })).unwrap();
-                
-                console.log("3. API Success");
                 message.success(`Đã ${checked ? "bật" : "tắt"} tự động đăng lại`);
             } catch (e) {
-                console.error("3. API Failed:", e);
-                
-                // Nếu lỗi, revert UI lại như cũ
                 setAutoRepostVal(!checked);
                 if (setFormData) setFormData(prev => ({ ...prev, autoRepost: !checked }));
                 message.error("Lỗi cập nhật trạng thái: " + e);
             }
-        } else {
-            console.log("2. Mode CREATE detected. Saved to state only.");
         }
     };
 
-    // Hàm đăng tin (cho nút Đăng tin / Cập nhật lớn)
-    const handlePost = async () => {
+    // 1. LOGIC TẠO MỚI (CREATE)
+    const handleCreate = async () => {
         if (outOfStock) {
             setShowPrompt(true);
             return;
         }
 
-        // Lấy giá trị từ formData (đã được sync ở handleAutoRepostChange)
         const payload = {
             ...formData,
             listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
-            autoRepost: formData.autoRepost, // Dùng giá trị từ formData
+            autoRepost: formData.autoRepost,
         };
 
         try {
-            await dispatch(
-                createPropertyThunk({
-                    formData: payload,
-                    listingTypePolicyId: payload.listingTypePolicyId,
-                    submitMode: "PUBLISHED",
-                })
-            ).unwrap();
+            await dispatch(createPropertyThunk({
+                formData: payload,
+                listingTypePolicyId: payload.listingTypePolicyId,
+                submitMode: "PUBLISHED",
+            })).unwrap();
             message.success("Đăng tin thành công!");
             onCreated?.();
         } catch (e) {
@@ -1077,50 +943,91 @@ function FooterType({
         }
     };
 
+    // 2. LOGIC CẬP NHẬT (UPDATE)
+    const handleUpdate = async () => {
+        // Chỉ check nếu đổi gói lên cao
+        const oldType = formData.listingType; 
+        const isChangingType = selectedTypeName && selectedTypeName !== oldType;
+
+        if (isVipLike && isChangingType && qty <= 0) {
+            setShowPromptEdit(true);
+            return;
+        }
+
+        const payload = {
+            ...formData,
+            listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
+            autoRepost: formData.autoRepost,
+        };
+
+        try {
+            await dispatch(updatePropertyThunk({
+                id: editingId,
+                formData: payload,
+                listingTypePolicyId: payload.listingTypePolicyId,
+                submitMode: "PUBLISHED", 
+            })).unwrap();
+            
+            message.success("Cập nhật tin thành công!");
+            onCreated?.();
+        } catch (e) {
+            message.error(e || "Cập nhật thất bại");
+        }
+    };
+
     return (
         <>
             <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
                 <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
+                
                 <div className="flex items-center gap-2">
-                    <Switch
-                        checked={autoRepostVal}
-                        onChange={handleAutoRepostChange}
-                    />
+                    <Switch checked={autoRepostVal} onChange={handleAutoRepostChange} />
                     <span className="text-gray-700 text-sm">Tự động đăng lại</span>
                     <Tooltip title="Tự động đăng lại tin khi hết hạn">
                         <InfoCircleOutlined className="text-gray-500 text-xs" />
                     </Tooltip>
                 </div>
+
                 <Button
                     type="primary"
                     loading={posting}
                     className="bg-[#1b264f] hover:bg-[#22347c]"
-                    onClick={handlePost} // Nếu bạn muốn có một nút đăng tin khác, có thể dùng cả 2
+                    onClick={isEdit ? handleUpdate : handleCreate}
                 >
-                    Đăng tin
+                    {isEdit ? "Cập nhật" : "Đăng tin"}
                 </Button>
             </div>
 
-            {/* Modal nhắc mua thêm */}
+            {/* Modal nhắc mua thêm (CREATE) */}
             <Modal centered open={showPrompt} footer={null} onCancel={() => setShowPrompt(false)} title={null}>
                 <div className="text-center space-y-3">
                     <div className="text-lg font-semibold text-[#0f223a]">
-                        Bạn không còn lượt đăng cho gói {currentType}
+                        Bạn không còn lượt đăng cho gói {selectedTypeName}
                     </div>
                     <p className="text-gray-600">
-                        Gói <b>{currentType}</b> đã hết số lượng. Bạn có muốn mua thêm không?
+                        Gói <b>{selectedTypeName}</b> đã hết số lượng. Bạn có muốn mua thêm không?
                     </p>
                     <div className="flex justify-center gap-2 pt-2">
                         <Button onClick={() => setShowPrompt(false)}>Để sau</Button>
-                        <Button
-                            type="primary"
-                            icon={<CreditCardOutlined />}
-                            onClick={() => {
-                                setShowPrompt(false);
-                                navigate("/dashboard/purchase");
-                            }}
-                        >
-                            Tiếp tục
+                        <Button type="primary" icon={<CreditCardOutlined />} onClick={() => { setShowPrompt(false); navigate("/dashboard/purchase"); }}>
+                            Mua thêm
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Modal nhắc mua thêm (UPDATE - chỉ hiện khi đổi gói) */}
+            <Modal centered open={showPromptEdit} footer={null} onCancel={() => setShowPromptEdit(false)} title={null}>
+                <div className="text-center space-y-3">
+                    <div className="text-lg font-semibold text-[#0f223a]">Nâng cấp gói tin</div>
+                    <p className="text-gray-600">
+                        Bạn đang chuyển sang gói <b>{selectedTypeName}</b> nhưng số lượng còn lại bằng 0. 
+                        Vui lòng mua thêm để thực hiện nâng cấp.
+                    </p>
+                    <div className="flex justify-center gap-2 pt-2">
+                        <Button onClick={() => setShowPromptEdit(false)}>Hủy nâng cấp</Button>
+                        <Button type="primary" icon={<CreditCardOutlined />} onClick={() => { setShowPromptEdit(false); navigate("/dashboard/purchase"); }}>
+                            Mua ngay
                         </Button>
                     </div>
                 </div>

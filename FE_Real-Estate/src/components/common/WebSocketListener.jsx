@@ -9,6 +9,10 @@ import { supportSliceActions } from "@/store/supportSlice";
 import { logoutThunk } from "@/store/authSlice";
 import ForceLogoutModal from "@/components/common/ForceLogoutModal";
 import AppNotificationModal from "@/components/common/AppNotificationModal";
+import { 
+  fetchMyPropertyCountsThunk, 
+  triggerRefreshList 
+} from "@/store/propertySlice";
 
 function safeJson(str) {
   try {
@@ -166,6 +170,36 @@ export default function WebSocketListener() {
             "Notifications",
           ])
         );
+
+        const REAL_ESTATE_REFRESH_TYPES = [
+            // Duyệt tin
+            "LISTING_APPROVED",
+            "LISTING_REJECTED",
+            "LISTING_EDITED_PENDING",
+            
+            // Vòng đời & Hệ thống
+            "LISTING_EXPIRED",
+            "LISTING_EXPIRING_SOON",
+            "LISTING_AUTO_RENEWED",
+            "LISTING_RENEW_FAILED",
+            "POST_WARNING",
+
+            // Hành động (để đồng bộ nếu user mở nhiều tab)
+            "LISTING_HIDDEN",
+            "LISTING_UNHIDDEN",
+            "LISTING_MARKED_SOLD",
+            "LISTING_UNMARKED_SOLD"
+        ];
+
+        if (REAL_ESTATE_REFRESH_TYPES.includes(notif.type)) {
+            console.log(`[WS] Tin BĐS thay đổi trạng thái (${notif.type}) -> Refreshing list...`);
+            
+            // 1. Cập nhật lại số đếm trên các Tab (Active: 5, Pending: 2...)
+            dispatch(fetchMyPropertyCountsThunk());
+
+            // 2. Bắn tín hiệu để PostManagerPage tự reload danh sách tin bên dưới
+            dispatch(triggerRefreshList());
+        }
 
         const receiverId = extractReceiverId(notif);
         const uid = currentUserId;

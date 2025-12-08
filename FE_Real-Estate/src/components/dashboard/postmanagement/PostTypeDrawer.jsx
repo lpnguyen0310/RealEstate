@@ -115,7 +115,7 @@
                             const isVipLike = opt.type === "VIP" || opt.type === "PREMIUM";
                             const isDepleted = isVipLike && opt.qty === 0; // hết lượt
                             const isCurrent = currentTypeText === opt.type; // gói hiện tại khi edit
-                            const isBlocked = isDepleted && !isCurrent; // hết lượt & không phải gói hiện tại → cấm chọn
+                            const isBlocked = false; // hết lượt & không phải gói hiện tại → cấm chọn
 
                             const defaultBadge = isVipLike
                                 ? (typeof opt.qty === "number" ? `Còn ${opt.qty}` : "—")
