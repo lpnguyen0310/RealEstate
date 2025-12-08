@@ -85,9 +85,9 @@ export const notificationApi = createApi({
       // ⭐️ Tự động refresh:
       // "Khi chạy xong, làm mới (refresh) data của 2 tag này"
       invalidatesTags: [
-{ type: 'Notifications', id: 'LIST' },
-'UnreadCount',
-],
+      { type: 'Notifications', id: 'LIST' },
+      'UnreadCount',
+      ],
     }),
   }),
 });

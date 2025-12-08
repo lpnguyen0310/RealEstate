@@ -748,6 +748,8 @@ const initialState = {
     errorFavorites: null,
     currentFavoriteUsers: [],
     pendingAction: null,
+
+    refreshSignal: 0,
 };
 
 const propertySlice = createSlice({
@@ -832,6 +834,9 @@ const propertySlice = createSlice({
         },
         clearPendingAction: (state) => {
             state.pendingAction = null;
+        },
+        triggerRefreshList: (state) => {
+            state.refreshSignal += 1;
         },
     },
     extraReducers: (b) => {
@@ -1196,6 +1201,7 @@ export const {
     setPendingAction,
     clearPendingAction,
     clearHomeSlots,
+    triggerRefreshList,
 } = propertySlice.actions;
 
 export default propertySlice.reducer;
