@@ -2,7 +2,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-import Sidebar from "@/components/dashboard/Sidebar";
+import Sidebar from "@/components/dashboard/SideBar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ChatHub from "@/components/chathub/ChatHub";
 
