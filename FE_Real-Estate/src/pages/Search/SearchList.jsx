@@ -41,56 +41,70 @@ const Icon = {
   ),
 };
 
+/* ============== Listing badge config ============== */
+const LISTING_BADGE = {
+  PREMIUM: {
+    label: "PREMIUM",
+    className:
+      "bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 shadow-[0_0_0_1px_rgba(255,255,255,0.5)]",
+  },
+  VIP: {
+    label: "VIP",
+    className:
+      "bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-500 shadow-[0_0_0_1px_rgba(255,255,255,0.5)]",
+  },
+  NORMAL: null, // tin thường không hiển thị ribbon
+};
+
 /* ============== Skeleton helpers ============== */
 function SkeletonBlock({ className = "" }) {
-  // bg-gray-200: fallback nếu quên import CSS shimmer .skeleton
-  return <div className={`skeleton bg-gray-200 ${className}`} />;
+  return <div className={`animate-pulse rounded-lg bg-slate-200/80 ${className}`} />;
 }
 
 function PropertyListItemSkeleton() {
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+    <article className="rounded-2xl border border-slate-200 bg-white/70 shadow-sm">
       <div className="p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
         {/* LEFT */}
         <div className="w-full sm:w-[320px] shrink-0">
-          <SkeletonBlock className="h-[210px] w-full rounded-xl" />
+          <SkeletonBlock className="h-[220px] w-full rounded-xl" />
           <div className="mt-2 flex items-center justify-between">
-            <SkeletonBlock className="h-6 w-24 rounded-full" />
-            <SkeletonBlock className="h-4 w-14 rounded" />
+            <SkeletonBlock className="h-6 w-24" />
+            <SkeletonBlock className="h-4 w-16" />
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2">
-            <SkeletonBlock className="h-[70px] rounded-lg" />
-            <SkeletonBlock className="h-[70px] rounded-lg" />
-            <SkeletonBlock className="h-[70px] rounded-lg" />
+            <SkeletonBlock className="h-[70px]" />
+            <SkeletonBlock className="h-[70px]" />
+            <SkeletonBlock className="h-[70px]" />
           </div>
         </div>
 
         {/* RIGHT */}
         <div className="flex-1 min-w-0">
-          <SkeletonBlock className="h-6 w-3/4 rounded" />
+          <SkeletonBlock className="h-6 w-3/4" />
           <div className="mt-2 flex items-center gap-2">
-            <SkeletonBlock className="h-4 w-5 rounded" />
-            <SkeletonBlock className="h-4 w-40 rounded" />
+            <SkeletonBlock className="h-4 w-5" />
+            <SkeletonBlock className="h-4 w-40" />
           </div>
           <div className="mt-2 flex gap-4">
-            <SkeletonBlock className="h-4 w-16 rounded" />
-            <SkeletonBlock className="h-4 w-12 rounded" />
-            <SkeletonBlock className="h-4 w-12 rounded" />
+            <SkeletonBlock className="h-4 w-16" />
+            <SkeletonBlock className="h-4 w-12" />
+            <SkeletonBlock className="h-4 w-12" />
           </div>
-          <SkeletonBlock className="mt-2 h-4 w-5/6 rounded" />
-          <SkeletonBlock className="mt-1 h-4 w-2/3 rounded" />
+          <SkeletonBlock className="mt-2 h-4 w-5/6" />
+          <SkeletonBlock className="mt-1 h-4 w-2/3" />
 
-          <div className="mt-3 flex items-center justify-between gap-3 bg-[#f5f9ff] rounded-xl px-3 py-2">
+          <div className="mt-3 flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-3 py-2">
             <div className="flex items-center gap-2 min-w-0">
               <SkeletonBlock className="h-8 w-8 rounded-full" />
               <div>
-                <SkeletonBlock className="h-4 w-28 rounded" />
-                <SkeletonBlock className="mt-1 h-3 w-16 rounded" />
+                <SkeletonBlock className="h-4 w-28" />
+                <SkeletonBlock className="mt-1 h-3 w-16" />
               </div>
             </div>
             <div className="flex items-center gap-2">
               <SkeletonBlock className="h-9 w-28 rounded-full" />
-              <SkeletonBlock className="h-8 w-8 rounded" />
+              <SkeletonBlock className="h-8 w-8 rounded-full" />
             </div>
           </div>
         </div>
@@ -101,115 +115,159 @@ function PropertyListItemSkeleton() {
 
 /* ============== Real item ============== */
 function PropertyListItem({ data, onClick }) {
-  const images = data.images?.length ? data.images : (data.image ? [data.image] : []);
+  const images = data.images?.length ? data.images : data.image ? [data.image] : [];
   const thumbs = images.slice(1, 4);
   const photosCount = data.photosCount ?? images.length ?? data.photos ?? 0;
 
+  // Lấy loại tin từ BE, ví dụ: PREMIUM / VIP / NORMAL
+  const listingType = data.listingType || data.listingLevel || "NORMAL";
+  const badge = LISTING_BADGE[listingType];
+
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+    <article className="group rounded-2xl border border-slate-200 bg-white/80 shadow-sm hover:shadow-xl hover:border-blue-500/60 transition-all duration-200 overflow-hidden">
       <div className="p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
         {/* LEFT: ảnh + thumbnails + chips */}
         <div className="w-full sm:w-[320px] shrink-0">
-          <div className="rounded-xl overflow-hidden">
+          <div className="relative rounded-xl overflow-hidden bg-slate-100">
+            {/* RIBBON PREMIUM / VIP */}
+            {badge && (
+              <div
+                className={`absolute left-0 top-3 inline-flex items-center gap-1 px-3 py-1 rounded-r-full text-[11px] font-semibold text-white backdrop-blur-sm ${badge.className}`}
+              >
+                <span className="text-base leading-none">⚡</span>
+                <span>{badge.label}</span>
+              </div>
+            )}
+
+            {/* Gradient overlay bottom */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />
+
             {images[0] ? (
               <img
                 src={images[0]}
                 alt={data.title}
-                className="h-[210px] w-full object-cover"
+                className="h-[220px] w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 loading="lazy"
               />
             ) : (
-              <div className="h-[210px] w-full bg-gray-100" />
+              <div className="h-[220px] w-full bg-slate-100" />
             )}
-          </div>
 
-          {(data.postedAt || photosCount) && (
-            <div className="mt-2 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-gray-600">
+            {/* Info overlay bottom-left */}
+            {(data.postedAt || photosCount) && (
+              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-slate-100">
                 {data.postedAt && (
-                  <span className="inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-full">
-                    <Icon.Clock /> {data.postedAt}
+                  <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 backdrop-blur-sm">
+                    <Icon.Clock /> <span className="truncate">{data.postedAt}</span>
                   </span>
                 )}
+                {photosCount ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 backdrop-blur-sm">
+                    <Icon.Camera /> {photosCount} ảnh
+                  </span>
+                ) : null}
               </div>
-              {photosCount ? (
-                <span className="inline-flex items-center gap-1 text-xs text-gray-700">
-                  <Icon.Camera /> {photosCount}
-                </span>
-              ) : null}
-            </div>
-          )}
+            )}
+          </div>
 
           {thumbs.length > 0 && (
             <div className="mt-2 grid grid-cols-3 gap-2">
               {thumbs.map((src, i) => (
-                <img
+                <div
                   key={i}
-                  src={src}
-                  className="h-[70px] w-full object-cover rounded-lg"
-                  loading="lazy"
-                />
+                  className="relative overflow-hidden rounded-lg bg-slate-100"
+                >
+                  <img
+                    src={src}
+                    className="h-[70px] w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                </div>
               ))}
             </div>
           )}
         </div>
 
         {/* RIGHT: nội dung */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Title + Price */}
           <div className="flex items-start justify-between gap-3">
             <h3
-              className="text-[18px] sm:text-[20px] font-semibold leading-snug line-clamp-2 cursor-pointer hover:text-blue-600"
+              className="text-[18px] sm:text-[20px] font-semibold leading-snug line-clamp-2 cursor-pointer text-slate-900 hover:text-blue-600 transition-colors"
               title={data.title}
               onClick={onClick}
             >
               {data.title}
             </h3>
             <div className="text-right shrink-0">
-              <div className="text-blue-600 font-bold text-lg">
+              <div className="bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400 bg-clip-text text-transparent font-extrabold text-lg">
                 {data.price || "Thỏa thuận"}
               </div>
               {data.pricePerM2 && (
-                <div className="text-xs text-gray-500">({data.pricePerM2})</div>
+                <div className="mt-0.5 text-xs text-slate-500">
+                  ({data.pricePerM2})
+                </div>
               )}
             </div>
           </div>
 
-          <div className="mt-2 flex items-center gap-2 text-gray-600">
-            <Icon.Pin />
-            <span className="text-sm truncate">{data.addressMain}</span>
+          {/* Address */}
+          <div className="mt-2 flex items-center gap-2 text-slate-600">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+              <Icon.Pin />
+            </span>
+            <span className="text-sm truncate" title={data.addressMain}>
+              {data.addressMain}
+            </span>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-700">
-            <span className="inline-flex items-center gap-1"><Icon.Area /> {data.area ?? "—"} m²</span>
-            <span className="inline-flex items-center gap-1"><Icon.Bed /> {data.bed ?? "—"}</span>
-            <span className="inline-flex items-center gap-1"><Icon.Bath /> {data.bath ?? "—"}</span>
+          {/* Stats row */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-slate-700">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
+              <Icon.Area />
+              <span>{data.area ?? "—"} m²</span>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
+              <Icon.Bed />
+              <span>{data.bed ?? "—"} PN</span>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
+              <Icon.Bath />
+              <span>{data.bath ?? "—"} WC</span>
+            </span>
           </div>
 
+          {/* Description */}
           {data.description && (
-            <p className="mt-2 text-sm text-gray-600 line-clamp-2">{data.description}</p>
+            <p className="mt-2 text-sm text-slate-600 line-clamp-2">
+              {data.description}
+            </p>
           )}
 
-          <div className="mt-3 flex items-center justify-between gap-3 bg-[#f5f9ff] rounded-xl px-3 py-2">
-            <div className="flex items-center gap-2 min-w-0">
+          {/* Agent + actions */}
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 px-3 py-2.5 border border-slate-100">
+            <div className="flex items-center gap-3 min-w-0">
               {data.agent?.avatar ? (
                 <img
                   src={data.agent.avatar}
                   alt={data.agent.name}
-                  className="h-8 w-8 rounded-full object-cover ring-1 ring-gray-200"
+                  className="h-9 w-9 rounded-full object-cover ring-2 ring-slate-100"
                 />
               ) : (
-                <div className="h-8 w-8 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center font-semibold text-gray-600">
+                <div className="h-9 w-9 rounded-full bg-slate-100 ring-2 ring-slate-200 flex items-center justify-center font-semibold text-slate-700">
                   {(data.agent?.name || "M")?.charAt(0)}
                 </div>
               )}
-              <div className="leading-tight">
+              <div className="leading-tight min-w-0">
                 <div
-                  className="text-sm font-medium truncate max-w-[180px]"
+                  className="text-sm font-medium truncate max-w-[180px] text-slate-900"
                   title={data.agent?.name || "Môi giới"}
                 >
                   {data.agent?.name || "Môi giới"}
                 </div>
-                <div className="text-xs text-gray-500">{data.agent?.role || "Môi giới"}</div>
+                <div className="mt-0.5 text-xs text-slate-500">
+                  {data.agent?.role || "Môi giới"}
+                </div>
               </div>
             </div>
 
@@ -217,10 +275,10 @@ function PropertyListItem({ data, onClick }) {
               {data.agent?.phone && (
                 <a
                   href={`tel:${String(data.agent.phone).replace(/\s/g, "")}`}
-                  className="h-9 px-3 rounded-full bg-[#173b6c] text-white text-sm font-semibold flex items-center gap-2"
+                  className="inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-500 px-3 text-sm font-semibold text-white shadow-sm hover:shadow-md hover:brightness-110 transition-all"
                 >
                   <Icon.Phone />
-                  {maskPhone(data.agent.phone)}
+                  <span>{maskPhone(data.agent.phone)}</span>
                 </a>
               )}
 
@@ -228,13 +286,13 @@ function PropertyListItem({ data, onClick }) {
                 href={data.agent?.zaloUrl || "#"}
                 target="_blank"
                 rel="noreferrer"
-                className="h-[32px] w-[32px] flex items-center justify-center"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all"
                 title="Zalo"
               >
                 <img
                   src={zaloIcon}
                   alt="Zalo"
-                  className="w-[28px] h-[28px] object-contain"
+                  className="w-[22px] h-[22px] object-contain"
                   loading="lazy"
                 />
               </a>
@@ -246,15 +304,12 @@ function PropertyListItem({ data, onClick }) {
   );
 }
 
-/* ============== SearchList wrapper ============== */
-/**
- * props:
- * - items: Array<any> | undefined
- * - loading?: boolean   (optional, nếu không truyền sẽ hiểu loading khi items == null)
- * - minDelayMs?: number (optional, mặc định 1200ms)
- * - skeletonCount?: number (optional, mặc định 6)
- */
-export default function SearchList({ items, loading, minDelayMs = 1200, skeletonCount = 6 }) {
+export default function SearchList({
+  items,
+  loading,
+  minDelayMs = 1200,
+  skeletonCount = 6,
+}) {
   const [minDelayDone, setMinDelayDone] = useState(false);
   const timerRef = useRef(null);
 
@@ -263,10 +318,9 @@ export default function SearchList({ items, loading, minDelayMs = 1200, skeleton
     return () => clearTimeout(timerRef.current);
   }, [minDelayMs]);
 
-  const isLoading = (loading ?? (items == null)); // nếu không truyền loading → xem items null là loading
+  const isLoading = loading ?? items == null;
   const hasData = Array.isArray(items) && items.length > 0;
 
-  // Hiện skeleton nếu còn loading hoặc chưa qua min delay
   const showSkeleton = isLoading || !minDelayDone;
 
   const listToRender = useMemo(() => {
@@ -277,8 +331,14 @@ export default function SearchList({ items, loading, minDelayMs = 1200, skeleton
 
   if (!showSkeleton && !hasData) {
     return (
-      <div className="col-span-full text-center text-gray-600 py-8">
-        Không có kết quả phù hợp.
+      <div className="col-span-full flex flex-col items-center justify-center py-10 text-slate-500">
+        <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+          <span className="text-xl">🔍</span>
+        </div>
+        <p className="text-sm font-medium">Không có kết quả phù hợp.</p>
+        <p className="mt-1 text-xs text-slate-400">
+          Thử thay đổi bộ lọc hoặc khu vực tìm kiếm nhé.
+        </p>
       </div>
     );
   }
