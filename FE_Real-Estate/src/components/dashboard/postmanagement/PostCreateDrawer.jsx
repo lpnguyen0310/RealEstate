@@ -33,6 +33,14 @@ import { useVNLocations, useAddressSuggestions, useListingTypes } from "@/hooks"
 import dayjs from "dayjs";
 import * as XLSX from "xlsx";
 
+/* ===== 1. CẤU HÌNH GIỚI HẠN ẢNH ===== */
+const IMAGE_LIMITS = {
+    NORMAL: 3,    // 1 ảnh lớn + 2 ảnh nhỏ
+    VIP: 7,       // 1 ảnh lớn + 6 ảnh nhỏ
+    PREMIUM: 15,  // Khoảng 15 ảnh
+    DEFAULT: 3    // Mặc định
+};
+
 /* ================= Header ================= */
 const Header = React.memo(function Header({ step, onClose, isEdit }) {
     const title = isEdit
@@ -141,8 +149,8 @@ function mapDetailToFormData(d) {
         position: d.position || "",
         direction: d.direction || "",
         landArea: d.landArea ?? "",
-        usableArea: d.usableArea ?? d.floorArea ?? "",           // NEW
-        floors: d.floors ?? d.numberOfFloors ?? 0,               // NEW
+        usableArea: d.usableArea ?? d.floorArea ?? "",          // NEW
+        floors: d.floors ?? d.numberOfFloors ?? 0,              // NEW
         bedrooms: d.bedrooms ?? 0,
         bathrooms: d.bathrooms ?? 0,
         width: d.width ?? "",
@@ -388,6 +396,26 @@ export default function PostCreateDrawer({
         return m;
     }, [invItems]);
 
+    /* ===== 2. TÍNH TOÁN GIỚI HẠN ẢNH DỰA TRÊN GÓI TIN ===== */
+    const currentListingTypeObj = useMemo(() => {
+        if (!listingTypes || !postTypeId) return null;
+        return listingTypes.find(t => t.id === postTypeId);
+    }, [listingTypes, postTypeId]);
+
+    const typeCode = currentListingTypeObj?.listingType || formData.listingType || "NORMAL";
+    const maxImages = IMAGE_LIMITS[typeCode] || IMAGE_LIMITS.DEFAULT;
+
+    /* ===== 3. TỰ ĐỘNG CẮT ẢNH NẾU ĐỔI GÓI TIN MÀ DƯ ẢNH ===== */
+    useEffect(() => {
+        if (formData.images.length > maxImages) {
+            message.warning(`Gói ${typeCode} chỉ cho phép tối đa ${maxImages} ảnh. Hệ thống đã tự động cắt bớt.`);
+            setFormData(prev => ({
+                ...prev,
+                images: prev.images.slice(0, maxImages)
+            }));
+        }
+    }, [maxImages, typeCode, formData.images.length]);
+
     /* ---- Reset + prefill contact (CREATE) hoặc fetch detail (EDIT) ---- */
     useEffect(() => {
         if (!open) return;
@@ -518,8 +546,16 @@ export default function PostCreateDrawer({
                 return;
             }
 
-            const row = rows[0]; // nếu muốn nhiều dòng → lặp
+            const row = rows[0];
             const mapped = excelRowToForm(row);
+
+            // XỬ LÝ ẢNH TỪ EXCEL VỚI GIỚI HẠN
+            // Lấy loại tin từ file hoặc mặc định NORMAL để tính limit
+            const importedType = mapped.listingType || "NORMAL";
+            const limitForImport = IMAGE_LIMITS[importedType] || IMAGE_LIMITS.DEFAULT;
+            
+            // Cắt ảnh
+            mapped.images = mapped.images.slice(0, limitForImport);
 
             // set các field đơn trước
             setFormData((prev) => ({ ...prev, ...mapped }));
@@ -554,7 +590,7 @@ export default function PostCreateDrawer({
                 wardId: wardId || prev.wardId,
             }));
 
-            message.success("Đã nhập dữ liệu từ Excel!");
+            message.success(`Đã nhập dữ liệu! (Giới hạn ${limitForImport} ảnh cho gói ${importedType})`);
         } catch (err) {
             console.error(err);
             message.error("Không đọc được file Excel. Vui lòng kiểm tra định dạng.");
@@ -741,51 +777,6 @@ export default function PostCreateDrawer({
                 </div>
             );
         }
-        // if (isEdit) {
-        //     return (
-        //         <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
-        //             <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
-
-        //             <div className="flex items-center gap-4">
-        //                 {/* 👉 Thêm block AutoRepost cho mode Edit */}
-        //                 <div className="flex items-center gap-2 mr-2">
-        //                     <Switch
-        //                         checked={formData.autoRepost}
-        //                         onChange={(checked) =>
-        //                             setFormData((p) => ({ ...p, autoRepost: checked }))
-        //                         }
-        //                     />
-        //                     <span className="text-gray-700 text-sm">Tự động đăng lại</span>
-        //                     <Tooltip title="Tự động đăng lại tin khi hết hạn">
-        //                         <InfoCircleOutlined className="text-gray-500 text-xs" />
-        //                     </Tooltip>
-        //                 </div>
-
-        //                 {/* Chỉ hiển thị nút Đăng lại nếu bài đã hết hạn */}
-        //                 {isExpired && (
-        //                     <Button
-        //                         type="primary"
-        //                         className="bg-[#1b264f] hover:bg-[#22347c]"
-        //                         onClick={onPublishDraft}
-        //                     >
-        //                         Đăng lại
-        //                     </Button>
-        //                 )}
-
-        //                 {!isExpired && (
-        //                     <Button
-        //                         type="primary"
-        //                         loading={posting}
-        //                         className="bg-[#1b264f] hover:bg-[#22347c]"
-        //                         onClick={onUpdate}
-        //                     >
-        //                         Cập nhật
-        //                     </Button>
-        //                 )}
-        //             </div>
-        //         </div>
-        //     );
-        // }
 
         if (isEdit) {
              return (
@@ -911,15 +902,22 @@ export default function PostCreateDrawer({
                                     value={formData.amenityIds}
                                     onChange={(next) => setFormData((p) => ({ ...p, amenityIds: next }))}
                                 />
-                                {/* ĐÃ BỎ ContactInfoSection */}
                             </div>
                         </div>
                     ) : (
                         <div className="flex-1 min-h-0">
                             <div className="h-full overflow-y-auto px-4 py-4 space-y-6 bg-[#f8faff] pb-28">
+                                {/* ===== 4. SỬA UI UPLOAD ẢNH (Chặn Upload) ===== */}
                                 <PublicImagesSection
                                     images={formData.images}
-                                    onChange={(arr) => setFormData((p) => ({ ...p, images: arr }))}
+                                    onChange={(arr) => {
+                                        if (arr.length > maxImages) {
+                                            message.warning(`Gói ${typeCode} giới hạn tối đa ${maxImages} ảnh.`);
+                                            setFormData((p) => ({ ...p, images: arr.slice(0, maxImages) }));
+                                        } else {
+                                            setFormData((p) => ({ ...p, images: arr }));
+                                        }
+                                    }}
                                     appendedImages={formData.constructionImages}
                                 />
                                 <PostTypeSection
