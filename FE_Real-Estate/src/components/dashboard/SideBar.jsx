@@ -1,4 +1,3 @@
-// src/components/Dashboard/Sidebar.jsx
 import { NavLink, useNavigate } from "react-router-dom";
 import { Tooltip, Drawer } from "antd";
 import { MENUS } from "@/data/SideBar/menuDataSideBar";

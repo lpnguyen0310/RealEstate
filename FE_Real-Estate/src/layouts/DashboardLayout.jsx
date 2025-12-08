@@ -1,10 +1,9 @@
-// src/layouts/DashboardLayout.jsx
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-import Sidebar from "@/components/Dashboard/Sidebar";
-import DashboardHeader from "@/components/Dashboard/DashboardHeader";
+import Sidebar from "@/components/dashboard/Sidebar";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ChatHub from "@/components/chathub/ChatHub";
 
 import { logoutThunk, getProfileThunk } from "@/store/authSlice";
