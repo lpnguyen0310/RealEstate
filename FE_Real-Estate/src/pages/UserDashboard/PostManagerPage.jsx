@@ -240,7 +240,7 @@ export default function PostManagerPage() {
                     {/* LEFT */}
                     <div className="min-w-0">
                         <div className="space-y-2 md:space-y-3">
-                            <h2 className="text-[22px] md:text-[26px] font-bold">Badongsan.vn</h2>
+                            <h2 className="text-[22px] md:text-[26px] font-bold">Nexus5-land.vn</h2>
                             <h3 className="text-[16px] md:text-[20px] font-semibold">
                                 Nền tảng Đăng tin Bất động sản Thế hệ mới
                             </h3>

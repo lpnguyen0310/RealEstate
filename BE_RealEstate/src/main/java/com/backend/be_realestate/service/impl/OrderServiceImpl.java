@@ -422,6 +422,16 @@ public class OrderServiceImpl implements OrderService {
                     " Trạng thái hiện tại: " + order.getStatus());
         }
 
+        long diffInMillies = Math.abs(new java.util.Date().getTime() - order.getCreatedAt().getTime());
+        long diffInDays = java.util.concurrent.TimeUnit.DAYS.convert(diffInMillies, java.util.concurrent.TimeUnit.MILLISECONDS);
+
+        // Khai báo hằng số hoặc config để dễ sửa sau này, ở đây hardcode 2 theo FE của bạn
+        int REFUND_WINDOW_DAYS = 2;
+
+        if (diffInDays > REFUND_WINDOW_DAYS) {
+            throw new IllegalStateException("Yêu cầu thất bại: Đơn hàng đã quá hạn hoàn tiền (" + diffInDays + " ngày). Giới hạn là " + REFUND_WINDOW_DAYS + " ngày.");
+        }
+
         // 1. Cập nhật trạng thái đơn hàng
         order.setStatus(OrderStatus.REFUNDED);
         orderRepository.save(order);

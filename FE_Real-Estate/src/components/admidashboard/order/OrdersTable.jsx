@@ -69,6 +69,25 @@ export default function OrdersTable({
     const [scrolled, setScrolled] = useState(false);
     const onScroll = (e) => setScrolled(e.currentTarget.scrollTop > 0);
 
+    const REFUND_WINDOW_DAYS = 2;
+    const canRefund = (order) => {
+        // 1. Phải là trạng thái đã thanh toán
+        if (!["PAID", "PROCESSING"].includes(order.status)) return false;
+
+        // 2. Kiểm tra thời gian
+        if (!order.createdAt) return false;
+        
+        const createdDate = new Date(order.createdAt);
+        const currentDate = new Date();
+        
+        // Tính khoảng cách thời gian (miliseconds)
+        const diffTime = Math.abs(currentDate - createdDate);
+        // Quy đổi ra ngày
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        
+        return diffDays <= REFUND_WINDOW_DAYS;
+    };
+
     return (
         <Paper
             elevation={0}
@@ -290,8 +309,9 @@ export default function OrdersTable({
                                                         </Tooltip>
                                                     )}
 
-                                                    {["PAID", "PROCESSING"].includes(r.status) && (
-                                                        <Tooltip title="Hoàn tiền">
+                                                    {/* Thay đoạn điều kiện cũ bằng hàm canRefund */}
+                                                    {canRefund(r) && (
+                                                        <Tooltip title={`Hoàn tiền (Còn hạn ${REFUND_WINDOW_DAYS} ngày)`}>
                                                             <IconButton
                                                                 onClick={(e) => { e.stopPropagation(); onQuickAction("refund", r); }}
                                                                 color="warning"

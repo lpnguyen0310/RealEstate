@@ -218,7 +218,7 @@ export default function TopUpForm({
 
             {/* Điều khoản + tick */}
             <div className="mt-4 rounded-xl border border-red-100 bg-red-50/60 p-4">
-              <div className="text-[14px] text-gray-700">Thời hạn sử dụng tiền trong tài khoản trên Batdongsan.com.vn như sau:</div>
+              <div className="text-[14px] text-gray-700">Thời hạn sử dụng tiền trong tài khoản trên nexus5-land như sau:</div>
               <ul className="list-disc pl-5 mt-1 text-[14px]">
                 <li><span className="font-semibold">Tài khoản chính:</span> 12 tháng</li>
                 <li><span className="font-semibold">Tài khoản khuyến mãi:</span> Tối đa 6 tháng</li>
