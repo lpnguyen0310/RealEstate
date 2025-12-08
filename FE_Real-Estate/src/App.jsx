@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { hydrateFromSession, getProfileThunk } from "@/store/authSlice";
 import { getAccessToken } from "@/utils/auth";
-import AppRoutes from "@/routes/AppRoutes";
+import AppRoutes from "@/routes/appRoutes";
 import WebSocketListener from "@/components/common/WebSocketListener"; // bạn nói đang dùng file này
 
 export default function App() {
