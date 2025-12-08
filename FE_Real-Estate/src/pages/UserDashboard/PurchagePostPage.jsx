@@ -1,28 +1,47 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+
 import { loadPricing } from "@/store/pricingSlice";
-import { createOrder, clearOrderError, payOrderByBalanceThunk } from "@/store/orderSlice";
+import {
+    createOrder,
+    clearOrderError,
+    payOrderByBalanceThunk,
+} from "@/store/orderSlice";
 import { fetchMyProfile } from "@/store/profileSlice";
+
 import { fmtVND as fmt, calcTotal } from "@/utils/countToToal";
-import { SingleCard, ComboCard, PaymentCard } from "@/components/dashboard/purchagemangement";
+import {
+    SingleCard,
+    ComboCard,
+    PaymentCard,
+} from "@/components/dashboard/purchagemangement";
 import { Spin } from "antd";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
+
+// 🧾 util xuất hóa đơn PDF
+import { generateInvoicePdf } from "@/utils/invoicePdf";
 
 export default function PurchagePostPage() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
     // Pricing
-    const { SINGLE, COMBOS, ALL_ITEMS, loading: pricingLoading, error: pricingError } = useSelector(
-        (s) => s.pricing
-    );
+    const {
+        SINGLE,
+        COMBOS,
+        ALL_ITEMS,
+        loading: pricingLoading,
+        error: pricingError,
+    } = useSelector((s) => s.pricing);
 
     // Profile
-    const { data: profileData, status: profileStatus, error: profileError } = useSelector(
-        (s) => s.profile
-    );
+    const {
+        data: profileData,
+        status: profileStatus,
+        error: profileError,
+    } = useSelector((s) => s.profile);
 
     // Order
     const {
@@ -36,8 +55,15 @@ export default function PurchagePostPage() {
     const [paymentMethod, setPaymentMethod] = useState("online");
     const setItem = (id, v) => setQty((s) => ({ ...s, [id]: v }));
 
+    // Bật/tắt xuất hoá đơn PDF
+    const [invoiceEnabled, setInvoiceEnabled] = useState(false);
+
     // Snackbar
-    const [alert, setAlert] = useState({ open: false, message: "", severity: "success" });
+    const [alert, setAlert] = useState({
+        open: false,
+        message: "",
+        severity: "success",
+    });
     const handleCloseAlert = (_, reason) => {
         if (reason === "clickaway") return;
         setAlert((s) => ({ ...s, open: false }));
@@ -48,17 +74,20 @@ export default function PurchagePostPage() {
         dispatch(loadPricing());
     }, [dispatch]);
 
-    // load profile if needed
+    // load profile nếu cần
     useEffect(() => {
         if (profileStatus === "idle") {
             dispatch(fetchMyProfile());
         }
     }, [dispatch, profileStatus]);
 
-    // total
-    const total = useMemo(() => calcTotal(qty, SINGLE, COMBOS), [qty, SINGLE, COMBOS]);
+    // tổng tiền
+    const total = useMemo(
+        () => calcTotal(qty, SINGLE, COMBOS),
+        [qty, SINGLE, COMBOS]
+    );
 
-    // balances
+    // số dư
     const { mainBalance, bonusBalance, canPayWithBalance } = useMemo(() => {
         const main = profileData?.mainBalance ?? 0;
         const bonus = profileData?.bonusBalance ?? 0;
@@ -69,24 +98,53 @@ export default function PurchagePostPage() {
         };
     }, [profileData, total]);
 
-    const isProcessingPayment = isCreatingOrder || payWithBalanceStatus === "loading";
+    const isProcessingPayment =
+        isCreatingOrder || payWithBalanceStatus === "loading";
 
-    // pay handler
+    // Sau khi thanh toán xong, nếu bật "Xuất hoá đơn" thì in PDF
+    const maybeExportInvoice = (orderId, itemsPayload) => {
+        if (!invoiceEnabled || !orderId) return;
+
+        try {
+            generateInvoicePdf({
+                orderId,
+                itemsPayload,
+                total,
+                profile: profileData,
+                allItems: ALL_ITEMS || [],
+            });
+        } catch (err) {
+            console.error("Lỗi xuất hóa đơn PDF:", err);
+            setAlert({
+                open: true,
+                message: "Thanh toán thành công nhưng xuất hóa đơn bị lỗi.",
+                severity: "warning",
+            });
+        }
+    };
+
+    // handle thanh toán
     const handlePayment = async () => {
         const itemsPayload = Object.keys(qty)
             .filter((itemId) => qty[itemId] > 0)
             .map((itemId) => {
-                const itemInfo = ALL_ITEMS.find((item) => item.id.toString() === itemId);
+                const itemInfo = ALL_ITEMS.find(
+                    (item) => item.id.toString() === itemId
+                );
                 if (!itemInfo) return null;
                 return {
-                    code: itemInfo._raw.code, // gửi code (VD: "VIP_1" | "COMBO_FAST")
+                    code: itemInfo._raw.code, // VD: "VIP_1" | "COMBO_FAST"
                     qty: qty[itemId],
                 };
             })
             .filter(Boolean);
 
         if (itemsPayload.length === 0) {
-            setAlert({ open: true, message: "Vui lòng chọn gói tin trước khi thanh toán.", severity: "warning" });
+            setAlert({
+                open: true,
+                message: "Vui lòng chọn gói tin trước khi thanh toán.",
+                severity: "warning",
+            });
             return;
         }
 
@@ -94,7 +152,7 @@ export default function PurchagePostPage() {
             dispatch(clearOrderError());
         }
 
-        // balance
+        // Thanh toán bằng số dư
         if (paymentMethod === "balance") {
             if (!canPayWithBalance) {
                 setAlert({
@@ -106,15 +164,24 @@ export default function PurchagePostPage() {
             }
 
             const createOrderAction = await dispatch(createOrder(itemsPayload));
+
             if (createOrder.fulfilled.match(createOrderAction)) {
                 const newOrder = createOrderAction.payload;
                 const orderIdToPay = newOrder?.orderId;
+
                 if (!orderIdToPay) {
-                    setAlert({ open: true, message: "Lỗi: Không nhận được ID đơn hàng sau khi tạo.", severity: "error" });
+                    setAlert({
+                        open: true,
+                        message: "Lỗi: Không nhận được ID đơn hàng sau khi tạo.",
+                        severity: "error",
+                    });
                     return;
                 }
 
-                const payAction = await dispatch(payOrderByBalanceThunk(orderIdToPay));
+                const payAction = await dispatch(
+                    payOrderByBalanceThunk(orderIdToPay)
+                );
+
                 if (payOrderByBalanceThunk.fulfilled.match(payAction)) {
                     setAlert({
                         open: true,
@@ -123,43 +190,57 @@ export default function PurchagePostPage() {
                     });
                     setQty({});
                     dispatch(fetchMyProfile());
+
+                    // Xuất hóa đơn nếu user bật
+                    maybeExportInvoice(orderIdToPay, itemsPayload);
                 } else if (payOrderByBalanceThunk.rejected.match(payAction)) {
                     setAlert({
                         open: true,
-                        message: `Lỗi thanh toán bằng số dư: ${payAction.payload || "Lỗi không xác định"}`,
+                        message: `Lỗi thanh toán bằng số dư: ${payAction.payload || "Lỗi không xác định"
+                            }`,
                         severity: "error",
                     });
                 }
             } else if (createOrder.rejected.match(createOrderAction)) {
                 setAlert({
                     open: true,
-                    message: `Lỗi tạo đơn hàng: ${createOrderAction.payload?.message || createOrderAction.payload || "Lỗi không xác định"
+                    message: `Lỗi tạo đơn hàng: ${createOrderAction.payload?.message ||
+                        createOrderAction.payload ||
+                        "Lỗi không xác định"
                         }`,
                     severity: "error",
                 });
             }
         }
-        // online
+        // Thanh toán online
         else {
             const resultAction = await dispatch(createOrder(itemsPayload));
+
             if (createOrder.fulfilled.match(resultAction)) {
                 const newOrder = resultAction.payload;
+
                 if (!newOrder?.orderId) {
                     setAlert({
                         open: true,
-                        message: "Lỗi: Không nhận được ID đơn hàng để chuyển sang thanh toán.",
+                        message:
+                            "Lỗi: Không nhận được ID đơn hàng để chuyển sang thanh toán.",
                         severity: "error",
                     });
                     return;
                 }
+
                 setQty({});
                 navigate(
-                    `/dashboard/pay?orderId=${encodeURIComponent(newOrder.orderId)}&amount=${encodeURIComponent(total)}`
+                    `/dashboard/pay?orderId=${encodeURIComponent(
+                        newOrder.orderId
+                    )}&amount=${encodeURIComponent(total)}`
                 );
             } else if (createOrder.rejected.match(resultAction)) {
                 setAlert({
                     open: true,
-                    message: `Lỗi tạo đơn hàng: ${resultAction.payload?.message || resultAction.payload || "Lỗi không xác định"
+                    message: `Lỗi tạo đơn hàng: ${resultAction.payload?.message ||
+                        resultAction.payload ||
+                        "Lỗi không xác định"
                         }`,
                     severity: "error",
                 });
@@ -197,10 +278,14 @@ export default function PurchagePostPage() {
                             Mua tin lẻ
                         </h2>
 
-                        {/* Grid 1-2-3 theo breakpoint */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
                             {SINGLE?.map((it) => (
-                                <SingleCard key={it.id} item={it} value={qty[it.id] || 0} onChange={(v) => setItem(it.id, v)} />
+                                <SingleCard
+                                    key={it.id}
+                                    item={it}
+                                    value={qty[it.id] || 0}
+                                    onChange={(v) => setItem(it.id, v)}
+                                />
                             ))}
                         </div>
 
@@ -209,7 +294,12 @@ export default function PurchagePostPage() {
                         </h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             {COMBOS?.map((it) => (
-                                <ComboCard key={it.id} item={it} value={qty[it.id] || 0} onChange={(v) => setItem(it.id, v)} />
+                                <ComboCard
+                                    key={it.id}
+                                    item={it}
+                                    value={qty[it.id] || 0}
+                                    onChange={(v) => setItem(it.id, v)}
+                                />
                             ))}
                         </div>
                     </div>
@@ -221,11 +311,13 @@ export default function PurchagePostPage() {
                         <Spin tip="Đang tải số dư..." size="small" className="mb-2 block" />
                     )}
                     {profileStatus === "failed" && (
-                        <div className="mb-2 text-xs text-red-500">Lỗi tải số dư: {profileError}</div>
+                        <div className="mb-2 text-xs text-red-500">
+                            Lỗi tải số dư: {profileError}
+                        </div>
                     )}
 
                     <PaymentCard
-                        className="lg:sticky lg:top-4"          // 🔥 sticky chỉ trên desktop
+                        className="lg:sticky lg:top-4"
                         qty={qty}
                         allItems={ALL_ITEMS || []}
                         total={total}
@@ -236,10 +328,14 @@ export default function PurchagePostPage() {
                         bonusBalance={profileIsReady ? profileData?.bonusBalance ?? 0 : 0}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={setPaymentMethod}
+                        invoiceEnabled={invoiceEnabled}
+                        setInvoiceEnabled={setInvoiceEnabled}
                     />
 
                     {isProcessingPayment && (
-                        <div className="mt-3 text-center text-blue-600 font-semibold">Đang xử lý...</div>
+                        <div className="mt-3 text-center text-blue-600 font-semibold">
+                            Đang xử lý...
+                        </div>
                     )}
                     {createOrderError && (
                         <div className="mt-3 text-xs text-red-600">
@@ -264,7 +360,12 @@ export default function PurchagePostPage() {
                 onClose={handleCloseAlert}
                 anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
             >
-                <MuiAlert onClose={handleCloseAlert} severity={alert.severity} sx={{ width: "100%" }} variant="filled">
+                <MuiAlert
+                    onClose={handleCloseAlert}
+                    severity={alert.severity}
+                    sx={{ width: "100%" }}
+                    variant="filled"
+                >
                     {alert.message}
                 </MuiAlert>
             </Snackbar>

@@ -506,8 +506,8 @@ public class OrderServiceImpl implements OrderService {
                     user,
                     NotificationType.ORDER_REFUNDED, // <-- Bạn cần thêm Enum này
                     "Đơn hàng #" + order.getId() + " của bạn đã được hoàn tiền. Số tiền "
-                            + refundAmount + " VND đã được xử lý.",
-                    "/dashboard/transactions?order_id=" + order.getId()
+                            + refundAmount + " VND đã được xử lý. Vui lòng kiểm tra lại tài khoản.",
+                    "/dashboard/account"
             );
             log.info("Đã gửi thông báo hoàn tiền cho user {}", user.getEmail());
         } catch (Exception e) {

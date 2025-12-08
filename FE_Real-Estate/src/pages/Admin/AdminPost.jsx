@@ -47,8 +47,13 @@ import {
     useSendWarningMutation // <<< IMPORT
 } from "@/services/reportApiSlice";
 
-// >>> NEW: Confirm Dialog
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+
+const LISTING_REVIEW_PRIORITY = {
+    PREMIUM: 3,
+    VIP: 2,
+    NORMAL: 1,
+};
 
 export default function AdminPostsMUI() {
     const dispatch = useDispatch();
@@ -561,6 +566,25 @@ export default function AdminPostsMUI() {
 
     }, [dispatch, selectedIds, bulkRejectDlg]);
 
+     const sortedPosts = useMemo(() => {
+        if (!posts || posts.length === 0) return [];
+
+        // Chỉ ưu tiên trong tab PENDING_REVIEW
+        if (selectedTab !== "PENDING_REVIEW") return posts;
+
+        return [...posts].sort((a, b) => {
+            const pa = LISTING_REVIEW_PRIORITY[a.listingType] ?? 0;
+            const pb = LISTING_REVIEW_PRIORITY[b.listingType] ?? 0;
+
+            // 1. Ưu tiên theo loại: PREMIUM > VIP > NORMAL
+            if (pa !== pb) return pb - pa;
+
+            // 2. Nếu cùng loại thì ưu tiên bài tạo sớm hơn (FIFO)
+            const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return ta - tb;
+        });
+    }, [posts, selectedTab]);
     return (
         <Box
             sx={{
@@ -609,7 +633,7 @@ export default function AdminPostsMUI() {
                 />
 
                 <PostsTable
-                    rows={posts}
+                    rows={sortedPosts}
                     loading={loadingList}
                     actioningId={actioningId}
                     page={page}

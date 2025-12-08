@@ -8,6 +8,7 @@ import { notificationApi } from "@/services/notificationApi";
 import { supportSliceActions } from "@/store/supportSlice";
 import { logoutThunk } from "@/store/authSlice";
 import ForceLogoutModal from "@/components/common/ForceLogoutModal";
+import AppNotificationModal from "@/components/common/AppNotificationModal";
 
 function safeJson(str) {
   try {
@@ -27,7 +28,7 @@ function ensureNotificationPermission() {
   }
 }
 
-// Show browser notification (ensured to be for the correct recipient)
+// Show browser notification
 function showBrowserNotification(payload) {
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (window.Notification.permission !== "granted") return;
@@ -39,9 +40,9 @@ function showBrowserNotification(payload) {
 
   try {
     console.log("[Notify] showBrowserNotification CALLED with:", payload);
-    window.__ALLOW_NOTIFICATION__ = true; // bật cờ cho patch ở App.jsx
+    window.__ALLOW_NOTIFICATION__ = true;
     const n = new window.Notification(title, { body, icon });
-    window.__ALLOW_NOTIFICATION__ = false; // tắt lại
+    window.__ALLOW_NOTIFICATION__ = false;
     n.onclick = () => {
       window.focus();
       window.location.href = link;
@@ -68,8 +69,8 @@ function extractReceiverId(payload) {
 }
 
 export default function WebSocketListener() {
-  const clientRef = useRef(null);   // WebSocket client STOMP
-  const convoSubRef = useRef(null); // subscription 
+  const clientRef = useRef(null); // WebSocket client STOMP
+  const convoSubRef = useRef(null); // subscription
   const activeIdRef = useRef(null); // active conversationId
 
   const dispatch = useDispatch();
@@ -83,8 +84,36 @@ export default function WebSocketListener() {
 
   // ======= state for force logout modal (reset / locked) =======
   const [forceOpen, setForceOpen] = useState(false);
-  const [forceType, setForceType] = useState(null);       // "reset" | "locked"
+  const [forceType, setForceType] = useState(null); // "reset" | "locked"
   const [forceMessage, setForceMessage] = useState("");
+
+  // ======= state cho notification modal dùng chung =======
+  const [notifModal, setNotifModal] = useState({
+    open: false,
+    status: "info", // "success" | "warning" | "error" | "info"
+    title: "",
+    message: "",
+    description: "",
+    primaryText: "OK",
+    secondaryText: null,
+    onPrimary: null,
+    onSecondary: null,
+  });
+
+  const openNotifModal = useCallback((config) => {
+    setNotifModal((prev) => ({
+      ...prev,
+      open: true,
+      ...config,
+    }));
+  }, []);
+
+  const closeNotifModal = useCallback(() => {
+    setNotifModal((prev) => ({
+      ...prev,
+      open: false,
+    }));
+  }, []);
 
   const WS_URL =
     (location.protocol === "https:" ? "wss://" : "ws://") +
@@ -130,7 +159,7 @@ export default function WebSocketListener() {
         const notif = safeJson(m.body) || { message: m.body };
         console.log("[Notify] Received:", notif);
 
-        // invalid cache notification list/unread
+        // invalidate cache notification list/unread
         dispatch(
           notificationApi.util.invalidateTags([
             "UnreadCount",
@@ -177,7 +206,39 @@ export default function WebSocketListener() {
           return;
         }
 
-        // 🔔 3. Other types of notifications → browser notification as before
+        // 💰 3. Order refunded (dùng modal generic)
+        if (notif.type === "ORDER_REFUNDED") {
+          const orderId =
+            notif.orderId ||
+            notif.order?.id ||
+            notif.data?.orderId ||
+            notif.data?.order?.id ||
+            null;
+          const link =
+            notif.link;
+          openNotifModal({
+            status: "success",
+            title: "Hoàn tiền đơn hàng",
+            message:
+              notif.message ||
+              (orderId
+                ? `Đơn hàng #${orderId} của bạn đã được hoàn tiền.`
+                : "Đơn hàng của bạn đã được hoàn tiền thành công."),
+            primaryText: "Xem chi tiết",
+            secondaryText: "Đóng",
+            onPrimary: () => {
+              navigate(link);
+            },
+            onSecondary: () => {
+              // chỉ đóng modal
+            },
+          });
+
+          showBrowserNotification(notif);
+          return;
+        }
+
+        // 🔔 4. Các loại notification khác → browser notification như cũ
         showBrowserNotification(notif);
       });
 
@@ -232,7 +293,15 @@ export default function WebSocketListener() {
         clientRef.current = null;
       }
     };
-  }, [token, WS_URL, dispatch, currentUserId, handleLogout]);
+  }, [
+    token,
+    WS_URL,
+    dispatch,
+    currentUserId,
+    handleLogout,
+    openNotifModal,
+    navigate,
+  ]);
 
   // Subscribe to the currently open conversation
   useEffect(() => {
@@ -241,7 +310,9 @@ export default function WebSocketListener() {
 
     try {
       convoSubRef.current?.unsubscribe();
-    } catch { }
+    } catch {
+      //
+    }
     convoSubRef.current = null;
 
     if (!activeConversationId) return;
@@ -267,19 +338,28 @@ export default function WebSocketListener() {
     return () => {
       try {
         convoSubRef.current?.unsubscribe();
-      } catch { }
+      } catch {
+        //
+      }
       convoSubRef.current = null;
     };
   }, [activeConversationId, dispatch]);
 
   return (
     <>
+      {/* Modal buộc đăng xuất (reset/locked) */}
       <ForceLogoutModal
         open={forceOpen}
-        type={forceType}         // "reset" hoặc "locked"
+        type={forceType}
         message={forceMessage}
         onLogout={handleLogout}
         seconds={10}
+      />
+
+      {/* Modal thông báo dùng chung – spread props cho gọn */}
+      <AppNotificationModal
+        {...notifModal}
+        onClose={closeNotifModal}
       />
     </>
   );

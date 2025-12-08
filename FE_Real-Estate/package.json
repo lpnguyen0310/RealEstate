@@ -33,6 +33,8 @@
     "dayjs": "^1.11.18",
     "emoji-picker-react": "^4.15.0",
     "google-map-react": "^2.2.5",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
     "maplibre-gl": "^5.8.0",
