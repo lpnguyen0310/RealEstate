@@ -7,6 +7,9 @@ COPY pom.xml .
 COPY .mvn .mvn
 COPY mvnw mvnw
 
+# cho phép thực thi mvnw
+RUN chmod +x mvnw
+
 # tải dependency (tùy chọn, để build nhanh hơn)
 RUN ./mvnw -q -B dependency:go-offline
 
@@ -18,7 +21,6 @@ RUN ./mvnw -q -B package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# copy file jar đã build sang stage run
 COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
