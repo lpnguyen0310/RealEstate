@@ -89,9 +89,15 @@ export default function NearbyAmenities({ center, address }) {
             setErr("");
             setSelected(null);
             try {
-                const { data } = await axios.get("/api/maps/nearby", {
+                
+                const envUrl = import.meta.env.VITE_API_BASE_URL;
+                const baseUrl = envUrl || "http://localhost:8080/api";
+
+                // 3. Gọi API: Nối baseUrl với endpoint /maps/nearby
+                const { data } = await axios.get(`${baseUrl}/maps/nearby`, {
                     params: { q: cat.q, lat: center.lat, lng: center.lng, zoom: 15 },
                 });
+                // =========================================================
 
                 const raw = data?.local_results || data?.places || data?.results || [];
                 const mapped = raw
@@ -119,10 +125,10 @@ export default function NearbyAmenities({ center, address }) {
                 if (!cancelled) setItems(mapped);
             } catch (e) {
                 if (!cancelled) {
-                    setErr("Không lấy được dữ liệu tiện ích (backend proxy).");
+                    setErr("Không lấy được dữ liệu tiện ích.");
                     setItems([]);
                 }
-                console.error(e);
+                console.error("Lỗi gọi API:", e);
             } finally {
                 if (!cancelled) setLoading(false);
             }
