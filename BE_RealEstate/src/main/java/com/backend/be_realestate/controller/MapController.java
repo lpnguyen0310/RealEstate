@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api/maps")
-@CrossOrigin(origins = {"http://localhost:5173"}, allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:5173","https://realestate-gmqu.onrender.com"}, allowCredentials = "true")
 @RequiredArgsConstructor
 public class MapController {
     private final SerpApiClient serp;
