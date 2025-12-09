@@ -9,9 +9,9 @@ import { supportSliceActions } from "@/store/supportSlice";
 import { logoutThunk } from "@/store/authSlice";
 import ForceLogoutModal from "@/components/common/ForceLogoutModal";
 import AppNotificationModal from "@/components/common/AppNotificationModal";
-import { 
-  fetchMyPropertyCountsThunk, 
-  triggerRefreshList 
+import {
+  fetchMyPropertyCountsThunk,
+  triggerRefreshList
 } from "@/store/propertySlice";
 
 function safeJson(str) {
@@ -119,10 +119,18 @@ export default function WebSocketListener() {
     }));
   }, []);
 
-  const WS_URL =
+  let WS_URL =
     (location.protocol === "https:" ? "wss://" : "ws://") +
     location.host +
     "/ws";
+
+  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+    WS_URL = "ws://localhost:8080/ws";
+  }
+
+  if (location.hostname === "nexus5-land.vercel.app") {
+    WS_URL = "wss://realestate-gmqu.onrender.com/ws";
+  }
 
   // synchronize conversationId into ref
   useEffect(() => {
@@ -172,33 +180,33 @@ export default function WebSocketListener() {
         );
 
         const REAL_ESTATE_REFRESH_TYPES = [
-            // Duyệt tin
-            "LISTING_APPROVED",
-            "LISTING_REJECTED",
-            "LISTING_EDITED_PENDING",
-            
-            // Vòng đời & Hệ thống
-            "LISTING_EXPIRED",
-            "LISTING_EXPIRING_SOON",
-            "LISTING_AUTO_RENEWED",
-            "LISTING_RENEW_FAILED",
-            "POST_WARNING",
+          // Duyệt tin
+          "LISTING_APPROVED",
+          "LISTING_REJECTED",
+          "LISTING_EDITED_PENDING",
 
-            // Hành động (để đồng bộ nếu user mở nhiều tab)
-            "LISTING_HIDDEN",
-            "LISTING_UNHIDDEN",
-            "LISTING_MARKED_SOLD",
-            "LISTING_UNMARKED_SOLD"
+          // Vòng đời & Hệ thống
+          "LISTING_EXPIRED",
+          "LISTING_EXPIRING_SOON",
+          "LISTING_AUTO_RENEWED",
+          "LISTING_RENEW_FAILED",
+          "POST_WARNING",
+
+          // Hành động (để đồng bộ nếu user mở nhiều tab)
+          "LISTING_HIDDEN",
+          "LISTING_UNHIDDEN",
+          "LISTING_MARKED_SOLD",
+          "LISTING_UNMARKED_SOLD"
         ];
 
         if (REAL_ESTATE_REFRESH_TYPES.includes(notif.type)) {
-            console.log(`[WS] Tin BĐS thay đổi trạng thái (${notif.type}) -> Refreshing list...`);
-            
-            // 1. Cập nhật lại số đếm trên các Tab (Active: 5, Pending: 2...)
-            dispatch(fetchMyPropertyCountsThunk());
+          console.log(`[WS] Tin BĐS thay đổi trạng thái (${notif.type}) -> Refreshing list...`);
 
-            // 2. Bắn tín hiệu để PostManagerPage tự reload danh sách tin bên dưới
-            dispatch(triggerRefreshList());
+          // 1. Cập nhật lại số đếm trên các Tab (Active: 5, Pending: 2...)
+          dispatch(fetchMyPropertyCountsThunk());
+
+          // 2. Bắn tín hiệu để PostManagerPage tự reload danh sách tin bên dưới
+          dispatch(triggerRefreshList());
         }
 
         const receiverId = extractReceiverId(notif);

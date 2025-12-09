@@ -18,7 +18,8 @@ import { useNavigate } from "react-router-dom";
 import React from "react";
 
 import { NAVS } from "@/data/header_submenu";
-
+import logo from "@/assets/logo.jpg";
+import logo2 from "@/assets/logo2.svg";
 import UserDropDownHeader from "@/components/menu/UserDropDownHeader";
 import FavoritePostList from "@/components/menu/FavoritePostList";
 import NotificationBell from "@/components/menu/NotificationBell";
@@ -132,7 +133,7 @@ export default function Header() {
           <Flex align="center" gap={32}>
             <a href="/" className="flex items-center h-full cursor-pointer px-4 py-3">
               <img
-                src="/src/assets/logo.jpg"
+                src={logo}
                 alt="logo"
                 className="w-[160px] h-[80px] object-contain"
               />
@@ -225,7 +226,7 @@ export default function Header() {
 
             <a href="/" className="flex items-center h-full">
               <img
-                src="/src/assets/logo2.svg"
+                src={logo2}
                 alt="logo"
                 className="w-[130px] h-[40px] object-contain"
               />
