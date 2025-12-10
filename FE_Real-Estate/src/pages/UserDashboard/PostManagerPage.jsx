@@ -124,14 +124,21 @@ export default function PostManagerPage() {
         const warnId = qp.warnedPostId ? Number(qp.warnedPostId) : null;
         const viewId = qp.viewPostId ? Number(qp.viewPostId) : null;
 
-        let urlStatus = qp.tab || "active";
+        // 1. Mặc định lấy tab từ URL, nếu không có thì mới là "active"
+        let urlStatus = qp.tab || "active"; 
 
         if (warnId) {
             dispatch(setPendingAction({ type: "warn", postId: warnId }));
-            urlStatus = "warned";
+            // Nếu là cảnh báo, có thể bạn muốn ép về tab cụ thể, 
+            // nhưng nếu hệ thống của bạn cảnh báo có thể nằm ở nhiều tab thì nên dùng qp.tab
+            // Giữ nguyên logic cũ của bạn cho warnId nếu muốn:
+            urlStatus = "warned"; 
         } else if (viewId) {
             dispatch(setPendingAction({ type: "view", postId: viewId }));
-            urlStatus = "active";
+            
+            // 2. SỬA LỖI: Xóa dòng 'urlStatus = "active"' 
+            // Nếu URL đã có ?tab=rejected thì biến urlStatus ở trên đã lấy đúng rồi.
+            // Chỉ khi nào URL không có tab thì nó mới fallback về 'active' (đã xử lý ở bước 1)
         }
 
         setStatus(urlStatus);
@@ -142,7 +149,7 @@ export default function PostManagerPage() {
 
         if (urlPage - 1 !== page) dispatch(setPage(Math.max(0, urlPage - 1)));
         if (urlSize !== size && urlSize != null) dispatch(setSize(urlSize));
-    }, [searchParams, dispatch]); // intentionally not depending on page/size to avoid loops
+    }, [searchParams, dispatch]);
 
     /* ========== xử lý hành động chờ (highlight / mở modal) ========== */
     useEffect(() => {

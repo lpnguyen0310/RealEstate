@@ -147,12 +147,48 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found"));
 
         p.setStatus(PropertyStatus.REJECTED);
-        propertyRepository.save(p);
+        // Lưu lại entity đã update
+        PropertyEntity savedProperty = propertyRepository.save(p);
 
         saveAudit(p, adminId, "REJECTED", req.getReason());
+
+        // =================================================================
+        // THÊM ĐOẠN NÀY ĐỂ GỬI SOCKET NOTIFICATION
+        // =================================================================
+        try {
+            log.info("[PropertyService] Tin đăng {} bị TỪ CHỐI, đang gửi thông báo...", savedProperty.getId());
+
+            String title = savedProperty.getTitle();
+            if (title == null || title.isBlank()) {
+                title = "Tin đăng";
+            } else if (title.length() > 50) {
+                title = title.substring(0, 47) + "...";
+            }
+
+            // Lý do từ chối
+            String reason = req.getReason() != null ? req.getReason() : "Vi phạm quy định";
+            String userMessage = String.format("Tin '%s' bị từ chối. Lý do: %s", title, reason);
+
+            // Link trỏ về tab "Bị từ chối" (hoặc tab chứa tin rejected)
+            // Lưu ý: tab FE của bạn tên là gì thì điền vào đây (ví dụ: 'rejected' hoặc 'inactive')
+            String userLink = String.format("/dashboard/posts?tab=rejected&viewPostId=%d", savedProperty.getId());
+
+            notificationService.createNotification(
+                    savedProperty.getUser(),
+                    NotificationType.LISTING_REJECTED, // Đảm bảo Enum này khớp với FE
+                    userMessage,
+                    userLink
+            );
+
+            log.info("[PropertyService] Đã gửi thông báo LISTING_REJECTED cho user {}.", savedProperty.getUser().getUserId());
+
+        } catch (Exception e) {
+            log.error("!!!!!!!!!!!! LỖI KHI GỬI NOTIFICATION 'REJECTED': {}", e.getMessage());
+        }
+        // =================================================================
+
         return toShort(p);
     }
-
     @Override
     @Transactional
     public PropertyShortResponse hide(Long propertyId, Long adminId) {
