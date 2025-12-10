@@ -59,9 +59,6 @@ public class EmailServiceImpl implements EmailService {
         sendEmail(toEmail, subject, content);
     }
 
-    // ==============================
-    // GỬI MAIL QUA SENDGRID WEB API
-    // ==============================
     private void sendEmail(String toEmail, String subject, String text) {
         // Body JSON theo spec SendGrid v3 /mail/send
         Map<String, Object> body = Map.of(

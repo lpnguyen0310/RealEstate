@@ -69,15 +69,18 @@ function Inner({ orderId, amount, onPaid }) {
     }, []);
 
     const pollOrder = async (timeoutMs = 60000, intervalMs = 1200) => {
-        // ⭐️ LƯU Ý: Hàm này cần 'orderId' để hoạt động
         if (!orderId) {
             console.warn("pollOrder: Bỏ qua polling vì thiếu orderId");
-            return false; // Không thể poll nếu không có orderId
+            return false;
         }
+        const envUrl = import.meta.env.VITE_API_BASE_URL;
+        const baseUrl = envUrl || "http://localhost:8080/api";
+
         const t0 = Date.now();
         while (Date.now() - t0 < timeoutMs) {
             try {
-                const r = await fetch(`/api/orders/${orderId}`);
+                const r = await fetch(`${baseUrl}/orders/${orderId}`);
+
                 if (r.ok) {
                     const data = await r.json();
                     const st = (data.status || data.orderStatus || "").toUpperCase();
