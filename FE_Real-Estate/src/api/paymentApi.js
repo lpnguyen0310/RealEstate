@@ -3,8 +3,9 @@ import api from "./axios";
 // src/api/paymentApi.js
 export async function createPaymentIntent(orderId) {
     if (!orderId) throw new Error("Thiếu orderId");
-
-    const res = await fetch(`/api/payments/orders/${orderId}/pay`, {
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    const baseUrl = envUrl || "http://localhost:8080/api";
+    const res = await fetch(`${baseUrl}/payments/orders/${orderId}/pay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
     });
@@ -30,9 +31,9 @@ export async function createTopUpIntent(amount) {
         // ⭐️ DÙNG `api.post` (axios)
         // Nó sẽ TỰ ĐỘNG đính kèm Authorization token
         const res = await api.post("/payments/top-up/create-intent", { amount });
-        
+
         // Backend trả về { clientSecret, orderId }
-        return res.data; 
+        return res.data;
     } catch (err) {
         // Xử lý lỗi chuẩn của axios
         const beError = err.response?.data; // {code, message}
