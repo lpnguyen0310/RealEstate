@@ -242,6 +242,7 @@ export default function InfoRealEstate() {
 
     // 
     // Geocode địa chỉ BĐS -> lat/lng
+    // Geocode địa chỉ BĐS -> lat/lng
     useEffect(() => {
         if (!postInfo?.address) return;
 
@@ -249,9 +250,20 @@ export default function InfoRealEstate() {
 
         async function geocode() {
             try {
-                const res = await axios.get("/api/maps/geocode", {
+                // =========================================================
+                // SỬA ĐOẠN NÀY ĐỂ HẾT LỖI 404 (Tương tự NearbyAmenities)
+                // =========================================================
+
+                // 1. Lấy Base URL từ biến môi trường hoặc Localhost
+                const envUrl = import.meta.env.VITE_API_BASE_URL;
+                const baseUrl = envUrl || "http://localhost:8080/api";
+
+                // 2. Gọi API: Nối baseUrl với endpoint /maps/geocode
+                // Kết quả: https://realestate-gmqu.onrender.com/api/maps/geocode
+                const res = await axios.get(`${baseUrl}/maps/geocode`, {
                     params: { q: postInfo.address },
                 });
+                // =========================================================
 
                 const data = res.data;
                 console.log("Geocode raw:", data);
@@ -294,9 +306,6 @@ export default function InfoRealEstate() {
 
                 if (!cancelled && typeof lat === "number" && typeof lng === "number") {
                     console.log("%c📍 Geocode success", "color: green; font-size: 14px;");
-                    console.log("Địa chỉ:", postInfo.address);
-                    console.log("Lat:", lat, "| Lng:", lng);
-
                     setCenter({ lat, lng });
                 } else {
                     console.warn("❌ Không đọc được lat/lng từ kết quả:", first);
