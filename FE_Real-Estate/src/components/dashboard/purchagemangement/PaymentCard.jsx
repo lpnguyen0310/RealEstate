@@ -291,7 +291,7 @@ export default function PaymentCard({
             <button
                 disabled={total === 0 || disabled}
                 onClick={onPay}
-                className={`mt-3 sm:mt-4 w-full h-[46px] sm:h-[48px] rounded-xl text-white font-semibold transition-colors duration-200 ${total <= 0 || disabled ? "bg-[#93a3bd] cursor-not-allowed" : "bg-[#0f2f63] hover:bg-[#0c2550]"
+                className={`mt-3 sm:mt-4 w-full h-[46px] sm:h-[48px] rounded-xl !text-white font-semibold transition-colors duration-200 ${total <= 0 || disabled ? "bg-[#93a3bd] cursor-not-allowed" : "bg-[#0f2f63] hover:bg-[#0c2550]"
                     }`}
             >
                 {disabled

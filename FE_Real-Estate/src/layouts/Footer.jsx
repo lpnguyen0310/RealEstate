@@ -11,7 +11,7 @@ export default function Footer() {
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-red-600 text-white font-bold">B</span>
               <div className="leading-tight">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-semibold text-gray-800">Batdongsan</span>
+                  <span className="text-2xl font-semibold text-gray-800">Nexus5-land</span>
                   <span className="text-sm text-gray-600 align-top">.com.vn</span>
                 </div>
                 <div className="text-xs text-gray-500 -mt-0.5">by PropertyGuru</div>
@@ -44,8 +44,8 @@ export default function Footer() {
               icon={<IconUserSupport className="h-6 w-6 text-gray-700" />}
               label="Hỗ trợ khách hàng"
               value={
-                <a href="https://trogiup.batdongsan.com.vn" className="font-semibold hover:text-red-600">
-                  trogiup.batdongsan.com.vn
+                <a href="https://trogiup.nexus5-land.com.vn" className="font-semibold hover:text-red-600">
+                  trogiup.nexus5-land.com.vn
                 </a>
               }
             />
@@ -58,7 +58,7 @@ export default function Footer() {
             <InfoSmall
               icon={<IconChat className="h-6 w-6 text-gray-700" />}
               label="Chăm sóc khách hàng"
-              value={<a href="mailto:hotro@batdongsan.com.vn" className="font-semibold hover:text-red-600">hotro@batdongsan.com.vn</a>}
+              value={<a href="mailto:hotro@nexus5-land.com.vn" className="font-semibold hover:text-red-600">hotro@nexus5-land.com.vn</a>}
             />
 
             <div>
@@ -101,7 +101,7 @@ export default function Footer() {
         {/* Gạch dưới + bản quyền */}
         <div className="mt-6 border-t border-gray-200 pt-5">
           <p className="text-xs text-gray-500">
-            © {new Date().getFullYear()} Batdongsan.com.vn — Một sản phẩm của PropertyGuru.
+            © {new Date().getFullYear()} Nexus5-land.com.vn — Một sản phẩm của PropertyGuru.
           </p>
         </div>
       </div>

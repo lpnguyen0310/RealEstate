@@ -266,7 +266,7 @@ export default function RegisterModal({ open, onClose, onSuccess, onBackToLogin 
                             onError={(e) => (e.currentTarget.style.display = "none")}
                         />
                         <p className="mt-6 text-[#c23a2a] text-[16px] font-semibold text-center leading-snug">
-                            Tìm nhà đất<br />Batdongsan.com.vn dẫn lối
+                            Tìm nhà đất<br />Nexus5-land.com.vn dẫn lối
                         </p>
                     </div>
                 )}
