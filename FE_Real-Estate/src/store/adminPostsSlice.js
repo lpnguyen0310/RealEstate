@@ -109,41 +109,75 @@ export const fetchPostsThunk = createAsyncThunk(
                 return {
                     id: p.id,
                     title: p.title,
-                    category: p.categoryName,
+                    price: p.price,
+
+                    // ✅ Drawer đang dùng
+                    area: p.area ?? p.landArea ?? null,
+                    bedrooms: p.bedrooms ?? null,
+                    bathrooms: p.bathrooms ?? null,
+                    floors: p.floors ?? null,
+                    landArea: p.landArea ?? null,
+                    width: p.width ?? null,
+                    height: p.height ?? null,
+                    direction: p.direction ?? null,
+                    legalStatus: p.legalStatus ?? null,
+                    position: p.position ?? null,
+                    propertyType: p.propertyType ?? null,
+                    priceType: p.priceType ?? null,
+
                     listingType: p.listingType,
+                    status: p.status,
+
                     displayAddress: p.displayAddress,
                     description: p.description,
-                    price: p.price,
-                    status: p.status,
+
+                    // ✅ để fmtDate dùng được
                     createdAt: p.postedAt,
                     expiresAt: p.expiresAt,
-                    reportCount: p.reportCount,
+                    amenityIds: Array.isArray(p.amenityIds) ? p.amenityIds : [],
 
-                    // BẢNG dùng số ngày THỰC TẾ:
-                    durationDays: actualDurationDays,
+                    // ✅ số ngày theo BE
+                    durationDays: p.durationDays ?? null,
+                    policyDurationDays: p.durationDays ?? null, // nếu bạn muốn coi durationDays là policy
 
-                    // Drawer dùng số ngày theo gói:
-                    policyDurationDays: p.policyDurationDays ?? p.durationDays ?? null,
-
+                    // ✅ tác giả
                     author: { name: p.authorName, email: p.authorEmail },
-                    images: p.imageUrls || [],
-                    contactName: p.contactName,
-                    contactPhone: p.contactPhone,
-                    contactEmail: p.contactEmail,
-                    contactRelationship: p.contactRelationship,
-                    isOwner: p.isOwner,
-                    audit: Array.isArray(p.audit) ? p.audit : [],
-                    rejectReason:
-                        p.rejectReason ??
-                        p.rejectionReason ??
-                        p.reject_note ??
-                        p.rejectNote ??
-                        p.reason ??
-                        null,
+                    authorName: p.authorName,
+                    authorEmail: p.authorEmail,
 
-                    // preview contact (không dùng cũng không sao)
-                    contactPreview,
+                    // ✅ ảnh + audit
+                    images: p.imageUrls || [],
+                    audit: Array.isArray(p.audit) ? p.audit : [],
+
+                    // ✅ reject/report
+                    rejectReason: p.rejectReason ?? null,
+                    reportCount: p.reportCount ?? 0,
+                    latestWarningMessage: p.LatestWarningMessage ?? null,
+
+                    // ✅ contact + chính chủ
+                    isOwner: p.isOwner ?? false,
+                    contactName: p.contactName ?? null,
+                    contactPhone: p.contactPhone ?? null,
+                    contactEmail: p.contactEmail ?? null,
+                    contactRelationship: p.contactRelationship ?? null,
+
+                    // (tuỳ bạn có dùng không)
+                    viewCount: p.viewCount ?? 0,
+                    favoriteCount: p.favoriteCount ?? 0,
+                    interactionCount: p.interactionCount ?? 0,
+                    potentialCustomerCount: p.potentialCustomerCount ?? 0,
+                    constructionImages: p.constructionImages ?? [],
+                    autoRenew: p.autoRenew ?? false,
+
+                    // ids (nếu cần)
+                    userId: p.userId,
+                    categoryId: p.categoryId,
+                    cityId: p.cityId,
+                    districtId: p.districtId,
+                    wardId: p.wardId,
+                    categoryName: p.categoryName,
                 };
+
             });
 
             const normalized = normalizeStatuses(normalizedRows);
@@ -341,7 +375,6 @@ const adminPostsSlice = createSlice({
             s.page = 1;
         },
 
-        // drawer (giữ để mở bằng row nếu muốn – nhưng khuyến nghị dùng fetchPostDetailThunk)
         openDetail: (s, a) => {
             const r = a.payload;
             const effectiveDuration = r.policyDurationDays ?? 30;
@@ -612,13 +645,13 @@ const adminPostsSlice = createSlice({
                 // Lọc bỏ các posts đã được duyệt thành công (nếu tab hiện tại là PENDING_REVIEW)
                 const fromStatus = "PENDING_REVIEW";
                 const isProcessingPending = s.selectedTab === fromStatus;
-                
+
                 if (isProcessingPending) {
                     s.posts = s.posts.filter(p => !approvedIds.includes(p.id));
                     s.totalItems = Math.max(0, s.totalItems - approvedIds.length);
                 } else {
                     // Nếu không phải tab Pending, cập nhật status (dù ít xảy ra)
-                    s.posts = s.posts.map(p => approvedIds.includes(p.id) ? {...p, status: "PUBLISHED"} : p);
+                    s.posts = s.posts.map(p => approvedIds.includes(p.id) ? { ...p, status: "PUBLISHED" } : p);
                 }
 
                 // Cập nhật Counts
@@ -642,12 +675,12 @@ const adminPostsSlice = createSlice({
                 const { rejectedIds, reason } = payload;
                 s.actioningId = null;
                 s.selectedIds = []; // Xóa selection
-                
+
                 // Lọc bỏ các posts đã bị từ chối
                 const fromStatus = s.selectedTab; // Có thể từ PENDING, PUBLISHED, ...
                 s.posts = s.posts.filter(p => !rejectedIds.includes(p.id));
                 s.totalItems = Math.max(0, s.totalItems - rejectedIds.length);
-                
+
                 // Cập nhật Counts
                 s.counts = {
                     ...s.counts,
@@ -677,8 +710,8 @@ export const {
     setPendingAction,
     clearPendingAction,
     bumpCounts,
-    setAllSelected,   
-    toggleSelected,   
+    setAllSelected,
+    toggleSelected,
     clearSelection,
 } = adminPostsSlice.actions;
 

@@ -27,19 +27,13 @@ public class PropertyStatusScheduler {
     // [NEW] Inject kho để trừ gói tin
     private final UserInventoryRepository inventoryRepo;
 
-    // @Scheduled(cron = "0 0 2 * * *")
+    // @Scheduled(cron = "0 0 7 * * *")
     @Scheduled(fixedRate = 600000) // Chạy mỗi 10 phút (khuyên dùng thay vì 10s để đỡ nặng DB)
-    @Transactional // [IMPORTANT] Cần transactional để đảm bảo trừ kho và update tin đồng bộ
+    @Transactional
     public void updateStatuses() {
         LocalDateTime now = LocalDateTime.now();
         Timestamp nowTs = Timestamp.valueOf(now);
-
-        // ==================================================================
-        // 1. AUTO RENEW LOGIC (Chạy trước khi quét expired)
-        // ==================================================================
-        // Gọi hàm repository bạn đã thêm ở bước trước
         List<PropertyEntity> renewalCandidates = propertyRepository.findExpiredCandidatesForAutoRenew(nowTs);
-
         if (!renewalCandidates.isEmpty()) {
             log.info("Tìm thấy {} tin đăng cần gia hạn tự động...", renewalCandidates.size());
             for (PropertyEntity p : renewalCandidates) {
@@ -50,13 +44,8 @@ public class PropertyStatusScheduler {
                 }
             }
         }
-
-        // ==================================================================
-        // 2. EXISTING LOGIC (Expiring Soon Notification)
-        // ==================================================================
         LocalDateTime soon = now.plusDays(8);
         Timestamp soonTs = Timestamp.valueOf(soon);
-
         var willExpireSoon = propertyRepository.findWillExpireSoon(nowTs, soonTs);
         willExpireSoon.forEach(p -> {
             try {
@@ -73,10 +62,6 @@ public class PropertyStatusScheduler {
             }
         });
 
-        // ==================================================================
-        // 3. UPDATE STATUS (ExpiringSoon & Expired)
-        // ==================================================================
-        // Lưu ý: Những tin đã gia hạn ở bước 1 có expiresAt mới > nowTs nên sẽ KHÔNG bị quét thành expired ở đây.
         int expiring = propertyRepository.updateStatusForExpiringSoon(nowTs, soonTs);
         int expired  = propertyRepository.updateStatusForExpiredPosts(nowTs);
 

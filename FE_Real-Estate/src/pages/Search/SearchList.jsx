@@ -46,28 +46,32 @@ const LISTING_BADGE = {
   PREMIUM: {
     label: "PREMIUM",
     className:
-      "bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 shadow-[0_0_0_1px_rgba(255,255,255,0.5)]",
+      "bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 shadow-[0_0_0_1px_rgba(255,255,255,0.4)]",
   },
   VIP: {
     label: "VIP",
     className:
-      "bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-500 shadow-[0_0_0_1px_rgba(255,255,255,0.5)]",
+      "bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-500 shadow-[0_0_0_1px_rgba(255,255,255,0.4)]",
   },
   NORMAL: null, // tin thường không hiển thị ribbon
 };
 
 /* ============== Skeleton helpers ============== */
 function SkeletonBlock({ className = "" }) {
-  return <div className={`animate-pulse rounded-lg bg-slate-200/80 ${className}`} />;
+  return (
+    <div
+      className={`animate-pulse rounded-xl bg-slate-200/80 ${className}`}
+    />
+  );
 }
 
 function PropertyListItemSkeleton() {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white/70 shadow-sm">
+    <article className="rounded-2xl border border-slate-200/80 bg-white/70 shadow-sm">
       <div className="p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
         {/* LEFT */}
         <div className="w-full sm:w-[320px] shrink-0">
-          <SkeletonBlock className="h-[220px] w-full rounded-xl" />
+          <SkeletonBlock className="h-[220px] w-full" />
           <div className="mt-2 flex items-center justify-between">
             <SkeletonBlock className="h-6 w-24" />
             <SkeletonBlock className="h-4 w-16" />
@@ -86,25 +90,25 @@ function PropertyListItemSkeleton() {
             <SkeletonBlock className="h-4 w-5" />
             <SkeletonBlock className="h-4 w-40" />
           </div>
-          <div className="mt-2 flex gap-4">
+          <div className="mt-3 flex gap-3">
+            <SkeletonBlock className="h-4 w-20" />
             <SkeletonBlock className="h-4 w-16" />
-            <SkeletonBlock className="h-4 w-12" />
-            <SkeletonBlock className="h-4 w-12" />
+            <SkeletonBlock className="h-4 w-16" />
           </div>
-          <SkeletonBlock className="mt-2 h-4 w-5/6" />
+          <SkeletonBlock className="mt-3 h-4 w-5/6" />
           <SkeletonBlock className="mt-1 h-4 w-2/3" />
 
-          <div className="mt-3 flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-3 py-2">
+          <div className="mt-4 flex items-center justify-between gap-3 bg-slate-50 rounded-2xl px-3 py-2.5">
             <div className="flex items-center gap-2 min-w-0">
-              <SkeletonBlock className="h-8 w-8 rounded-full" />
-              <div>
+              <SkeletonBlock className="h-9 w-9 rounded-full" />
+              <div className="space-y-1">
                 <SkeletonBlock className="h-4 w-28" />
-                <SkeletonBlock className="mt-1 h-3 w-16" />
+                <SkeletonBlock className="h-3 w-16" />
               </div>
             </div>
             <div className="flex items-center gap-2">
               <SkeletonBlock className="h-9 w-28 rounded-full" />
-              <SkeletonBlock className="h-8 w-8 rounded-full" />
+              <SkeletonBlock className="h-9 w-9 rounded-full" />
             </div>
           </div>
         </div>
@@ -123,12 +127,29 @@ function PropertyListItem({ data, onClick }) {
   const listingType = data.listingType || data.listingLevel || "NORMAL";
   const badge = LISTING_BADGE[listingType];
 
+  // Một số chip phụ (nếu BE có)
+  const chipItems = [
+    data.transactionTypeLabel || data.transactionType, // "Bán", "Cho thuê"...
+    data.propertyTypeLabel || data.category,
+  ].filter(Boolean);
+
+  const handleCardClick = () => {
+    if (onClick) onClick();
+  };
+
   return (
-    <article className="group rounded-2xl border border-slate-200 bg-white/80 shadow-sm hover:shadow-xl hover:border-blue-500/60 transition-all duration-200 overflow-hidden">
-      <div className="p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
+    <article
+      className="group relative rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50/70 to-slate-100/60 shadow-[0_8px_24px_rgba(15,23,42,0.06)] hover:shadow-[0_18px_45px_rgba(30,64,175,0.25)] hover:border-blue-500/70 transition-all duration-200 overflow-hidden"
+      onClick={handleCardClick}
+      role="button"
+    >
+      {/* Border glow */}
+      <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gradient-to-r from-blue-500/10 via-cyan-400/10 to-sky-500/10" />
+
+      <div className="relative p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
         {/* LEFT: ảnh + thumbnails + chips */}
         <div className="w-full sm:w-[320px] shrink-0">
-          <div className="relative rounded-xl overflow-hidden bg-slate-100">
+          <div className="relative rounded-xl overflow-hidden bg-slate-100/80 ring-1 ring-slate-200/70">
             {/* RIBBON PREMIUM / VIP */}
             {badge && (
               <div
@@ -139,8 +160,22 @@ function PropertyListItem({ data, onClick }) {
               </div>
             )}
 
+            {/* CHIPS loại giao dịch / loại tin */}
+            {chipItems.length > 0 && (
+              <div className="absolute right-3 top-3 flex flex-col items-end gap-1">
+                {chipItems.map((item, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center rounded-full bg-black/55 px-2 py-1 text-[11px] font-medium text-slate-50 backdrop-blur"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Gradient overlay bottom */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
 
             {images[0] ? (
               <img
@@ -155,14 +190,15 @@ function PropertyListItem({ data, onClick }) {
 
             {/* Info overlay bottom-left */}
             {(data.postedAt || photosCount) && (
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-slate-100">
+              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-slate-100 gap-2">
                 {data.postedAt && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 backdrop-blur-sm">
-                    <Icon.Clock /> <span className="truncate">{data.postedAt}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm max-w-[60%]">
+                    <Icon.Clock />{" "}
+                    <span className="truncate">{data.postedAt}</span>
                   </span>
                 )}
                 {photosCount ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 backdrop-blur-sm">
+                  <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm">
                     <Icon.Camera /> {photosCount} ảnh
                   </span>
                 ) : null}
@@ -175,7 +211,7 @@ function PropertyListItem({ data, onClick }) {
               {thumbs.map((src, i) => (
                 <div
                   key={i}
-                  className="relative overflow-hidden rounded-lg bg-slate-100"
+                  className="relative overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200/70"
                 >
                   <img
                     src={src}
@@ -193,18 +229,17 @@ function PropertyListItem({ data, onClick }) {
           {/* Title + Price */}
           <div className="flex items-start justify-between gap-3">
             <h3
-              className="text-[18px] sm:text-[20px] font-semibold leading-snug line-clamp-2 cursor-pointer text-slate-900 hover:text-blue-600 transition-colors"
+              className="text-[17px] sm:text-[20px] font-semibold leading-snug line-clamp-2 cursor-pointer text-slate-900 group-hover:text-blue-600 transition-colors"
               title={data.title}
-              onClick={onClick}
             >
               {data.title}
             </h3>
             <div className="text-right shrink-0">
-              <div className="bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400 bg-clip-text text-transparent font-extrabold text-lg">
+              <div className="inline-flex items-baseline gap-1 bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400 bg-clip-text text-transparent font-extrabold text-[18px] sm:text-[20px]">
                 {data.price || "Thỏa thuận"}
               </div>
               {data.pricePerM2 && (
-                <div className="mt-0.5 text-xs text-slate-500">
+                <div className="mt-0.5 text-[11px] text-slate-500">
                   ({data.pricePerM2})
                 </div>
               )}
@@ -213,60 +248,69 @@ function PropertyListItem({ data, onClick }) {
 
           {/* Address */}
           <div className="mt-2 flex items-center gap-2 text-slate-600">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 shadow-sm">
               <Icon.Pin />
             </span>
-            <span className="text-sm truncate" title={data.addressMain}>
-              {data.addressMain}
+            <span
+              className="text-sm truncate"
+              title={data.addressMain || data.address}
+            >
+              {data.addressMain || data.address}
             </span>
           </div>
 
           {/* Stats row */}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-slate-700">
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 border border-slate-200/80">
               <Icon.Area />
               <span>{data.area ?? "—"} m²</span>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 border border-slate-200/80">
               <Icon.Bed />
               <span>{data.bed ?? "—"} PN</span>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 border border-slate-200/80">
               <Icon.Bath />
               <span>{data.bath ?? "—"} WC</span>
             </span>
+
+            {data.direction && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 border border-slate-200/70 text-[12px] text-slate-600">
+                Hướng: <span className="font-medium">{data.direction}</span>
+              </span>
+            )}
           </div>
 
           {/* Description */}
           {data.description && (
-            <p className="mt-2 text-sm text-slate-600 line-clamp-2">
+            <p className="mt-3 text-sm text-slate-600 line-clamp-2">
               {data.description}
             </p>
           )}
 
           {/* Agent + actions */}
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 px-3 py-2.5 border border-slate-100">
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 px-3 py-2.5 border border-slate-100/90">
             <div className="flex items-center gap-3 min-w-0">
               {data.agent?.avatar ? (
                 <img
                   src={data.agent.avatar}
                   alt={data.agent.name}
-                  className="h-9 w-9 rounded-full object-cover ring-2 ring-slate-100"
+                  className="h-10 w-10 rounded-full object-cover ring-2 ring-slate-100 shadow-sm"
                 />
               ) : (
-                <div className="h-9 w-9 rounded-full bg-slate-100 ring-2 ring-slate-200 flex items-center justify-center font-semibold text-slate-700">
+                <div className="h-10 w-10 rounded-full bg-slate-100 ring-2 ring-slate-200 flex items-center justify-center font-semibold text-slate-700 shadow-sm">
                   {(data.agent?.name || "M")?.charAt(0)}
                 </div>
               )}
               <div className="leading-tight min-w-0">
                 <div
-                  className="text-sm font-medium truncate max-w-[180px] text-slate-900"
+                  className="text-sm font-medium truncate max-w-[190px] text-slate-900"
                   title={data.agent?.name || "Môi giới"}
                 >
                   {data.agent?.name || "Môi giới"}
                 </div>
                 <div className="mt-0.5 text-xs text-slate-500">
-                  {data.agent?.role || "Môi giới"}
+                  {data.agent?.role || "Môi giới bất động sản"}
                 </div>
               </div>
             </div>
@@ -275,27 +319,31 @@ function PropertyListItem({ data, onClick }) {
               {data.agent?.phone && (
                 <a
                   href={`tel:${String(data.agent.phone).replace(/\s/g, "")}`}
-                  className="inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-500 px-3 text-sm font-semibold text-white shadow-sm hover:shadow-md hover:brightness-110 transition-all"
+                  className="inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-500 px-3 text-[13px] font-semibold text-white shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:brightness-110 transition-all"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <Icon.Phone />
                   <span>{maskPhone(data.agent.phone)}</span>
                 </a>
               )}
 
-              <a
-                href={data.agent?.zaloUrl || "#"}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all"
-                title="Zalo"
-              >
-                <img
-                  src={zaloIcon}
-                  alt="Zalo"
-                  className="w-[22px] h-[22px] object-contain"
-                  loading="lazy"
-                />
-              </a>
+              {data.agent?.zaloUrl && (
+                <a
+                  href={data.agent.zaloUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all"
+                  title="Chat Zalo"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <img
+                    src={zaloIcon}
+                    alt="Zalo"
+                    className="w-[22px] h-[22px] object-contain"
+                    loading="lazy"
+                  />
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -332,7 +380,7 @@ export default function SearchList({
   if (!showSkeleton && !hasData) {
     return (
       <div className="col-span-full flex flex-col items-center justify-center py-10 text-slate-500">
-        <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+        <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 shadow-sm">
           <span className="text-xl">🔍</span>
         </div>
         <p className="text-sm font-medium">Không có kết quả phù hợp.</p>

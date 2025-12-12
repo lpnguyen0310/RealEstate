@@ -68,7 +68,10 @@ public class PropertySpecification {
     }
 
     public static Specification<PropertyEntity> isPublished() {
-        return (root, query, cb) -> cb.equal(root.get("status"), PropertyStatus.PUBLISHED);
+        return (root, query, cb) -> cb.or(
+                cb.equal(root.get("status"), PropertyStatus.PUBLISHED),
+                cb.equal(root.get("status"), PropertyStatus.EXPIRINGSOON)
+        );
     }
 
     public static Specification<PropertyEntity> notExpired() {

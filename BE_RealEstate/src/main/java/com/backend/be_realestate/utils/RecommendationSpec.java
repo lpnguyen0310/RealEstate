@@ -14,8 +14,12 @@ public final class RecommendationSpec {
     private RecommendationSpec() {}
 
     public static Specification<PropertyEntity> statusPublished() {
-        return (root, cq, cb) -> cb.equal(root.get("status"), PropertyStatus.PUBLISHED);
+        return (root, cq, cb) -> cb.or(
+                cb.equal(root.get("status"), PropertyStatus.PUBLISHED),
+                cb.equal(root.get("status"), PropertyStatus.EXPIRINGSOON)
+        );
     }
+
 
     public static Specification<PropertyEntity> priceBetween(Double from, Double to) {
         if (from == null && to == null) return null;

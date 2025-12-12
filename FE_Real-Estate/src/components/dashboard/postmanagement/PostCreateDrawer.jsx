@@ -341,7 +341,7 @@ export default function PostCreateDrawer({
     }));
 
     const upperStatus = (currentProperty?.status || "").toUpperCase();
-    const isDraft = upperStatus === "DRAFT";
+    const isDraft = upperStatus === "DRAFT"; // Biến check trạng thái Draft
     const needsResubmit = ["WARNED", "REJECTED", "PUBLISHED"].includes(upperStatus);
     const isExpiringSoon = upperStatus === "EXPIRINGSOON" || upperStatus === "EXPIRING_SOON";
     const isExpired = upperStatus === "EXPIRED" || upperStatus === "REJECTED";
@@ -663,6 +663,7 @@ export default function PostCreateDrawer({
         setTimeout(() => { setLoading(false); setStep("type"); onContinue?.(formData); }, 400);
     }, [isEdit, formData, onContinue]);
 
+    /* ================= UPDATED FOOTER LOGIC ================= */
     const footerNode = useMemo(() => {
         if (step === "form") {
             return (
@@ -672,19 +673,36 @@ export default function PostCreateDrawer({
                         onClick={async () => {
                             try {
                                 const payload = { ...formData, listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId };
-                                console.log("👉 CREATE lưu nháp - submitMode:", "DRAFT", { payload });
 
-                                await dispatch(
-                                    createPropertyThunk({
-                                        formData: payload,
-                                        listingTypePolicyId: payload.listingTypePolicyId,
-                                        submitMode: "DRAFT",
-                                    })
-                                ).unwrap();
-                                message.success("Đã lưu nháp!");
+                                // LOGIC MỚI: Kiểm tra update hay create cho DRAFT
+                                if (isEdit && editingId) {
+                                    console.log("👉 UPDATE lưu nháp:", { id: editingId, payload });
+                                    await dispatch(
+                                        updatePropertyThunk({
+                                            id: editingId,
+                                            formData: payload,
+                                            listingTypePolicyId: payload.listingTypePolicyId,
+                                            submitMode: "DRAFT", // Giữ trạng thái Draft
+                                        })
+                                    ).unwrap();
+                                    message.success("Đã cập nhật bản nháp!");
+                                } else {
+                                    console.log("👉 CREATE lưu nháp:", { payload });
+                                    await dispatch(
+                                        createPropertyThunk({
+                                            formData: payload,
+                                            listingTypePolicyId: payload.listingTypePolicyId,
+                                            submitMode: "DRAFT",
+                                        })
+                                    ).unwrap();
+                                    message.success("Đã tạo bản nháp mới!");
+                                }
+
                                 onCreated?.();
                                 onClose?.();
-                            } catch (e) { message.error(e || "Lưu nháp thất bại"); }
+                            } catch (e) {
+                                message.error(e || "Lưu nháp thất bại");
+                            }
                         }}
                     >
                         Lưu nháp
@@ -705,11 +723,14 @@ export default function PostCreateDrawer({
                 onCreated={onCreated}
                 isEdit={isEdit}
                 editingId={editingId}
+                onClose={onClose} // <-- Truyền onClose xuống Step 2
+                isDraft={isDraft} // <-- Truyền trạng thái Draft xuống để xử lý text nút bấm
             />
         );
     }, [
         step, onClose, formData, loading, goToTypeStep,
-        postTypeId, invMap, listingTypes, onCreated, isEdit
+        postTypeId, invMap, listingTypes, onCreated,
+        isEdit, editingId, dispatch, isDraft
     ]);
 
     const showBlockingSpin = loadingDetail;
@@ -872,7 +893,7 @@ export default function PostCreateDrawer({
     );
 }
 
-/* ========== FooterType (Đã tách logic Update/Create) ========== */
+/* ========== FooterType (Updated with Save Draft) ========== */
 function FooterType({
     setStep,
     formData,
@@ -882,7 +903,9 @@ function FooterType({
     listingTypes = [],
     onCreated,
     isEdit,
-    editingId
+    editingId,
+    onClose, // <-- Nhận prop onClose
+    isDraft  // <-- Nhận trạng thái Draft
 }) {
     const navigate = useNavigate();
     const [showPrompt, setShowPrompt] = useState(false);
@@ -923,7 +946,40 @@ function FooterType({
         }
     };
 
-    // 1. LOGIC TẠO MỚI (CREATE)
+    // --- HÀM LƯU NHÁP Ở BƯỚC 2 ---
+    const handleSaveDraft = async () => {
+        try {
+            const payload = {
+                ...formData,
+                listingTypePolicyId: postTypeId ?? formData.listingTypePolicyId,
+                autoRepost: autoRepostVal,
+            };
+
+            if (isEdit && editingId) {
+                // Update existing Draft
+                await dispatch(updatePropertyThunk({
+                    id: editingId,
+                    formData: payload,
+                    listingTypePolicyId: payload.listingTypePolicyId,
+                    submitMode: "DRAFT",
+                })).unwrap();
+                message.success("Đã cập nhật bản nháp!");
+            } else {
+                // Create new Draft
+                await dispatch(createPropertyThunk({
+                    formData: payload,
+                    listingTypePolicyId: payload.listingTypePolicyId,
+                    submitMode: "DRAFT",
+                })).unwrap();
+                message.success("Đã tạo bản nháp mới!");
+            }
+            onCreated?.();
+            onClose?.();
+        } catch (e) {
+            message.error(e || "Lưu nháp thất bại");
+        }
+    };
+
     const handleCreate = async () => {
         if (outOfStock) {
             setShowPrompt(true);
@@ -949,9 +1005,7 @@ function FooterType({
         }
     };
 
-    // 2. LOGIC CẬP NHẬT (UPDATE)
     const handleUpdate = async () => {
-        // Chỉ check nếu đổi gói lên cao
         const oldType = formData.listingType;
         const isChangingType = selectedTypeName && selectedTypeName !== oldType;
 
@@ -986,22 +1040,34 @@ function FooterType({
             <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
                 <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
 
-                <div className="flex items-center gap-2">
-                    <Switch checked={autoRepostVal} onChange={handleAutoRepostChange} />
-                    <span className="text-gray-700 text-sm">Tự động đăng lại</span>
-                    <Tooltip title="Tự động đăng lại tin khi hết hạn">
-                        <InfoCircleOutlined className="text-gray-500 text-xs" />
-                    </Tooltip>
-                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <Switch checked={autoRepostVal} onChange={handleAutoRepostChange} />
+                        <span className="text-gray-700 text-sm hidden sm:inline">Tự động đăng lại</span>
+                        <Tooltip title="Tự động đăng lại tin khi hết hạn">
+                            <InfoCircleOutlined className="text-gray-500 text-xs" />
+                        </Tooltip>
+                    </div>
 
-                <Button
-                    type="primary"
-                    loading={posting}
-                    className="bg-[#1b264f] hover:bg-[#22347c]"
-                    onClick={isEdit ? handleUpdate : handleCreate}
-                >
-                    {isEdit ? "Cập nhật" : "Đăng tin"}
-                </Button>
+                    {/* --- NÚT LƯU NHÁP & ĐĂNG TIN --- */}
+                    <div className="flex gap-2">
+                        <Button onClick={handleSaveDraft}>
+                            Lưu nháp
+                        </Button>
+                        <Button
+                            type="primary"
+                            loading={posting}
+                            className="bg-[#1b264f] hover:bg-[#22347c]"
+                            onClick={isEdit ? handleUpdate : handleCreate}
+                        >
+                            {/* Logic hiển thị text: 
+                                - Nếu đang sửa tin ĐÃ ĐĂNG (Active/Expired) -> Hiện 'Cập nhật'
+                                - Nếu đang tạo mới HOẶC đang sửa bản NHÁP -> Hiện 'Đăng tin'
+                            */}
+                            {isEdit && !isDraft ? "Cập nhật" : "Đăng tin"}
+                        </Button>
+                    </div>
+                </div>
             </div>
 
             {/* Modal nhắc mua thêm (CREATE) */}

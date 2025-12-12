@@ -1,29 +1,23 @@
-// src/pages/SearchResultsPage.jsx
-
 import { useState, useEffect } from "react";
-import { Tag, Pagination } from "antd";
+import { Tag, Pagination, Spin } from "antd";
 import { useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 
 import SearchFilters from "../Search/SearchFilters";
 import SearchList from "../Search/SearchList";
-import { fetchPropertiesThunk, setPage as setReduxPage } from "@/store/propertySlice"; // Chỉnh lại đường dẫn nếu cần
+import {
+    fetchPropertiesThunk,
+    setPage as setReduxPage,
+} from "@/store/propertySlice";
 
-// Đặt hàm này bên ngoài component SearchResultsPage
 const getFiltersFromURL = (searchParams) => {
     const filters = {};
-    const priceFrom = searchParams.get("priceFrom");
-    const priceTo = searchParams.get("priceTo");
-    const areaFrom = searchParams.get("areaFrom");
-    const areaTo = searchParams.get("areaTo");
-    // Thêm các filter khác như bedrooms, bathrooms nếu có...
+    const keys = ["priceFrom", "priceTo", "areaFrom", "areaTo"];
 
-    if (priceFrom) filters.priceFrom = Number(priceFrom);
-    if (priceTo) filters.priceTo = Number(priceTo);
-    if (areaFrom) filters.areaFrom = Number(areaFrom);
-    if (areaTo) filters.areaTo = Number(areaTo);
+    keys.forEach((key) => {
+        if (searchParams.get(key)) filters[key] = Number(searchParams.get(key));
+    });
 
-    // Trả về null nếu không có filter nào để logic cũ không bị ảnh hưởng
     return Object.keys(filters).length > 0 ? filters : null;
 };
 
@@ -32,15 +26,13 @@ export default function SearchResultsPage() {
     const dispatch = useDispatch();
 
     const {
-        list: pageItems,      // Dữ liệu của trang hiện tại
+        list: pageItems,
         loading,
         error,
-        page: currentPage,    // Số trang hiện tại (bắt đầu từ 0)
-        pageSize: currentPageSize, // Kích thước trang
-        totalElements: total, // Tổng số kết quả
+        page: currentPage,
+        pageSize: currentPageSize,
+        totalElements: total,
     } = useSelector((state) => state.property);
-
-    console.log("SearchResultsPage - pageItems:", pageItems, "loading:", loading, "error:", error, "currentPage:", currentPage, "currentPageSize:", currentPageSize, "total:", total);
 
     const [keyword, setKeyword] = useState(() =>
         searchParams.get("keyword") || searchParams.get("q") || ""
@@ -49,112 +41,126 @@ export default function SearchResultsPage() {
     const [filters, setFilters] = useState(() => getFiltersFromURL(searchParams));
 
     useEffect(() => {
-        // Xây dựng object `params` để gửi lên cho thunk
         const params = {
             page: currentPage,
             size: currentPageSize,
-            sort: sort === "relevance" ? "postedAt,desc" : sort.replace('Asc', ',asc').replace('Desc', ',desc'),
+            sort:
+                sort === "relevance"
+                    ? "postedAt,desc"
+                    : sort.replace("Asc", ",asc").replace("Desc", ",desc"),
         };
 
-        // Lấy các tham số từ URL
         const type = searchParams.get("type");
         const category = searchParams.get("category");
         const kwMode = searchParams.get("kwMode");
-        if (kwMode) params.kwMode = kwMode;
-        // Thêm các bộ lọc vào params nếu chúng tồn tại
+
         if (keyword) params.keyword = keyword;
         if (type) params.type = type;
         if (category) params.category = category;
-        if (filters?.priceFrom) params.priceFrom = filters.priceFrom;
-        if (filters?.priceTo) params.priceTo = filters.priceTo;
-        if (filters?.areaFrom) params.areaFrom = filters.areaFrom;
-        if (filters?.areaTo) params.areaTo = filters.areaTo;
-        // ... thêm các filter khác cho phòng ngủ, phòng tắm nếu có
+        if (kwMode) params.kwMode = kwMode;
 
-        // GỌI API với các tham số đã tổng hợp
+        if (filters) Object.assign(params, filters);
+
         dispatch(fetchPropertiesThunk(params));
 
-        // Đồng bộ hóa keyword với URL
-        if (keyword) {
-            searchParams.set('q', keyword);
-        } else {
-            searchParams.delete('q');
-        }
-        setSearchParams(searchParams);
+        if (keyword) searchParams.set("q", keyword);
+        else searchParams.delete("q");
 
-    }, [dispatch, keyword, sort, filters, currentPage, currentPageSize, searchParams, setSearchParams]);
+        setSearchParams(searchParams);
+    }, [dispatch, keyword, sort, filters, currentPage, currentPageSize]);
 
     const handleResetAll = () => {
         setKeyword("");
         setSort("relevance");
         setFilters(null);
-        dispatch(setReduxPage(0)); // Reset về trang đầu tiên trong Redux
-        searchParams.delete('q');
-        searchParams.delete('type');
-        searchParams.delete('category');
+        dispatch(setReduxPage(0));
+
+        searchParams.delete("q");
+        searchParams.delete("type");
+        searchParams.delete("category");
         setSearchParams(searchParams);
     };
 
-    // Giao diện cho Loading và Error (dùng state từ Redux)
+    // ================= UI STATES =================
     if (loading) {
-        return <div className="text-center py-20">Đang tải dữ liệu...</div>;
+        return (
+            <div className="flex justify-center py-16">
+                <Spin size="large" tip="Đang tải dữ liệu..." />
+            </div>
+        );
     }
+
     if (error) {
-        return <div className="text-center py-20 text-red-600">Lỗi: {error}. Vui lòng thử lại.</div>;
+        return (
+            <div className="py-20 text-center">
+                <p className="text-red-500 text-lg font-medium">
+                    Đã xảy ra lỗi khi tải dữ liệu.
+                </p>
+                <p className="text-gray-500 mt-1">{error}</p>
+            </div>
+        );
     }
 
     return (
-        <div className="mx-auto max-w-[1200px] px-4 py-6">
-            <SearchFilters
-                keyword={keyword}
-                onKeywordChange={setKeyword}
-                sort={sort}
-                onSortChange={setSort}
-                onResetAll={handleResetAll}
-                initialFilters={filters}
-                onApplyFilters={(newFilters) => {
-                    setFilters(newFilters);
-                    dispatch(setReduxPage(0));
+        <div className="bg-gray-50 min-h-screen py-6">
+            <div className="mx-auto max-w-[1220px] px-4">
 
-                    // ✅ Thêm đoạn code này để cập nhật URL
-                    const newSearchParams = new URLSearchParams(searchParams);
-                    // Xóa các filter cũ để tránh trùng lặp
-                    ['priceFrom', 'priceTo', 'areaFrom', 'areaTo'].forEach(key => newSearchParams.delete(key));
+                {/* 🌟 FILTER SECTION */}
+                <div className="bg-white shadow-sm rounded-xl p-5 border border-gray-100 sticky top-2 z-20">
+                    <SearchFilters
+                        keyword={keyword}
+                        onKeywordChange={setKeyword}
+                        sort={sort}
+                        onSortChange={setSort}
+                        onResetAll={handleResetAll}
+                        initialFilters={filters}
+                        onApplyFilters={(newFilters) => {
+                            setFilters(newFilters);
+                            dispatch(setReduxPage(0));
 
-                    // Ghi các filter mới vào URL
-                    Object.entries(newFilters).forEach(([key, value]) => {
-                        if (value) { // Chỉ thêm vào nếu có giá trị
-                            newSearchParams.set(key, value);
-                        }
-                    });
-                    setSearchParams(newSearchParams);
-                }}
-            />
+                            const newParams = new URLSearchParams(searchParams);
+                            ["priceFrom", "priceTo", "areaFrom", "areaTo"].forEach((k) =>
+                                newParams.delete(k)
+                            );
 
-            <div className="mt-3 text-sm text-gray-600">
-                {searchParams.get("type") && (
-                    <span>Loại: <Tag color="blue">{searchParams.get("type")}</Tag></span>
-                )}
-                {searchParams.get("category") && (
-                    <span> / Danh mục: <Tag color="blue">{searchParams.get("category")}</Tag></span>
-                )}
-                <> — Tìm thấy <b>{total}</b> kết quả</>
-            </div>
+                            Object.entries(newFilters).forEach(([k, v]) => {
+                                if (v) newParams.set(k, v);
+                            });
 
-            {/* `pageItems` giờ là `list` từ Redux, đã được map sẵn trong slice */}
-            <SearchList items={pageItems} />
+                            setSearchParams(newParams);
+                        }}
+                    />
+                </div>
 
-            <div className="mt-6 flex justify-center">
-                <Pagination
-                    current={currentPage + 1} // Antd Pagination bắt đầu từ 1
-                    pageSize={currentPageSize}
-                    total={total}
-                    showSizeChanger={false} // Tạm thời ẩn đi để đơn giản
-                    onChange={(page) => {
-                        // Khi đổi trang, chỉ cần dispatch action, useEffect sẽ lo việc gọi lại API
-                        dispatch(setReduxPage(page - 1));
-                    }}
-                />
+                {/* 📌 SEARCH SUMMARY */}
+                <div className="mt-4 bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex items-center gap-3 text-sm text-gray-700">
+                    {searchParams.get("type") && (
+                        <Tag color="geekblue">{searchParams.get("type")}</Tag>
+                    )}
+                    {searchParams.get("category") && (
+                        <Tag color="blue">{searchParams.get("category")}</Tag>
+                    )}
+                    <span className="ml-auto">
+                        🔍 Tìm thấy <strong>{total}</strong> kết quả phù hợp
+                    </span>
+                </div>
+
+                {/* 🏡 LIST RESULTS */}
+                <div className="mt-5">
+                    <SearchList items={pageItems} />
+                </div>
+
+                {/* 🔽 PAGINATION */}
+                <div className="mt-8 flex justify-center">
+                    <Pagination
+                        current={currentPage + 1}
+                        pageSize={currentPageSize}
+                        total={total}
+                        showSizeChanger={false}
+                        className="shadow-sm p-3 bg-white rounded-xl border border-gray-100"
+                        onChange={(page) => dispatch(setReduxPage(page - 1))}
+                    />
+                </div>
             </div>
         </div>
     );
