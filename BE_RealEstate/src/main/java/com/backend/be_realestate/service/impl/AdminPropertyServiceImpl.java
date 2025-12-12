@@ -125,24 +125,39 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
         // - HOẶC: Có đổi gói (isPackageChanged)
         // - HOẶC: Admin cố tình nhập số ngày (isAdminOverrideDate)
 
-        boolean shouldUpdateDate = (!isActive) || isPackageChanged || isAdminOverrideDate;
+        boolean shouldUpdateDate;
+
+        // KIỂM TRA ĐẶC BIỆT:
+        // Nếu tin đang chạy (Active) VÀ Không đổi gói
+        // -> Ta QUYẾT ĐỊNH KHÔNG TÍNH LẠI NGÀY (Bất chấp Admin có gửi durationDays lên hay không)
+        // Điều này giúp chống lại việc Frontend tự động gửi số ngày mặc định lên làm reset ngày của user.
+        if (isActive && !isPackageChanged) {
+            shouldUpdateDate = false;
+            log.info("Approve: Tin {} đang active và không đổi gói -> Giữ nguyên ngày hết hạn cũ.", propertyId);
+        }
+        else {
+            // Các trường hợp còn lại thì PHẢI tính lại:
+            // 1. Tin chết (Hết hạn)
+            // 2. Tin mới (Chưa có ngày hết hạn)
+            // 3. Đổi gói (User nâng cấp)
+            // 4. Admin nhập ngày (Khi tin không thuộc trường hợp Active ở trên)
+            shouldUpdateDate = true;
+        }
 
         if (shouldUpdateDate) {
             int days;
 
-            // NẾU ADMIN CỐ TÌNH NHẬP (Override):
+            // Ưu tiên số Admin nhập (Chỉ có tác dụng khi shouldUpdateDate = true)
             if (isAdminOverrideDate) {
                 days = req.getDurationDays();
             }
-            // NẾU KHÔNG: TỰ ĐỘNG TÍNH THEO GÓI (LOGIC AN TOÀN)
             else {
-                // [FIX QUAN TRỌNG]: Thay vì lấy p.getListingTypePolicy() (có thể bị cũ/sai),
-                // ta lấy gói chuẩn từ DB dựa trên listingType hiện tại của bài đăng.
+                // Tự động lấy theo gói chuẩn trong DB
                 ListingTypePolicy cleanPolicy = policyRepo
                         .findFirstByListingTypeAndIsActive(p.getListingType(), 1L)
                         .orElseThrow(() -> new IllegalStateException("Không tìm thấy cấu hình ngày cho gói " + p.getListingType()));
 
-                // Đồng bộ lại Policy vào bài đăng cho chắc chắn (Fix lỗi dữ liệu nếu có)
+                // Đồng bộ policy ID nếu lệch
                 if (p.getListingTypePolicy().getId() != cleanPolicy.getId()) {
                     p.setListingTypePolicy(cleanPolicy);
                 }
@@ -151,7 +166,6 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             }
 
             p.setExpiresAt(Timestamp.from(Instant.now().plus(days, ChronoUnit.DAYS)));
-            log.info("Approve: Đã tính lại ngày hết hạn cho tin {}. Cộng thêm {} ngày.", propertyId, days);
         }
         // ELSE: Nếu tin đang chạy (Active) + Không đổi gói + Admin không nhập ngày
         // -> Giữ nguyên expiresAt cũ (Không làm gì cả).
