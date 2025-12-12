@@ -51,6 +51,7 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
     @Override
     @Transactional
     public PropertyShortResponse approve(Long propertyId, ApprovePropertyRequest req, Long adminId) {
+        // 1. Lấy thông tin & Validate
         PropertyEntity p = propertyRepository.lockById(propertyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found"));
 
@@ -58,88 +59,127 @@ public class AdminPropertyServiceImpl implements AdminPropertyService {
             throw new IllegalStateException("Rejected property cannot be approved");
         }
 
-        // Cho phép đổi listingType khi duyệt (optional)
-        ListingType targetType;
+        ListingType currentType = p.getListingType();
+        ListingType targetType = (req.getListingType() != null) ? req.getListingType() : currentType;
+        Timestamp now = Timestamp.from(Instant.now());
 
-        if (req.getListingType() != null) {
-            targetType = req.getListingType();
-            ListingTypePolicy policy = policyRepo
-                    .findFirstByListingTypeAndIsActive(targetType, 1L)
-                    .orElseThrow(() -> new IllegalStateException("Policy not found or inactive for " + targetType));
+        // 2. Xác định các cờ (Flags) trạng thái
 
-            p.setListingTypePolicy(policy);
-            p.setListingType(targetType);
+        // Cờ 1: Tin có đang còn sống (Active) không?
+        boolean isActive = p.getExpiresAt() != null && p.getExpiresAt().after(now);
 
+        // Cờ 2: Có thay đổi gói tin không?
+        boolean isPackageChanged = (req.getListingType() != null && !req.getListingType().equals(currentType));
 
-            if (p.getListingType() == ListingType.NORMAL && targetType != ListingType.NORMAL) {
-                UserInventoryEntity inv = inventoryRepo.lockByUserAndType(p.getUser().getUserId(), targetType.name())
-                        .orElseThrow(() -> new IllegalStateException("Inventory not found"));
-                if (inv.getQuantity() == null || inv.getQuantity() <= 0) throw new OutOfStockException(targetType.name());
-                inv.setQuantity(inv.getQuantity() - 1);
-                inventoryRepo.save(inv);
+        // Cờ 3: Admin có nhập tay số ngày không?
+        boolean isAdminOverrideDate = (req.getDurationDays() != null && req.getDurationDays() > 0);
+
+        // ---------------------------------------------------------
+        // 3. XỬ LÝ TRỪ KHO (INVENTORY) - LOGIC QUAN TRỌNG NHẤT
+        // ---------------------------------------------------------
+        // Nguyên tắc: Chỉ trừ kho khi bắt đầu một "Hợp đồng tính phí" mới.
+        // Điều kiện:
+        // 1. Gói đích phải tốn phí (Khác Normal).
+        // 2. VÀ: (Tin đã hết hạn/Tin mới TOANH) HOẶC (Khách hàng đổi gói).
+        // LƯU Ý: KHÔNG đưa isAdminOverrideDate vào đây. Admin chỉnh ngày kệ Admin, không được trừ tiền user.
+
+        boolean shouldDeductInventory = (targetType != ListingType.NORMAL)
+                && (!isActive || isPackageChanged);
+
+        if (shouldDeductInventory) {
+            UserInventoryEntity inv = inventoryRepo.lockByUserAndType(p.getUser().getUserId(), targetType.name())
+                    .orElseThrow(() -> new IllegalStateException("Không tìm thấy gói " + targetType.name()));
+
+            if (inv.getQuantity() == null || inv.getQuantity() <= 0) {
+                throw new OutOfStockException("User đã hết gói " + targetType.name());
             }
 
-        } else {
-            targetType = p.getListingType();
+            inv.setQuantity(inv.getQuantity() - 1);
+            inventoryRepo.save(inv);
+
+            log.info("Approve: Trừ 1 gói {} của user {}. Lý do: isActive={}, isPackageChanged={}",
+                    targetType, p.getUser().getUserId(), isActive, isPackageChanged);
         }
 
+        // 4. Cập nhật Policy (Nếu đổi gói)
+        if (isPackageChanged) {
+            ListingTypePolicy policy = policyRepo
+                    .findFirstByListingTypeAndIsActive(targetType, 1L)
+                    .orElseThrow(() -> new IllegalStateException("Policy not found for " + targetType));
+            p.setListingTypePolicy(policy);
+            p.setListingType(targetType);
+        }
 
-        if (p.getPostedAt() == null) p.setPostedAt(Timestamp.from(Instant.now()));
+        // 5. Cập nhật Ngày Đăng (postedAt)
+        // Chỉ làm mới ngày đăng nếu tin này đã "chết" hoặc chưa từng đăng.
+        // Tin đang sửa (Active) thì giữ nguyên để không bị đẩy lên đầu (trừ khi đổi gói VIP).
+        if (p.getPostedAt() == null || !isActive || isPackageChanged) {
+            p.setPostedAt(now);
+        }
 
-        // hạn bài: ưu tiên req.durationDays, fallback policy
-        int days = req.getDurationDays() != null && req.getDurationDays() > 0
-                ? req.getDurationDays()
-                : (p.getListingTypePolicy().getDurationDays() != null ? p.getListingTypePolicy().getDurationDays().intValue() : 30);
+        // ---------------------------------------------------------
+        // 6. XỬ LÝ NGÀY HẾT HẠN (EXPIRES_AT)
+        // ---------------------------------------------------------
+        // Ta sẽ tính lại ngày hết hạn mới NẾU:
+        // - Tin đã hết hạn hoặc tin mới (!isActive)
+        // - HOẶC: Có đổi gói (isPackageChanged)
+        // - HOẶC: Admin cố tình nhập số ngày (isAdminOverrideDate)
 
-        p.setExpiresAt(Timestamp.from(Instant.now().plus(days, ChronoUnit.DAYS)));
-        p.setStatus(PropertyStatus.PUBLISHED); // map sang FE là "PUBLISHED"
+        boolean shouldUpdateDate = (!isActive) || isPackageChanged || isAdminOverrideDate;
+
+        if (shouldUpdateDate) {
+            int days;
+
+            // NẾU ADMIN CỐ TÌNH NHẬP (Override):
+            if (isAdminOverrideDate) {
+                days = req.getDurationDays();
+            }
+            // NẾU KHÔNG: TỰ ĐỘNG TÍNH THEO GÓI (LOGIC AN TOÀN)
+            else {
+                // [FIX QUAN TRỌNG]: Thay vì lấy p.getListingTypePolicy() (có thể bị cũ/sai),
+                // ta lấy gói chuẩn từ DB dựa trên listingType hiện tại của bài đăng.
+                ListingTypePolicy cleanPolicy = policyRepo
+                        .findFirstByListingTypeAndIsActive(p.getListingType(), 1L)
+                        .orElseThrow(() -> new IllegalStateException("Không tìm thấy cấu hình ngày cho gói " + p.getListingType()));
+
+                // Đồng bộ lại Policy vào bài đăng cho chắc chắn (Fix lỗi dữ liệu nếu có)
+                if (p.getListingTypePolicy().getId() != cleanPolicy.getId()) {
+                    p.setListingTypePolicy(cleanPolicy);
+                }
+
+                days = cleanPolicy.getDurationDays() != null ? cleanPolicy.getDurationDays().intValue() : 30;
+            }
+
+            p.setExpiresAt(Timestamp.from(Instant.now().plus(days, ChronoUnit.DAYS)));
+            log.info("Approve: Đã tính lại ngày hết hạn cho tin {}. Cộng thêm {} ngày.", propertyId, days);
+        }
+        // ELSE: Nếu tin đang chạy (Active) + Không đổi gói + Admin không nhập ngày
+        // -> Giữ nguyên expiresAt cũ (Không làm gì cả).
+
+        // 7. Lưu & Thông báo
+        p.setStatus(PropertyStatus.PUBLISHED);
         p.setReportCount(0);
         p.setLatestWarningMessage(null);
 
-         List<Report> oldReports = reportRepository.findByPropertyId(propertyId);
-         if (oldReports != null && !oldReports.isEmpty()) {
-             reportRepository.deleteAll(oldReports);
-         }
+        List<Report> oldReports = reportRepository.findByPropertyId(propertyId);
+        if (oldReports != null && !oldReports.isEmpty()) reportRepository.deleteAll(oldReports);
+
         PropertyEntity savedProperty = propertyRepository.save(p);
 
         try {
-            log.info("[PropertyService] Tin đăng {} đã được DUYỆT, đang gửi thông báo...", savedProperty.getId());
-
-            String title = savedProperty.getTitle();
-            if (title == null || title.isBlank()) {
-                title = "không có tiêu đề";
-            } else if (title.length() > 50) {
-                // Rút gọn tiêu đề cho ngắn
-                title = title.substring(0, 47) + "...";
-            }
-
-            // --- GỬI THÔNG BÁO CHO NGƯỜI ĐĂNG (AUTHOR) ---
-            String userMessage = String.format("Tin đăng '%s' của bạn đã được duyệt thành công!", title);
-
-            // Sửa link tới tab "Đang đăng"
-            String userLink = String.format("/dashboard/posts?tab=active&viewPostId=%d", savedProperty.getId());
-
-            // *** Đây là lúc sử dụng service đã "tiêm" ***
             notificationService.createNotification(
-                    savedProperty.getUser(), // Lấy user ID từ property đã lưu
-                    NotificationType.LISTING_APPROVED, // <-- Bạn cần tạo Enum này
-                    userMessage,
-                    userLink
+                    savedProperty.getUser(),
+                    NotificationType.LISTING_APPROVED,
+                    "Tin đăng '" + (savedProperty.getTitle() != null ? savedProperty.getTitle() : "") + "' đã được duyệt.",
+                    "/dashboard/posts?tab=active&viewPostId=" + savedProperty.getId()
             );
-            log.info("[PropertyService] Đã gửi thông báo LISTING_APPROVED cho user {}.", savedProperty.getUser().getUserId());
-
         } catch (Exception e) {
-            // Rất quan trọng: Vẫn bắt lỗi để nếu gửi noti lỗi,
-            // nó KHÔNG làm rollback việc DUYỆT TIN
-            log.error("!!!!!!!!!!!! LỖI KHI GỬI NOTIFICATION 'APPROVED' (nhưng tin đăng đã duyệt thành công): {}", e.getMessage(), e);
+            log.error("Error sending notification", e);
         }
 
-        saveAudit(p, adminId, "APPROVED", req.getNote() != null ? req.getNote() :
-                String.format("Approved %d days (%s)", days, targetType));
-
+        saveAudit(p, adminId, "APPROVED", req.getNote());
         return toShort(p);
     }
-
     @Override
     @Transactional
     public PropertyShortResponse reject(Long propertyId, RejectPropertyRequest req, Long adminId) {
