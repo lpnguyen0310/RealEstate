@@ -63,7 +63,7 @@ export default function SimilarNews() {
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-[#1b2a57]">Bất động sản nổi bật</h2>
+        <h2 className="text-2xl font-bold text-[#1b2a57]">Bất động sản mới nhất</h2>
         <Link 
           to="/search?sort=postedAt,desc" 
           className="text-[#1f5fbf] font-semibold hover:underline"

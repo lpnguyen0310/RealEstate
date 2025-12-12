@@ -640,14 +640,20 @@ export default function PostCreateDrawer({
         const isEmpty = (v) =>
             v == null || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
 
-        const required = ["title", "description", "categoryId", "price", "position", "landArea", "legalDocument"];
+        const required = ["title", "description", "categoryId", "price", "provinceId", "districtId", "wardId", "position", "landArea", "legalDocument",
+        ];
         const msgMap = {
-            suggestedAddress: "Vui lòng chọn Địa chỉ đề xuất",
+            title: "Vui lòng nhập Tiêu đề",
+            description: "Vui lòng nhập Mô tả",
+            categoryId: "Vui lòng chọn Danh mục",
+            price: "Vui lòng nhập Giá",
+            provinceId: "Vui lòng chọn Tỉnh/Thành phố",
+            districtId: "Vui lòng chọn Quận/Huyện",
+            wardId: "Vui lòng chọn Phường/Xã",
             position: "Vui lòng chọn Vị trí",
             landArea: "Vui lòng nhập Diện tích đất",
             legalDocument: "Vui lòng chọn Giấy tờ pháp lý",
         };
-
         const requiredErrs = {};
         for (const k of required) if (isEmpty(formData[k])) requiredErrs[k] = msgMap[k] || "Trường này là bắt buộc";
 
@@ -876,7 +882,7 @@ function FooterType({
     listingTypes = [],
     onCreated,
     isEdit,
-    editingId  
+    editingId
 }) {
     const navigate = useNavigate();
     const [showPrompt, setShowPrompt] = useState(false);
@@ -904,7 +910,7 @@ function FooterType({
     const handleAutoRepostChange = async (checked) => {
         setAutoRepostVal(checked);
         if (setFormData) setFormData(prev => ({ ...prev, autoRepost: checked }));
-        
+
         if (isEdit && editingId) {
             try {
                 await dispatch(toggleAutoRenewThunk({ id: editingId, enable: checked })).unwrap();
@@ -946,7 +952,7 @@ function FooterType({
     // 2. LOGIC CẬP NHẬT (UPDATE)
     const handleUpdate = async () => {
         // Chỉ check nếu đổi gói lên cao
-        const oldType = formData.listingType; 
+        const oldType = formData.listingType;
         const isChangingType = selectedTypeName && selectedTypeName !== oldType;
 
         if (isVipLike && isChangingType && qty <= 0) {
@@ -965,9 +971,9 @@ function FooterType({
                 id: editingId,
                 formData: payload,
                 listingTypePolicyId: payload.listingTypePolicyId,
-                submitMode: "PUBLISHED", 
+                submitMode: "PUBLISHED",
             })).unwrap();
-            
+
             message.success("Cập nhật tin thành công!");
             onCreated?.();
         } catch (e) {
@@ -979,7 +985,7 @@ function FooterType({
         <>
             <div className="flex items-center justify-between px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2 border-t border-[#e3e9f5] bg-[#f8faff]/90 backdrop-blur">
                 <Button onClick={() => setStep("form")}>&larr; Quay lại</Button>
-                
+
                 <div className="flex items-center gap-2">
                     <Switch checked={autoRepostVal} onChange={handleAutoRepostChange} />
                     <span className="text-gray-700 text-sm">Tự động đăng lại</span>
@@ -1021,7 +1027,7 @@ function FooterType({
                 <div className="text-center space-y-3">
                     <div className="text-lg font-semibold text-[#0f223a]">Nâng cấp gói tin</div>
                     <p className="text-gray-600">
-                        Bạn đang chuyển sang gói <b>{selectedTypeName}</b> nhưng số lượng còn lại bằng 0. 
+                        Bạn đang chuyển sang gói <b>{selectedTypeName}</b> nhưng số lượng còn lại bằng 0.
                         Vui lòng mua thêm để thực hiện nâng cấp.
                     </p>
                     <div className="flex justify-center gap-2 pt-2">
