@@ -841,9 +841,6 @@ export default function PostDetailDrawer({
                                         <Grid item xs={12} md={4}>
                                             <Field label="Vị trí" value={safeText(d.position)} />
                                         </Grid>
-                                        <Grid item xs={12}>
-                                            <Field label="Địa chỉ (đường)" value={safeText(d.addressStreet)} />
-                                        </Grid>
                                     </Grid>
                                 </SubBlock>
 

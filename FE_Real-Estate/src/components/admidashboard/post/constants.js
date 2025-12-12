@@ -11,6 +11,7 @@ export const STATUS_LABEL = {
   HIDDEN: "Đã ẩn",
   REJECTED: "Bị từ chối",
   DRAFT: "Nháp",
+  ARCHIVED: "Thành công", // nếu BE có ARCHIVED
   ACTIVE: "Đang hiển thị", // nếu BE có ACTIVE
 };
 
@@ -25,7 +26,7 @@ export const STATUS_CHIP_COLOR = {
   HIDDEN: "default",
   REJECTED: "error",
   DRAFT: "default",
-  ACTIVE: "success",
+  ARCHIVED: "archived", // nếu BE có ARCHIVED
 };
 
 // Style hex tuyệt đối (đảm bảo màu đúng kể cả khi palette chưa cấu hình)
@@ -38,6 +39,7 @@ export const STATUS_CHIP_STYLE = {
   REJECTED:       { bg: "#fecdd3", text: "#7f1d1d" },  // hồng nhạt
   DRAFT:          { bg: "#e5e7eb", text: "#374151" },  // xám
   ACTIVE:         { bg: "#e6f4ff", text: "#0f2350" },  // xanh nhẹ (nếu dùng)
+  ARCHIVED:      { bg: "#d1fae5", text: "#064e3b" },  // xanh lá nhạt (nếu dùng)
 };
 
 export const CATEGORIES = ["Căn hộ", "Nhà phố", "Đất nền", "Mặt bằng", "Văn phòng"];
