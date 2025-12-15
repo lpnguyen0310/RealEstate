@@ -61,13 +61,13 @@
                 const t = it.listingType; // NORMAL | VIP | PREMIUM
                 const photoLine =
                     t === "NORMAL"
-                        ? "1 ảnh vừa (Máy tính) / 1 ảnh nhỏ (Điện thoại)"
+                        ? "1 ảnh vừa 2 ảnh nhỏ"
                         : t === "PREMIUM"
-                            ? "2 ảnh lớn, 1 ảnh vừa, 2 ảnh nhỏ (Máy tính) / 1 ảnh lớn, 3 ảnh nhỏ (Điện thoại)"
-                            : "1 ảnh vừa, 3 ảnh nhỏ (Máy tính) / 1 ảnh lớn (Điện thoại)";
+                            ? "Tối đa 15 ảnh"
+                            : "Tối đa 7 ảnh";
                 const rankLine =
                     t === "NORMAL" ? "Hiển thị mặc định" : t === "VIP" ? "Hiển thị trên tin thường" : "Tin đầu trang";
-                const contactOnSearch = t !== "NORMAL";
+                const contactOnSearch = t;;
 
                 return {
                     id: it.id,

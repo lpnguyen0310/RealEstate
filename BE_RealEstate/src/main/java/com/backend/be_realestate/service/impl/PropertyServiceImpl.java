@@ -126,7 +126,23 @@
                     Specification<PropertyEntity> spec = Specification
                             .where(PropertySpecification.isPublished())
                             .and(PropertySpecification.notExpired()); // optional: lọc tin hết hạn
+                    List<String> directions = null;
+                    String directionsRaw = params.get("directions"); // "Tây - Bắc,Đông"
+                    if (directionsRaw != null && !directionsRaw.isBlank()) {
+                        directions = Arrays.stream(directionsRaw.split(","))
+                                .map(String::trim)
+                                .filter(s -> !s.isEmpty())
+                                .toList();
+                    }
 
+                    List<String> positions = null;
+                    String positionsRaw = params.get("positions");
+                    if (positionsRaw != null && !positionsRaw.isBlank()) {
+                        positions = Arrays.stream(positionsRaw.split(","))
+                                .map(String::trim)
+                                .filter(s -> !s.isEmpty())
+                                .toList();
+                    }
                     if (cityId != null) {
                         spec = spec.and(PropertySpecification.hasCity(cityId));
                     } else {
@@ -138,11 +154,12 @@
                             .and(PropertySpecification.hasCategorySlug(categorySlug))
                             .and(PropertySpecification.priceBetween(priceFrom, priceTo))
                             .and(PropertySpecification.areaBetween(areaFrom, areaTo))
-                            // 🔹 các điều kiện mới
                             .and(PropertySpecification.hasMinBedrooms(bedroomsFrom))
                             .and(PropertySpecification.hasMinBathrooms(bathroomsFrom))
                             .and(PropertySpecification.hasLegalStatus(legalType))
-                            .and(PropertySpecification.hasAnyAmenities(amenityIds));
+                            .and(PropertySpecification.hasAnyAmenities(amenityIds))
+                            .and(PropertySpecification.hasAnyDirections(directions))
+                            .and(PropertySpecification.hasAnyPositions(positions));
 
                     Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
                     return resultPage.map(propertyMapper::toPropertyCardDTO);

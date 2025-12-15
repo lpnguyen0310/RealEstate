@@ -38,7 +38,14 @@ import ReportOutlinedIcon from "@mui/icons-material/ReportOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-
+import SquareFootOutlinedIcon from "@mui/icons-material/SquareFootOutlined";
+import BedOutlinedIcon from "@mui/icons-material/BedOutlined";
+import BathtubOutlinedIcon from "@mui/icons-material/BathtubOutlined";
+import StairsOutlinedIcon from "@mui/icons-material/StairsOutlined";
+import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
+import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
+import HomeWorkOutlinedIcon from "@mui/icons-material/HomeWorkOutlined";
+import GavelOutlinedIcon from "@mui/icons-material/GavelOutlined";
 import { STATUS_LABEL, STATUS_CHIP_COLOR } from "./constants";
 import ImageViewer from "./ImageViewer";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -745,37 +752,38 @@ export default function PostDetailDrawer({
                                     </Grid>
 
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Diện tích" value={m2(d.area)} />
+                                        <Field label="Diện tích" value={m2(d.area)} icon={SquareFootOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Diện tích đất" value={m2(d.landArea)} />
+                                        <Field label="Diện tích đất" value={m2(d.landArea)} icon={SquareFootOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Phòng ngủ" value={numOrDash(d.bedrooms)} />
+                                        <Field label="Phòng ngủ" value={numOrDash(d.bedrooms)} icon={BedOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Phòng tắm" value={numOrDash(d.bathrooms)} />
+                                        <Field label="Phòng tắm" value={numOrDash(d.bathrooms)} icon={BathtubOutlinedIcon} />
                                     </Grid>
 
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Số tầng" value={numOrDash(d.floors)} />
+                                        <Field label="Số tầng" value={numOrDash(d.floors)} icon={StairsOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Hướng" value={safeText(d.direction)} />
+                                        <Field label="Hướng" value={safeText(d.direction)} icon={ExploreOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Ngang" value={dim(d.width)} />
+                                        <Field label="Ngang" value={dim(d.width)} icon={StraightenOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Dài" value={dim(d.height)} />
+                                        <Field label="Dài" value={dim(d.height)} icon={StraightenOutlinedIcon} />
                                     </Grid>
 
                                     <Grid item xs={12} md={6}>
-                                        <Field label="Loại BĐS" value={safeText(d.propertyType)} />
+                                        <Field label="Loại BĐS" value={safeText(d.propertyType)} icon={HomeWorkOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={12} md={6}>
-                                        <Field label="Pháp lý" value={safeText(d.legalStatus)} />
+                                        <Field label="Pháp lý" value={safeText(d.legalStatus)} icon={GavelOutlinedIcon} />
                                     </Grid>
+
 
                                     <Grid item xs={12} md={6}>
                                         <Field

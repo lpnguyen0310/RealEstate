@@ -177,4 +177,18 @@ public class PropertySpecification {
             return amenityJoin.get("id").in(amenityIds);
         };
     }
+
+    public static Specification<PropertyEntity> hasAnyDirections(List<String> directions) {
+        return (root, query, cb) -> {
+            if (directions == null || directions.isEmpty()) return cb.conjunction();
+            return root.get("direction").in(directions);
+        };
+    }
+
+    public static Specification<PropertyEntity> hasAnyPositions(List<String> positions) {
+        return (root, query, cb) -> {
+            if (positions == null || positions.isEmpty()) return cb.conjunction();
+            return root.get("position").in(positions);
+        };
+    }
 }

@@ -65,14 +65,40 @@ export async function callAI(historyMsgs) {
 /* ===== /search helpers ===== */
 export function parseMoneyVN(s) {
     if (!s) return null;
-    const x = s.toString().trim().toLowerCase().replace(/\./g, "").replace(/,/g, "");
-    if (x.endsWith("k")) return Number(x.slice(0, -1)) * 1_000;
-    if (/(ng|nghìn|nghin)$/.test(x)) return Number(x.replace(/[^\d]/g, "")) * 1_000;
-    if (x.endsWith("m") || x.endsWith("tr"))
-        return Number(x.replace(/[^\d]/g, "")) * 1_000_000;
-    if (/(ty|tỷ|tỷ)$/.test(x)) return Number(x.replace(/[^\d]/g, "")) * 1_000_000_000;
-    const n = Number(x.replace(/[^\d]/g, ""));
-    return Number.isFinite(n) ? n : null;
+    const raw = String(s).trim().toLowerCase();
+
+    // giữ lại dấu thập phân, chỉ bỏ khoảng trắng
+    const x = raw.replace(/\s+/g, "");
+
+    // helper đọc số float (hỗ trợ 6.9 hoặc 6,9)
+    const readFloat = (t) => {
+        const n = Number(String(t).replace(",", ".").replace(/[^\d.]/g, ""));
+        return Number.isFinite(n) ? n : null;
+    };
+
+    if (x.endsWith("k")) {
+        const v = readFloat(x.slice(0, -1));
+        return v == null ? null : Math.round(v * 1_000);
+    }
+
+    if (/(ng|nghìn|nghin)$/.test(x)) {
+        const v = readFloat(x);
+        return v == null ? null : Math.round(v * 1_000);
+    }
+
+    if (x.endsWith("m") || x.endsWith("tr") || /trieu/.test(x)) {
+        const v = readFloat(x);
+        return v == null ? null : Math.round(v * 1_000_000);
+    }
+
+    if (/(ty|tỷ|tỷ|ti|tỉ)$/.test(x)) {
+        const v = readFloat(x);
+        return v == null ? null : Math.round(v * 1_000_000_000);
+    }
+
+    // fallback: số vnd thô
+    const digits = Number(x.replace(/[^\d]/g, ""));
+    return Number.isFinite(digits) ? digits : null;
 }
 
 export function parseArea(s) {
@@ -211,6 +237,8 @@ function toNum(v) {
 }
 
 export function mapPublicPropertyToCard(p) {
+    console.log("API raw p.price:", p?.price);
+
     if (!p) return {};
     return {
         id: p.id,
@@ -233,6 +261,7 @@ export function mapPublicPropertyToCard(p) {
         category: p.category,
         listingType: p.listing_type,
     };
+
 }
 
 export async function searchPropertiesAPI(params) {
@@ -341,79 +370,83 @@ export function tryNLToSearchParams(nlText) {
 
     const text = original.toLowerCase();
 
-    // Phải có ý định tìm BĐS => tránh hiểu nhầm câu chat thường
+    // ==== intent ====
     const intentRe =
         /(tìm|mua|thuê|cần|kiếm)\b.*(nhà|căn hộ|chung cư|phòng|đất|bất động sản|bđs)|\b(nhà|căn hộ|chung cư|phòng|đất|bất động sản|bđs)\b.*(tìm|mua|thuê)/;
     if (!intentRe.test(text)) return null;
 
     const params = {};
 
-    // Mục đích: mua / thuê
+    // ==== TYPE ====
     if (text.includes("thuê")) params.type = "rent";
     else if (text.includes("mua") || text.includes("bán")) params.type = "sell";
 
-    // GIÁ: "dưới 7 tỷ", "trên 3 tỷ", "từ 2 tỷ", "khoảng 5 tỷ" ...
+    // ==== PRICE ====
     const priceRe =
         /(dưới|<=|<|trên|>=|>|từ|khoảng)\s*([\d.,]+)\s*(tỷ|ty|triệu|tr|nghìn|nghin|k)?/i;
-    const pm = original.match(priceRe); // dùng original để giữ đơn vị
+    const pm = original.match(priceRe);
     if (pm) {
         const dir = pm[1].toLowerCase();
-        const num = pm[2];
-        const unit = pm[3] || "";
-        const val = parseMoneyVN(num + unit);
+        const val = parseMoneyVN(pm[2] + (pm[3] || ""));
         if (val != null) {
-            if (
-                dir.includes("dưới") ||
-                dir === "<=" ||
-                dir === "<" ||
-                dir.includes("khoảng")
-            ) {
+            if (dir.includes("dưới") || dir === "<=" || dir === "<" || dir.includes("khoảng")) {
                 params.priceTo = val;
-            } else if (
-                dir.includes("trên") ||
-                dir === ">=" ||
-                dir === ">" ||
-                dir.includes("từ")
-            ) {
+            } else {
                 params.priceFrom = val;
             }
         }
     }
 
-    // DIỆN TÍCH: "trên 60m2", "khoảng 70 m²" -> đơn giản: areaFrom
+    // ==== AREA ====
     const areaRe = /(\d+)\s*(m2|m²|m vuông|m\s*vuong)/i;
     const am = original.match(areaRe);
     if (am) {
         const a = parseArea(am[0]);
-        if (a != null) {
-            params.areaFrom = a;
-        }
+        if (a != null) params.areaFrom = a;
     }
 
-    // PHÒNG NGỦ: "2pn", "2 phòng ngủ"
+    // ==== BEDROOMS ====
     const bedRe = /(\d+)\s*(pn|phòng ngủ|phong ngu)/i;
     const bm = original.match(bedRe);
     if (bm) {
-        const n = Number(bm[1].replace(/[^\d]/g, ""));
+        const n = Number(bm[1]);
         if (Number.isFinite(n)) params.bedroomsFrom = n;
     }
 
-    // PHÒNG TẮM: "2wc", "2 toilet"
+    // ==== BATHROOMS ====
     const bathRe = /(\d+)\s*(wc|toilet|phòng tắm|phong tam)/i;
     const wm = original.match(bathRe);
     if (wm) {
-        const n = Number(wm[1].replace(/[^\d]/g, ""));
+        const n = Number(wm[1]);
         if (Number.isFinite(n)) params.bathroomsFrom = n;
     }
 
-    // KHU VỰC: phần sau "ở"/"tại" -> cho vào keyword, BE map city bằng keyword
-    const locRe = /(ở|tại)\s+([^.,;]+)$/i;
+    // ==== DIRECTION (HƯỚNG) ====
+    const dirRe =
+        /\b(hướng|huong)\s+(đông\s*nam|dong\s*nam|đông\s*bắc|dong\s*bac|tây\s*nam|tay\s*nam|tây\s*bắc|tay\s*bac|đông|dong|tây|tay|nam|bắc|bac)\b/i;
+    const dm = original.match(dirRe);
+    if (dm?.[2]) {
+        let d = dm[2].trim().replace(/\s+/g, " ");
+        d = d
+            .replace(/^dong$/i, "Đông")
+            .replace(/^tay$/i, "Tây")
+            .replace(/^bac$/i, "Bắc")
+            .replace(/^dong nam$/i, "Đông Nam")
+            .replace(/^dong bac$/i, "Đông Bắc")
+            .replace(/^tay nam$/i, "Tây Nam")
+            .replace(/^tay bac$/i, "Tây Bắc");
+        params.directions = d;
+    }
+
+    // ==== LOCATION ====
+    const locRe = /\b(ở|tại|khu vực|khu vuc)\s+([^,.;]+)/i;
     const lm = original.match(locRe);
     if (lm?.[2]) {
-        const kw = lm[2].trim();
+        let kw = lm[2]
+            .replace(/\b(có giá|giá|dưới|trên|từ|khoảng|max|<=|>=|<|>)\b.*$/i, "")
+            .trim();
         if (kw) params.keyword = kw;
     }
 
-    // Nếu không parse được gì thì trả null để fallback sang chat AI
     return Object.keys(params).length ? params : null;
 }
