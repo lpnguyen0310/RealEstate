@@ -1,6 +1,7 @@
 package com.backend.be_realestate.service.impl;
 
 import com.backend.be_realestate.entity.PropertyEntity;
+import com.backend.be_realestate.entity.PropertyImageEntity;
 import com.backend.be_realestate.enums.VerificationStatus;
 import com.backend.be_realestate.modals.dto.LegalCheckResult;
 import com.backend.be_realestate.repository.PropertyRepository;
@@ -12,13 +13,15 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class LegalVerificationService {
 
     private final PropertyRepository propertyRepository;
-    private final IAIService aiService; // Inject Interface AI
+    private final IAIService aiService;
 
     @Async
     @Transactional
@@ -26,28 +29,56 @@ public class LegalVerificationService {
         PropertyEntity property = propertyRepository.findById(propertyId).orElse(null);
         if (property == null) return;
 
-        // Lấy ảnh đầu tiên trong list legal images
-        String images = property.getLegalImages();
-        if (images == null || images.isBlank()) return;
+        // 1. Lấy ảnh từ List Entity (Bảng con property_images)
+        List<PropertyImageEntity> deedImages = property.getDeedFiles();
 
-        String firstImageUrl = images.split(",")[0].trim();
+        if (deedImages == null || deedImages.isEmpty()) {
+            log.warn("Property ID {} status PENDING_SCAN nhưng không có ảnh LEGAL_DEED", propertyId);
+            return;
+        }
 
-        // GỌI AI SERVICE (Đã implement ở bước 3)
+        String firstImageUrl = deedImages.get(0).getImageUrl();
+        log.info("AI đang xử lý ảnh: {}", firstImageUrl);
+
+        // --- 2. SỬA LẠI ĐOẠN NÀY: TẠO BIẾN fullAddress ---
+        StringBuilder fullAddress = new StringBuilder();
+
+        // Ghép địa chỉ chi tiết (nếu có)
+        if (property.getAddressStreet() != null && !property.getAddressStreet().isBlank()) {
+            fullAddress.append(property.getAddressStreet()).append(", ");
+        }
+        // Ghép Phường/Xã
+        if (property.getWard() != null) {
+            fullAddress.append(property.getWard().getName()).append(", ");
+        }
+        // Ghép Quận/Huyện
+        if (property.getDistrict() != null) {
+            fullAddress.append(property.getDistrict().getName()).append(", ");
+        }
+        // Ghép Tỉnh/TP
+        if (property.getCity() != null) {
+            fullAddress.append(property.getCity().getName());
+        }
+
+        // Nếu không ghép được gì (data rỗng) thì lấy displayAddress làm fallback
+        String addressToSend = fullAddress.toString();
+        if (addressToSend.isBlank() && property.getDisplayAddress() != null) {
+            addressToSend = property.getDisplayAddress();
+        }
+        // ------------------------------------------------
+
+        // 3. GỌI AI SERVICE (Truyền addressToSend vào)
         LegalCheckResult result = aiService.verifyLegalDocument(
                 firstImageUrl,
                 property.getContactName(),
-                property.getArea()
+                property.getArea(),
+                addressToSend // <--- Biến đã được tạo ở trên
         );
 
-        // Lưu kết quả vào DB
+        // 4. Lưu kết quả vào DB
         property.setVerificationScore(result.getConfidenceScore());
         property.setVerificationAiData(convertToJson(result));
         property.setVerificationStatus(VerificationStatus.SCANNED);
-
-        // Logic tự động duyệt nếu điểm quá cao (Optional)
-        // if (result.getConfidenceScore() > 95 && !result.isFraudSuspected()) {
-        //    property.setVerificationStatus(VerificationStatus.VERIFIED);
-        // }
 
         propertyRepository.save(property);
     }

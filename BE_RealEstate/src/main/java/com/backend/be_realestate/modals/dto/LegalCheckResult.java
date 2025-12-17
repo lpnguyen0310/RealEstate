@@ -11,4 +11,5 @@ public class LegalCheckResult {
     private Double extractedArea;      // Diện tích AI đọc được
     private String matchDetails;       // Lý giải: "Tên khớp 90%, diện tích lệch 0.5m2"
     private boolean isFraudSuspected;  // AI nghi ngờ ảnh fake/photoshop
+    private String extractedAddress;
 }

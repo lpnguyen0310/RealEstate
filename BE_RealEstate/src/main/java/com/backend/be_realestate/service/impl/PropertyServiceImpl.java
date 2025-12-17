@@ -488,30 +488,41 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setPriceType(PriceType.valueOf(req.getPriceType().name()));
         }
 
-                    // === Ảnh & tiện ích (replace) ===
-                    if (req.getImageUrls() != null) {
-                        property.replaceImages(req.getImageUrls());
-                    }
-                    if (req.getConstructionImages() != null) {
-                        property.replaceConstructionImages(req.getConstructionImages());
-                    }
+        // === Ảnh & tiện ích (replace) ===
+        if (req.getImageUrls() != null) {
+            property.replaceImages(req.getImageUrls());
+        }
+        if (req.getConstructionImages() != null) {
+            property.replaceConstructionImages(req.getConstructionImages());
+        }
 
 
-                    if (req.getDeedFileUrls() != null) {
-                        property.replaceDeedFiles(req.getDeedFileUrls());
-                    }
+        List<String> legalUrls = req.getDeedFileUrls();
+        if (legalUrls == null) {
+            legalUrls = req.getLegalDocumentUrls(); // Fallback phòng hờ
+        }
 
-                    if (req.getAuthorizationFileUrls() != null) {
-                        property.replaceAuthorizationFiles(req.getAuthorizationFileUrls());
-                    }
+        if (legalUrls != null && !legalUrls.isEmpty()) {
+            // A. Lưu vào bảng property_images với type = LEGAL_DEED
+            property.replaceDeedFiles(legalUrls);
 
-                    if (req.getAmenityIds() != null) {
-                        var amenities = req.getAmenityIds().isEmpty()
-                                ? java.util.Collections.<AmenityEntity>emptyList()
-                                : amenityRepository.findAllById(req.getAmenityIds());
-                        property.setAmenities(amenities);
-                    }
-                    if (req.getIsOwner() != null) property.setIsOwner(req.getIsOwner());
+            // B. Kích hoạt trạng thái chờ AI quét
+            property.setVerificationStatus(VerificationStatus.PENDING_SCAN);
+
+            // C. (Quan trọng) Không setLegalImages(String) nữa để tránh dư thừa dữ liệu
+        }
+
+        if (req.getAuthorizationFileUrls() != null) {
+            property.replaceAuthorizationFiles(req.getAuthorizationFileUrls());
+        }
+
+        if (req.getAmenityIds() != null) {
+            var amenities = req.getAmenityIds().isEmpty()
+                    ? java.util.Collections.<AmenityEntity>emptyList()
+                    : amenityRepository.findAllById(req.getAmenityIds());
+            property.setAmenities(amenities);
+        }
+        if (req.getIsOwner() != null) property.setIsOwner(req.getIsOwner());
 
         if (Boolean.TRUE.equals(property.getIsOwner())) {
             // Nếu chính chủ: auto-fill từ User nếu FE không gửi
@@ -545,14 +556,14 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setAutoRenew(false);
         }
 
-        if (req.getLegalDocumentUrls() != null && !req.getLegalDocumentUrls().isEmpty()) {
-            // 1. Nối danh sách URL thành chuỗi string (cách nhau dấu phẩy)
-            String joinedUrls = String.join(",", req.getLegalDocumentUrls());
-            property.setLegalImages(joinedUrls);
-
-            // 2. Kích hoạt trạng thái chờ quét
-            property.setVerificationStatus(VerificationStatus.PENDING_SCAN);
-        }
+//        if (req.getLegalDocumentUrls() != null && !req.getLegalDocumentUrls().isEmpty()) {
+//            // 1. Nối danh sách URL thành chuỗi string (cách nhau dấu phẩy)
+//            String joinedUrls = String.join(",", req.getLegalDocumentUrls());
+//            property.setLegalImages(joinedUrls);
+//
+//            // 2. Kích hoạt trạng thái chờ quét
+//            property.setVerificationStatus(VerificationStatus.PENDING_SCAN);
+//        }
 
 
     }
