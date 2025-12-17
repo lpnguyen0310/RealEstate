@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -29,53 +30,57 @@ public class LegalVerificationService {
         PropertyEntity property = propertyRepository.findById(propertyId).orElse(null);
         if (property == null) return;
 
-        // 1. Lấy ảnh từ List Entity (Bảng con property_images)
-        List<PropertyImageEntity> deedImages = property.getDeedFiles();
+        // 1. TỔNG HỢP ẢNH (Gom Sổ đỏ + Ủy quyền vào 1 list tạm)
+        List<String> imagesToSend = new ArrayList<>();
 
-        if (deedImages == null || deedImages.isEmpty()) {
-            log.warn("Property ID {} status PENDING_SCAN nhưng không có ảnh LEGAL_DEED", propertyId);
+        // A. Lấy ảnh Sổ đỏ (Deed)
+        List<PropertyImageEntity> deedImages = property.getDeedFiles();
+        if (deedImages != null) {
+            imagesToSend.addAll(deedImages.stream().map(PropertyImageEntity::getImageUrl).toList());
+        }
+
+        // B. Lấy ảnh Ủy quyền (Authorization) - Chỉ lấy nếu có
+        List<PropertyImageEntity> authImages = property.getAuthorizationFiles(); // Giả sử trong Entity bạn đã có field này
+        if (authImages != null && !authImages.isEmpty()) {
+            imagesToSend.addAll(authImages.stream().map(PropertyImageEntity::getImageUrl).toList());
+        }
+
+        // Nếu không có ảnh nào thì dừng
+        if (imagesToSend.isEmpty()) {
+            log.warn("Property ID {} status PENDING_SCAN nhưng không có ảnh pháp lý nào", propertyId);
             return;
         }
 
-        String firstImageUrl = deedImages.get(0).getImageUrl();
-        log.info("AI đang xử lý ảnh: {}", firstImageUrl);
+        log.info("AI đang xử lý tổng cộng {} ảnh (Sổ + Ủy quyền)", imagesToSend.size());
 
-        // --- 2. SỬA LẠI ĐOẠN NÀY: TẠO BIẾN fullAddress ---
+        // 2. TẠO CHUỖI ĐỊA CHỈ (Logic cũ giữ nguyên - rất quan trọng để AI so sánh)
         StringBuilder fullAddress = new StringBuilder();
-
-        // Ghép địa chỉ chi tiết (nếu có)
         if (property.getAddressStreet() != null && !property.getAddressStreet().isBlank()) {
             fullAddress.append(property.getAddressStreet()).append(", ");
         }
-        // Ghép Phường/Xã
         if (property.getWard() != null) {
             fullAddress.append(property.getWard().getName()).append(", ");
         }
-        // Ghép Quận/Huyện
         if (property.getDistrict() != null) {
             fullAddress.append(property.getDistrict().getName()).append(", ");
         }
-        // Ghép Tỉnh/TP
         if (property.getCity() != null) {
             fullAddress.append(property.getCity().getName());
         }
-
-        // Nếu không ghép được gì (data rỗng) thì lấy displayAddress làm fallback
         String addressToSend = fullAddress.toString();
         if (addressToSend.isBlank() && property.getDisplayAddress() != null) {
             addressToSend = property.getDisplayAddress();
         }
-        // ------------------------------------------------
 
-        // 3. GỌI AI SERVICE (Truyền addressToSend vào)
+        // 3. GỌI AI SERVICE (Truyền List ảnh)
         LegalCheckResult result = aiService.verifyLegalDocument(
-                firstImageUrl,
+                imagesToSend, // <--- Truyền List đã gộp
                 property.getContactName(),
                 property.getArea(),
-                addressToSend // <--- Biến đã được tạo ở trên
+                addressToSend
         );
 
-        // 4. Lưu kết quả vào DB
+        // 4. LƯU KẾT QUẢ
         property.setVerificationScore(result.getConfidenceScore());
         property.setVerificationAiData(convertToJson(result));
         property.setVerificationStatus(VerificationStatus.SCANNED);

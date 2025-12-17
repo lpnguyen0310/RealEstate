@@ -291,93 +291,120 @@ public class AIServiceOpenRouterImpl implements IAIService {
     public static class AiRankItem { private Long id; private Double score; }
 
     @Override
-    public LegalCheckResult verifyLegalDocument(String imageUrl, String userContactName, float userArea, String userAddress) {
-        log.info("[AI-LEGAL] Verifying image: {}", imageUrl);
+    public LegalCheckResult verifyLegalDocument(List<String> imageUrls, String userContactName, float userArea, String userAddress) {
+        // Kiểm tra đầu vào
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            log.warn("[AI-LEGAL] Danh sách ảnh trống, không thể verify.");
+            LegalCheckResult empty = new LegalCheckResult();
+            empty.setConfidenceScore(0.0);
+            empty.setMatchDetails("Không có ảnh pháp lý để kiểm tra");
+            return empty;
+        }
+
+        log.info("[AI-LEGAL] Đang xử lý {} ảnh cho user: {}", imageUrls.size(), userContactName);
 
         try {
-            // 1. Build Payload cho Vision Model
-            Map<String, Object> userMessageContent = new HashMap<>();
-
-            // --- SỬA LẠI PROMPT TEXT TẠI ĐÂY ---
+            // 1. Build Prompt Text (Nâng cấp để xử lý cả Sổ đỏ & Ủy quyền)
+            // Prompt này hướng dẫn AI tìm mối liên hệ: Chủ Sổ (A) -> Ủy Quyền (A cho B) -> User (B)
             String promptText = String.format("""
-                Bạn là AI chuyên gia thẩm định pháp lý BĐS Việt Nam. Nhiệm vụ:
-                1. Đọc ảnh Sổ Đỏ/Sổ Hồng (Giấy chứng nhận quyền sử dụng đất).
-                2. Trích xuất 3 thông tin: "Tên người sử dụng đất", "Diện tích" (số m2), và "Địa chỉ thửa đất".
-                3. So sánh dữ liệu trích xuất với dữ liệu User nhập dưới đây:
-                   - User nhập Tên: "%s"
-                   - User nhập Diện tích: %s m2
-                   - User nhập Địa chỉ: "%s"
+                Bạn là AI chuyên gia thẩm định pháp lý BĐS Việt Nam. Input gồm danh sách ảnh: Sổ Đỏ/Sổ Hồng và (có thể có) Giấy Ủy Quyền.
                 
-                LƯU Ý QUAN TRỌNG VỀ ĐỊA CHỈ:
-                - Địa chỉ trên Sổ đỏ thường ghi là: "Thửa đất số..., Tờ bản đồ số..., Xã/Phường..., Huyện/Quận..., Tỉnh/TP...".
-                - Địa chỉ User nhập thường là: "Số nhà, Đường, Phường, Quận, TP".
-                - Hãy đánh giá xem Phường/Xã, Quận/Huyện, Tỉnh/TP có khớp nhau không. Nếu sai lệch Quận/Huyện hoặc Tỉnh/TP thì trừ điểm nặng.
-                
-                4. Trả về JSON duy nhất (không markdown) theo mẫu:
-                {
-                  "confidenceScore": <0-100. Điểm tin cậy tổng hợp dựa trên độ khớp Tên, Diện tích và Địa chỉ>,
-                  "extractedOwnerName": "<Tên đọc được từ ảnh>",
-                  "extractedArea": <Số diện tích đọc được từ ảnh, nếu ko thấy trả về 0>,
-                  "extractedAddress": "<Địa chỉ đọc được từ ảnh>",
-                  "matchDetails": "<Nhận xét ngắn gọn tiếng Việt về độ khớp của cả 3 trường>",
-                  "fraudSuspected": <true/false nếu ảnh mờ, bị cắt ghép, hoặc thông tin sai lệch hoàn toàn>
-                }
-                """, userContactName, userArea, userAddress); // <--- NHỚ THÊM userAddress VÀO ĐÂY
-            // ------------------------------------
+                DỮ LIỆU NGƯỜI DÙNG ĐĂNG TIN:
+                - Tên liên hệ (User Contact): "%s"
+                - Diện tích khai báo: %s m2
+                - Địa chỉ khai báo: "%s"
 
+                NHIỆM VỤ CỦA BẠN:
+                Bước 1: QUÉT TẤT CẢ ẢNH
+                   - Tìm "Giấy chứng nhận QSDĐ" (Sổ đỏ) -> Trích xuất: "Tên người sử dụng đất", "Diện tích", "Địa chỉ thửa đất".
+                   - Tìm "Giấy Ủy Quyền" (Nếu có) -> Trích xuất: "Bên Ủy Quyền" (Bên A) và "Bên Được Ủy Quyền" (Bên B).
+                
+                Bước 2: PHÂN TÍCH QUYỀN SỞ HỮU (Logic quan trọng)
+                   - Trường hợp 1 (Chính chủ): "Tên người sử dụng đất" TRÙNG VỚI "Tên liên hệ".
+                   - Trường hợp 2 (Ủy quyền hợp lệ): 
+                        + "Tên người sử dụng đất" KHÁC "Tên liên hệ".
+                        + NHƯNG có Giấy ủy quyền mà: (Bên Ủy Quyền == Tên người sử dụng đất) VÀ (Bên Được Ủy Quyền == Tên liên hệ).
+                   -> Nếu thỏa mãn TH1 hoặc TH2: Hãy kết luận là Hợp lệ (isAuthorized = true).
+
+                Bước 3: SO SÁNH ĐỊA CHỈ & DIỆN TÍCH
+                   - So sánh địa chỉ trên Sổ đỏ vs Địa chỉ User khai báo sai chính tả nhỏ có thể bỏ qua (Chú ý khớp Phường/Xã, Quận/Huyện, Tỉnh/TP).
+                   - So sánh diện tích (chấp nhận sai số nhỏ < 5%%).
+
+                Bước 4: TRẢ VỀ JSON DUY NHẤT (Không Markdown, đúng format sau):
+                {
+                  "confidenceScore": <0-100. Điểm cao (80-100) nếu Tên khớp (hoặc ủy quyền khớp) VÀ Địa chỉ đúng. Điểm thấp nếu sai tên hoặc sai địa chỉ>,
+                  "extractedOwnerName": "<Tên chủ đất đọc được trên Sổ đỏ>",
+                  "extractedArea": <Số m2 đọc được trên sổ, nếu ko rõ để 0>,
+                  "extractedAddress": "<Địa chỉ đọc được trên sổ>",
+                  "authDelegatorName": "<Tên Bên Ủy Quyền (Bên A) tìm thấy, nếu ko có để null>",
+                  "authDelegateeName": "<Tên Bên Được Ủy Quyền (Bên B) tìm thấy, nếu ko có để null>",
+                  "isAuthorized": <true/false. True nếu là Chính chủ hoặc có Ủy quyền hợp lệ>,
+                  "matchDetails": "<Giải thích ngắn gọn tiếng Việt: Ví dụ 'Ủy quyền hợp lệ từ ông A sang ông B, địa chỉ khớp', hoặc 'Sai tên chủ sở hữu và không tìm thấy giấy ủy quyền'>",
+                  "isFraudSuspected": <true/false. True nếu ảnh bị mờ, cắt ghép hoặc thông tin sai lệch nghiêm trọng>
+                }
+                """, userContactName, userArea, userAddress);
+
+            // 2. Build Content List (Hỗ trợ nhiều ảnh)
             List<Map<String, Object>> contentList = new ArrayList<>();
 
-            // Phần Text
+            // A. Thêm Prompt Text vào đầu tiên
             contentList.add(Map.of("type", "text", "text", promptText));
 
-            // Phần Ảnh (OpenRouter/OpenAI format)
-            contentList.add(Map.of(
-                    "type", "image_url",
-                    "image_url", Map.of("url", imageUrl)
-            ));
+            // B. Duyệt qua List URL và thêm từng ảnh vào payload
+            for (String url : imageUrls) {
+                contentList.add(Map.of(
+                        "type", "image_url",
+                        "image_url", Map.of("url", url)
+                ));
+            }
 
+            // 3. Cấu hình Request Body
             Map<String, Object> message = Map.of(
                     "role", "user",
                     "content", contentList
             );
 
             Map<String, Object> body = Map.of(
-                    "model", visionModel,
+                    "model", visionModel, // Đảm bảo visionModel là model đọc được ảnh (vd: google/gemini-2.0-flash-exp:free)
                     "messages", List.of(message),
-                    "temperature", 0.1,
+                    "temperature", 0.1, // Nhiệt độ thấp để AI trả lời chính xác
                     "max_tokens", 1000
             );
 
+            // 4. Cấu hình Header
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("Authorization", "Bearer " + apiKey);
-            headers.set("HTTP-Referer", "http://localhost:8080");
+            headers.set("HTTP-Referer", "https://your-domain.com");
             headers.set("X-Title", "RealEstateApp");
 
+            // 5. Gọi API OpenRouter
             ResponseEntity<String> res = restTemplate.exchange(
                     apiUrl, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
 
-            // 3. Parse Kết quả
+            // 6. Parse Kết quả trả về
             OpenRouterResp parsed = mapper.readValue(res.getBody(), OpenRouterResp.class);
 
-            // Validate null safety
             if (parsed.getChoices() == null || parsed.getChoices().isEmpty()) {
-                throw new RuntimeException("AI trả về rỗng");
+                throw new RuntimeException("AI trả về rỗng (No choices)");
             }
 
             String content = parsed.getChoices().get(0).getMessage().getContent();
 
-            // Clean JSON
+            // Clean JSON (Loại bỏ markdown ```json nếu có)
             String cleanJson = cleanJson(content);
 
+            // Map JSON string sang Object DTO
             return mapper.readValue(cleanJson, LegalCheckResult.class);
 
         } catch (Exception e) {
-            log.error("[AI-LEGAL] Error: {}", e.getMessage());
+            log.error("[AI-LEGAL] Error processing legal verification: {}", e.getMessage(), e);
+
+            // Trả về object lỗi an toàn để không crash luồng
             LegalCheckResult fail = new LegalCheckResult();
             fail.setConfidenceScore(0.0);
             fail.setMatchDetails("Lỗi hệ thống AI: " + e.getMessage());
-            fail.setFraudSuspected(false); // Default
+            fail.setFraudSuspected(false);
             return fail;
         }
     }
