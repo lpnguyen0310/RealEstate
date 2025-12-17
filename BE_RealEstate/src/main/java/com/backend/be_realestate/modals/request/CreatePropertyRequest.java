@@ -54,4 +54,7 @@ public class CreatePropertyRequest {
     private String contactEmail;
     private String contactRelationship;
     private Boolean autoRenew;
+    private List<String> deedFileUrls;           // Sổ đỏ / sổ hồng (Cloudinary URL)
+    private List<String> authorizationFileUrls;  // Giấy ủy quyền (Cloudinary URL)
+
 }

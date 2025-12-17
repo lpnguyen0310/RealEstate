@@ -177,6 +177,11 @@ function mapDetailToFormData(d) {
 
         constructionImages: Array.isArray(d.constructionImages) ? d.constructionImages : [],
         autoRepost: d.autoRenew !== undefined ? d.autoRenew : (!!d.autoRepost),
+        legalFiles: {
+            deedFiles: Array.isArray(d.deedFileUrls) ? d.deedFileUrls : (Array.isArray(d.deedFiles) ? d.deedFiles : []),
+            authFiles: Array.isArray(d.authorizationFileUrls) ? d.authorizationFileUrls : (Array.isArray(d.authFiles) ? d.authFiles : []),
+        },
+
     };
 }
 
@@ -208,6 +213,10 @@ function createInitialForm() {
         },
         constructionImages: [],
         autoRepost: false,
+        legalFiles: {
+            deedFiles: [],      // sổ đỏ / sổ hồng (URL cloudinary)
+            authFiles: [],      // giấy ủy quyền (URL cloudinary)
+        },
     };
 }
 
@@ -656,6 +665,12 @@ export default function PostCreateDrawer({
         };
         const requiredErrs = {};
         for (const k of required) if (isEmpty(formData[k])) requiredErrs[k] = msgMap[k] || "Trường này là bắt buộc";
+        const isOwner = !!formData?.ownerAuth?.isOwner;
+        const deedCount = formData?.legalFiles?.deedFiles?.length || 0;
+        const authCount = formData?.legalFiles?.authFiles?.length || 0;
+
+        if (deedCount === 0) requiredErrs["legalFiles.deedFiles"] = "Vui lòng tải sổ đỏ/sổ hồng";
+        if (!isOwner && authCount === 0) requiredErrs["legalFiles.authFiles"] = "Vui lòng tải giấy ủy quyền (bắt buộc khi không chính chủ)";
 
         if (Object.keys(requiredErrs).length) { setErrors((prev) => ({ ...prev, ...requiredErrs })); return; }
 

@@ -1,5 +1,5 @@
 // src/components/.../PostDetailDrawer.jsx
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, use } from "react";
 import {
     Drawer,
     Box,
@@ -52,6 +52,7 @@ import ConfirmDialog from "@/components/common/ConfirmDialog";
 
 // ✅ NEW: amenity API
 import { amenityApi } from "@/api/amenityApi";
+import PostVerifyDrawer from "./PostVerifyDrawer";
 
 /* ---------- helpers ---------- */
 function safeText(v, fallback = "-") {
@@ -420,6 +421,18 @@ export default function PostDetailDrawer({
     const hasDetail = !!detail;
     const d = detail ?? {};
     const busy = hasDetail && actioningId === d.id;
+    const isLegalOrAuthUrl = (u = "") =>
+        /\/properties\/(legal|authorization)\//i.test(u);
+
+    const publicImages = useMemo(() => {
+        const raw = Array.isArray(d.images) ? d.images : (d.imageUrls || []);
+
+        const urls = raw
+            .map((x) => (typeof x === "string" ? x : (x?.url || x?.imageUrl || x?.fileUrl || "")))
+            .filter(Boolean);
+
+        return urls.filter((u) => !isLegalOrAuthUrl(u));
+    }, [d.images, d.imageUrls]);
 
     const isPending = hasDetail && d.status === "PENDING_REVIEW";
     const isRejected = hasDetail && d.status === "REJECTED";
@@ -431,6 +444,17 @@ export default function PostDetailDrawer({
 
     const listingChipColor =
         d.listingType === "VIP" ? "secondary" : d.listingType === "PREMIUM" ? "warning" : "info";
+    const [verifyOpen, setVerifyOpen] = useState(false);
+    const openVerify = useCallback(() => setVerifyOpen(true), []);
+    const closeVerify = useCallback(() => setVerifyOpen(false), []);
+
+    // đổi tin thì đóng verify
+    useEffect(() => {
+        setVerifyOpen(false);
+    }, [d?.id]);
+
+
+
 
     const resubmitInfo = useMemo(() => {
         if (!hasDetail || !isPending) return { isResubmit: false, fromStatus: null };
@@ -719,7 +743,7 @@ export default function PostDetailDrawer({
                             {/* Images */}
                             <Card sx={{ ...cardSx, mt: 0 }}>
                                 <CardContent sx={{ p: { xs: 1, sm: 1.2 } }}>
-                                    <ImageViewer images={d.images || d.imageUrls || []} />
+                                    <ImageViewer images={publicImages} />
                                 </CardContent>
                             </Card>
 
@@ -1234,6 +1258,20 @@ export default function PostDetailDrawer({
                                 )}
 
                                 <Button
+                                    variant="outlined"
+                                    startIcon={<GavelOutlinedIcon linedIcon />}
+                                    onClick={openVerify}
+                                    sx={{
+                                        borderRadius: 2,
+                                        textTransform: "none",
+                                        fontWeight: 900,
+                                        borderColor: "#e6edf7",
+                                    }}
+                                >
+                                    Xem giấy tờ
+                                </Button>
+
+                                <Button
                                     variant="contained"
                                     startIcon={<CheckCircleOutlineIcon />}
                                     disabled={busy || !isApprovable}
@@ -1307,6 +1345,17 @@ export default function PostDetailDrawer({
                     doReject();
                 }}
             />
+
+            <PostVerifyDrawer
+                open={verifyOpen}
+                onClose={closeVerify}
+                detail={d}
+                isXs={isXs}
+                mainDrawerWidth={drawerWidth}
+
+            />
+
+
         </Drawer>
     );
 }

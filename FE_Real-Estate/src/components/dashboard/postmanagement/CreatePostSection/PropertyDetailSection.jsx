@@ -6,6 +6,8 @@ import {
     FormHelperText, FormControlLabel, Radio,
 } from "@mui/material";
 
+import LegalFilesUpload from "./LegalFilesUpload";
+
 const range = (n) => Array.from({ length: n + 1 }, (_, i) => i);
 
 export default function PropertyDetailSection({
@@ -61,21 +63,20 @@ export default function PropertyDetailSection({
     const smallMenuProps = {
         PaperProps: {
             sx: {
-                maxHeight: 280,        // giới hạn chiều cao menu
-                borderRadius: 2,       // bo góc nhẹ
+                maxHeight: 280,
+                borderRadius: 2,
                 boxShadow: "0 8px 24px rgba(15,23,42,0.12)",
             },
         },
-        MenuListProps: {
-            dense: true,             // item cao thấp hơn
-            sx: { py: 0 },           // bỏ padding trên/dưới danh sách
-        },
+        MenuListProps: { dense: true, sx: { py: 0 } },
         anchorOrigin: { vertical: "bottom", horizontal: "left" },
         transformOrigin: { vertical: "top", horizontal: "left" },
     };
 
-    // 👇 style chung cho MenuItem (gọn hơn)
     const itemSx = { minHeight: 32, py: 0.5, fontSize: 14 };
+
+    // ✅ rule chính chủ / không chính chủ
+    const isOwner = formData?.ownerAuth?.isOwner !== false;
 
     return (
         <Card
@@ -110,15 +111,8 @@ export default function PropertyDetailSection({
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" }, gap: 1.5 }}>
                     {/* Province */}
                     <FormControl size="small" sx={selectSx} error={!!errors.provinceId}>
-                        <Select
-                            displayEmpty
-                            value={formData.provinceId ?? ""}
-                            onChange={handleProvinceChange}
-                            MenuProps={smallMenuProps}            // 👈 áp vào đây
-                        >
-                            <MenuItem disabled value="">
-                                <span style={{ color: "#94a3b8" }}>Tỉnh/Thành phố *</span>
-                            </MenuItem>
+                        <Select displayEmpty value={formData.provinceId ?? ""} onChange={handleProvinceChange} MenuProps={smallMenuProps}>
+                            <MenuItem disabled value=""><span style={{ color: "#94a3b8" }}>Tỉnh/Thành phố *</span></MenuItem>
                             {provinces.map((p) => (
                                 <MenuItem key={p.id ?? p.value} value={p.id ?? p.value} sx={itemSx}>
                                     {p.name ?? p.label}
@@ -128,13 +122,9 @@ export default function PropertyDetailSection({
                         {!!errors.provinceId && <FormHelperText>{errors.provinceId}</FormHelperText>}
                     </FormControl>
 
+                    {/* District */}
                     <FormControl size="small" sx={selectSx} error={!!errors.districtId} disabled={!isProvinceChosen}>
-                        <Select
-                            displayEmpty
-                            value={formData.districtId ?? ""}
-                            onChange={handleDistrictChange}
-                            MenuProps={smallMenuProps}            // 👈
-                        >
+                        <Select displayEmpty value={formData.districtId ?? ""} onChange={handleDistrictChange} MenuProps={smallMenuProps}>
                             <MenuItem disabled value="">
                                 <span style={{ color: "#94a3b8" }}>
                                     {isProvinceChosen ? (loadingDistricts ? "Đang tải Quận/Huyện..." : "Quận/Huyện *") : "Chọn Tỉnh/TP trước"}
@@ -154,8 +144,12 @@ export default function PropertyDetailSection({
                         <Select
                             displayEmpty
                             value={formData.wardId ?? ""}
-                            onChange={(e) => { const wardId = e.target.value; setFormData(p => ({ ...p, wardId })); onChange?.("wardId", wardId); }}
-                            MenuProps={smallMenuProps}            // 👈
+                            onChange={(e) => {
+                                const wardId = e.target.value;
+                                setFormData((p) => ({ ...p, wardId }));
+                                onChange?.("wardId", wardId);
+                            }}
+                            MenuProps={smallMenuProps}
                         >
                             <MenuItem disabled value="">
                                 <span style={{ color: "#94a3b8" }}>
@@ -179,9 +173,7 @@ export default function PropertyDetailSection({
                     </Typography>
                     <FormControl fullWidth size="small" sx={selectSx} error={!!errors.suggestedAddress}>
                         <Select displayEmpty {...F("suggestedAddress")}>
-                            <MenuItem disabled value="">
-                                <span style={{ color: "#94a3b8" }}>Địa chỉ đề xuất *</span>
-                            </MenuItem>
+                            <MenuItem disabled value=""><span style={{ color: "#94a3b8" }}>Địa chỉ đề xuất *</span></MenuItem>
                             {(formData.addressSuggestions ?? []).map((s, idx) => (
                                 <MenuItem key={idx} value={s}>{s}</MenuItem>
                             ))}
@@ -194,13 +186,9 @@ export default function PropertyDetailSection({
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5, mt: 1.8 }}>
                     <FormControl size="small" sx={selectSx}>
                         <Select displayEmpty {...F("streetName")}>
-                            <MenuItem disabled value="">
-                                <span style={{ color: "#94a3b8" }}>Đường</span>
-                            </MenuItem>
+                            <MenuItem disabled value=""><span style={{ color: "#94a3b8" }}>Đường</span></MenuItem>
                             {(formData.streetOptions ?? []).map((s, i) => (
-                                <MenuItem key={i} value={s}>
-                                    {s}
-                                </MenuItem>
+                                <MenuItem key={i} value={s}>{s}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>
@@ -225,7 +213,6 @@ export default function PropertyDetailSection({
                     </Box>
                 </Box>
 
-    
                 <Typography sx={{ fontWeight: 600, color: "#475569", mt: 2, mb: 1 }}>
                     Thông tin chi tiết
                 </Typography>
@@ -233,13 +220,9 @@ export default function PropertyDetailSection({
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
                     <FormControl size="small" sx={selectSx}>
                         <Select displayEmpty {...F("direction")}>
-                            <MenuItem disabled value="">
-                                <span style={{ color: "#94a3b8" }}>Hướng nhà</span>
-                            </MenuItem>
+                            <MenuItem disabled value=""><span style={{ color: "#94a3b8" }}>Hướng nhà</span></MenuItem>
                             {balconyDirs.map((d) => (
-                                <MenuItem key={d} value={d}>
-                                    {d}
-                                </MenuItem>
+                                <MenuItem key={d} value={d}>{d}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>
@@ -293,17 +276,11 @@ export default function PropertyDetailSection({
 
                     <Box sx={{ display: "flex", flexDirection: "column" }}>
                         <TextField label="Số tầng" size="small" {...F("floors")} InputProps={{ sx: inputRootSx, inputMode: "numeric" }} />
-                        <Link
-                            component="button"
-                            type="button"
-                            sx={{ fontSize: 12.5, color: "#5b72ff", mt: 0.5, alignSelf: "flex-start", textDecoration: "none" }}
-                        >
+                        <Link component="button" type="button" sx={{ fontSize: 12.5, color: "#5b72ff", mt: 0.5, alignSelf: "flex-start", textDecoration: "none" }}>
                             Vì sao cần nhập đúng số tầng ?
                         </Link>
                     </Box>
                 </Box>
-
-
 
                 {/* Vị trí + Pháp lý */}
                 <Box
@@ -315,7 +292,7 @@ export default function PropertyDetailSection({
                         mt: 1,
                     }}
                 >
-                    {/* Cột trái: 2 hàng */}
+                    {/* Cột trái */}
                     <Box sx={{ display: "grid", gridAutoRows: "min-content", rowGap: 2 }}>
                         <TextField
                             select
@@ -326,9 +303,7 @@ export default function PropertyDetailSection({
                             SelectProps={{ displayEmpty: false }}
                             sx={{ "& .MuiOutlinedInput-root": inputRootSx }}
                         >
-                            {range(10).map((n) => (
-                                <MenuItem key={n} value={n}>{n}</MenuItem>
-                            ))}
+                            {range(10).map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
                         </TextField>
 
                         <TextField
@@ -340,13 +315,11 @@ export default function PropertyDetailSection({
                             SelectProps={{ displayEmpty: false }}
                             sx={{ "& .MuiOutlinedInput-root": inputRootSx }}
                         >
-                            {range(10).map((n) => (
-                                <MenuItem key={n} value={n}>{n}</MenuItem>
-                            ))}
+                            {range(10).map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
                         </TextField>
                     </Box>
 
-                    {/* Cột phải: Vị trí */}
+                    {/* Cột phải */}
                     <TextField
                         select
                         required
@@ -367,19 +340,14 @@ export default function PropertyDetailSection({
                     </TextField>
                 </Box>
 
+                {/* ==================== Giấy tờ pháp lý ==================== */}
                 <Typography sx={{ fontWeight: 600, color: "#475569", mt: 2.5, mb: 1 }}>
                     Giấy tờ pháp lý <span style={{ color: "#ef4444" }}>*</span>
                 </Typography>
 
                 <FormControl error={!!errors.legalDocument} component="fieldset" sx={{ width: "100%" }}>
-                    <Box
-                        sx={{
-                            display: "grid",
-                            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                            gap: 1.5,
-                        }}
-                    >
-                        {["Sổ đỏ", "Sổ hồng", "HĐ mua bán", "Khác"].map((opt) => {
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
+                        {["Sổ đỏ", "Sổ hồng"].map((opt) => {
                             const selected = formData.legalDocument === opt;
                             const hasErr = !!errors.legalDocument;
                             return (
@@ -424,10 +392,47 @@ export default function PropertyDetailSection({
                         })}
                     </Box>
 
-                    {!!errors.legalDocument && (
-                        <FormHelperText sx={{ mt: 1 }}>{errors.legalDocument}</FormHelperText>
-                    )}
+                    {!!errors.legalDocument && <FormHelperText sx={{ mt: 1 }}>{errors.legalDocument}</FormHelperText>}
                 </FormControl>
+
+                <Box sx={{ mt: 1.5 }}>
+                    <LegalFilesUpload
+                        title={isOwner ? "Tải sổ đỏ / sổ hồng" : "Tải sổ đỏ / sổ hồng (bản sao)"}
+                        required
+                        value={formData?.legalFiles?.deedFiles || []}
+                        onChange={(arr) => {
+                            setFormData((p) => ({
+                                ...p,
+                                legalFiles: { ...(p.legalFiles || {}), deedFiles: arr },
+                            }));
+                            onChange?.("legalFiles.deedFiles", arr);
+                        }}
+                        errorText={errors["legalFiles.deedFiles"] || ""}
+                        folder="properties/legal"
+                        hint="Chấp nhận PDF/DOC/DOCX/XLS/XLSX hoặc ảnh."
+                    />
+                </Box>
+
+                {!isOwner && (
+                    <Box sx={{mt: 2}}>
+                        <LegalFilesUpload
+                            title="Giấy ủy quyền"
+                            required
+                            value={formData?.legalFiles?.authFiles || []}
+                            onChange={(arr) => {
+                                setFormData((p) => ({
+                                    ...p,
+                                    legalFiles: { ...(p.legalFiles || {}), authFiles: arr },
+                                }));
+                                onChange?.("legalFiles.authFiles", arr);
+                            }}
+                            errorText={errors["legalFiles.authFiles"] || ""}
+                            folder="properties/authorization"
+                            hint="Bắt buộc khi đăng tin không chính chủ."
+                        />
+                    </Box>
+                )}
+
             </CardContent>
         </Card>
     );

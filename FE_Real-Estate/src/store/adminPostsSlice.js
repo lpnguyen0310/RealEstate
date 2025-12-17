@@ -176,6 +176,10 @@ export const fetchPostsThunk = createAsyncThunk(
                     districtId: p.districtId,
                     wardId: p.wardId,
                     categoryName: p.categoryName,
+                    deedFiles: p.deedFileUrls ?? [],
+                    authorizationFiles: p.authorizationFileUrls ?? [],
+
+
                 };
 
             });
@@ -252,6 +256,9 @@ export const fetchPostDetailThunk = createAsyncThunk(
                 contactEmail: contact.email,
                 contactRelationship: contact.relationship,
                 isOwner: contact.isOwner,
+                deedFiles: full.deedFileUrls ?? [],
+                authorizationFiles: full.authorizationFileUrls ?? [],
+
             };
         } catch (e) {
             return rejectWithValue(e?.response?.data?.message || "Load chi tiết thất bại");

@@ -481,6 +481,15 @@
                     if (req.getConstructionImages() != null) {
                         property.replaceConstructionImages(req.getConstructionImages());
                     }
+
+
+                    if (req.getDeedFileUrls() != null) {
+                        property.replaceDeedFiles(req.getDeedFileUrls());
+                    }
+                    if (req.getAuthorizationFileUrls() != null) {
+                        property.replaceAuthorizationFiles(req.getAuthorizationFileUrls());
+                    }
+
                     if (req.getAmenityIds() != null) {
                         var amenities = req.getAmenityIds().isEmpty()
                                 ? java.util.Collections.<AmenityEntity>emptyList()

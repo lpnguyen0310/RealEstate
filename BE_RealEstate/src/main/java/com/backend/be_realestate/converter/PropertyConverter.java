@@ -79,6 +79,23 @@ public class PropertyConverter {
                         .map(PropertyImageEntity::getImageUrl)
                         .toList()
         );
+
+        dto.setDeedFileUrls(
+                entity.getDeedFiles().stream()
+                        .filter(Objects::nonNull)
+                        .sorted(Comparator.comparingInt(i -> i.getDisplayOrder() == null ? 0 : i.getDisplayOrder()))
+                        .map(PropertyImageEntity::getImageUrl)
+                        .toList()
+        );
+
+        dto.setAuthorizationFileUrls(
+                entity.getAuthorizationFiles().stream()
+                        .filter(Objects::nonNull)
+                        .sorted(Comparator.comparingInt(i -> i.getDisplayOrder() == null ? 0 : i.getDisplayOrder()))
+                        .map(PropertyImageEntity::getImageUrl)
+                        .toList()
+        );
+
         // --- Listing type as String ---
         if (entity.getListingType() != null) {
             dto.setListingType(entity.getListingType().name()); // NORMAL | VIP | PREMIUM

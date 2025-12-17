@@ -13,8 +13,12 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class PropertyImageEntity {
-    public enum ImageType { PUBLIC, CONSTRUCTION }
-
+    public enum ImageType {
+        PUBLIC,
+        CONSTRUCTION,
+        LEGAL_DEED,       // sổ đỏ/sổ hồng
+        AUTHORIZATION     // giấy ủy quyền
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
