@@ -1,6 +1,6 @@
 // src/components/dashboard/postmanagement/PostCard.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Tag, Tooltip, Dropdown, Button, Space, message } from "antd";
+import { Tooltip, Dropdown, Button, Space } from "antd";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination as SwiperPagination } from "swiper/modules";
 import "swiper/css";
@@ -10,16 +10,23 @@ import "swiper/css/pagination";
 import Viewer from "viewerjs";
 import "viewerjs/dist/viewer.min.css";
 
+import dayjs from "dayjs";
+
 import { useDispatch, useSelector } from "react-redux";
 import { fetchPropertyFavoritesThunk, clearFavorites } from "@/store/propertySlice";
 import FavoriteUsersModal from "./FavoriteUsersModal";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
-// thêm vào đầu file
 import PostRatingModal from "./PostRatingModal";
-import  siteReviewApi  from "../../../api/siteReviewApi";
+import siteReviewApi from "../../../api/siteReviewApi";
+
 /* ---------- helpers ---------- */
 const Box = ({ children, className = "" }) => (
-  <div className={"bg-white/90 rounded-xl border border-[#e9eef7] shadow-[0_6px_18px_rgba(13,47,97,0.06)] p-4 " + className}>
+  <div
+    className={
+      "bg-white/90 rounded-xl border border-[#e9eef7] shadow-[0_6px_18px_rgba(13,47,97,0.06)] p-4 " +
+      className
+    }
+  >
     {children}
   </div>
 );
@@ -35,6 +42,32 @@ const STATUS_STYLE = {
   warned: { label: "Cần Chỉnh Sửa", cls: "bg-yellow-100 border-yellow-300 text-yellow-700" },
   archived: { label: "Thành Công", cls: "bg-emerald-50 border-emerald-200 text-[#046c4e]" },
 };
+
+const LISTING_TYPE_STYLE = {
+  VIP: {
+    label: "VIP",
+    cls: "bg-gradient-to-r from-yellow-400 to-orange-400 text-white border border-yellow-300",
+    icon: "👑",
+  },
+  PREMIUM: {
+    label: "PREMIUM",
+    cls: "bg-gradient-to-r from-blue-500 to-indigo-500 text-white border border-blue-300",
+    icon: "⭐",
+  },
+  NORMAL: {
+    label: "NORMAL",
+    cls: "bg-slate-100 text-slate-700 border border-slate-300",
+    icon: "📄",
+  },
+};
+const getListingTypeStyle = (type) => {
+  if (!type) return null;
+  return LISTING_TYPE_STYLE[type.toUpperCase()] || {
+    label: type,
+    cls: "bg-gray-100 text-gray-700 border border-gray-300",
+    icon: "🏷",
+  };
+};
 const getStatusStyle = (key) => STATUS_STYLE[key] ?? STATUS_STYLE.draft;
 
 /* ---------- component ---------- */
@@ -46,7 +79,6 @@ export default function PostCard({
   onUnhidePost = (id) => console.log("unhide post:", id),
   onUnmarkSold = (id) => console.log("unmark sold:", id), // 🆕 Đăng lại
   onViewWarning = () => { },
-  onSubmitRating = async () => { },
   isHighlighted = false,
 }) {
   /* ====== images + viewer ====== */
@@ -60,20 +92,40 @@ export default function PostCard({
 
   useEffect(() => {
     if (viewerRef.current) {
-      try { viewerRef.current.destroy(); } catch { }
+      try {
+        viewerRef.current.destroy();
+      } catch { }
       viewerRef.current = null;
     }
     if (imgWrapRef.current) {
       try {
         viewerRef.current = new Viewer(imgWrapRef.current, {
-          toolbar: { zoomIn: 1, zoomOut: 1, oneToOne: 1, reset: 1, prev: 1, next: 1, rotateLeft: 1, rotateRight: 1, flipHorizontal: 1, flipVertical: 1 },
-          navbar: false, title: false, movable: true, scalable: true, transition: true, zIndex: 3000,
+          toolbar: {
+            zoomIn: 1,
+            zoomOut: 1,
+            oneToOne: 1,
+            reset: 1,
+            prev: 1,
+            next: 1,
+            rotateLeft: 1,
+            rotateRight: 1,
+            flipHorizontal: 1,
+            flipVertical: 1,
+          },
+          navbar: false,
+          title: false,
+          movable: true,
+          scalable: true,
+          transition: true,
+          zIndex: 3000,
         });
       } catch { }
     }
     return () => {
       if (viewerRef.current) {
-        try { viewerRef.current.destroy(); } catch { }
+        try {
+          viewerRef.current.destroy();
+        } catch { }
         viewerRef.current = null;
       }
     };
@@ -85,6 +137,30 @@ export default function PostCard({
     viewerRef.current.view(idx);
   };
 
+  /* ====== expiresAt text/hint ====== */
+  const expiresAtText = useMemo(() => {
+    if (!post?.expiresAt) return "-";
+    const d = dayjs(post.expiresAt);
+    return d.isValid() ? d.format("DD/MM/YYYY HH:mm") : "-";
+  }, [post?.expiresAt]);
+
+  const expiresHint = useMemo(() => {
+    if (!post?.expiresAt) return null;
+    const exp = dayjs(post.expiresAt);
+    if (!exp.isValid()) return null;
+
+    const diffDays = exp.diff(dayjs(), "day");
+    if (diffDays < 0) return "Đã hết hạn";
+    if (diffDays === 0) return "Hết hạn hôm nay";
+    if (diffDays <= 3) return `Còn ${diffDays} ngày (gấp)`;
+    return `Còn ${diffDays} ngày`;
+  }, [post?.expiresAt]);
+
+  /* ✅ NEW: listingType (thay cho Loại BĐS) */
+  const listingTypeMeta = useMemo(() => {
+    const raw = post?.listingTypeText || post?.listingType;
+    return getListingTypeStyle(raw);
+  }, [post?.listingTypeText, post?.listingType]);
   /* ====== favorites modal ====== */
   const dispatch = useDispatch();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -118,34 +194,28 @@ export default function PostCard({
 
   const menuItems = isArchived
     ? [
-      { key: "repost", label: "Đăng lại" },                 // thay cho confirm
+      { key: "repost", label: "Đăng lại" },
       { type: "divider" },
-      { key: "hide", danger: true, label: "Ẩn tin" },       // vẫn cho phép ẩn
+      { key: "hide", danger: true, label: "Ẩn tin" },
     ]
     : [
       { key: "confirm", label: "Xác nhận giao dịch thành công" },
       { type: "divider" },
-      isHidden
-        ? { key: "unhide", label: "Hiện lại tin" }
-        : { key: "hide", danger: true, label: "Ẩn tin" },
+      isHidden ? { key: "unhide", label: "Hiện lại tin" } : { key: "hide", danger: true, label: "Ẩn tin" },
     ];
 
   /* ====== ConfirmDialog state ====== */
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [confirmDisabled, setConfirmDisabled] = useState(false);
-  const [confirmMeta, setConfirmMeta] = useState({
-    type: "",
-    title: "",
-    content: "",
-    onConfirm: null,
-  });
+  const [confirmMeta, setConfirmMeta] = useState({ type: "", title: "", content: "", onConfirm: null });
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
 
   const openConfirm = (meta) => {
     setConfirmMeta(meta);
     setConfirmOpen(true);
   };
+
   const closeConfirm = () => {
     if (confirmLoading) return;
     setConfirmOpen(false);
@@ -153,6 +223,7 @@ export default function PostCard({
     setConfirmLoading(false);
     setConfirmMeta({ type: "", title: "", content: "", onConfirm: null });
   };
+
   const handleSubmitRating = async ({ rating, comment }) => {
     try {
       await siteReviewApi.create({ rating, comment });
@@ -160,6 +231,7 @@ export default function PostCard({
       console.error(err);
     }
   };
+
   const onMenuClick = ({ key, domEvent }) => {
     domEvent?.stopPropagation?.();
 
@@ -172,7 +244,7 @@ export default function PostCard({
           try {
             setConfirmLoading(true);
             setConfirmDisabled(true);
-            await Promise.resolve(onUnmarkSold(post.id)); // gọi UNMARK_SOLD
+            await Promise.resolve(onUnmarkSold(post.id));
             closeConfirm();
           } catch (e) {
             setConfirmLoading(false);
@@ -246,7 +318,6 @@ export default function PostCard({
     }
   }, [isHighlighted, post?.id]);
 
-  /* ====== render ====== */
   return (
     <>
       <div
@@ -264,11 +335,7 @@ export default function PostCard({
         aria-label={`Mở chỉnh sửa tin #${post?.id ?? ""}`}
       >
         {/* Nút menu ba chấm */}
-        <Dropdown
-          menu={{ items: menuItems, onClick: onMenuClick }}
-          placement="bottomRight"
-          trigger={["click"]}
-        >
+        <Dropdown menu={{ items: menuItems, onClick: onMenuClick }} placement="bottomRight" trigger={["click"]}>
           <button
             className="absolute top-2 right-2 z-20 h-9 w-9 rounded-full bg-white/90 border border-[#e5eaf5] shadow flex items-center justify-center hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             aria-label="Mở menu hành động"
@@ -285,14 +352,19 @@ export default function PostCard({
         <div className="grid grid-cols-12 gap-3 items-stretch">
           {/* LEFT: images */}
           <div className="col-span-12 md:col-span-4" onClick={stop} onKeyDown={stop} role="presentation">
-            <div className="rounded-2xl overflow-hidden relative h-full">
-              <Swiper modules={[Navigation, SwiperPagination]} navigation pagination={{ clickable: true }} className="!rounded-2xl h-full">
+            <div className="rounded-2xl overflow-hidden relative h-full min-h-[300px]">
+              <Swiper
+                modules={[Navigation, SwiperPagination]}
+                navigation
+                pagination={{ clickable: true }}
+                className="!rounded-2xl h-full"
+              >
                 {images.map((src, i) => (
                   <SwiperSlide key={i}>
                     <img
                       src={src}
                       alt={`Property image ${i + 1}`}
-                      className="h[240px] md:h-[240px] w-full object-cover cursor-zoom-in"
+                      className="h-[320px] w-full object-cover cursor-zoom-in"
                       onClick={() => openViewerAt(i)}
                       onError={(e) => {
                         e.currentTarget.onerror = null;
@@ -302,18 +374,29 @@ export default function PostCard({
                   </SwiperSlide>
                 ))}
               </Swiper>
+
               <button
                 title="Fullscreen"
                 aria-label="View images fullscreen"
                 className="absolute top-3 right-3 h-9 w-9 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onClick={(e) => { e.stopPropagation(); openViewerAt(0); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openViewerAt(0);
+                }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+                  />
                 </svg>
               </button>
+
               <div ref={imgWrapRef} className="hidden" aria-hidden="true">
-                {images.map((src, i) => (<img key={i} src={src} alt={`Viewer image ${i + 1}`} />))}
+                {images.map((src, i) => (
+                  <img key={i} src={src} alt={`Viewer image ${i + 1}`} />
+                ))}
               </div>
             </div>
           </div>
@@ -322,19 +405,51 @@ export default function PostCard({
           <div className="col-span-12 md:col-span-4 flex flex-col gap-3">
             <Box>
               <div className="text-[#325cdb] font-semibold flex items-center gap-2">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#d7e1fb]" aria-hidden="true"> 💲 </span>
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#d7e1fb]" aria-hidden="true">
+                  💲
+                </span>
                 <span>Giá bán</span>
                 <div className="ml-auto text-[22px] font-bold text-[#2b55d1]">{post.priceText}</div>
               </div>
+
               <div className="grid grid-cols-3 gap-3 mt-4 text-[15px] text-[#5b6f92]">
-                <div><div className="text-[#7a8fb2]">Loại tin</div><div className="font-medium">{post.installmentText || "-"}</div></div>
-                <div><div className="text-[#7a8fb2]">Giá / m²</div><div className="font-medium">{post.unitPriceText || "-"}</div></div>
-                <div><div className="text-[#7a8fb2]">Giá đất</div><div className="font-medium">{post.landPriceText || "-"}</div></div>
+                <div>
+                  <div className="text-[#7a8fb2]">Loại tin</div>
+                  <div className="font-medium">{post.installmentText || "-"}</div>
+                </div>
+                <div>
+                  <div className="text-[#7a8fb2]">Giá / m²</div>
+                  <div className="font-medium">{post.unitPriceText || "-"}</div>
+                </div>
+
+                {/* ✅ ĐỔI "Loại BĐS" -> "Listing type" */}
+                <div>
+                  <div className="text-[#7a8fb2]">Listing type</div>
+
+                  {listingTypeMeta ? (
+                    <span
+                      className={
+                        "inline-flex items-center gap-1 px-3 py-1 mt-1 rounded-full text-xs font-semibold " +
+                        listingTypeMeta.cls
+                      }
+                    >
+                      <span aria-hidden="true">{listingTypeMeta.icon}</span>
+                      {listingTypeMeta.label}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </div>
               </div>
             </Box>
+
             <Box>
               <div className="grid grid-cols-2 gap-y-3 text-[#506285]">
-                <div className="flex items-center gap-2"><span aria-hidden="true">🗂️</span><span>Tình trạng tin đăng</span></div>
+                <div className="flex items-center gap-2">
+                  <span aria-hidden="true">🗂️</span>
+                  <span>Tình trạng tin đăng</span>
+                </div>
+
                 {(() => {
                   const stKeyLocal = post?.statusKey || "draft";
                   const isWarned = stKeyLocal === "warned";
@@ -371,17 +486,40 @@ export default function PostCard({
                     </div>
                   );
                 })()}
-                <div className="flex items-center gap-2"><span aria-hidden="true">🕒</span><span>Ngày tạo</span></div>
+
+                <div className="flex items-center gap-2">
+                  <span aria-hidden="true">🕒</span>
+                  <span>Ngày tạo</span>
+                </div>
                 <div className="text-right">{post.createdAt || "-"}</div>
 
-                <div className="flex items-center gap-2"><span aria-hidden="true">👁</span><span>Số lượt xem</span></div>
+                <div className="flex items-center gap-2">
+                  <span aria-hidden="true">⏳</span>
+                  <span>Ngày hết hạn</span>
+                </div>
+                <div className="text-right">
+                  <div>{expiresAtText}</div>
+                  {expiresHint && <div className="text-xs text-[#7a8fb2]">{expiresHint}</div>}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span aria-hidden="true">👁</span>
+                  <span>Số lượt xem</span>
+                </div>
                 <div className="text-right">{post.views ?? 0}</div>
 
-                <div className="flex items-center gap-2"><span aria-hidden="true">❤️</span><span>Số lượt yêu thích</span></div>
+                <div className="flex items-center gap-2">
+                  <span aria-hidden="true">❤️</span>
+                  <span>Số lượt yêu thích</span>
+                </div>
+
                 <Tooltip title={post.favoriteCount > 0 ? "Xem danh sách người yêu thích" : ""}>
                   <button
                     type="button"
-                    className={`text-right font-medium focus:outline-none ${post.favoriteCount > 0 ? "text-[#ff4d4f] cursor-pointer hover:underline focus:underline" : "text-[#506285] cursor-default"}`}
+                    className={`text-right font-medium focus:outline-none ${post.favoriteCount > 0
+                      ? "text-[#ff4d4f] cursor-pointer hover:underline focus:underline"
+                      : "text-[#506285] cursor-default"
+                      }`}
                     onClick={handleShowFavorites}
                     disabled={!post.favoriteCount || post.favoriteCount === 0}
                     aria-label={`Xem ${post.favoriteCount} lượt yêu thích`}
@@ -400,7 +538,9 @@ export default function PostCard({
                 <div className="space-y-4 text-[#334e7d]">
                   <div className="leading-6">
                     <div className="flex items-start gap-2">
-                      <span className="mt-1" aria-hidden="true">📍</span>
+                      <span className="mt-1" aria-hidden="true">
+                        📍
+                      </span>
                       <div className="font-medium">{post.addressMain || "Chưa cập nhật địa chỉ"}</div>
                     </div>
                     {post.description && (
@@ -410,11 +550,22 @@ export default function PostCard({
                       </div>
                     )}
                   </div>
+
                   <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[#415a8c]">
-                    <div className="flex items-center gap-2"><span aria-hidden="true">📐</span><span>{post.area || "—"} m²</span></div>
-                    <div className="flex items-center gap-2"><span aria-hidden="true">🛏</span><span>{post.bed || "—"} PN</span></div>
-                    <div className="flex items-center gap-2"><span aria-hidden="true">🛁</span><span>{post.bath || "—"} WC</span></div>
+                    <div className="flex items-center gap-2">
+                      <span aria-hidden="true">📐</span>
+                      <span>{post.area || "—"} m²</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span aria-hidden="true">🛏</span>
+                      <span>{post.bed || "—"} PN</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span aria-hidden="true">🛁</span>
+                      <span>{post.bath || "—"} WC</span>
+                    </div>
                   </div>
+
                   {post.sizeText && <div className="text-[#3a4f78]">Kích thước: {post.sizeText}</div>}
                   {post.note && <div className="text-[#8a98b2]">Ghi chú: {post.note}</div>}
                 </div>
@@ -466,6 +617,7 @@ export default function PostCard({
         onClose={closeConfirm}
         onConfirm={confirmMeta.onConfirm}
       />
+
       <PostRatingModal
         open={isRatingModalOpen}
         onClose={() => setIsRatingModalOpen(false)}

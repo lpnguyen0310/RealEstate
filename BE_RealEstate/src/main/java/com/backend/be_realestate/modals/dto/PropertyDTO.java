@@ -73,4 +73,7 @@ public class PropertyDTO {
     private String contactEmail;         // email liên hệ
     private String contactRelationship;  // quan hệ với chủ sở hữu
     private Boolean autoRenew;
+    private List<String> deedFileUrls;
+    private List<String> authorizationFileUrls;
+
 }

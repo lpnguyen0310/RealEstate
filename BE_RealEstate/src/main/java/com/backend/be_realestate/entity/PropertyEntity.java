@@ -168,6 +168,44 @@ import java.util.List;
                 }
             }
 
+            @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
+            @org.hibernate.annotations.Where(clause = "image_type = 'LEGAL_DEED'")
+            @Builder.Default
+            private List<PropertyImageEntity> deedFiles = new ArrayList<>();
+
+            public void replaceDeedFiles(List<String> urls) {
+                this.deedFiles.clear();
+                if (urls == null) return;
+                int i = 0;
+                for (String url : urls) {
+                    var img = new PropertyImageEntity();
+                    img.setProperty(this);
+                    img.setImageUrl(url);
+                    img.setDisplayOrder(i++);
+                    img.setImageType(PropertyImageEntity.ImageType.LEGAL_DEED);
+                    this.deedFiles.add(img);
+                }
+            }
+
+            @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
+            @org.hibernate.annotations.Where(clause = "image_type = 'AUTHORIZATION'")
+            @Builder.Default
+            private List<PropertyImageEntity> authorizationFiles = new ArrayList<>();
+
+            public void replaceAuthorizationFiles(List<String> urls) {
+                this.authorizationFiles.clear();
+                if (urls == null) return;
+                int i = 0;
+                for (String url : urls) {
+                    var img = new PropertyImageEntity();
+                    img.setProperty(this);
+                    img.setImageUrl(url);
+                    img.setDisplayOrder(i++);
+                    img.setImageType(PropertyImageEntity.ImageType.AUTHORIZATION);
+                    this.authorizationFiles.add(img);
+                }
+            }
+
 
             @ManyToMany
             @JoinTable(

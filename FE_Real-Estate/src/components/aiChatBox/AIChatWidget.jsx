@@ -594,10 +594,10 @@ export default function AIChatWidget({
                                 busy={busy}
                                 msgHClass={SZ.msgH}
                             />
-                            <QuickChips
+                            {/* <QuickChips
                                 items={quickChips}
                                 onPick={(t, d) => handleSend(t, { display: d })}
-                            />
+                            /> */}
                             <InputBar
                                 inputRef={inputRef}
                                 value={input}

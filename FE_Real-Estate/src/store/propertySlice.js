@@ -173,7 +173,8 @@ export const createPropertyThunk = createAsyncThunk(
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
             const isOwner = !!formData?.ownerAuth?.isOwner;
-
+            const deedFileUrls = formData?.legalFiles?.deedFiles || [];
+            const authorizationFileUrls = formData?.legalFiles?.authFiles || [];
             // 3) Payload
             const payload = {
                 title: formData.title,
@@ -236,6 +237,8 @@ export const createPropertyThunk = createAsyncThunk(
                 contactRelationship: !isOwner
                     ? (formData.ownerAuth?.relationship || "").trim()
                     : undefined,
+                deedFileUrls,
+                authorizationFileUrls,
             };
 
             const mode =
@@ -314,7 +317,8 @@ export const updatePropertyThunk = createAsyncThunk(
             const uploadedUrls = uploaded.map((x) => x.secure_url);
             const imageUrls = [...existedUrls, ...uploadedUrls];
             const isOwner = !!formData?.ownerAuth?.isOwner;
-
+            const deedFileUrls = formData?.legalFiles?.deedFiles || [];
+            const authorizationFileUrls = formData?.legalFiles?.authFiles || [];
             // 2) Payload (same as create)
             const payload = {
                 title: formData.title,
@@ -376,6 +380,8 @@ export const updatePropertyThunk = createAsyncThunk(
                 contactRelationship: !isOwner
                     ? (formData.ownerAuth?.relationship || "").trim()
                     : undefined,
+                deedFileUrls,
+                authorizationFileUrls,
             };
 
             const mode = submitMode ? submitMode.toUpperCase() : undefined;
@@ -1102,10 +1108,10 @@ const propertySlice = createSlice({
                 // Cập nhật trong myList (Dashboard)
                 const myIdx = s.myList.findIndex(x => String(x.id) === String(id));
                 if (myIdx >= 0) {
-                    s.myList[myIdx].autoRenew = enable; 
+                    s.myList[myIdx].autoRenew = enable;
                     // Lưu ý: Cần đảm bảo mapDtoToPostCard có map field autoRenew
                 }
-                
+
                 // Cập nhật trong currentProperty (nếu đang xem chi tiết)
                 if (s.currentProperty && String(s.currentProperty.id) === String(id)) {
                     s.currentProperty.autoRenew = enable;

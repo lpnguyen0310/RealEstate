@@ -124,26 +124,43 @@ public class PropertyServiceImpl implements IPropertyService {
 
         boolean matchAll = !"any".equalsIgnoreCase(params.getOrDefault("kwMode", "all"));
 
-        Specification<PropertyEntity> spec = Specification
-                .where(PropertySpecification.isPublished())
-                .and(PropertySpecification.notExpired()); // optional: lọc tin hết hạn
+                    Specification<PropertyEntity> spec = Specification
+                            .where(PropertySpecification.isPublished())
+                            .and(PropertySpecification.notExpired()); // optional: lọc tin hết hạn
+                    List<String> directions = null;
+                    String directionsRaw = params.get("directions"); // "Tây - Bắc,Đông"
+                    if (directionsRaw != null && !directionsRaw.isBlank()) {
+                        directions = Arrays.stream(directionsRaw.split(","))
+                                .map(String::trim)
+                                .filter(s -> !s.isEmpty())
+                                .toList();
+                    }
 
-        if (cityId != null) {
-            spec = spec.and(PropertySpecification.hasCity(cityId));
-        } else {
-            spec = spec.and(PropertySpecification.hasKeyword(keyword, matchAll));
-        }
+                    List<String> positions = null;
+                    String positionsRaw = params.get("positions");
+                    if (positionsRaw != null && !positionsRaw.isBlank()) {
+                        positions = Arrays.stream(positionsRaw.split(","))
+                                .map(String::trim)
+                                .filter(s -> !s.isEmpty())
+                                .toList();
+                    }
+                    if (cityId != null) {
+                        spec = spec.and(PropertySpecification.hasCity(cityId));
+                    } else {
+                        spec = spec.and(PropertySpecification.hasKeyword(keyword, matchAll));
+                    }
 
-        spec = spec
-                .and(PropertySpecification.hasPropertyType(propertyType))
-                .and(PropertySpecification.hasCategorySlug(categorySlug))
-                .and(PropertySpecification.priceBetween(priceFrom, priceTo))
-                .and(PropertySpecification.areaBetween(areaFrom, areaTo))
-                // 🔹 các điều kiện mới
-                .and(PropertySpecification.hasMinBedrooms(bedroomsFrom))
-                .and(PropertySpecification.hasMinBathrooms(bathroomsFrom))
-                .and(PropertySpecification.hasLegalStatus(legalType))
-                .and(PropertySpecification.hasAnyAmenities(amenityIds));
+                    spec = spec
+                            .and(PropertySpecification.hasPropertyType(propertyType))
+                            .and(PropertySpecification.hasCategorySlug(categorySlug))
+                            .and(PropertySpecification.priceBetween(priceFrom, priceTo))
+                            .and(PropertySpecification.areaBetween(areaFrom, areaTo))
+                            .and(PropertySpecification.hasMinBedrooms(bedroomsFrom))
+                            .and(PropertySpecification.hasMinBathrooms(bathroomsFrom))
+                            .and(PropertySpecification.hasLegalStatus(legalType))
+                            .and(PropertySpecification.hasAnyAmenities(amenityIds))
+                            .and(PropertySpecification.hasAnyDirections(directions))
+                            .and(PropertySpecification.hasAnyPositions(positions));
 
         Page<PropertyEntity> resultPage = propertyRepository.findAll(spec, pageable);
         return resultPage.map(propertyMapper::toPropertyCardDTO);
@@ -471,20 +488,29 @@ public class PropertyServiceImpl implements IPropertyService {
             property.setPriceType(PriceType.valueOf(req.getPriceType().name()));
         }
 
-        // === Ảnh & tiện ích (replace) ===
-        if (req.getImageUrls() != null) {
-            property.replaceImages(req.getImageUrls());
-        }
-        if (req.getConstructionImages() != null) {
-            property.replaceConstructionImages(req.getConstructionImages());
-        }
-        if (req.getAmenityIds() != null) {
-            var amenities = req.getAmenityIds().isEmpty()
-                    ? java.util.Collections.<AmenityEntity>emptyList()
-                    : amenityRepository.findAllById(req.getAmenityIds());
-            property.setAmenities(amenities);
-        }
-        if (req.getIsOwner() != null) property.setIsOwner(req.getIsOwner());
+                    // === Ảnh & tiện ích (replace) ===
+                    if (req.getImageUrls() != null) {
+                        property.replaceImages(req.getImageUrls());
+                    }
+                    if (req.getConstructionImages() != null) {
+                        property.replaceConstructionImages(req.getConstructionImages());
+                    }
+
+
+                    if (req.getDeedFileUrls() != null) {
+                        property.replaceDeedFiles(req.getDeedFileUrls());
+                    }
+                    if (req.getAuthorizationFileUrls() != null) {
+                        property.replaceAuthorizationFiles(req.getAuthorizationFileUrls());
+                    }
+
+                    if (req.getAmenityIds() != null) {
+                        var amenities = req.getAmenityIds().isEmpty()
+                                ? java.util.Collections.<AmenityEntity>emptyList()
+                                : amenityRepository.findAllById(req.getAmenityIds());
+                        property.setAmenities(amenities);
+                    }
+                    if (req.getIsOwner() != null) property.setIsOwner(req.getIsOwner());
 
         if (Boolean.TRUE.equals(property.getIsOwner())) {
             // Nếu chính chủ: auto-fill từ User nếu FE không gửi

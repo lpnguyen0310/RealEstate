@@ -11,17 +11,40 @@ export default function PropertyMiniCard({ item }) {
         title,
         addressShort,
         price, // giá tính theo TRIỆU đồng (ví dụ: 1 = 1 triệu)
+        pricePerM2,
         area,  // diện tích (m²)
         bed,
         bath,
+        type,
     } = item || {};
+
 
     const fmt = new Intl.NumberFormat("vi-VN");
     const img = image || images[0];
 
-    // ==== TÍNH GIÁ ====
-    const totalPriceVND = price ? price * 1_000_000 : null; // triệu -> VND
-    const pricePerM2VND = area && price ? (totalPriceVND / area) : null;
+    const formatPrice = (val, listingType) => {
+        if (!val) return "—";
+
+        // 1. Nếu API trả về String (nguyên gốc), dùng luôn
+        if (typeof val === "string") return val;
+
+        // 2. Nếu API trả về Number (đã bị mất chữ), ta đoán dựa vào Type
+        if (typeof val === "number") {
+            if (listingType === "rent") {
+                return `${val} triệu`; // Thuê thì là triệu
+            }
+            return `${val} tỷ`;        // Mặc định bán là tỷ
+        }
+        return val;
+    };
+
+    // --- HÀM FORMAT GIÁ/M2 ---
+    const formatM2 = (val) => {
+        if (!val) return "";
+        if (typeof val === "string") return val; // Nếu là chuỗi thì trả về nguyên vẹn
+        if (typeof val === "number") return `${val} tr/m²`; // Số thì thêm tr/m2
+        return val;
+    };
 
     return (
         <div
@@ -58,14 +81,14 @@ export default function PropertyMiniCard({ item }) {
                 <div className="text-[11px] text-zinc-500 line-clamp-1">{addressShort}</div>
 
                 <div className="flex items-center justify-between pt-1">
-                    {/* Tổng giá */}
+                    {/* GIÁ: Truyền cả price và type vào hàm xử lý */}
                     <div className="text-[13px] font-bold text-indigo-600">
-                        {totalPriceVND != null ? `${fmt.format(totalPriceVND)} ₫` : "—"}
+                        {formatPrice(price, type)}
                     </div>
 
-                    {/* Giá / m² */}
-                    <div className="text-[11px] text-zinc-500">
-                        {pricePerM2VND != null ? `${fmt.format(pricePerM2VND)} ₫/m²` : ""}
+                    {/* GIÁ/M2 */}
+                    <div className="text-[10px] text-zinc-400">
+                        {formatM2(pricePerM2)}
                     </div>
                 </div>
 

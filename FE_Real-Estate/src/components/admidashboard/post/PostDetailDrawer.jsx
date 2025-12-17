@@ -1,5 +1,5 @@
 // src/components/.../PostDetailDrawer.jsx
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, use } from "react";
 import {
     Drawer,
     Box,
@@ -38,13 +38,21 @@ import ReportOutlinedIcon from "@mui/icons-material/ReportOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-
+import SquareFootOutlinedIcon from "@mui/icons-material/SquareFootOutlined";
+import BedOutlinedIcon from "@mui/icons-material/BedOutlined";
+import BathtubOutlinedIcon from "@mui/icons-material/BathtubOutlined";
+import StairsOutlinedIcon from "@mui/icons-material/StairsOutlined";
+import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
+import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
+import HomeWorkOutlinedIcon from "@mui/icons-material/HomeWorkOutlined";
+import GavelOutlinedIcon from "@mui/icons-material/GavelOutlined";
 import { STATUS_LABEL, STATUS_CHIP_COLOR } from "./constants";
 import ImageViewer from "./ImageViewer";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 
 // ✅ NEW: amenity API
 import { amenityApi } from "@/api/amenityApi";
+import PostVerifyDrawer from "./PostVerifyDrawer";
 
 /* ---------- helpers ---------- */
 function safeText(v, fallback = "-") {
@@ -413,6 +421,18 @@ export default function PostDetailDrawer({
     const hasDetail = !!detail;
     const d = detail ?? {};
     const busy = hasDetail && actioningId === d.id;
+    const isLegalOrAuthUrl = (u = "") =>
+        /\/properties\/(legal|authorization)\//i.test(u);
+
+    const publicImages = useMemo(() => {
+        const raw = Array.isArray(d.images) ? d.images : (d.imageUrls || []);
+
+        const urls = raw
+            .map((x) => (typeof x === "string" ? x : (x?.url || x?.imageUrl || x?.fileUrl || "")))
+            .filter(Boolean);
+
+        return urls.filter((u) => !isLegalOrAuthUrl(u));
+    }, [d.images, d.imageUrls]);
 
     const isPending = hasDetail && d.status === "PENDING_REVIEW";
     const isRejected = hasDetail && d.status === "REJECTED";
@@ -424,6 +444,17 @@ export default function PostDetailDrawer({
 
     const listingChipColor =
         d.listingType === "VIP" ? "secondary" : d.listingType === "PREMIUM" ? "warning" : "info";
+    const [verifyOpen, setVerifyOpen] = useState(false);
+    const openVerify = useCallback(() => setVerifyOpen(true), []);
+    const closeVerify = useCallback(() => setVerifyOpen(false), []);
+
+    // đổi tin thì đóng verify
+    useEffect(() => {
+        setVerifyOpen(false);
+    }, [d?.id]);
+
+
+
 
     const resubmitInfo = useMemo(() => {
         if (!hasDetail || !isPending) return { isResubmit: false, fromStatus: null };
@@ -712,7 +743,7 @@ export default function PostDetailDrawer({
                             {/* Images */}
                             <Card sx={{ ...cardSx, mt: 0 }}>
                                 <CardContent sx={{ p: { xs: 1, sm: 1.2 } }}>
-                                    <ImageViewer images={d.images || d.imageUrls || []} />
+                                    <ImageViewer images={publicImages} />
                                 </CardContent>
                             </Card>
 
@@ -745,37 +776,38 @@ export default function PostDetailDrawer({
                                     </Grid>
 
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Diện tích" value={m2(d.area)} />
+                                        <Field label="Diện tích" value={m2(d.area)} icon={SquareFootOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Diện tích đất" value={m2(d.landArea)} />
+                                        <Field label="Diện tích đất" value={m2(d.landArea)} icon={SquareFootOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Phòng ngủ" value={numOrDash(d.bedrooms)} />
+                                        <Field label="Phòng ngủ" value={numOrDash(d.bedrooms)} icon={BedOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Phòng tắm" value={numOrDash(d.bathrooms)} />
+                                        <Field label="Phòng tắm" value={numOrDash(d.bathrooms)} icon={BathtubOutlinedIcon} />
                                     </Grid>
 
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Số tầng" value={numOrDash(d.floors)} />
+                                        <Field label="Số tầng" value={numOrDash(d.floors)} icon={StairsOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Hướng" value={safeText(d.direction)} />
+                                        <Field label="Hướng" value={safeText(d.direction)} icon={ExploreOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Ngang" value={dim(d.width)} />
+                                        <Field label="Ngang" value={dim(d.width)} icon={StraightenOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={6} md={3}>
-                                        <Field label="Dài" value={dim(d.height)} />
+                                        <Field label="Dài" value={dim(d.height)} icon={StraightenOutlinedIcon} />
                                     </Grid>
 
                                     <Grid item xs={12} md={6}>
-                                        <Field label="Loại BĐS" value={safeText(d.propertyType)} />
+                                        <Field label="Loại BĐS" value={safeText(d.propertyType)} icon={HomeWorkOutlinedIcon} />
                                     </Grid>
                                     <Grid item xs={12} md={6}>
-                                        <Field label="Pháp lý" value={safeText(d.legalStatus)} />
+                                        <Field label="Pháp lý" value={safeText(d.legalStatus)} icon={GavelOutlinedIcon} />
                                     </Grid>
+
 
                                     <Grid item xs={12} md={6}>
                                         <Field
@@ -1226,6 +1258,20 @@ export default function PostDetailDrawer({
                                 )}
 
                                 <Button
+                                    variant="outlined"
+                                    startIcon={<GavelOutlinedIcon linedIcon />}
+                                    onClick={openVerify}
+                                    sx={{
+                                        borderRadius: 2,
+                                        textTransform: "none",
+                                        fontWeight: 900,
+                                        borderColor: "#e6edf7",
+                                    }}
+                                >
+                                    Xem giấy tờ
+                                </Button>
+
+                                <Button
                                     variant="contained"
                                     startIcon={<CheckCircleOutlineIcon />}
                                     disabled={busy || !isApprovable}
@@ -1299,6 +1345,17 @@ export default function PostDetailDrawer({
                     doReject();
                 }}
             />
+
+            <PostVerifyDrawer
+                open={verifyOpen}
+                onClose={closeVerify}
+                detail={d}
+                isXs={isXs}
+                mainDrawerWidth={drawerWidth}
+
+            />
+
+
         </Drawer>
     );
 }
