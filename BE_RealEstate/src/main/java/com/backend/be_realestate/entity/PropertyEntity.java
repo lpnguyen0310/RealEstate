@@ -1,9 +1,6 @@
 package com.backend.be_realestate.entity;
 
-import com.backend.be_realestate.enums.ListingType;
-import com.backend.be_realestate.enums.PriceType;
-import com.backend.be_realestate.enums.PropertyStatus;
-import com.backend.be_realestate.enums.PropertyType;
+import com.backend.be_realestate.enums.*;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -216,4 +213,21 @@ import java.util.List;
             @Column(name = "auto_renew")
             @Builder.Default
             private Boolean autoRenew = false;
+
+            @Enumerated(EnumType.STRING)
+            @Column(name = "verification_status", length = 32)
+            @Builder.Default
+            private VerificationStatus verificationStatus = VerificationStatus.UNVERIFIED;
+
+            // Lưu URL ảnh sổ đỏ (Json string hoặc phân cách bằng dấu phẩy)
+            @Column(name = "legal_images", columnDefinition = "TEXT")
+            private String legalImages;
+
+            // Điểm tin cậy do AI chấm (0 - 100)
+            @Column(name = "verification_score")
+            private Double verificationScore;
+
+            // Lưu dữ liệu AI đọc được (JSON) để hiện lên cho Admin so sánh
+            @Column(name = "verification_ai_data", columnDefinition = "TEXT")
+            private String verificationAiData;
         }

@@ -2,6 +2,7 @@ package com.backend.be_realestate.service.impl;
 
 import com.backend.be_realestate.modals.ai.ScoredProperty;
 import com.backend.be_realestate.modals.ai.UserPreference;
+import com.backend.be_realestate.modals.dto.LegalCheckResult;
 import com.backend.be_realestate.service.IAIService;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -28,14 +29,17 @@ public class AIServiceOpenRouterImpl implements IAIService {
     @Value("${ai.rerank.url}")
     private String apiUrl;
 
-    @Value("${ai.rerank.model:openai/gpt-3.5-turbo}")
+    @Value("${ai.rerank.model:google/gemini-2.0-flash-exp:free}")
     private String model;
 
-    // đọc từ ENV (OPENROUTER_KEY=sk-or-xxx) hoặc application.properties
+    // 🔥 FIX 1: Thêm biến visionModel (Quan trọng)
+    @Value("${ai.vision.model:google/gemini-2.0-flash-exp:free}")
+    private String visionModel;
+
     @Value("${OPENROUTER_KEY}")
     private String apiKey;
 
-    @Value("${ai.rerank.timeoutMs:12000}")
+    @Value("${ai.rerank.timeoutMs:20000}")
     private int timeoutMs;
 
     private static final double W_BASE = 0.35;
@@ -285,4 +289,95 @@ public class AIServiceOpenRouterImpl implements IAIService {
 
     @Data
     public static class AiRankItem { private Long id; private Double score; }
+
+    @Override
+    public LegalCheckResult verifyLegalDocument(String imageUrl, String userContactName, float userArea) {
+        log.info("[AI-LEGAL] Verifying image: {}", imageUrl);
+
+        try {
+            // 1. Build Payload cho Vision Model
+            // Cấu trúc message cho Vision thường là mảng content
+            Map<String, Object> userMessageContent = new HashMap<>();
+
+            // Text prompt
+            String promptText = String.format("""
+                Bạn là AI chuyên gia thẩm định pháp lý BĐS Việt Nam. Nhiệm vụ:
+                1. Đọc ảnh Sổ Đỏ/Sổ Hồng (Giấy chứng nhận quyền sử dụng đất).
+                2. Trích xuất "Tên người sử dụng đất" và "Diện tích" (số m2).
+                3. So sánh dữ liệu trích xuất với dữ liệu User nhập dưới đây:
+                   - User nhập Tên: "%s"
+                   - User nhập Diện tích: %s m2
+                4. Trả về JSON duy nhất (không markdown) theo mẫu:
+                {
+                  "confidenceScore": <0-100 dựa trên độ khớp tên và diện tích>,
+                  "extractedOwnerName": "<Tên đọc được>",
+                  "extractedArea": <Số đọc được, nếu ko thấy trả về 0>,
+                  "matchDetails": "<Nhận xét ngắn gọn tiếng Việt>",
+                  "fraudSuspected": <true/false nếu ảnh mờ/cắt ghép>
+                }
+                """, userContactName, userArea);
+
+            List<Map<String, Object>> contentList = new ArrayList<>();
+
+            // Phần Text
+            contentList.add(Map.of("type", "text", "text", promptText));
+
+            // Phần Ảnh (OpenRouter/OpenAI format)
+            contentList.add(Map.of(
+                    "type", "image_url",
+                    "image_url", Map.of("url", imageUrl)
+            ));
+
+            Map<String, Object> message = Map.of(
+                    "role", "user",
+                    "content", contentList
+            );
+
+            Map<String, Object> body = Map.of(
+                    "model", visionModel,
+                    "messages", List.of(message),
+                    "temperature", 0.1,
+                    "max_tokens", 1000 // <--- BẮT BUỘC THÊM: Giới hạn token trả về
+            );
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Authorization", "Bearer " + apiKey);
+
+            // QUAN TRỌNG: Phải có 2 dòng này thì Model Free mới chịu chạy
+            headers.set("HTTP-Referer", "http://localhost:8080");
+            headers.set("X-Title", "RealEstateApp");
+
+            // ... (Đoạn gọi RestTemplate giống hàm Rerank) ...
+            ResponseEntity<String> res = restTemplate.exchange(
+                    apiUrl, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+
+            // 3. Parse Kết quả
+            OpenRouterResp parsed = mapper.readValue(res.getBody(), OpenRouterResp.class);
+            String content = parsed.getChoices().get(0).getMessage().getContent();
+
+            // Clean JSON (xóa ```json nếu có) - dùng lại logic cleanJson ở câu trả lời trước
+            String cleanJson = cleanJson(content);
+
+            return mapper.readValue(cleanJson, LegalCheckResult.class);
+
+        } catch (Exception e) {
+            log.error("[AI-LEGAL] Error: {}", e.getMessage());
+            // Trả về kết quả mặc định nếu lỗi (để ko crash app)
+            LegalCheckResult fail = new LegalCheckResult();
+            fail.setConfidenceScore(0.0);
+            fail.setMatchDetails("Lỗi hệ thống AI: " + e.getMessage());
+            return fail;
+        }
+    }
+
+    // Helper clean json tách ra dùng chung
+    private String cleanJson(String content) {
+        if (content == null) return "{}";
+        String s = content.trim();
+        if (s.startsWith("```")) {
+            s = s.replaceAll("```json", "").replaceAll("```", "");
+        }
+        return s.trim();
+    }
 }

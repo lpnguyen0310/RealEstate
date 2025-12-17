@@ -54,4 +54,6 @@ public class CreatePropertyRequest {
     private String contactEmail;
     private String contactRelationship;
     private Boolean autoRenew;
+
+    private List<String> legalDocumentUrls;
 }
