@@ -30,7 +30,6 @@ public class PropertyImageEntity {
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
 
-
     @Enumerated(EnumType.STRING)
     @Column(name = "image_type", length = 20, nullable = false)
     private ImageType imageType = ImageType.PUBLIC;
