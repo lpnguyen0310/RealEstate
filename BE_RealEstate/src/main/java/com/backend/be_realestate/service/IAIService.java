@@ -8,5 +8,5 @@ import java.util.List;
 
 public interface IAIService {
     List<ScoredProperty> rerank(UserPreference pref, List<ScoredProperty> candidates, int topK);
-    LegalCheckResult verifyLegalDocument(String imageUrl, String userContactName, float userArea,String userAddress);
+    LegalCheckResult verifyLegalDocument(List<String> imageUrls, String userContactName, float userArea,String userAddress);
 }
