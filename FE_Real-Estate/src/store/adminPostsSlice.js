@@ -179,6 +179,9 @@ export const fetchPostsThunk = createAsyncThunk(
                     deedFiles: p.deedFileUrls ?? [],
                     authorizationFiles: p.authorizationFileUrls ?? [],
 
+                    verificationStatus: p.verificationStatus ?? null,
+                    verificationScore: typeof p.verificationScore === "number" ? p.verificationScore : null,
+                    verificationAiData: p.verificationAiData ?? null,
 
                 };
 
@@ -258,6 +261,10 @@ export const fetchPostDetailThunk = createAsyncThunk(
                 isOwner: contact.isOwner,
                 deedFiles: full.deedFileUrls ?? [],
                 authorizationFiles: full.authorizationFileUrls ?? [],
+                verificationStatus: full.verificationStatus ?? null,
+                verificationScore: typeof full.verificationScore === "number" ? full.verificationScore : null,
+                verificationAiData: full.verificationAiData ?? null,
+
 
             };
         } catch (e) {

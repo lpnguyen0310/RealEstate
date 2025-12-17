@@ -122,6 +122,10 @@ public class PropertyConverter {
                 List.of(ActivityType.SHARE, ActivityType.FAVORITE)
         );
         dto.setInteractionCount(totalInteractions);
+        // --- Verification (AI & Admin) ---
+        dto.setVerificationStatus(entity.getVerificationStatus());
+        dto.setVerificationScore(entity.getVerificationScore());
+        dto.setVerificationAiData(entity.getVerificationAiData());
 
         // Tính Khách tiềm năng (Zalo + Phone + Form)
         Long leadCount = potentialCustomerRepo.countByPropertyId(propertyId);

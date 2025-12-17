@@ -500,6 +500,7 @@ public class PropertyServiceImpl implements IPropertyService {
                     if (req.getDeedFileUrls() != null) {
                         property.replaceDeedFiles(req.getDeedFileUrls());
                     }
+
                     if (req.getAuthorizationFileUrls() != null) {
                         property.replaceAuthorizationFiles(req.getAuthorizationFileUrls());
                     }

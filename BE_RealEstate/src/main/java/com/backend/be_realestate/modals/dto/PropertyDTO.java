@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import com.backend.be_realestate.enums.PriceType;
 import com.backend.be_realestate.enums.PropertyStatus;
 import com.backend.be_realestate.enums.PropertyType;
+import com.backend.be_realestate.enums.VerificationStatus;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
 import java.math.BigDecimal;
@@ -75,5 +76,9 @@ public class PropertyDTO {
     private Boolean autoRenew;
     private List<String> deedFileUrls;
     private List<String> authorizationFileUrls;
+    private VerificationStatus verificationStatus;
+    private Double verificationScore;
+    private String  verificationAiData;
+
 
 }
