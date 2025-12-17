@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poster Khóa Luận Tốt Nghiệp - Nexus5 Land</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #e5e7eb;
+            -webkit-print-color-adjust: exact;
+        }
+        .poster-container {
+            width: 1200px; /* Kích thước cố định để mô phỏng khổ giấy A0/A1 */
+            min-height: 1600px;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .section-header {
+            border-bottom: 2px solid #1e3a8a;
+            color: #1e3a8a;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .content-box {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            height: fit-content;
+        }
+        .diagram-placeholder {
+            background-color: #cbd5e1;
+            border: 2px dashed #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #475569;
+            font-weight: bold;
+            text-align: center;
+        }
+        ul.custom-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        ul.custom-list li {
+            position: relative;
+            padding-left: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        ul.custom-list li::before {
+            content: "•";
+            color: #2563eb;
+            font-weight: bold;
+            font-size: 1.5rem;
+            position: absolute;
+            left: 0;
+            top: -0.25rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Nút hành động cho người dùng xem trên web -->
+    <div class="fixed top-4 right-4 flex gap-2 no-print">
+        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow flex items-center gap-2">
+            <i data-lucide="printer"></i> In Poster / Lưu PDF
+        </button>
+    </div>
+
+    <!-- Bắt đầu Poster -->
+    <div class="poster-container p-8">
+        
+        <!-- Header: Tiêu đề và thông tin chung -->
+        <header class="bg-blue-900 text-white p-6 rounded-t-xl grid grid-cols-12 gap-4 items-center mb-6">
+            <div class="col-span-2 flex justify-center items-center bg-white rounded-lg h-24 w-24 mx-auto">
+                <!-- Placeholder Logo Trường -->
+                <span class="text-blue-900 font-bold text-center text-xs">LOGO<br>TRƯỜNG</span>
+            </div>
+            
+            <div class="col-span-8 text-center">
+                <h3 class="text-xl font-light uppercase tracking-widest mb-1 text-blue-200">KHOÁ LUẬN TỐT NGHIỆP - NIÊN KHÓA 2021 - 2025</h3>
+                <h1 class="text-4xl font-black uppercase mb-2 leading-tight">XÂY DỰNG NỀN TẢNG GIAO DỊCH BẤT ĐỘNG SẢN NEXUS5 LAND TÍCH HỢP QUẢN LÝ DỊCH VỤ</h1>
+                <p class="text-lg text-blue-100 font-medium">NHÓM 46 - KHOA CÔNG NGHỆ THÔNG TIN</p>
+            </div>
+
+            <div class="col-span-2 flex flex-col justify-center text-sm font-light text-right">
+                <p>GVHD: <span class="font-bold">ThS. Nguyễn Thị Hồng Lương</span></p>
+                <div class="mt-2 border-t border-blue-400 pt-2">
+                    <p>SV1: Lê Phước Nguyên (21070711)</p>
+                    <p>SV2: Trần Trọng Nhân (21095871)</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Body: Nội dung chính chia 3 cột -->
+        <div class="grid grid-cols-3 gap-6 flex-grow">
+
+            <!-- CỘT 1: TỔNG QUAN & CÔNG NGHỆ -->
+            <div class="col-span-1 flex flex-col gap-4">
+                
+                <!-- Tổng quan -->
+                <div class="content-box shadow-md border-t-4 border-blue-600">
+                    <h2 class="section-header"><i data-lucide="info"></i> 01. Tổng quan đề tài</h2>
+                    <div class="text-sm text-gray-700 text-justify">
+                        <p class="mb-3">
+                            <span class="font-bold text-blue-800">Bối cảnh:</span> Sự bùng nổ của CNTT và nhu cầu chuyển đổi số mạnh mẽ trong lĩnh vực Bất động sản. Khách hàng cần giao dịch nhanh chóng, thuận tiện.
+                        </p>
+                        <p class="mb-3">
+                            <span class="font-bold text-blue-800">Mục tiêu:</span> Xây dựng hệ thống quản lý tập trung <strong>Nexus5 Land</strong>.
+                        </p>
+                        <p>
+                            <span class="font-bold text-blue-800">Giá trị cốt lõi:</span>
+                            <ul class="custom-list mt-2">
+                                <li>Cung cấp công cụ tìm kiếm tối ưu.</li>
+                                <li>Quản lý giao dịch hiệu quả.</li>
+                                <li>Nâng cao chất lượng dịch vụ.</li>
+                            </ul>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Công nghệ -->
+                <div class="content-box shadow-md border-t-4 border-blue-600">
+                    <h2 class="section-header"><i data-lucide="cpu"></i> 02. Công nghệ nền tảng</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h3 class="font-bold text-blue-700 flex items-center gap-2"><i data-lucide="layout"></i> Frontend Layer</h3>
+                            <p class="text-sm text-gray-600 ml-6">ReactJS (Component-based), Redux (State Management), Axios, Virtual DOM.</p>
+                        </div>
+                        
+                        <div>
+                            <h3 class="font-bold text-blue-700 flex items-center gap-2"><i data-lucide="server"></i> Backend Layer</h3>
+                            <p class="text-sm text-gray-600 ml-6">Spring Boot (RESTful API), Spring Security, Data JPA.</p>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-blue-700 flex items-center gap-2"><i data-lucide="database"></i> Data Layer</h3>
+                            <p class="text-sm text-gray-600 ml-6">MySQL (RDBMS), đảm bảo tính toàn vẹn dữ liệu (ACID).</p>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-blue-700 flex items-center gap-2"><i data-lucide="cloud"></i> Tích hợp 3rd Party</h3>
+                            <div class="flex gap-2 mt-1 ml-6 flex-wrap">
+                                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-semibold">Stripe (Thanh toán)</span>
+                                <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-semibold">OpenAI (Chatbot)</span>
+                                <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded font-semibold">Cloudinary (Ảnh)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hình minh họa nhỏ -->
+                 <div class="content-box shadow-md border-t-4 border-blue-600 flex-grow">
+                    <h2 class="section-header"><i data-lucide="layers"></i> Kiến trúc Layered</h2>
+                    <div class="diagram-placeholder h-40 rounded-lg">
+                        <div class="text-center">
+                            <p>Sơ đồ kiến trúc 3 lớp</p>
+                            <p class="text-xs font-normal">(Chèn hình sơ đồ từ slide tại đây)</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2 italic text-center">Phân tách Controller, Service, Repository rõ ràng.</p>
+                </div>
+
+            </div>
+
+            <!-- CỘT 2: PHÂN TÍCH THIẾT KẾ & CHỨC NĂNG -->
+            <div class="col-span-1 flex flex-col gap-4">
+                
+                <!-- Phân tích thiết kế -->
+                <div class="content-box shadow-md border-t-4 border-indigo-600">
+                    <h2 class="section-header text-indigo-800" style="border-color: #3730a3;"><i data-lucide="git-branch"></i> 03. Phân tích thiết kế</h2>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <p class="font-bold text-sm mb-1 text-center">Mô hình MVC (Model-View-Controller)</p>
+                            <div class="diagram-placeholder h-32 rounded-lg bg-indigo-50 border-indigo-200 text-indigo-800">
+                                Sơ đồ Use Case Tổng Quát
+                            </div>
+                        </div>
+                        <div>
+                            <p class="font-bold text-sm mb-1 text-center">Class Diagram (Giao dịch)</p>
+                            <div class="diagram-placeholder h-32 rounded-lg bg-indigo-50 border-indigo-200 text-indigo-800">
+                                Sơ đồ Lớp
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chức năng chính (Highlight) -->
+                <div class="content-box shadow-md border-t-4 border-indigo-600 flex-grow">
+                    <h2 class="section-header text-indigo-800" style="border-color: #3730a3;"><i data-lucide="monitor-smartphone"></i> 04. Hiện thực đề tài</h2>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-white p-2 rounded border shadow-sm">
+                            <div class="diagram-placeholder h-48 rounded bg-gray-100 mb-2">
+                                Ảnh chụp màn hình: Trang chủ / Dashboard Admin
+                            </div>
+                            <h4 class="text-center font-bold text-sm text-indigo-700">Giao diện Dashboard quản lý trực quan</h4>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="bg-indigo-50 p-3 rounded border border-indigo-100">
+                                <h4 class="font-bold text-sm text-indigo-900 mb-1">AI Chatbot</h4>
+                                <p class="text-xs">Tích hợp OpenAI hoạt động 24/7, hỗ trợ giải đáp thắc mắc và tư vấn sơ bộ.</p>
+                            </div>
+                            <div class="bg-indigo-50 p-3 rounded border border-indigo-100">
+                                <h4 class="font-bold text-sm text-indigo-900 mb-1">Thanh toán</h4>
+                                <p class="text-xs">Tự động xử lý mua gói tin (Premium, VIP) qua cổng Stripe.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- CỘT 3: KẾT QUẢ & HƯỚNG PHÁT TRIỂN -->
+            <div class="col-span-1 flex flex-col gap-4">
+                
+                <!-- Kết quả đạt được -->
+                <div class="content-box shadow-md border-t-4 border-green-600">
+                    <h2 class="section-header text-green-800" style="border-color: #166534;"><i data-lucide="check-circle-2"></i> 05. Kết quả đạt được</h2>
+                    <ul class="custom-list text-sm text-gray-700">
+                        <li><strong>Kỹ thuật:</strong> Xây dựng thành công mô hình Client-Server, Responsive trên mọi thiết bị.</li>
+                        <li><strong>Hỗ trợ người bán:</strong> Quy trình đăng tin chặt chẽ, thống kê lượt xem/lưu tin.</li>
+                        <li><strong>Thương mại:</strong> Quản lý gói dịch vụ linh hoạt, thanh toán điện tử an toàn.</li>
+                    </ul>
+                </div>
+
+                <!-- Hạn chế -->
+                <div class="content-box shadow-md border-t-4 border-orange-500">
+                    <h2 class="section-header text-orange-800" style="border-color: #c2410c;"><i data-lucide="alert-triangle"></i> Hạn chế tồn tại</h2>
+                    <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                        <li>Chưa có Native App (Mobile).</li>
+                        <li>AI chưa có khả năng học sâu (Deep Learning) để gợi ý cá nhân hóa.</li>
+                        <li>Chưa kiểm thử chịu tải (Stress Test) với Big Data.</li>
+                    </ul>
+                </div>
+
+                <!-- Hướng phát triển -->
+                <div class="content-box shadow-md border-t-4 border-blue-600 flex-grow bg-blue-50">
+                    <h2 class="section-header"><i data-lucide="trending-up"></i> Hướng phát triển</h2>
+                    
+                    <div class="grid grid-cols-1 gap-3">
+                        <div class="flex items-start gap-3 bg-white p-3 rounded shadow-sm">
+                            <div class="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">1</div>
+                            <div>
+                                <h4 class="font-bold text-sm text-blue-900">Mobile App (Native)</h4>
+                                <p class="text-xs text-gray-600">React Native/Flutter + Push Notification.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-3 bg-white p-3 rounded shadow-sm">
+                            <div class="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">2</div>
+                            <div>
+                                <h4 class="font-bold text-sm text-blue-900">Tối ưu Big Data</h4>
+                                <p class="text-xs text-gray-600">Tối ưu truy vấn, Stress Test triệu bản ghi.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-3 bg-white p-3 rounded shadow-sm">
+                            <div class="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">3</div>
+                            <div>
+                                <h4 class="font-bold text-sm text-blue-900">AI Cá nhân hóa</h4>
+                                <p class="text-xs text-gray-600">Deep Learning phân tích hành vi người dùng để gợi ý BĐS.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer thông tin liên hệ -->
+                <div class="mt-auto pt-4 text-center">
+                    <div class="bg-blue-900 text-white p-3 rounded-lg">
+                        <p class="font-bold text-sm">HỘI ĐỒNG BẢO VỆ KHÓA LUẬN TỐT NGHIỆP</p>
+                        <p class="text-xs mt-1 opacity-80">Thành phố Hồ Chí Minh, 2025</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Kích hoạt các icon Lucide
+        lucide.createIcons();
+    </script>
+</body>
+</html>

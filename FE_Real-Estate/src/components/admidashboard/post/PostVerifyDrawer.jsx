@@ -60,16 +60,14 @@ function normalizeFileItem(x) {
         return {
             url: x,
             mimeType: "",
-            name: getFileNameFromUrl(x), // ✅
+            name: getFileNameFromUrl(x),
         };
     }
 
     const url = x.url || x.imageUrl || x.fileUrl || "";
-
     return {
         url,
         mimeType: x.mimeType || x.type || "",
-        // ✅ fallback nhiều key + fallback từ URL
         name: x.name || x.originalName || x.fileName || x.filename || getFileNameFromUrl(url),
     };
 }
@@ -119,8 +117,30 @@ function TabPanel({ value, index, children }) {
     return <Box sx={{ pt: 2 }}>{children}</Box>;
 }
 
-/* ================== UI blocks ================== */
+/* ================= AI helpers ================= */
+function safeJsonParse(str) {
+    if (!str || typeof str !== "string") return null;
+    try {
+        return JSON.parse(str);
+    } catch {
+        return null;
+    }
+}
 
+function splitMatchDetails(s = "") {
+    return (s || "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+}
+
+function hasMismatch(matchDetails = "", key = "") {
+    // key: "tên" | "diện tích" | "địa chỉ"
+    const s = (matchDetails || "").toLowerCase();
+    return s.includes(key.toLowerCase()) && s.includes("không khớp");
+}
+
+/* ================== UI blocks ================== */
 function SectionHeader({ title, subtitle, right }) {
     return (
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.25 }}>
@@ -137,57 +157,39 @@ function SectionHeader({ title, subtitle, right }) {
     );
 }
 
-
 function StatusChecklist({ isOwner, hasDeed, hasAuth, aiScore, verificationStatus }) {
     const scoreNum = typeof aiScore === "number" ? aiScore : null;
-    const aiHas = scoreNum != null;
-    const aiOk = aiHas && scoreNum >= 60; // ✅ ngưỡng đạt (đổi tuỳ ý)
+    const aiHas = typeof scoreNum === "number";
+    const aiOk = aiHas ? scoreNum >= 60 : false;
+
     const status = (verificationStatus || "UNVERIFIED").toString();
     const statusOk = status === "VERIFIED";
 
     const items = [
         { ok: hasDeed, label: "Có giấy tờ sở hữu (ảnh/file)" },
-        ...(!isOwner ? [{ ok: hasAuth, label: "Có giấy ủy quyền (ảnh/file)" }] : []),
         { ok: aiHas, label: `Có điểm AI (${aiHas ? `${scoreNum}/100` : "-"})` },
         { ok: aiOk, label: "Điểm AI đạt ngưỡng tin cậy" },
         { ok: statusOk, label: `Trạng thái xác minh: ${status}` },
-
-        // (giữ các checklist thủ công)
         { ok: true, label: "Ảnh rõ nét, đọc được số/thông tin" },
         { ok: true, label: "Thông tin địa chỉ / diện tích khớp nội dung tin" },
+        ...(!isOwner ? [{ ok: hasAuth, label: "Có giấy ủy quyền (ảnh/file)" }] : []),
     ];
 
-    const okCount = items.filter((x) => x.ok).length;
-    const percent = Math.round((okCount / items.length) * 100);
-
-    const aiChipColor =
-        scoreNum == null ? "default" : scoreNum >= 80 ? "success" : scoreNum >= 60 ? "warning" : "error";
+    const passed = items.filter((x) => x.ok).length;
+    const percent = Math.round((passed / items.length) * 100);
 
     return (
         <Card variant="outlined" sx={{ borderRadius: 2.5, borderColor: "#e6edf7" }}>
             <CardContent sx={{ py: 1.5 }}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                     <Typography sx={{ fontWeight: 950, fontSize: 13 }}>Tình trạng hồ sơ</Typography>
-
-                    <Stack direction="row" spacing={1} alignItems="center">
-                        {scoreNum != null ? (
-                            <Chip
-                                size="small"
-                                label={`AI: ${scoreNum}/100`}
-                                color={aiChipColor}
-                                variant="outlined"
-                                sx={{ fontWeight: 900 }}
-                            />
-                        ) : null}
-
-                        <Chip
-                            size="small"
-                            label={`${percent}%`}
-                            color={percent >= 75 ? "success" : percent >= 50 ? "warning" : "error"}
-                            variant="outlined"
-                            sx={{ fontWeight: 900 }}
-                        />
-                    </Stack>
+                    <Chip
+                        size="small"
+                        label={`${percent}%`}
+                        color={percent >= 75 ? "success" : percent >= 50 ? "warning" : "error"}
+                        variant="outlined"
+                        sx={{ fontWeight: 900 }}
+                    />
                 </Stack>
 
                 <LinearProgress variant="determinate" value={percent} sx={{ height: 8, borderRadius: 99 }} />
@@ -208,7 +210,11 @@ function StatusChecklist({ isOwner, hasDeed, hasAuth, aiScore, verificationStatu
                                     flex: "0 0 auto",
                                 }}
                             >
-                                {it.ok ? <CheckCircleOutlineIcon sx={{ fontSize: 16 }} /> : <HighlightOffOutlinedIcon sx={{ fontSize: 16 }} />}
+                                {it.ok ? (
+                                    <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />
+                                ) : (
+                                    <HighlightOffOutlinedIcon sx={{ fontSize: 16 }} />
+                                )}
                             </Box>
                             <ListItemText
                                 primaryTypographyProps={{ sx: { fontSize: 13, fontWeight: 700, color: "#0f172a" } }}
@@ -217,11 +223,6 @@ function StatusChecklist({ isOwner, hasDeed, hasAuth, aiScore, verificationStatu
                         </ListItem>
                     ))}
                 </List>
-
-                {/* nhỏ gọn: show raw status */}
-                <Typography sx={{ mt: 0.75, fontSize: 12, color: "#64748b", fontWeight: 700 }}>
-                    Verification status: <b>{status}</b>
-                </Typography>
             </CardContent>
         </Card>
     );
@@ -441,14 +442,6 @@ export default function PostVerifyDrawer({ open, onClose, detail, isXs, mainDraw
     // ❗ Chỉ khi isOwner === false mới là không chính chủ
     const isOwner = detail?.isOwner !== false;
 
-    // ✅ lấy điểm & status AI từ detail (đã map từ BE -> DTO -> slice)
-    const aiScore =
-        typeof detail?.verificationScore === "number"
-            ? Math.max(0, Math.min(100, Math.round(detail.verificationScore)))
-            : null;
-
-    const verificationStatus = (detail?.verificationStatus || "UNVERIFIED").toString();
-
     const { deedImages, deedDocs, authImages, authDocs } = useMemo(() => extractFiles(detail), [detail]);
 
     const tabs = useMemo(() => {
@@ -482,6 +475,22 @@ export default function PostVerifyDrawer({ open, onClose, detail, isXs, mainDraw
     const deedUrls = useMemo(() => deedImages.map((x) => x.url), [deedImages]);
     const authUrls = useMemo(() => authImages.map((x) => x.url), [authImages]);
 
+    // ===== NEW: AI score/status/data =====
+    const aiScore =
+        typeof detail?.verificationScore === "number"
+            ? Math.max(0, Math.min(100, Math.round(detail.verificationScore)))
+            : null;
+
+    const verificationStatus = (detail?.verificationStatus || "UNVERIFIED").toString();
+
+    const aiData = useMemo(() => safeJsonParse(detail?.verificationAiData), [detail?.verificationAiData]);
+
+    const matchItems = useMemo(() => splitMatchDetails(aiData?.matchDetails || ""), [aiData?.matchDetails]);
+
+    const mismatchName = useMemo(() => hasMismatch(aiData?.matchDetails, "tên"), [aiData?.matchDetails]);
+    const mismatchArea = useMemo(() => hasMismatch(aiData?.matchDetails, "diện tích"), [aiData?.matchDetails]);
+    const mismatchAddr = useMemo(() => hasMismatch(aiData?.matchDetails, "địa chỉ"), [aiData?.matchDetails]);
+
     return (
         <Drawer
             anchor="right"
@@ -497,11 +506,14 @@ export default function PostVerifyDrawer({ open, onClose, detail, isXs, mainDraw
                     bgcolor: "#fff",
                     border: "1px solid #e6edf7",
                     boxShadow: "0 16px 50px rgba(0,0,0,0.18)",
+                    overflowY: "auto",            // ✅ CHỈ scroll ở đây
+                    overflowX: "hidden",
                     ...(isXs
                         ? { height: "100vh", borderRadius: 0 }
                         : { height: "calc(100vh - 48px)", mt: 3, mb: 3, mr: 3, borderRadius: 3 }),
                 },
             }}
+
         >
             <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
                 {/* ===== Header ===== */}
@@ -596,7 +608,6 @@ export default function PostVerifyDrawer({ open, onClose, detail, isXs, mainDraw
                         </Alert>
                     ) : (
                         <Stack spacing={1.5}>
-                            {/* ✅ UPDATED: AI đánh giá nằm trong tình trạng hồ sơ */}
                             <StatusChecklist
                                 isOwner={isOwner}
                                 hasDeed={hasDeed}
@@ -691,16 +702,154 @@ export default function PostVerifyDrawer({ open, onClose, detail, isXs, mainDraw
 
                             <Divider />
 
-                            <Alert severity="warning" sx={{ borderRadius: 2.5 }}>
-                                <AlertTitle sx={{ fontWeight: 950 }}>Checklist nhanh</AlertTitle>
-                                Kiểm tra chủ sở hữu, địa chỉ, diện tích; ảnh/file rõ nét; {!isOwner && "và giấy ủy quyền hợp lệ."}
-                            </Alert>
+                            {/* ================== NEW: Checklist nhanh (AI) ================== */}
+                            <Card variant="outlined" sx={{ borderRadius: 2.5, borderColor: "#e6edf7" }}>
+                                <CardContent>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                                        <Typography sx={{ fontWeight: 950 }}>Checklist nhanh (AI)</Typography>
+
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            {typeof aiData?.confidenceScore === "number" ? (
+                                                <Chip
+                                                    size="small"
+                                                    label={`Confidence: ${Math.round(aiData.confidenceScore)}/100`}
+                                                    color={
+                                                        aiData.confidenceScore >= 80 ? "success" : aiData.confidenceScore >= 60 ? "warning" : "error"
+                                                    }
+                                                    variant="outlined"
+                                                    sx={{ fontWeight: 900 }}
+                                                />
+                                            ) : null}
+
+                                            {typeof aiData?.fraudSuspected === "boolean" ? (
+                                                <Chip
+                                                    size="small"
+                                                    label={aiData.fraudSuspected ? "Fraud suspected" : "No fraud suspected"}
+                                                    color={aiData.fraudSuspected ? "error" : "success"}
+                                                    variant="outlined"
+                                                    sx={{ fontWeight: 900 }}
+                                                />
+                                            ) : null}
+                                        </Stack>
+                                    </Stack>
+
+                                    {!aiData ? (
+                                        <Alert severity="info" sx={{ borderRadius: 2 }}>
+                                            <AlertTitle>Chưa có dữ liệu AI</AlertTitle>
+                                            Tin này chưa có <b>verificationAiData</b> hoặc JSON không hợp lệ.
+                                        </Alert>
+                                    ) : (
+                                        <Stack spacing={1}>
+                                            {matchItems.length > 0 ? (
+                                                <Box>
+                                                    <Typography sx={{ fontSize: 12, color: "#64748b", fontWeight: 800, mb: 0.75 }}>
+                                                        Kết quả đối chiếu
+                                                    </Typography>
+
+                                                    <List dense sx={{ py: 0 }}>
+                                                        {matchItems.map((text, idx) => {
+                                                            const isBad = text.toLowerCase().includes("không khớp");
+                                                            return (
+                                                                <ListItem key={idx} sx={{ px: 0 }}>
+                                                                    <Box
+                                                                        sx={{
+                                                                            width: 22,
+                                                                            height: 22,
+                                                                            borderRadius: 99,
+                                                                            mr: 1.2,
+                                                                            display: "grid",
+                                                                            placeItems: "center",
+                                                                            bgcolor: isBad ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.12)",
+                                                                            color: isBad ? "#ef4444" : "#10b981",
+                                                                            flex: "0 0 auto",
+                                                                        }}
+                                                                    >
+                                                                        {isBad ? (
+                                                                            <HighlightOffOutlinedIcon sx={{ fontSize: 16 }} />
+                                                                        ) : (
+                                                                            <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />
+                                                                        )}
+                                                                    </Box>
+
+                                                                    <ListItemText
+                                                                        primaryTypographyProps={{
+                                                                            sx: { fontSize: 13, fontWeight: 800, color: isBad ? "#b91c1c" : "#0f172a" },
+                                                                        }}
+                                                                        primary={text}
+                                                                    />
+                                                                </ListItem>
+                                                            );
+                                                        })}
+                                                    </List>
+                                                </Box>
+                                            ) : null}
+
+                                            <Divider sx={{ my: 0.5 }} />
+
+                                            <Box>
+                                                <Typography sx={{ fontSize: 12, color: "#64748b", fontWeight: 800, mb: 0.75 }}>
+                                                    Dữ liệu AI trích xuất
+                                                </Typography>
+
+                                                <Stack spacing={0.75}>
+                                                    <Box
+                                                        sx={{
+                                                            p: 1,
+                                                            borderRadius: 2,
+                                                            border: "1px solid #e6edf7",
+                                                            bgcolor: mismatchName ? "rgba(239,68,68,0.06)" : "rgba(16,185,129,0.06)",
+                                                        }}
+                                                    >
+                                                        <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#64748b" }}>Chủ sở hữu</Typography>
+                                                        <Typography sx={{ fontWeight: 950, color: mismatchName ? "#b91c1c" : "#0f172a" }}>
+                                                            {aiData.extractedOwnerName || "-"}
+                                                        </Typography>
+                                                    </Box>
+
+                                                    <Box
+                                                        sx={{
+                                                            p: 1,
+                                                            borderRadius: 2,
+                                                            border: "1px solid #e6edf7",
+                                                            bgcolor: mismatchArea ? "rgba(239,68,68,0.06)" : "rgba(16,185,129,0.06)",
+                                                        }}
+                                                    >
+                                                        <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#64748b" }}>Diện tích</Typography>
+                                                        <Typography sx={{ fontWeight: 950, color: mismatchArea ? "#b91c1c" : "#0f172a" }}>
+                                                            {typeof aiData.extractedArea === "number" ? aiData.extractedArea : "-"}
+                                                        </Typography>
+                                                    </Box>
+
+                                                    <Box
+                                                        sx={{
+                                                            p: 1,
+                                                            borderRadius: 2,
+                                                            border: "1px solid #e6edf7",
+                                                            bgcolor: mismatchAddr ? "rgba(239,68,68,0.06)" : "rgba(16,185,129,0.06)",
+                                                        }}
+                                                    >
+                                                        <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#64748b" }}>Địa chỉ trích xuất</Typography>
+                                                        <Typography sx={{ fontWeight: 950, color: mismatchAddr ? "#b91c1c" : "#0f172a" }}>
+                                                            {aiData.extractedAddress || "-"}
+                                                        </Typography>
+                                                    </Box>
+
+                                                    <Box sx={{ mt: 0.25 }}>
+                                                        <Typography sx={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>
+                                                            Verification status: {verificationStatus}
+                                                        </Typography>
+                                                    </Box>
+                                                </Stack>
+                                            </Box>
+                                        </Stack>
+                                    )}
+                                </CardContent>
+                            </Card>
                         </Stack>
                     )}
                 </Box>
             </Box>
 
-            {/* ✅ Lightbox (chỉ mở khi viewer.open) */}
             {viewer.open ? (
                 <ImageViewer images={viewer.images} open={viewer.open} index={viewer.index} onClose={closeViewer} />
             ) : null}
